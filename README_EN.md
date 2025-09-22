@@ -2,22 +2,26 @@
 
 **[🇫🇷 Français](README.md)** | 🇺🇸 English
 
-A comprehensive Home Assistant integration for Fluidra pool equipment (E30iQ pumps, lighting, heaters, etc.).
+A Home Assistant integration for Fluidra pool equipment control.
+
+**🔬 Testing Status:**
+- ✅ **E30iQ Pump**: Fully tested and functional
+- ⚠️ **Other equipment** (lighting, heaters, etc.): Code implemented but **requires user testing**
 
 ## ✨ Features
 
-### 🔄 **E30iQ Pump Control**
+### 🔄 **E30iQ Pump Control** ✅ **TESTED**
 - **Multiple speeds**: Low (45%), Medium (65%), High (100%)
 - **Automatic mode**: Smart management based on schedules
 - **Manual control**: Custom speed and on/off control
 - **Advanced scheduling**: Up to 8 time slots per day
 
 ### 📊 **Complete Sensors**
-- **Pump information**: Speed, mode, operating status
-- **Schedules**: Display of active and planned time slots
-- **Device information**: Firmware, network signal, diagnostics
-- **Temperature**: Sensors for heaters (current/target)
-- **Lighting**: Brightness of LED equipment
+- **Pump information** ✅: Speed, mode, operating status
+- **Schedules** ✅: Display of active and planned time slots
+- **Device information** ✅: Firmware, network signal, diagnostics
+- **Temperature** ⚠️: Sensors for heaters (current/target) - **NOT TESTED**
+- **Lighting** ⚠️: Brightness of LED equipment - **NOT TESTED**
 
 ### ⚙️ **Home Assistant Entities**
 - `switch`: Pump on/off and automatic mode
@@ -147,9 +151,26 @@ entities:
 | `Device not responding` | Check equipment network connectivity |
 | `Token expired` | Restart integration |
 
-## 🤝 Contributing
+## 🧪 Testing and Contributing
 
-Contributions are welcome!
+### Current Testing Status
+This integration was developed through **reverse engineering** of the Fluidra Connect API:
+
+**✅ Tested equipment:**
+- **E30iQ Pump**: Complete control (speeds, modes, scheduling)
+
+**⚠️ Untested equipment (help needed):**
+- **LED Lighting**: Code implemented but not tested
+- **Heaters**: Temperature sensors implemented but not tested
+- **Other accessories**: Theoretical support only
+
+### Help Needed for Testing
+If you own other Fluidra equipment, your testing would be valuable!
+- Create an [Issue](https://github.com/foXaCe/Fluidra-pool/issues) with your results
+- Share debug logs
+- Suggest improvements
+
+## 🤝 Contributing
 
 1. **Fork** the repository
 2. **Create** a feature branch (`git checkout -b feature/AmazingFeature`)

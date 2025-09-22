@@ -2,22 +2,26 @@
 
 🇫🇷 Français | **[🇺🇸 English](README_EN.md)**
 
-Une intégration complète pour Home Assistant permettant de contrôler les équipements de piscine Fluidra (pompes E30iQ, éclairage, chauffages, etc.).
+Une intégration pour Home Assistant permettant de contrôler les équipements de piscine Fluidra.
+
+**🔬 État des tests :**
+- ✅ **Pompe E30iQ** : Entièrement testée et fonctionnelle
+- ⚠️ **Autres équipements** (éclairage, chauffages, etc.) : Code implémenté mais **nécessite des tests utilisateurs**
 
 ## ✨ Fonctionnalités
 
-### 🔄 **Contrôle Pompe E30iQ**
+### 🔄 **Contrôle Pompe E30iQ** ✅ **TESTÉ**
 - **Vitesses multiples** : Faible (45%), Moyenne (65%), Élevée (100%)
 - **Mode automatique** : Gestion intelligente basée sur les programmations
 - **Contrôle manuel** : Vitesse personnalisée et marche/arrêt
 - **Programmations avancées** : Jusqu'à 8 créneaux horaires par jour
 
 ### 📊 **Capteurs Complets**
-- **Informations pompe** : Vitesse, mode, état de fonctionnement
-- **Programmations** : Affichage des créneaux actifs et planifiés
-- **Informations appareil** : Firmware, signal réseau, diagnostics
-- **Température** : Capteurs pour chauffages (actuel/cible)
-- **Éclairage** : Luminosité des équipements LED
+- **Informations pompe** ✅ : Vitesse, mode, état de fonctionnement
+- **Programmations** ✅ : Affichage des créneaux actifs et planifiés
+- **Informations appareil** ✅ : Firmware, signal réseau, diagnostics
+- **Température** ⚠️ : Capteurs pour chauffages (actuel/cible) - **NON TESTÉ**
+- **Éclairage** ⚠️ : Luminosité des équipements LED - **NON TESTÉ**
 
 ### ⚙️ **Entités Home Assistant**
 - `switch` : Marche/arrêt pompe et mode automatique
@@ -147,9 +151,26 @@ entities:
 | `Device not responding` | Vérifier la connectivité réseau de l'équipement |
 | `Token expired` | Redémarrer l'intégration |
 
-## 🤝 Contribution
+## 🧪 Tests et Contribution
 
-Les contributions sont les bienvenues !
+### État Actuel des Tests
+Cette intégration a été développée par **reverse engineering** de l'API Fluidra Connect :
+
+**✅ Équipements testés :**
+- **Pompe E30iQ** : Contrôle complet (vitesses, modes, programmations)
+
+**⚠️ Équipements non testés (aide recherchée) :**
+- **Éclairage LED** : Code implémenté mais non testé
+- **Chauffages** : Capteurs température implémentés mais non testés
+- **Autres accessoires** : Support théorique seulement
+
+### Besoin d'aide pour les tests
+Si vous possédez d'autres équipements Fluidra, vos tests seraient précieux !
+- Créer une [Issue](https://github.com/foXaCe/Fluidra-pool/issues) avec vos résultats
+- Partager les logs en mode debug
+- Proposer des améliorations
+
+## 🤝 Contribution
 
 1. **Fork** le dépôt
 2. **Créer** une branche de fonctionnalité (`git checkout -b feature/NouvelleFonctionnalite`)
