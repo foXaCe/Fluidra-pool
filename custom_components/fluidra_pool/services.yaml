@@ -1,0 +1,71 @@
+# Services pour la gestion des programmations de pompe
+set_schedule:
+  name: Définir programmation pompe
+  description: Configure la programmation horaire d'une pompe
+  fields:
+    device_id:
+      name: ID du device
+      description: Identifiant du device (ex. LE24500883)
+      example: "LE24500883"
+      required: true
+      selector:
+        text:
+    schedules:
+      name: Programmations
+      description: Liste des créneaux horaires
+      required: true
+      example: |
+        - enabled: true
+          start_time: "08:00"
+          end_time: "12:00"
+          mode: "1"
+          days: [1,2,3,4,5]
+        - enabled: true
+          start_time: "18:00"
+          end_time: "20:00"
+          mode: "2"
+          days: [6,0]
+      selector:
+        object:
+
+clear_schedule:
+  name: Effacer programmation pompe
+  description: Supprime toutes les programmations d'une pompe
+  fields:
+    device_id:
+      name: ID du device
+      description: Identifiant du device (ex. LE24500883)
+      example: "LE24500883"
+      required: true
+      selector:
+        text:
+
+set_preset_schedule:
+  name: Programmation prédéfinie
+  description: Applique une programmation prédéfinie
+  fields:
+    device_id:
+      name: ID du device
+      description: Identifiant du device (ex. LE24500883)
+      example: "LE24500883"
+      required: true
+      selector:
+        text:
+    preset:
+      name: Preset
+      description: Type de programmation prédéfinie
+      required: true
+      default: "standard"
+      selector:
+        select:
+          options:
+            - value: "standard"
+              label: "Standard (8h-12h + 18h-20h Moyenne)"
+            - value: "intensive"
+              label: "Intensif (8h-18h Élevée)"
+            - value: "eco"
+              label: "Économique (10h-14h Faible)"
+            - value: "summer"
+              label: "Été (6h-10h + 16h-22h Élevée)"
+            - value: "winter"
+              label: "Hiver (12h-16h Faible)"

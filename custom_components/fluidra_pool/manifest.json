@@ -1,0 +1,17 @@
+{
+  "domain": "fluidra_pool",
+  "name": "Fluidra Pool",
+  "codeowners": ["@foxace66"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/foxace66/fluidra-pool",
+  "homekit": {},
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/foxace66/fluidra-pool/issues",
+  "loggers": ["fluidra_pool"],
+  "requirements": ["aiohttp>=3.8.0", "PyJWT>=2.0.0"],
+  "ssdp": [],
+  "version": "1.0.0",
+  "zeroconf": [],
+  "icon": "mdi:pool"
+}
