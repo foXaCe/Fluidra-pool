@@ -34,7 +34,7 @@ A comprehensive Home Assistant integration for Fluidra pool equipment (E30iQ pum
 
 1. **Add the repository**
    ```
-   https://github.com/your-username/Fluidra-pool
+   https://github.com/foXaCe/Fluidra-pool
    ```
 
 2. **Install the integration**
@@ -49,7 +49,7 @@ A comprehensive Home Assistant integration for Fluidra pool equipment (E30iQ pum
 
 1. **Download files**
    ```bash
-   git clone https://github.com/your-username/Fluidra-pool.git
+   git clone https://github.com/foXaCe/Fluidra-pool.git
    ```
 
 2. **Copy the integration**
@@ -161,7 +161,7 @@ Contributions are welcome!
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/Fluidra-pool.git
+git clone https://github.com/foXaCe/Fluidra-pool.git
 cd Fluidra-pool
 
 # Test environment setup
@@ -171,14 +171,6 @@ cp custom_components/fluidra_pool /config/custom_components/
 python -m pytest tests/
 ```
 
-## 📋 Roadmap
-
-- [ ] 🌊 Pool cleaner robot support
-- [ ] 🧪 Water chemistry sensors (pH, chlorine)
-- [ ] 📱 Push notifications
-- [ ] 🔄 Bidirectional synchronization
-- [ ] 📊 History and statistics
-- [ ] 🌡️ Weather integration
 
 ## 📄 License
 
@@ -192,8 +184,8 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-username/Fluidra-pool/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/Fluidra-pool/discussions)
+- **Issues**: [GitHub Issues](https://github.com/foXaCe/Fluidra-pool/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/foXaCe/Fluidra-pool/discussions)
 - **Discord**: [Home Assistant Discord](https://discord.gg/home-assistant)
 
 ---

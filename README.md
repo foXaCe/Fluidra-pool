@@ -34,7 +34,7 @@ Une intégration complète pour Home Assistant permettant de contrôler les équ
 
 1. **Ajouter le dépôt**
    ```
-   https://github.com/your-username/Fluidra-pool
+   https://github.com/foXaCe/Fluidra-pool
    ```
 
 2. **Installer l'intégration**
@@ -49,7 +49,7 @@ Une intégration complète pour Home Assistant permettant de contrôler les équ
 
 1. **Télécharger les fichiers**
    ```bash
-   git clone https://github.com/your-username/Fluidra-pool.git
+   git clone https://github.com/foXaCe/Fluidra-pool.git
    ```
 
 2. **Copier l'intégration**
@@ -161,7 +161,7 @@ Les contributions sont les bienvenues !
 
 ```bash
 # Cloner le dépôt
-git clone https://github.com/your-username/Fluidra-pool.git
+git clone https://github.com/foXaCe/Fluidra-pool.git
 cd Fluidra-pool
 
 # Configuration environnement de test
@@ -171,14 +171,6 @@ cp custom_components/fluidra_pool /config/custom_components/
 python -m pytest tests/
 ```
 
-## 📋 Feuille de Route
-
-- [ ] 🌊 Support des robots nettoyeurs de piscine
-- [ ] 🧪 Capteurs chimie de l'eau (pH, chlore)
-- [ ] 📱 Notifications push
-- [ ] 🔄 Synchronisation bidirectionnelle
-- [ ] 📊 Historique et statistiques
-- [ ] 🌡️ Intégration météo
 
 ## 📄 Licence
 
@@ -192,8 +184,8 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 
 ## 📞 Support
 
-- **Issues** : [GitHub Issues](https://github.com/your-username/Fluidra-pool/issues)
-- **Discussions** : [GitHub Discussions](https://github.com/your-username/Fluidra-pool/discussions)
+- **Issues** : [GitHub Issues](https://github.com/foXaCe/Fluidra-pool/issues)
+- **Discussions** : [GitHub Discussions](https://github.com/foXaCe/Fluidra-pool/discussions)
 - **Discord** : [Home Assistant Discord](https://discord.gg/home-assistant)
 
 ---
