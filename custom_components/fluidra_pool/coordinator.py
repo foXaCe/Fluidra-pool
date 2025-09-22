@@ -1,0 +1,260 @@
+"""Data update coordinator for Fluidra Pool integration."""
+import logging
+from datetime import timedelta
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+from .fluidra_api import FluidraPoolAPI
+
+_LOGGER = logging.getLogger(__name__)
+
+UPDATE_INTERVAL = timedelta(seconds=30)
+
+
+class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching data from the Fluidra Pool API."""
+
+    def __init__(self, hass: HomeAssistant, api: FluidraPoolAPI) -> None:
+        """Initialize."""
+        self.api = api
+        self._optimistic_entities = set()  # Entités avec état optimiste actif
+        super().__init__(
+            hass,
+            _LOGGER,
+            name="fluidra_pool",
+            update_interval=UPDATE_INTERVAL,
+        )
+
+    def register_optimistic_entity(self, entity_id: str):
+        """Enregistrer une entité comme ayant un état optimiste actif."""
+        self._optimistic_entities.add(entity_id)
+        _LOGGER.debug(f"🎯 COORDINATOR: Registering optimistic entity {entity_id}")
+
+    def unregister_optimistic_entity(self, entity_id: str):
+        """Désenregistrer une entité de l'état optimiste."""
+        self._optimistic_entities.discard(entity_id)
+        _LOGGER.debug(f"🔄 COORDINATOR: Unregistering optimistic entity {entity_id}")
+
+    def has_optimistic_entities(self) -> bool:
+        """Vérifier si des entités ont un état optimiste actif."""
+        return len(self._optimistic_entities) > 0
+
+    def _calculate_auto_speed_from_schedules(self, device: dict) -> int:
+        """Calculate current speed based on active schedules in auto mode."""
+        try:
+            from datetime import datetime, time
+
+            schedule_data = device.get("schedule_data", [])
+            if not schedule_data:
+                _LOGGER.debug("No schedule data available, defaulting to 0%")
+                return 0
+
+            now = datetime.now()
+            current_time = now.time()
+            current_weekday = now.weekday()  # 0 = Monday, 6 = Sunday
+
+            # Mapping operationName to percentage (from mitmproxy capture)
+            operation_to_percent = {
+                "0": 45,   # Faible
+                "1": 65,   # Moyenne
+                "2": 100   # Élevée
+            }
+
+            def _parse_cron_time(cron_time: str):
+                """Parse cron time format to time object."""
+                try:
+                    parts = cron_time.split()
+                    if len(parts) >= 2:
+                        minute = int(parts[0])
+                        hour = int(parts[1])
+                        return time(hour, minute)
+                except (ValueError, IndexError):
+                    pass
+                return None
+
+            def _parse_cron_days(cron_time: str):
+                """Parse cron days format."""
+                try:
+                    parts = cron_time.split()
+                    if len(parts) >= 5:
+                        days_str = parts[4]
+                        if days_str == "*":
+                            return list(range(7))  # All days
+                        days = []
+                        for day in days_str.split(','):
+                            day_num = int(day.strip())
+                            # Convert from cron format (0=Sunday) to Python format (0=Monday)
+                            if day_num == 0:  # Sunday
+                                days.append(6)
+                            else:  # Monday-Saturday
+                                days.append(day_num - 1)
+                        return days
+                except (ValueError, IndexError):
+                    pass
+                return []
+
+            # Check each schedule to see if it's currently active
+            for schedule in schedule_data:
+                if not schedule.get("enabled", False):
+                    continue
+
+                start_time_obj = _parse_cron_time(schedule.get("startTime", ""))
+                end_time_obj = _parse_cron_time(schedule.get("endTime", ""))
+                schedule_days = _parse_cron_days(schedule.get("startTime", ""))
+
+                if start_time_obj and end_time_obj and current_weekday in schedule_days:
+                    # Check if current time is within this schedule
+                    if start_time_obj <= current_time <= end_time_obj:
+                        operation = schedule.get("startActions", {}).get("operationName", "0")
+                        speed_percent = operation_to_percent.get(operation, 0)
+                        _LOGGER.debug(f"✅ Active schedule found: {schedule.get('id')} - operation {operation} = {speed_percent}%")
+                        return speed_percent
+
+            # No active schedule found = "Pas en marche"
+            _LOGGER.debug("No active schedule found, returning 0%")
+            return 0
+
+        except Exception as e:
+            _LOGGER.error(f"Error calculating auto speed from schedules: {e}")
+            return 0
+
+    async def _async_update_data(self):
+        """Update data via library using real-time polling."""
+        try:
+            # Si des entités ont un état optimiste actif, réduire les mises à jour pour éviter les conflits
+            if self.has_optimistic_entities():
+                _LOGGER.debug(f"🚫 COORDINATOR: Skipping aggressive polling - {len(self._optimistic_entities)} optimistic entities active")
+                # Retourner les données actuelles sans nouveau polling intensif
+                current_data = getattr(self, 'data', None)
+                if current_data:
+                    return current_data
+
+            # Vérification proactive du token avant chaque polling
+            if not await self.api.ensure_valid_token():
+                raise UpdateFailed("Token refresh failed")
+
+            # D'abord, récupérer la structure des pools
+            pools = await self.api.get_pools()
+
+            # Pour chaque pool, faire le polling temps réel des devices
+            for pool in pools:
+                pool_id = pool["id"]
+
+                # Polling télémétrie qualité de l'eau
+                water_quality = await self.api.poll_water_quality(pool_id)
+                if water_quality:
+                    pool["water_quality"] = water_quality
+
+                # Pour chaque device du pool, faire le polling temps réel
+                for device in pool.get("devices", []):
+                    device_id = device.get("device_id")
+                    if device_id:
+                        # Polling de l'état du device
+                        device_status = await self.api.poll_device_status(pool_id, device_id)
+                        if device_status:
+                            device["status"] = device_status
+                            device["connectivity"] = device_status.get("connectivity", {})
+
+                        # Initialiser la structure components si elle n'existe pas
+                        if "components" not in device:
+                            device["components"] = {}
+
+                        # Polling intensif de TOUS les components pour trouver la vitesse manuelle
+                        for component_id in range(0, 25):  # Test de tous les components 0-24
+                            component_state = await self.api.get_component_state(device_id, component_id)
+                            if component_state:
+                                reported_value = component_state.get("reportedValue")
+
+                                # Stocker TOUTES les données de component dans la structure components
+                                device["components"][str(component_id)] = component_state
+
+                                if component_id == 0:  # Device ID
+                                    device["device_id_component"] = reported_value
+                                elif component_id == 1:  # Part Numbers
+                                    device["part_numbers_component"] = reported_value
+                                elif component_id == 2:  # Signal Strength
+                                    device["signal_strength_component"] = reported_value
+                                elif component_id == 3:  # Firmware Version
+                                    device["firmware_version_component"] = reported_value
+                                elif component_id == 4:  # Hardware Errors
+                                    device["hardware_errors_component"] = reported_value
+                                elif component_id == 5:  # Communication Errors
+                                    device["comm_errors_component"] = reported_value
+                                elif component_id == 9:  # Pompe
+                                    device["pump_reported"] = reported_value
+                                    device["pump_desired"] = component_state.get("desiredValue")
+                                    device["is_running"] = bool(reported_value)
+                                elif component_id == 10:  # Mode auto
+                                    device["auto_reported"] = reported_value
+                                    device["auto_desired"] = component_state.get("desiredValue")
+                                    device["auto_mode_enabled"] = bool(reported_value)
+                                elif component_id == 11:  # Vitesse levels (utilisé en auto ET manuel)
+                                    device["speed_level_reported"] = reported_value
+                                    device["speed_level_desired"] = component_state.get("desiredValue")
+                                    _LOGGER.debug(f"🔍 Component 11: reported={reported_value}, desired={component_state.get('desiredValue')}")
+
+                                    # Component 11 : Vitesse en mode MANUEL uniquement
+                                    if not device.get("is_running", False):
+                                        # Pompe arrêtée = toujours 0%
+                                        device["speed_percent"] = 0
+                                        _LOGGER.debug(f"✅ Pump stopped → speed_percent = 0")
+                                    else:
+                                        auto_mode = device.get("auto_mode_enabled", False)
+                                        if auto_mode:
+                                            # MODE AUTO : Calculer à partir des schedules actifs
+                                            current_speed = self._calculate_auto_speed_from_schedules(device)
+                                            device["speed_percent"] = current_speed
+                                            _LOGGER.debug(f"✅ AUTO Mode - Schedule-based speed: {current_speed}%")
+                                        else:
+                                            # MODE MANUEL : Utiliser Component 11
+                                            if reported_value == 0:
+                                                device["speed_percent"] = 45  # Faible
+                                            elif reported_value == 1:
+                                                device["speed_percent"] = 65  # Moyenne
+                                            elif reported_value == 2:
+                                                device["speed_percent"] = 100 # Élevée
+                                            else:
+                                                device["speed_percent"] = 0   # Défaut
+                                            _LOGGER.debug(f"✅ MANUAL Mode - Speed level {reported_value} → speed_percent = {device['speed_percent']}")
+                                elif component_id == 15:  # Vitesse élevée (référence)
+                                    _LOGGER.debug(f"📊 Component 15 (Référence): {component_state}")
+                                    device["component_15_speed"] = reported_value or component_state.get("desiredValue") or 0
+                                    # Note: Component 15 n'est plus utilisé pour le mode manuel, remplacé par Component 13
+                                elif component_id == 19:  # Timezone
+                                    device["timezone_component"] = reported_value
+                                elif component_id == 20:  # Programmations
+                                    schedule_data = reported_value or []
+                                    device["schedule_data"] = schedule_data
+                                    _LOGGER.debug(f"📅 Updated schedules for device {device_id}: {len(schedule_data)} schedules")
+                                elif component_id == 21:  # Network Status
+                                    device["network_status_component"] = reported_value
+                                elif component_id == 13:  # Component 13 - pas le bon pour manuel
+                                    _LOGGER.debug(f"📊 Component 13: {component_state}")
+                                    device["component_13_data"] = component_state
+                                elif component_id == 14:  # Component 14 exploration
+                                    _LOGGER.debug(f"📊 Component 14: {component_state}")
+                                    device["component_14_data"] = component_state
+                                else:  # TOUS les autres components - exploration intensive
+                                    if reported_value is not None and reported_value != 0:
+                                        _LOGGER.error(f"🔍 COMPONENT {component_id}: reported={reported_value}, desired={component_state.get('desiredValue')}, full={component_state}")
+                                    device[f"component_{component_id}_data"] = component_state
+
+                        # Logging final des résultats
+                        for device in pool.get("devices", []):
+                            device_id = device.get("device_id")
+                            if device_id:
+                                is_running = device.get("is_running", False)
+                                auto_mode = device.get("auto_mode_enabled", False)
+                                component_15_value = device.get("component_15_speed", 0)
+                                current_speed_percent = device.get("speed_percent", 0)
+                                speed_level = device.get("speed_level_reported", "unknown")
+
+                                _LOGGER.debug(f"🔧 Device {device_id}: running={is_running}, auto={auto_mode}, speed_level={speed_level}, final_speed={current_speed_percent}")
+
+            _LOGGER.debug(f"🔄 Polling temps réel terminé pour {len(pools)} pool(s)")
+            return {pool['id']: pool for pool in pools}
+
+        except Exception as err:
+            _LOGGER.error(f"Error updating Fluidra Pool data: {err}")
+            raise UpdateFailed(f"Error communicating with API: {err}") from err

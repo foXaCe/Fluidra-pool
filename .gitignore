@@ -1,0 +1,85 @@
+# Sensitive data
+*.json
+!manifest.json
+!services.json
+
+# Credentials and tokens
+.env
+.env.*
+*token*
+*credential*
+*auth*
+
+# Capture files
+capture_*.py
+capture_*.json
+fullcapture_*
+cognito_tokens_*
+
+# Personal data
+foxace66@gmail.com
+chabrol
+stephane
+
+# Home Assistant
+*.log
+home-assistant*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+venv_*/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# Test outputs
+test_output/
+test_results/
