@@ -19,6 +19,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         """Initialize."""
         self.api = api
         self._optimistic_entities = set()  # Entités avec état optimiste actif
+        self._previous_schedule_entities = {}  # Track scheduler entities per device for cleanup
         super().__init__(
             hass,
             _LOGGER,
@@ -39,6 +40,32 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     def has_optimistic_entities(self) -> bool:
         """Vérifier si des entités ont un état optimiste actif."""
         return len(self._optimistic_entities) > 0
+
+    async def _cleanup_schedule_sensor_if_empty(self, pool_id: str, device_id: str, schedule_data: list):
+        """Clean up schedule sensor entity if no schedules remain."""
+        try:
+            from homeassistant.helpers import entity_registry as er
+
+            # If no schedules remain, we can consider removing the sensor entity
+            if len(schedule_data) == 0:
+                entity_registry = er.async_get(self.hass)
+
+                # The unique_id format for schedule sensor is: fluidra_pool_{pool_id}_{device_id}_sensor_schedules
+                expected_unique_id = f"fluidra_pool_{pool_id}_{device_id}_sensor_schedules"
+
+                # Look for the schedule sensor entity
+                for entity_id, entry in entity_registry.entities.items():
+                    if (entry.platform == "fluidra_pool" and
+                        entry.unique_id == expected_unique_id):
+
+                        _LOGGER.info(f"🗑️ Removing empty schedule sensor entity: {entity_id} (no schedules remaining)")
+                        entity_registry.async_remove(entity_id)
+                        break
+            else:
+                _LOGGER.debug(f"📊 Schedule sensor kept for device {device_id} ({len(schedule_data)} schedules remaining)")
+
+        except Exception as e:
+            _LOGGER.error(f"Error cleaning up schedule sensor for device {device_id}: {e}")
 
     def _calculate_auto_speed_from_schedules(self, device: dict) -> int:
         """Calculate current speed based on active schedules in auto mode."""
@@ -141,6 +168,17 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             for pool in pools:
                 pool_id = pool["id"]
 
+                # Récupération des détails spécifiques de la piscine
+                pool_details = await self.api.get_pool_details(pool_id)
+                if pool_details:
+                    # Sauvegarder les devices existants avant la mise à jour
+                    existing_devices = pool.get("devices", [])
+                    # Mise à jour des données piscine avec les détails de l'API
+                    pool.update(pool_details)
+                    # Restaurer les devices pour ne pas les écraser
+                    pool["devices"] = existing_devices
+                    _LOGGER.debug(f"Pool details updated for {pool_id}")
+
                 # Polling télémétrie qualité de l'eau
                 water_quality = await self.api.poll_water_quality(pool_id)
                 if water_quality:
@@ -227,6 +265,20 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                     schedule_data = reported_value or []
                                     device["schedule_data"] = schedule_data
                                     _LOGGER.debug(f"📅 Updated schedules for device {device_id}: {len(schedule_data)} schedules")
+
+                                    # Track current scheduler count for this device
+                                    current_schedule_count = len(schedule_data)
+                                    device_key = f"{pool_id}_{device_id}"
+
+                                    # Check if we had schedulers before and now have fewer (indicating deletion)
+                                    previous_count = self._previous_schedule_entities.get(device_key, 0)
+                                    if previous_count > 0 and current_schedule_count < previous_count:
+                                        _LOGGER.info(f"🗑️ Schedule count decreased for device {device_id}: {previous_count} → {current_schedule_count}")
+                                        # Trigger entity registry cleanup for this device's schedule sensor
+                                        await self._cleanup_schedule_sensor_if_empty(pool_id, device_id, schedule_data)
+
+                                    # Update tracking count
+                                    self._previous_schedule_entities[device_key] = current_schedule_count
                                 elif component_id == 21:  # Network Status
                                     device["network_status_component"] = reported_value
                                 elif component_id == 13:  # Component 13 - pas le bon pour manuel

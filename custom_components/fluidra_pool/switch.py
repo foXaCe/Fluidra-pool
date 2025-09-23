@@ -98,11 +98,13 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
     @property
     def device_info(self) -> dict:
         """Return device info."""
+        device_data = self.device_data
+        device_name = device_data.get("name", f"Device {self._device_id}")
         return {
             "identifiers": {(DOMAIN, self._device_id)},
-            "name": self.device_data["name"],
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "Pool Equipment"),
+            "name": device_name,
+            "manufacturer": device_data.get("manufacturer", "Fluidra"),
+            "model": device_data.get("model", "Pool Equipment"),
             "via_device": (DOMAIN, self._pool_id),
         }
 
@@ -308,7 +310,9 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        return f"{self.pool_data['name']} {self.device_data['name']}"
+        device_name = self.device_data.get('name', f'Device {self._device_id}')
+        pool_name = self.pool_data.get('name', 'Pool')
+        return f"{pool_name} {device_name}"
 
     @property
     def icon(self) -> str:
