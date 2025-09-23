@@ -72,6 +72,8 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
         self._api = api
         self._pool_id = pool_id
         self._device_id = device_id
+        self._pending_state = None
+        self._last_action_time = None
 
     @property
     def device_data(self) -> dict:
@@ -112,7 +114,20 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
     @property
     def assumed_state(self) -> bool:
         """Return True if state is assumed during command execution."""
-        return True
+        return self._pending_state is not None
+
+    def _set_pending_state(self, state: bool) -> None:
+        """Set pending state for optimistic UI updates."""
+        import time
+        self._pending_state = state
+        self._last_action_time = time.time()
+        self.async_write_ha_state()
+
+    def _clear_pending_state(self) -> None:
+        """Clear pending state after API confirmation."""
+        self._pending_state = None
+        self._last_action_time = None
+        self.async_write_ha_state()
 
 
     async def _refresh_device_state(self) -> None:
@@ -170,16 +185,39 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        return f"{self.pool_data['name']} {self.device_data['name']} Pompe"
+        pool_name = self.pool_data.get('name', 'Piscine')
+        device_name = self.device_data.get('name', 'Pompe')
+        return f"{pool_name} {device_name}"
 
     @property
     def icon(self) -> str:
         """Return the icon of the switch."""
-        return "mdi:pump" if self.is_on else "mdi:pump-off"
+        if self.is_on:
+            return "mdi:pump"
+        return "mdi:pump-off"
+
+    @property
+    def entity_picture(self) -> str:
+        """Return entity picture for better visual representation."""
+        return None
+
+    @property
+    def device_class(self) -> str:
+        """Return device class for proper styling."""
+        return "switch"
 
     @property
     def is_on(self) -> bool:
-        """Return true if the pump is on using real-time reported value."""
+        """Return true if the pump is on using optimistic UI or real-time reported value."""
+        # Si on a un état en attente, l'utiliser pour la réactivité
+        if self._pending_state is not None:
+            import time
+            # Effacer l'état en attente après 10 secondes de sécurité
+            if time.time() - self._last_action_time > 10:
+                self._clear_pending_state()
+            else:
+                return self._pending_state
+
         # Utiliser reportedValue du polling temps réel si disponible
         pump_reported = self.device_data.get("pump_reported")
         if pump_reported is not None:
@@ -189,9 +227,13 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
 
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the pump on using discovered API."""
+        """Turn the pump on using discovered API with optimistic UI."""
         try:
             _LOGGER.info(f"🚀 Starting pump {self._device_id}")
+
+            # Mise à jour optimiste immédiate pour la réactivité
+            self._set_pending_state(True)
+
             success = await self._api.start_pump(self._device_id)
             if success:
                 _LOGGER.info(f"✅ Successfully started pump {self._device_id}")
@@ -201,15 +243,25 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
+                # Effacer l'état en attente après confirmation
+                self._clear_pending_state()
             else:
                 _LOGGER.error(f"❌ Failed to start pump {self._device_id}")
+                # Annuler l'état optimiste en cas d'échec
+                self._clear_pending_state()
         except Exception as e:
             _LOGGER.error(f"❌ Error starting pump {self._device_id}: {e}")
+            # Annuler l'état optimiste en cas d'erreur
+            self._clear_pending_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the pump off using discovered API."""
+        """Turn the pump off using discovered API with optimistic UI."""
         try:
             _LOGGER.info(f"🚀 Stopping pump {self._device_id}")
+
+            # Mise à jour optimiste immédiate pour la réactivité
+            self._set_pending_state(False)
+
             success = await self._api.stop_pump(self._device_id)
             if success:
                 _LOGGER.info(f"✅ Successfully stopped pump {self._device_id}")
@@ -219,10 +271,16 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
+                # Effacer l'état en attente après confirmation
+                self._clear_pending_state()
             else:
                 _LOGGER.error(f"❌ Failed to stop pump {self._device_id}")
+                # Annuler l'état optimiste en cas d'échec
+                self._clear_pending_state()
         except Exception as e:
             _LOGGER.error(f"❌ Error stopping pump {self._device_id}: {e}")
+            # Annuler l'état optimiste en cas d'erreur
+            self._clear_pending_state()
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -236,7 +294,10 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             "pump_reported": self.device_data.get("pump_reported"),
             "pump_desired": self.device_data.get("pump_desired"),
             "connectivity": self.device_data.get("connectivity", {}),
-            "last_update": self.device_data.get("last_update")
+            "last_update": self.device_data.get("last_update"),
+            # UI responsiveness indicators
+            "pending_action": self._pending_state is not None,
+            "action_timestamp": self._last_action_time
         }
         return attrs
 
@@ -252,7 +313,19 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
     @property
     def icon(self) -> str:
         """Return the icon of the switch."""
-        return "mdi:fire" if self.is_on else "mdi:fire-off"
+        if self.is_on:
+            return "mdi:heat-wave"
+        return "mdi:snowflake"
+
+    @property
+    def entity_picture(self) -> str:
+        """Return entity picture for better visual representation."""
+        return None
+
+    @property
+    def device_class(self) -> str:
+        """Return device class for proper styling."""
+        return "switch"
 
     @property
     def is_on(self) -> bool:
@@ -297,7 +370,9 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        return f"{self.pool_data['name']} {self.device_data['name']} Mode Auto"
+        pool_name = self.pool_data.get('name', 'Piscine')
+        device_name = self.device_data.get('name', 'Pompe')
+        return f"{pool_name} {device_name} Mode Auto"
 
     @property
     def unique_id(self) -> str:
@@ -307,11 +382,32 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     @property
     def icon(self) -> str:
         """Return the icon of the switch."""
-        return "mdi:autorenew" if self.is_on else "mdi:autorenew-off"
+        if self.is_on:
+            return "mdi:auto-mode"
+        return "mdi:autorenew-off"
+
+    @property
+    def entity_picture(self) -> str:
+        """Return entity picture for better visual representation."""
+        return None
+
+    @property
+    def device_class(self) -> str:
+        """Return device class for proper styling."""
+        return "switch"
 
     @property
     def is_on(self) -> bool:
-        """Return true if auto mode is on using real-time reported value."""
+        """Return true if auto mode is on using optimistic UI or real-time reported value."""
+        # Si on a un état en attente, l'utiliser pour la réactivité
+        if self._pending_state is not None:
+            import time
+            # Effacer l'état en attente après 10 secondes de sécurité
+            if time.time() - self._last_action_time > 10:
+                self._clear_pending_state()
+            else:
+                return self._pending_state
+
         # Utiliser reportedValue du polling temps réel si disponible
         auto_reported = self.device_data.get("auto_reported")
         if auto_reported is not None:
@@ -320,9 +416,13 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
         return self.device_data.get("auto_mode_enabled", False)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn auto mode on using discovered Component 10."""
+        """Turn auto mode on using discovered Component 10 with optimistic UI."""
         try:
             _LOGGER.info(f"🚀 Enabling auto mode for {self._device_id}")
+
+            # Mise à jour optimiste immédiate pour la réactivité
+            self._set_pending_state(True)
+
             success = await self._api.enable_auto_mode(self._device_id)
             if success:
                 _LOGGER.info(f"✅ Successfully enabled auto mode for {self._device_id}")
@@ -332,15 +432,25 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
+                # Effacer l'état en attente après confirmation
+                self._clear_pending_state()
             else:
                 _LOGGER.error(f"❌ Failed to enable auto mode for {self._device_id}")
+                # Annuler l'état optimiste en cas d'échec
+                self._clear_pending_state()
         except Exception as e:
             _LOGGER.error(f"❌ Error enabling auto mode {self._device_id}: {e}")
+            # Annuler l'état optimiste en cas d'erreur
+            self._clear_pending_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn auto mode off using discovered Component 10."""
+        """Turn auto mode off using discovered Component 10 with optimistic UI."""
         try:
             _LOGGER.info(f"🚀 Disabling auto mode for {self._device_id}")
+
+            # Mise à jour optimiste immédiate pour la réactivité
+            self._set_pending_state(False)
+
             success = await self._api.disable_auto_mode(self._device_id)
             if success:
                 _LOGGER.info(f"✅ Successfully disabled auto mode for {self._device_id}")
@@ -350,10 +460,16 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
+                # Effacer l'état en attente après confirmation
+                self._clear_pending_state()
             else:
                 _LOGGER.error(f"❌ Failed to disable auto mode for {self._device_id}")
+                # Annuler l'état optimiste en cas d'échec
+                self._clear_pending_state()
         except Exception as e:
             _LOGGER.error(f"❌ Error disabling auto mode {self._device_id}: {e}")
+            # Annuler l'état optimiste en cas d'erreur
+            self._clear_pending_state()
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -366,7 +482,10 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             "auto_reported": self.device_data.get("auto_reported"),
             "auto_desired": self.device_data.get("auto_desired"),
             "connectivity": self.device_data.get("connectivity", {}),
-            "last_update": self.device_data.get("last_update")
+            "last_update": self.device_data.get("last_update"),
+            # UI responsiveness indicators
+            "pending_action": self._pending_state is not None,
+            "action_timestamp": self._last_action_time
         }
 
 
@@ -393,7 +512,19 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
     @property
     def icon(self) -> str:
         """Return the icon of the switch."""
-        return "mdi:calendar-check" if self.is_on else "mdi:calendar-remove"
+        if self.is_on:
+            return "mdi:calendar-clock"
+        return "mdi:calendar-outline"
+
+    @property
+    def entity_picture(self) -> str:
+        """Return entity picture for better visual representation."""
+        return None
+
+    @property
+    def device_class(self) -> str:
+        """Return device class for proper styling."""
+        return "switch"
 
     def _get_schedule_data(self) -> Optional[dict]:
         """Get schedule data from coordinator."""
@@ -436,16 +567,27 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
 
     @property
     def is_on(self) -> bool:
-        """Return true if the schedule is enabled."""
+        """Return true if the schedule is enabled using optimistic UI."""
+        # Si on a un état en attente, l'utiliser pour la réactivité
+        if self._pending_state is not None:
+            import time
+            # Effacer l'état en attente après 10 secondes de sécurité
+            if time.time() - self._last_action_time > 10:
+                self._clear_pending_state()
+            else:
+                return self._pending_state
+
         schedule = self._get_schedule_data()
         if schedule:
             return schedule.get("enabled", False)
         return False
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Enable the schedule using exact mobile app format."""
+        """Enable the schedule using exact mobile app format with optimistic UI."""
         _LOGGER.info(f"[{self._schedule_id}] 🔄 Attempting to enable schedule...")
         try:
+            # Mise à jour optimiste immédiate pour la réactivité
+            self._set_pending_state(True)
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
@@ -495,15 +637,23 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             if success:
                 _LOGGER.info(f"[{self._schedule_id}] ✅ Successfully enabled schedule")
                 await self.coordinator.async_request_refresh()
+                # Effacer l'état en attente après confirmation
+                self._clear_pending_state()
             else:
                 _LOGGER.error(f"[{self._schedule_id}] ❌ Failed to enable schedule")
+                # Annuler l'état optimiste en cas d'échec
+                self._clear_pending_state()
 
         except Exception as e:
             _LOGGER.error(f"[{self._schedule_id}] ❌ Error enabling schedule: {e}")
+            # Annuler l'état optimiste en cas d'erreur
+            self._clear_pending_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn off the switch using exact mobile app format."""
+        """Turn off the switch using exact mobile app format with optimistic UI."""
         try:
+            # Mise à jour optimiste immédiate pour la réactivité
+            self._set_pending_state(False)
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
@@ -550,11 +700,17 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             if success:
                 _LOGGER.info(f"✅ Disabled schedule {self._schedule_id}")
                 await self.coordinator.async_request_refresh()
+                # Effacer l'état en attente après confirmation
+                self._clear_pending_state()
             else:
                 _LOGGER.error(f"❌ Failed to disable schedule {self._schedule_id}")
+                # Annuler l'état optimiste en cas d'échec
+                self._clear_pending_state()
 
         except Exception as e:
             _LOGGER.error(f"❌ Error disabling schedule {self._schedule_id}: {e}")
+            # Annuler l'état optimiste en cas d'erreur
+            self._clear_pending_state()
 
     def _convert_cron_days(self, cron_time: str) -> str:
         """Convert cron time from HA format (0,1,2,3,4,5,6) to mobile format (1,2,3,4,5,6,7)."""
@@ -600,5 +756,11 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 "start_action": schedule.get("startActions", {}),
                 "end_action": schedule.get("endActions", {}),
             })
+
+        # UI responsiveness indicators
+        attrs.update({
+            "pending_action": self._pending_state is not None,
+            "action_timestamp": self._last_action_time
+        })
 
         return attrs

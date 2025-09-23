@@ -1,0 +1,148 @@
+# Configuration Lovelace pour les switches Fluidra avec styles améliorés
+# À ajouter dans votre configuration Lovelace
+
+resources:
+  - url: /local/community/fluidra_pool/fluidra-switches.css
+    type: css
+  - url: /local/community/fluidra_pool/fluidra-switches.js
+    type: module
+
+views:
+  - title: Piscine Fluidra
+    path: fluidra-pool
+    icon: mdi:pool
+    cards:
+      - type: vertical-stack
+        cards:
+          # Carte principale de contrôle de la pompe
+          - type: entities
+            title: "Contrôle Pompe Principal"
+            show_header_toggle: false
+            entities:
+              - entity: switch.piscine_e30iq_pump_pompe
+                name: "Pompe Principale"
+                icon: mdi:pump
+                card_mod:
+                  style: |
+                    ha-entity-toggle {
+                      --switch-checked-color: #2196F3;
+                      --switch-checked-track-color: #2196F3;
+                    }
+              - entity: switch.piscine_e30iq_pump_mode_auto
+                name: "Mode Automatique"
+                icon: mdi:auto-mode
+                card_mod:
+                  style: |
+                    ha-entity-toggle {
+                      --switch-checked-color: #4CAF50;
+                      --switch-checked-track-color: #4CAF50;
+                    }
+
+          # Carte des planifications
+          - type: entities
+            title: "Planifications Pompe"
+            show_header_toggle: false
+            entities:
+              - entity: switch.fluidra_schedule_1_enabled
+                name: "Programme 1"
+                icon: mdi:calendar-clock
+              - entity: switch.fluidra_schedule_2_enabled
+                name: "Programme 2"
+                icon: mdi:calendar-clock
+              - entity: switch.fluidra_schedule_3_enabled
+                name: "Programme 3"
+                icon: mdi:calendar-clock
+              - entity: switch.fluidra_schedule_4_enabled
+                name: "Programme 4"
+                icon: mdi:calendar-clock
+            card_mod:
+              style: |
+                ha-entity-toggle {
+                  --switch-checked-color: #FF9800;
+                  --switch-checked-track-color: #FF9800;
+                }
+
+          # Carte compacte avec boutons
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: button
+                entity: switch.piscine_e30iq_pump_pompe
+                name: "Pompe"
+                icon: mdi:pump
+                tap_action:
+                  action: toggle
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      transition: all 0.3s ease;
+                    }
+                    ha-card:hover {
+                      transform: translateY(-2px);
+                      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+                    }
+
+              - type: button
+                entity: switch.piscine_e30iq_pump_mode_auto
+                name: "Auto"
+                icon: mdi:auto-mode
+                tap_action:
+                  action: toggle
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      transition: all 0.3s ease;
+                    }
+                    ha-card:hover {
+                      transform: translateY(-2px);
+                      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+                    }
+
+          # Carte d'état avec indicateurs visuels
+          - type: custom:mushroom-entity-card
+            entity: switch.piscine_e30iq_pump_pompe
+            name: "État Pompe"
+            icon_color: |
+              {% if is_state('switch.piscine_e30iq_pump_pompe', 'on') %}
+                blue
+              {% else %}
+                grey
+              {% endif %}
+            badge_icon: |
+              {% if is_state('switch.piscine_e30iq_pump_mode_auto', 'on') %}
+                mdi:auto-mode
+              {% endif %}
+            badge_color: |
+              {% if is_state('switch.piscine_e30iq_pump_mode_auto', 'on') %}
+                green
+              {% endif %}
+
+# Configuration card-mod pour styles globaux (à ajouter dans la configuration)
+card_mod:
+  card:
+    # Styles pour toutes les cartes Fluidra
+    ".fluidra-card":
+      border-radius: 16px
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08)
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1)
+    ".fluidra-card:hover":
+      transform: translateY(-2px)
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12)
+
+  # Styles spécifiques pour les switches Fluidra
+  switch:
+    "ha-entity-toggle[data-entity-id*='fluidra']":
+      border-radius: 20px
+      transition: all 0.3s ease
+    "ha-entity-toggle[data-entity-id*='pompe']":
+      --switch-checked-color: "#2196F3"
+      --switch-checked-track-color: "#2196F3"
+    "ha-entity-toggle[data-entity-id*='auto']":
+      --switch-checked-color: "#4CAF50"
+      --switch-checked-track-color: "#4CAF50"
+    "ha-entity-toggle[data-entity-id*='schedule']":
+      --switch-checked-color: "#FF9800"
+      --switch-checked-track-color: "#FF9800"
