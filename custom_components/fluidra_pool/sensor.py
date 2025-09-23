@@ -60,6 +60,12 @@ async def async_setup_entry(
             if "light" in device_type and "brightness" in device:
                 entities.append(FluidraLightBrightnessSensor(coordinator, coordinator.api, pool["id"], device_id))
 
+        # Sensors spécifiques à la piscine (pas liés aux devices)
+        entities.append(FluidraPoolWeatherSensor(coordinator, coordinator.api, pool["id"]))
+        entities.append(FluidraPoolStatusSensor(coordinator, coordinator.api, pool["id"]))
+        entities.append(FluidraPoolLocationSensor(coordinator, coordinator.api, pool["id"]))
+        entities.append(FluidraPoolWaterQualitySensor(coordinator, coordinator.api, pool["id"]))
+
     async_add_entities(entities)
 
 
@@ -100,11 +106,13 @@ class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self) -> dict:
         """Return device info."""
+        device_data = self.device_data
+        device_name = device_data.get("name", f"Device {self._device_id}")
         return {
             "identifiers": {(DOMAIN, self._device_id)},
-            "name": self.device_data["name"],
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "Pool Equipment"),
+            "name": device_name,
+            "manufacturer": device_data.get("manufacturer", "Fluidra"),
+            "model": device_data.get("model", "Pool Equipment"),
             "via_device": (DOMAIN, self._pool_id),
         }
 
@@ -121,7 +129,9 @@ class FluidraTemperatureSensor(FluidraPoolSensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         temp_type = "Current" if self._sensor_type == "current" else "Target"
-        return f"{self.pool_data['name']} {self.device_data['name']} {temp_type} Temperature"
+        device_name = self.device_data.get('name', f'Device {self._device_id}')
+        pool_name = self.pool_data.get('name', 'Pool')
+        return f"{pool_name} {device_name} {temp_type} Temperature"
 
     @property
     def native_value(self) -> Optional[float]:
@@ -160,7 +170,9 @@ class FluidraLightBrightnessSensor(FluidraPoolSensorEntity):
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
-        return f"{self.pool_data['name']} {self.device_data['name']} Brightness"
+        device_name = self.device_data.get('name', f'Device {self._device_id}')
+        pool_name = self.pool_data.get('name', 'Pool')
+        return f"{pool_name} {device_name} Brightness"
 
     @property
     def native_value(self) -> Optional[int]:
@@ -624,5 +636,385 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
         except Exception as e:
             _LOGGER.error(f"Error getting device info attributes: {e}")
             attrs["error"] = str(e)
+
+        return attrs
+
+
+# NOUVEAUX SENSORS SPÉCIFIQUES À LA PISCINE
+
+class FluidraPoolSensorBase(CoordinatorEntity, SensorEntity):
+    """Base class for pool-specific sensor entities."""
+
+    def __init__(self, coordinator, api, pool_id: str, sensor_type: str = ""):
+        """Initialize the pool sensor."""
+        super().__init__(coordinator)
+        self._api = api
+        self._pool_id = pool_id
+        self._sensor_type = sensor_type
+
+    @property
+    def pool_data(self) -> dict:
+        """Get pool data from coordinator."""
+        return self.coordinator.data.get(self._pool_id, {})
+
+    @property
+    def unique_id(self) -> str:
+        """Return unique ID."""
+        suffix = f"_{self._sensor_type}" if self._sensor_type else ""
+        return f"{DOMAIN}_{self._pool_id}_pool{suffix}"
+
+    @property
+    def device_info(self) -> dict:
+        """Return device info for the pool."""
+        pool_name = self.pool_data.get("name", f"Pool {self._pool_id}")
+        return {
+            "identifiers": {(DOMAIN, self._pool_id)},
+            "name": pool_name,
+            "manufacturer": "Fluidra",
+            "model": "Pool System",
+            "sw_version": "1.0",
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return self.coordinator.last_update_success
+
+
+class FluidraPoolWeatherSensor(FluidraPoolSensorBase):
+    """Sensor for weather temperature at pool location."""
+
+    def __init__(self, coordinator, api, pool_id: str):
+        """Initialize the pool weather sensor."""
+        super().__init__(coordinator, api, pool_id, "weather")
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        pool_name = self.pool_data.get("name", f"Pool {self._pool_id}")
+        return f"{pool_name} Température extérieure"
+
+    @property
+    def native_value(self) -> Optional[float]:
+        """Return the weather temperature."""
+        pool_data = self.pool_data
+
+        # Chercher dans les données météo/status
+        status_data = pool_data.get("status_data", {})
+        weather = status_data.get("weather", {})
+        if weather.get("status") == "ok":
+            weather_value = weather.get("value", {})
+            current = weather_value.get("current", {})
+            if "main" in current and "temp" in current["main"]:
+                # Convertir de Kelvin vers Celsius
+                temp_kelvin = current["main"]["temp"]
+                return round(temp_kelvin - 273.15, 1)
+
+        return None
+
+    @property
+    def native_unit_of_measurement(self) -> str:
+        """Return the unit of measurement."""
+        return UnitOfTemperature.CELSIUS
+
+    @property
+    def device_class(self) -> SensorDeviceClass:
+        """Return the device class."""
+        return SensorDeviceClass.TEMPERATURE
+
+    @property
+    def state_class(self) -> SensorStateClass:
+        """Return the state class."""
+        return SensorStateClass.MEASUREMENT
+
+    @property
+    def icon(self) -> str:
+        """Return the icon of the sensor."""
+        return "mdi:thermometer"
+
+
+class FluidraPoolStatusSensor(FluidraPoolSensorBase):
+    """Sensor for overall pool status."""
+
+    def __init__(self, coordinator, api, pool_id: str):
+        """Initialize the pool status sensor."""
+        super().__init__(coordinator, api, pool_id, "status")
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        pool_name = self.pool_data.get("name", f"Pool {self._pool_id}")
+        return f"{pool_name} Statut"
+
+    @property
+    def native_value(self) -> str:
+        """Return the pool status."""
+        pool_data = self.pool_data
+
+        # Vérifier l'état de la piscine depuis l'API
+        state = pool_data.get("state", "unknown")
+
+        if state == "using":
+            # Piscine en utilisation - vérifier les équipements
+            devices = pool_data.get("devices", [])
+            total_devices = len(devices)
+
+            if total_devices > 0:
+                return f"En service ({total_devices} équipement{'s' if total_devices > 1 else ''})"
+            else:
+                return "En service"
+        elif state == "maintenance":
+            return "En maintenance"
+        elif state == "offline":
+            return "Hors ligne"
+        elif state == "winterized":
+            return "Hivernage"
+        else:
+            # État par défaut basé sur les données disponibles
+            if pool_data.get("name"):
+                return "Connectée"
+            else:
+                return "État inconnu"
+
+    @property
+    def icon(self) -> str:
+        """Return the icon of the sensor."""
+        pool_data = self.pool_data
+        state = pool_data.get("state", "unknown")
+
+        if state == "using":
+            return "mdi:pool"
+        elif state == "maintenance":
+            return "mdi:tools"
+        elif state == "offline":
+            return "mdi:pool-off"
+        elif state == "winterized":
+            return "mdi:snowflake"
+        else:
+            return "mdi:help-circle"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return additional state attributes."""
+        pool_data = self.pool_data
+        attrs = {}
+
+        # Informations générales
+        attrs["pool_state"] = pool_data.get("state", "unknown")
+        if "owner" in pool_data:
+            attrs["owner_id"] = pool_data["owner"]
+
+        # Caractéristiques de la piscine
+        characteristics = pool_data.get("characteristics", {})
+        if characteristics:
+            attrs["shape"] = characteristics.get("shape")
+            attrs["construction_year"] = characteristics.get("constructionYear")
+            attrs["waterproof"] = characteristics.get("waterproof")
+            attrs["ground"] = characteristics.get("ground")
+            attrs["place"] = characteristics.get("place")
+            attrs["pool_type"] = characteristics.get("type")
+
+            dimensions = characteristics.get("dimensions", {})
+            if "volume" in dimensions:
+                attrs["volume_m3"] = dimensions["volume"]
+
+        # Désinfection
+        disinfection = pool_data.get("disinfection", {})
+        if disinfection:
+            method = disinfection.get("method", {})
+            attrs["disinfection_type"] = method.get("type")
+            attrs["disinfection_method"] = method.get("name")
+            attrs["automatic_disinfection"] = disinfection.get("automatic", False)
+
+        # Statistiques des équipements
+        devices = pool_data.get("devices", [])
+        attrs["total_devices"] = len(devices)
+
+        # Types d'équipements
+        device_types = {}
+        for device in devices:
+            device_type = device.get("type", "unknown")
+            device_types[device_type] = device_types.get(device_type, 0) + 1
+        attrs["device_types"] = device_types
+
+        # Informations météo si disponibles
+        status_data = pool_data.get("status_data", {})
+        weather = status_data.get("weather", {})
+        if weather.get("status") == "ok":
+            weather_value = weather.get("value", {})
+            current = weather_value.get("current", {})
+            if current:
+                attrs["weather_available"] = True
+                if "main" in current:
+                    attrs["air_temperature"] = round(current["main"]["temp"] - 273.15, 1)
+                    attrs["humidity"] = current["main"]["humidity"]
+                    attrs["pressure"] = current["main"]["pressure"]
+                if "wind" in current:
+                    attrs["wind_speed"] = current["wind"]["speed"]
+
+        return attrs
+
+
+class FluidraPoolLocationSensor(FluidraPoolSensorBase):
+    """Sensor for pool location and geographic information."""
+
+    def __init__(self, coordinator, api, pool_id: str):
+        """Initialize the pool location sensor."""
+        super().__init__(coordinator, api, pool_id, "location")
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        pool_name = self.pool_data.get("name", f"Pool {self._pool_id}")
+        return f"{pool_name} Localisation"
+
+    @property
+    def native_value(self) -> str:
+        """Return the pool location."""
+        pool_data = self.pool_data
+
+        # Chercher dans les données de géolocalisation
+        geolocation = pool_data.get("geolocation", {})
+        if geolocation:
+            locality = geolocation.get("locality")
+            country_code = geolocation.get("countryCode")
+
+            if locality and country_code:
+                return f"{locality}, {country_code}"
+            elif locality:
+                return locality
+            elif country_code:
+                return country_code
+
+        return "Localisation inconnue"
+
+    @property
+    def icon(self) -> str:
+        """Return the icon of the sensor."""
+        return "mdi:map-marker"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return additional state attributes."""
+        pool_data = self.pool_data
+        attrs = {}
+
+        # Informations géographiques détaillées
+        geolocation = pool_data.get("geolocation", {})
+        if geolocation:
+            attrs["latitude"] = geolocation.get("latitude")
+            attrs["longitude"] = geolocation.get("longitude")
+            attrs["locality"] = geolocation.get("locality")
+            attrs["country_code"] = geolocation.get("countryCode")
+
+        # Informations météo si disponibles
+        status_data = pool_data.get("status_data", {})
+        weather = status_data.get("weather", {})
+        if weather.get("status") == "ok":
+            weather_value = weather.get("value", {})
+            current = weather_value.get("current", {})
+            if current:
+                attrs["weather_country"] = current.get("sys", {}).get("country")
+                attrs["timezone"] = weather_value.get("current", {}).get("timezone")
+
+        return attrs
+
+
+class FluidraPoolWaterQualitySensor(FluidraPoolSensorBase):
+    """Sensor for pool water quality information."""
+
+    def __init__(self, coordinator, api, pool_id: str):
+        """Initialize the pool water quality sensor."""
+        super().__init__(coordinator, api, pool_id, "water_quality")
+
+    @property
+    def name(self) -> str:
+        """Return the name of the sensor."""
+        pool_name = self.pool_data.get("name", f"Pool {self._pool_id}")
+        return f"{pool_name} Qualité de l'eau"
+
+    @property
+    def native_value(self) -> str:
+        """Return the water quality status."""
+        pool_data = self.pool_data
+
+        # Chercher dans les données de désinfection
+        disinfection = pool_data.get("disinfection", {})
+        if disinfection:
+            method = disinfection.get("method", {})
+            disinfection_name = method.get("name", "Inconnu")
+            automatic = disinfection.get("automatic", False)
+
+            if automatic:
+                return f"Auto - {disinfection_name}"
+            else:
+                return f"Manuel - {disinfection_name}"
+
+        return "Non configuré"
+
+    @property
+    def icon(self) -> str:
+        """Return the icon of the sensor."""
+        return "mdi:water-check"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return additional state attributes."""
+        pool_data = self.pool_data
+        attrs = {}
+
+        # Informations de désinfection détaillées
+        disinfection = pool_data.get("disinfection", {})
+        if disinfection:
+            method = disinfection.get("method", {})
+            attrs["disinfection_type"] = method.get("type")
+            attrs["disinfection_method"] = method.get("name")
+            attrs["automatic_disinfection"] = disinfection.get("automatic", False)
+
+        # Plages de qualité de l'eau
+        water_quality_ranges = pool_data.get("waterQualitySensorRanges", {})
+        if water_quality_ranges:
+            # pH
+            ph_data = water_quality_ranges.get("ph", {})
+            if ph_data:
+                attrs["ph_min"] = ph_data.get("minValue")
+                attrs["ph_max"] = ph_data.get("maxValue")
+                attrs["ph_unit"] = ph_data.get("unit")
+
+            # Chlore
+            chlorine_data = water_quality_ranges.get("chlorine", {})
+            if chlorine_data:
+                attrs["chlorine_min"] = chlorine_data.get("minValue")
+                attrs["chlorine_max"] = chlorine_data.get("maxValue")
+                attrs["chlorine_unit"] = chlorine_data.get("unit")
+
+            # Salinité
+            salinity_data = water_quality_ranges.get("salinity", {})
+            if salinity_data:
+                attrs["salinity_min"] = salinity_data.get("minValue")
+                attrs["salinity_max"] = salinity_data.get("maxValue")
+                attrs["salinity_unit"] = salinity_data.get("unit")
+
+            # ORP (Potentiel d'oxydoréduction)
+            orp_data = water_quality_ranges.get("orp", {})
+            if orp_data:
+                attrs["orp_min"] = orp_data.get("minValue")
+                attrs["orp_max"] = orp_data.get("maxValue")
+                attrs["orp_unit"] = orp_data.get("unit")
+
+        # Qualité de l'eau actuelle si disponible
+        water_quality = pool_data.get("water_quality", {})
+        if water_quality:
+            attrs["current_water_quality"] = water_quality
+
+        # Ajout d'informations sur les caractéristiques de la piscine liées à l'eau
+        characteristics = pool_data.get("characteristics", {})
+        if characteristics:
+            dimensions = characteristics.get("dimensions", {})
+            if "volume" in dimensions:
+                attrs["pool_volume_m3"] = dimensions["volume"]
+
+            attrs["pool_type"] = characteristics.get("type")
+            attrs["waterproof"] = characteristics.get("waterproof")
 
         return attrs

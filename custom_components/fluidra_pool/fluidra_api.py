@@ -897,6 +897,102 @@ class FluidraPoolAPI:
         """Clear all schedules for device."""
         return await self.set_schedule(device_id, [])
 
+    async def get_pool_details(self, pool_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Récupérer les détails spécifiques de la piscine.
+        Pattern: GET /generic/pools/{poolId}
+        """
+        if not self.access_token:
+            raise FluidraAuthError("Not authenticated")
+
+        # Vérification proactive du token
+        if not await self.ensure_valid_token():
+            raise FluidraAuthError("Token refresh failed")
+
+        headers = {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "authorization": f"Bearer {self.access_token}",
+            "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
+            "accept-encoding": "gzip, deflate",
+            "priority": "u=1, i"
+        }
+
+        pool_data = {}
+
+        # Récupérer les détails généraux de la piscine
+        url = f"{FLUIDRA_EMEA_BASE}/generic/pools/{pool_id}"
+        try:
+            async with self._session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    pool_details = await response.json()
+                    pool_data.update(pool_details)
+                    _LOGGER.debug(f"Pool details retrieved for {pool_id}")
+                elif response.status == 403:
+                    if await self.refresh_access_token():
+                        return await self.get_pool_details(pool_id)
+                    else:
+                        raise FluidraAuthError("Token refresh failed")
+        except Exception as e:
+            _LOGGER.error(f"Exception récupération détails piscine: {e}")
+
+        # Récupérer les données de statut (météo, etc.)
+        status_url = f"{FLUIDRA_EMEA_BASE}/generic/pools/{pool_id}/status"
+        try:
+            async with self._session.get(status_url, headers=headers) as response:
+                if response.status == 200:
+                    status_data = await response.json()
+                    pool_data["status_data"] = status_data
+                    _LOGGER.debug(f"Pool status retrieved for {pool_id}")
+        except Exception as e:
+            _LOGGER.error(f"Exception récupération statut piscine: {e}")
+
+        return pool_data if pool_data else None
+
+    async def get_user_pools(self) -> Optional[List[Dict[str, Any]]]:
+        """
+        Récupérer la liste des piscines de l'utilisateur.
+        Pattern: GET /generic/users/me/pools?
+        """
+        if not self.access_token:
+            raise FluidraAuthError("Not authenticated")
+
+        # Vérification proactive du token
+        if not await self.ensure_valid_token():
+            raise FluidraAuthError("Token refresh failed")
+
+        headers = {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "authorization": f"Bearer {self.access_token}",
+            "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
+            "accept-encoding": "gzip, deflate",
+            "priority": "u=1, i"
+        }
+
+        url = f"{FLUIDRA_EMEA_BASE}/generic/users/me/pools"
+
+        try:
+            async with self._session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    user_pools = await response.json()
+                    _LOGGER.debug(f"User pools retrieved: {len(user_pools) if user_pools else 0} pools")
+                    return user_pools
+                elif response.status == 403:
+                    # Token expiré, essayer de le rafraîchir
+                    _LOGGER.info("Token expiré, tentative de refresh...")
+                    if await self.refresh_access_token():
+                        return await self.get_user_pools()
+                    else:
+                        raise FluidraAuthError("Token refresh failed")
+                else:
+                    _LOGGER.error(f"Erreur récupération piscines utilisateur: {response.status}")
+                    return None
+
+        except Exception as e:
+            _LOGGER.error(f"Exception récupération piscines utilisateur: {e}")
+            return None
+
     async def close(self) -> None:
         """Close the API connection."""
         if self._session:
