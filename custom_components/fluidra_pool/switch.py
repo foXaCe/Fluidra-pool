@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import EntityCategory
 
-from .const import DOMAIN, DEVICE_TYPE_PUMP, DEVICE_TYPE_HEATER
+from .const import DOMAIN, DEVICE_TYPE_PUMP, DEVICE_TYPE_HEAT_PUMP, DEVICE_TYPE_HEATER
 from .coordinator import FluidraDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,6 +39,13 @@ async def async_setup_entry(
                     entities.append(FluidraPumpSwitch(coordinator, coordinator.api, pool["id"], device_id))
                     # Switch pour mode auto ON/OFF
                     entities.append(FluidraAutoModeSwitch(coordinator, coordinator.api, pool["id"], device_id))
+
+            # Create heat pump switches
+            elif "heat_pump" in device_type:
+                device_id = device.get("device_id")
+                if device_id:
+                    # Switch pour pompe à chaleur ON/OFF
+                    entities.append(FluidraHeatPumpSwitch(coordinator, coordinator.api, pool["id"], device_id))
 
             # Create heater switches
             elif "heater" in device_type or "heat" in device_type:
@@ -301,6 +308,157 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             "pending_action": self._pending_state is not None,
             "action_timestamp": self._last_action_time
         }
+        return attrs
+
+
+class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
+    """Switch for controlling pool heat pumps (Astralpool Eco Elyo, etc.)."""
+
+    def __init__(self, coordinator, api, pool_id: str, device_id: str):
+        """Initialize the switch."""
+        super().__init__(coordinator, api, pool_id, device_id)
+
+    @property
+    def name(self) -> str:
+        """Return the name of the switch."""
+        pool_name = self.pool_data.get('name', 'Piscine')
+        device_name = self.device_data.get('name', 'Pompe à chaleur')
+        return f"{pool_name} {device_name}"
+
+    @property
+    def icon(self) -> str:
+        """Return the icon of the switch."""
+        if self.is_on:
+            return "mdi:heat-pump"
+        return "mdi:heat-pump-outline"
+
+    @property
+    def entity_picture(self) -> str:
+        """Return entity picture for better visual representation."""
+        return None
+
+    @property
+    def device_class(self) -> str:
+        """Return device class for proper styling."""
+        return "switch"
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if the heat pump is on using optimistic UI or real-time reported value."""
+        # Si on a un état en attente, l'utiliser pour la réactivité
+        if self._pending_state is not None:
+            import time
+            # Effacer l'état en attente après 10 secondes de sécurité
+            if time.time() - self._last_action_time > 10:
+                self._clear_pending_state()
+            else:
+                return self._pending_state
+
+        # Utiliser reportedValue du polling temps réel si disponible
+        heat_pump_reported = self.device_data.get("heat_pump_reported")
+        if heat_pump_reported is not None:
+            return bool(heat_pump_reported)
+        # Fallback sur is_heating pour compatibilité
+        return self.device_data.get("is_heating", False)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the heat pump on using discovered API with optimistic UI."""
+        try:
+            _LOGGER.info(f"🚀 Starting heat pump {self._device_id}")
+
+            # Mise à jour optimiste immédiate pour la réactivité
+            self._set_pending_state(True)
+
+            # Tenter d'utiliser le component 9 pour les pompes à chaleur
+            success = await self._api.start_pump(self._device_id)
+            if success:
+                _LOGGER.info(f"✅ Successfully started heat pump {self._device_id}")
+                # Attendre que l'API se synchronise
+                import asyncio
+                await asyncio.sleep(2)
+                # Récupérer l'état réel immédiatement
+                await self._refresh_heat_pump_state()
+                await self.coordinator.async_request_refresh()
+                # Effacer l'état en attente après confirmation
+                self._clear_pending_state()
+            else:
+                _LOGGER.error(f"❌ Failed to start heat pump {self._device_id}")
+                # Annuler l'état optimiste en cas d'échec
+                self._clear_pending_state()
+        except Exception as e:
+            _LOGGER.error(f"❌ Error starting heat pump {self._device_id}: {e}")
+            # Annuler l'état optimiste en cas d'erreur
+            self._clear_pending_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the heat pump off using discovered API with optimistic UI."""
+        try:
+            _LOGGER.info(f"🚀 Stopping heat pump {self._device_id}")
+
+            # Mise à jour optimiste immédiate pour la réactivité
+            self._set_pending_state(False)
+
+            success = await self._api.stop_pump(self._device_id)
+            if success:
+                _LOGGER.info(f"✅ Successfully stopped heat pump {self._device_id}")
+                # Attendre que l'API se synchronise
+                import asyncio
+                await asyncio.sleep(2)
+                # Récupérer l'état réel immédiatement
+                await self._refresh_heat_pump_state()
+                await self.coordinator.async_request_refresh()
+                # Effacer l'état en attente après confirmation
+                self._clear_pending_state()
+            else:
+                _LOGGER.error(f"❌ Failed to stop heat pump {self._device_id}")
+                # Annuler l'état optimiste en cas d'échec
+                self._clear_pending_state()
+        except Exception as e:
+            _LOGGER.error(f"❌ Error stopping heat pump {self._device_id}: {e}")
+            # Annuler l'état optimiste en cas d'erreur
+            self._clear_pending_state()
+
+    async def _refresh_heat_pump_state(self) -> None:
+        """Refresh heat pump state by polling real API components."""
+        try:
+            _LOGGER.info(f"🔄 Refreshing real-time state for heat pump {self._device_id}")
+
+            # Component 9 (on/off) - standard pour pompes et pompes à chaleur
+            heat_pump_state = await self._api.get_device_component_state(self._device_id, 9)
+            if heat_pump_state:
+                reported_value = heat_pump_state.get("reportedValue", 0)
+                device = self._api.get_device_by_id(self._device_id)
+                if device:
+                    device["is_heating"] = bool(reported_value)
+                    device["heat_pump_reported"] = reported_value
+                    _LOGGER.info(f"✅ Updated heat pump {self._device_id} is_heating: {bool(reported_value)}")
+
+        except Exception as e:
+            _LOGGER.error(f"❌ Error refreshing heat pump state: {e}")
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return extra state attributes."""
+        attrs = {
+            "component_id": 9,
+            "operation": "heat_pump_control",
+            "device_type": "heat_pump",
+            # Real-time API data from reverse engineering
+            "heat_pump_reported": self.device_data.get("heat_pump_reported"),
+            "heat_pump_desired": self.device_data.get("heat_pump_desired"),
+            "connectivity": self.device_data.get("connectivity", {}),
+            "last_update": self.device_data.get("last_update"),
+            # UI responsiveness indicators
+            "pending_action": self._pending_state is not None,
+            "action_timestamp": self._last_action_time
+        }
+
+        # Ajouter les données de température si disponibles
+        if "current_temperature" in self.device_data:
+            attrs["current_temperature"] = self.device_data["current_temperature"]
+        if "target_temperature" in self.device_data:
+            attrs["target_temperature"] = self.device_data["target_temperature"]
+
         return attrs
 
 

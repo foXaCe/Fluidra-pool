@@ -30,6 +30,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,    # Pour modes d'opération pompe (OFF/ON/AUTO/TURBO)
     Platform.NUMBER,    # Pour contrôle vitesse pompe E30iQ (0-100%)
     Platform.TIME,      # Pour édition des heures de programmation
+    Platform.CLIMATE,   # Pour contrôle température pompes à chaleur
 ]
 
 UPDATE_INTERVAL = timedelta(seconds=30)

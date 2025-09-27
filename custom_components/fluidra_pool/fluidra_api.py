@@ -261,8 +261,24 @@ class FluidraPoolAPI:
                     family = info.get("family", "")
                     connection_type = device.get("type", "unknown")
 
-                    # Determine device type from family
-                    device_type = "pump" if "pump" in family.lower() else "unknown"
+                    # Determine device type from family - Enhanced for heat pumps
+                    family_lower = family.lower()
+                    device_name_lower = device_name.lower()
+
+                    if "pump" in family_lower and ("heat" in family_lower or "eco" in family_lower or "elyo" in family_lower or "thermal" in family_lower):
+                        device_type = "heat_pump"
+                    elif "pump" in family_lower:
+                        device_type = "pump"
+                    elif any(keyword in family_lower for keyword in ["heat", "thermal", "eco elyo", "astralpool"]):
+                        device_type = "heat_pump"
+                    elif any(keyword in device_name_lower for keyword in ["heat", "thermal", "eco", "elyo"]):
+                        device_type = "heat_pump"
+                    elif "heater" in family_lower:
+                        device_type = "heater"
+                    elif "light" in family_lower:
+                        device_type = "light"
+                    else:
+                        device_type = "unknown"
 
                     _LOGGER.info(f"   📋 Extracted: ID={device_id}, name={device_name}, family={family}, type={device_type}")
 
@@ -719,6 +735,35 @@ class FluidraPoolAPI:
 
         except aiohttp.ClientError as e:
             _LOGGER.error(f"❌ Connection error during control: {e}")
+            return False
+
+    async def set_heat_pump_temperature(self, device_id: str, temperature: float) -> bool:
+        """Set heat pump target temperature using API control."""
+        try:
+            _LOGGER.info(f"🌡️ Setting heat pump {device_id} temperature to {temperature}°C")
+
+            # Pour les pompes à chaleur, il faut découvrir le bon composant
+            # Commençons par tester le composant 12 (souvent utilisé pour température)
+            # ou 13, 14, etc. selon le modèle
+            component_id = 12  # À ajuster selon les tests réels
+
+            # Convertir la température en valeur entière ou selon le format API
+            temperature_value = int(temperature)
+
+            success = await self.control_device_component(device_id, component_id, temperature_value)
+            if success:
+                _LOGGER.info(f"✅ Successfully set heat pump temperature to {temperature}°C")
+                # Mettre à jour l'état local
+                device = self.get_device_by_id(device_id)
+                if device:
+                    device["target_temperature"] = temperature
+                return True
+            else:
+                _LOGGER.error(f"❌ Failed to set heat pump temperature to {temperature}°C")
+                return False
+
+        except Exception as e:
+            _LOGGER.error(f"❌ Error setting heat pump temperature: {e}")
             return False
 
     async def start_pump(self, device_id: str) -> bool:

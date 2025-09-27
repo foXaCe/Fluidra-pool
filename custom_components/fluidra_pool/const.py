@@ -8,6 +8,7 @@ CONF_PASSWORD = "password"
 
 # Device types
 DEVICE_TYPE_PUMP = "pump"
+DEVICE_TYPE_HEAT_PUMP = "heat_pump"
 DEVICE_TYPE_HEATER = "heater"
 DEVICE_TYPE_LIGHT = "light"
 DEVICE_TYPE_SENSOR = "sensor"
