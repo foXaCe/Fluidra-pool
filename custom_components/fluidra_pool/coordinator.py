@@ -201,7 +201,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                         # Polling intensif de TOUS les components pour trouver la vitesse manuelle
                         for component_id in range(0, 25):  # Test de tous les components 0-24
                             component_state = await self.api.get_component_state(device_id, component_id)
-                            if component_state:
+                            if component_state and isinstance(component_state, dict):
                                 reported_value = component_state.get("reportedValue")
 
                                 # Stocker TOUTES les données de component dans la structure components
@@ -289,7 +289,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                     device["component_14_data"] = component_state
                                 else:  # TOUS les autres components - exploration intensive
                                     if reported_value is not None and reported_value != 0:
-                                        _LOGGER.error(f"🔍 COMPONENT {component_id}: reported={reported_value}, desired={component_state.get('desiredValue')}, full={component_state}")
+                                        # Safe access to desiredValue
+                                        desired_value = component_state.get('desiredValue') if isinstance(component_state, dict) else None
+                                        _LOGGER.error(f"🔍 COMPONENT {component_id}: reported={reported_value}, desired={desired_value}, full={component_state}")
                                     device[f"component_{component_id}_data"] = component_state
 
                         # Logging final des résultats
