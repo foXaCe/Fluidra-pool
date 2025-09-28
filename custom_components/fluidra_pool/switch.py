@@ -18,6 +18,9 @@ _LOGGER = logging.getLogger(__name__)
 
 def _is_eco_elyo_heat_pump(device: dict) -> bool:
     """Detect if device is an Eco Elyo heat pump based on device signature."""
+    if not isinstance(device, dict):
+        return False
+
     device_id = device.get("device_id", "")
     device_name = device.get("name", "").lower()
     family = device.get("family", "").lower()
@@ -31,11 +34,22 @@ def _is_eco_elyo_heat_pump(device: dict) -> bool:
         "eco" in device_name and "elyo" in device_name,
         "astralpool" in model,
         "eco elyo" in family,
-        # Component 7 typically contains BXWAA* for Eco Elyo
-        any("BXWAA" in str(comp.get("reportedValue", ""))
-            for comp in device.get("components", [])
-            if comp.get("id") == 7)
     ]
+
+    # Component 7 check with safe type handling
+    try:
+        components = device.get("components", [])
+        if components:
+            for comp in components:
+                # Handle both dict and string components safely
+                if isinstance(comp, dict) and comp.get("id") == 7:
+                    reported_value = str(comp.get("reportedValue", ""))
+                    if "BXWAA" in reported_value:
+                        eco_elyo_indicators.append(True)
+                        break
+    except (AttributeError, TypeError):
+        # If component analysis fails, continue with other indicators
+        pass
 
     return any(eco_elyo_indicators)
 
