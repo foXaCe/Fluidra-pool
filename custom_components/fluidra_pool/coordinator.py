@@ -291,7 +291,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                     if reported_value is not None and reported_value != 0:
                                         # Safe access to desiredValue
                                         desired_value = component_state.get('desiredValue') if isinstance(component_state, dict) else None
-                                        _LOGGER.error(f"🔍 COMPONENT {component_id}: reported={reported_value}, desired={desired_value}, full={component_state}")
+                                        _LOGGER.debug(f"🔍 COMPONENT {component_id}: reported={reported_value}, desired={desired_value}, full={component_state}")
                                     device[f"component_{component_id}_data"] = component_state
 
                         # Logging final des résultats
