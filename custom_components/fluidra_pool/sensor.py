@@ -228,10 +228,7 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
     def icon(self) -> str:
         """Return the icon for the entity."""
         speed_mode = self._get_speed_mode()
-        stopped_text = self.hass.localize("component.fluidra_pool.state.sensor.pump_status.stopped") or "Arrêtée"
-        not_running_text = self.hass.localize("component.fluidra_pool.state.sensor.pump_status.not_running") or "Pas en marche"
-
-        if stopped_text in speed_mode or not_running_text in speed_mode:
+        if "Arrêtée" in speed_mode or "Pas en marche" in speed_mode:
             return "mdi:pump-off"
         elif "Auto" in speed_mode:
             return "mdi:autorenew"
@@ -254,13 +251,13 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
 
         # Si pompe arrêtée
         if not is_running:
-            return self.hass.localize("component.fluidra_pool.state.sensor.pump_status.stopped") or "Arrêtée"
+            return "Arrêtée"
 
         # Récupérer le pourcentage actuel
         current_speed = self.device_data.get("speed_percent", 0)
 
         if current_speed == 0:
-            return self.hass.localize("component.fluidra_pool.state.sensor.pump_status.not_running") or "Pas en marche"
+            return "Pas en marche"
 
         # Afficher simplement le pourcentage avec le mode
         if auto_mode:
@@ -293,9 +290,9 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
             def _get_operation_name(operation: str) -> str:
                 """Convert operation name to readable format."""
                 operation_map = {
-                    "0": self.hass.localize("component.fluidra_pool.state.sensor.pump_speed.low") or "Faible",
-                    "1": self.hass.localize("component.fluidra_pool.state.sensor.pump_speed.medium") or "Moyenne",
-                    "2": self.hass.localize("component.fluidra_pool.state.sensor.pump_speed.high") or "Élevée"
+                    "0": "Faible",
+                    "1": "Moyenne",
+                    "2": "Élevée"
                 }
                 return operation_map.get(operation, f"Mode {operation}")
 
@@ -420,9 +417,9 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
     def _get_operation_name(self, operation: str) -> str:
         """Convert operation name to readable format."""
         operation_map = {
-            "0": f"{self.hass.localize('component.fluidra_pool.state.sensor.pump_speed.low') or 'Faible'} (45%)",
-            "1": f"{self.hass.localize('component.fluidra_pool.state.sensor.pump_speed.medium') or 'Moyenne'} (65%)",
-            "2": f"{self.hass.localize('component.fluidra_pool.state.sensor.pump_speed.high') or 'Élevée'} (100%)"
+            "0": "Faible (45%)",
+            "1": "Moyenne (65%)",
+            "2": "Élevée (100%)"
         }
         return operation_map.get(operation, f"Mode {operation}")
 
@@ -464,7 +461,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         try:
             schedules = self._get_schedules_data()
             if not schedules:
-                return self.hass.localize("component.fluidra_pool.state.sensor.pump_status.no_schedule") or "Aucune programmation"
+                return "Aucune programmation"
 
             # Vérifier s'il y a une programmation active maintenant
             current_schedule = self._get_current_schedule(schedules)
@@ -472,13 +469,11 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                 operation = current_schedule.get("startActions", {}).get("operationName", "0")
                 time_range = self._format_schedule_time(current_schedule)
                 mode = self._get_operation_name(operation)
-                active_text = self.hass.localize("component.fluidra_pool.state.sensor.pump_speed.active") or "Actif"
-                return f"{active_text}: {time_range} - {mode}"
+                return f"Actif: {time_range} - {mode}"
 
             # Compter les programmations actives
             enabled_count = sum(1 for s in schedules if s.get("enabled", False))
-            schedule_text = self.hass.localize("component.fluidra_pool.state.sensor.schedule.active_schedules") or "programmations actives"
-            return f"{enabled_count} {schedule_text}"
+            return f"{enabled_count} programmations actives"
 
         except Exception as e:
             _LOGGER.error(f"Error getting schedule state: {e}")
@@ -629,15 +624,13 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
                     elif signal >= -70:
                         attrs["signal_quality"] = "Bon"
                     elif signal >= -80:
-                        attrs["signal_quality"] = self.hass.localize("component.fluidra_pool.state.sensor.signal_quality.low") or "Faible"
+                        attrs["signal_quality"] = "Faible"
                     else:
-                        attrs["signal_quality"] = self.hass.localize("component.fluidra_pool.state.sensor.signal_quality.very_low") or "Très faible"
+                        attrs["signal_quality"] = "Très faible"
 
             if "network_status" in info_data:
                 network_status = info_data["network_status"]
-                connected_text = self.hass.localize("component.fluidra_pool.state.sensor.network_status.connected") or "Connecté"
-                disconnected_text = self.hass.localize("component.fluidra_pool.state.sensor.network_status.disconnected") or "Déconnecté"
-                attrs["network_status"] = connected_text if network_status == 1 else disconnected_text
+                attrs["network_status"] = "Connecté" if network_status == 1 else "Déconnecté"
 
             # Informations système
             if "firmware_version" in info_data:
@@ -798,15 +791,15 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
         elif state == "maintenance":
             return "En maintenance"
         elif state == "offline":
-            return self.hass.localize("component.fluidra_pool.state.sensor.pool_status.offline") or "Hors ligne"
+            return "Hors ligne"
         elif state == "winterized":
-            return self.hass.localize("component.fluidra_pool.state.sensor.pool_status.winterized") or "Hivernage"
+            return "Hivernage"
         else:
             # État par défaut basé sur les données disponibles
             if pool_data.get("name"):
-                return self.hass.localize("component.fluidra_pool.state.sensor.pool_status.connected") or "Connectée"
+                return "Connectée"
             else:
-                return self.hass.localize("component.fluidra_pool.state.sensor.pool_status.unknown_state") or "État inconnu"
+                return "État inconnu"
 
     @property
     def icon(self) -> str:
