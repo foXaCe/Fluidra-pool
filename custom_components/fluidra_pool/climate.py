@@ -89,6 +89,11 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         self._device_id = device_id
         self._pending_temperature = None
         self._last_action_time = None
+        # Optimistic state updates
+        self._pending_preset_mode = None
+        self._pending_hvac_mode = None
+        self._last_preset_action_time = None
+        self._last_hvac_action_time = None
 
     @property
     def device_data(self) -> dict:
@@ -216,6 +221,16 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         if not self._device_id.startswith("LG"):
             return None
 
+        # Check for pending optimistic preset mode first
+        if self._pending_preset_mode is not None:
+            import time
+            # Clear pending mode after 10 seconds
+            if time.time() - self._last_preset_action_time > 10:
+                self._pending_preset_mode = None
+                self._last_preset_action_time = None
+            else:
+                return self._pending_preset_mode
+
         # Get current mode from component 14 value
         device_data = self.device_data
 
@@ -232,6 +247,17 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     @property
     def hvac_mode(self) -> HVACMode:
         """Return current hvac operation mode."""
+
+        # Check for pending optimistic HVAC mode first
+        if self._pending_hvac_mode is not None:
+            import time
+            # Clear pending mode after 10 seconds
+            if time.time() - self._last_hvac_action_time > 10:
+                self._pending_hvac_mode = None
+                self._last_hvac_action_time = None
+            else:
+                return self._pending_hvac_mode
+
         # Use same logic as switch for LG heat pumps
         device_data = self.device_data
 
@@ -375,13 +401,25 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             mode_value = LG_MODE_TO_VALUE[preset_mode]
             _LOGGER.info(f"🚀 Setting heat pump {self._device_id} preset mode to {preset_mode} (value: {mode_value})")
 
+            # Optimistic update - show immediately in UI
+            import time
+            self._pending_preset_mode = preset_mode
+            self._last_preset_action_time = time.time()
+            self.async_write_ha_state()
+
             success = await self._api.control_device_component(self._device_id, 14, mode_value)
 
             if success:
                 _LOGGER.info(f"✅ Successfully set preset mode to {preset_mode}")
+                # Clear optimistic state on success
+                self._pending_preset_mode = None
+                self._last_preset_action_time = None
                 await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to set preset mode to {preset_mode}")
+                # Clear optimistic state on failure
+                self._pending_preset_mode = None
+                self._last_preset_action_time = None
                 # Stocker l'erreur pour affichage utilisateur
                 device = self._api.get_device_by_id(self._device_id)
                 if device:
@@ -393,6 +431,9 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
         except Exception as e:
             _LOGGER.error(f"❌ Error setting preset mode {preset_mode}: {e}")
+            # Clear optimistic state on error
+            self._pending_preset_mode = None
+            self._last_preset_action_time = None
             # Stocker l'erreur pour affichage utilisateur
             device = self._api.get_device_by_id(self._device_id)
             if device:

@@ -42,26 +42,26 @@ async def async_setup_entry(
                 _LOGGER.info(f"🚫 Skipping time entities for LG heat pump: {device_id}")
                 continue
 
-            if "pump" in device_type and not device_id.startswith("LG"):
-                # Create time entities for the actual 8 schedulers found
-                for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
-                    # Create start time entity
-                    entities.append(FluidraScheduleStartTimeEntity(
-                        coordinator,
-                        coordinator.api,
-                        pool["id"],
-                        device_id,
-                        schedule_id
-                    ))
+            # Create time entities for pumps (only non-LG reach here)
+            # Create time entities for the actual 8 schedulers found
+            for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
+                # Create start time entity
+                entities.append(FluidraScheduleStartTimeEntity(
+                    coordinator,
+                    coordinator.api,
+                    pool["id"],
+                    device_id,
+                    schedule_id
+                ))
 
-                    # Create end time entity
-                    entities.append(FluidraScheduleEndTimeEntity(
-                        coordinator,
-                        coordinator.api,
-                        pool["id"],
-                        device_id,
-                        schedule_id
-                    ))
+                # Create end time entity
+                entities.append(FluidraScheduleEndTimeEntity(
+                    coordinator,
+                    coordinator.api,
+                    pool["id"],
+                    device_id,
+                    schedule_id
+                ))
 
     async_add_entities(entities)
 
