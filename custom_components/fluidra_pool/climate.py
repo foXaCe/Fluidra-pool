@@ -260,6 +260,10 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             else:
                 return self._pending_hvac_mode
 
+        # If we have a pending preset mode, the heat pump should stay HEAT
+        if self._pending_preset_mode is not None:
+            return HVACMode.HEAT
+
         # Use same logic as switch for LG heat pumps
         device_data = self.device_data
 
