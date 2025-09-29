@@ -661,7 +661,7 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
             if "signal_strength" in info_data:
                 signal = info_data["signal_strength"]
                 attrs["signal_strength_dbm"] = signal
-                if signal:
+                if signal and isinstance(signal, (int, float)):
                     # Convertir dBm en qualité de signal
                     if signal >= -50:
                         attrs["signal_quality"] = "Excellent"
@@ -983,10 +983,11 @@ class FluidraPoolLocationSensor(FluidraPoolSensorBase):
         weather = status_data.get("weather", {})
         if weather.get("status") == "ok":
             weather_value = weather.get("value", {})
-            current = weather_value.get("current", {})
-            if current:
-                attrs["weather_country"] = current.get("sys", {}).get("country")
-                attrs["timezone"] = weather_value.get("current", {}).get("timezone")
+            if weather_value:
+                current = weather_value.get("current", {})
+                if current:
+                    attrs["weather_country"] = current.get("sys", {}).get("country")
+                    attrs["timezone"] = weather_value.get("current", {}).get("timezone")
 
         return attrs
 
