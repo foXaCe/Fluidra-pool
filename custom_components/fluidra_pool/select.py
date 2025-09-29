@@ -38,8 +38,8 @@ async def async_setup_entry(
             if device.get("variable_speed"):
                 entities.append(FluidraPumpSpeedSelect(coordinator, coordinator.api, pool["id"], device_id))
 
-            # Schedule mode selects for pumps
-            if "pump" in device_type:
+            # Schedule mode selects for pumps (exclude LG heat pumps)
+            if "pump" in device_type and not device_id.startswith("LG"):
                 # Create selects for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                     entities.append(FluidraScheduleModeSelect(
