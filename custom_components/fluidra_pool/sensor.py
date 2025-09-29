@@ -230,8 +230,8 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         speed_mode = self._get_speed_mode()
         if speed_mode in ["stopped", "not_running"]:
             return "mdi:pump-off"
-        elif "Auto" in speed_mode:
-            return "mdi:autorenew"
+        elif speed_mode in ["low", "medium", "high"]:
+            return "mdi:pump"
         else:
             return "mdi:pump"
 
@@ -259,11 +259,13 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         if current_speed == 0:
             return "not_running"
 
-        # Afficher simplement le pourcentage avec le mode
-        if auto_mode:
-            return f"{current_speed}%"
+        # Mapper le pourcentage vers des états énumérés
+        if current_speed <= 50:
+            return "low"
+        elif current_speed <= 70:
+            return "medium"
         else:
-            return f"{current_speed}%"
+            return "high"
 
     def _get_current_schedule_mode(self) -> str:
         """Get current speed mode from active schedule (more reliable than polling)."""
