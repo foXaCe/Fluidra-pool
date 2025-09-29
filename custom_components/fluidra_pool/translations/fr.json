@@ -159,7 +159,10 @@
       },
       "pump_speed_status": {
         "stopped": "Arrêtée",
-        "not_running": "Pas en marche"
+        "not_running": "Pas en marche",
+        "low": "Faible",
+        "medium": "Moyenne",
+        "high": "Élevée"
       },
       "pump_speed": {
         "low": "Faible",
