@@ -225,15 +225,43 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         return "pump_speed_status"
 
     @property
+    def device_class(self) -> str:
+        """Return device class."""
+        return "fluidra_pool__pump_speed_status"
+
+    @property
     def icon(self) -> str:
         """Return the icon for the entity."""
         speed_mode = self._get_speed_mode()
-        if speed_mode in ["stopped", "not_running"]:
+        # Vérifier par mots-clés car maintenant on retourne du texte traduit
+        if any(word in speed_mode.lower() for word in ["stopped", "arrêtée", "not running", "pas en marche"]):
             return "mdi:pump-off"
-        elif speed_mode in ["low", "medium", "high"]:
-            return "mdi:pump"
         else:
             return "mdi:pump"
+
+    def _translate_state(self, state_key: str) -> str:
+        """Translate state based on HA language."""
+        # Détection de langue basique
+        language = getattr(self.hass.config, 'language', 'en')
+
+        translations = {
+            'en': {
+                'stopped': 'Stopped',
+                'not_running': 'Not Running',
+                'low': 'Low',
+                'medium': 'Medium',
+                'high': 'High'
+            },
+            'fr': {
+                'stopped': 'Arrêtée',
+                'not_running': 'Pas en marche',
+                'low': 'Faible',
+                'medium': 'Moyenne',
+                'high': 'Élevée'
+            }
+        }
+
+        return translations.get(language, translations['en']).get(state_key, state_key)
 
     def _get_speed_mode(self) -> str:
         """Get the current speed with percentage display."""
@@ -251,21 +279,21 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
 
         # Si pompe arrêtée
         if not is_running:
-            return "stopped"
+            return self._translate_state("stopped")
 
         # Récupérer le pourcentage actuel
         current_speed = self.device_data.get("speed_percent", 0)
 
         if current_speed == 0:
-            return "not_running"
+            return self._translate_state("not_running")
 
         # Mapper le pourcentage vers des états énumérés
         if current_speed <= 50:
-            return "low"
+            return self._translate_state("low")
         elif current_speed <= 70:
-            return "medium"
+            return self._translate_state("medium")
         else:
-            return "high"
+            return self._translate_state("high")
 
     def _get_current_schedule_mode(self) -> str:
         """Get current speed mode from active schedule (more reliable than polling)."""
@@ -395,6 +423,22 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         """Return the icon for the entity."""
         return "mdi:calendar-clock"
 
+    def _translate_schedule_state(self, state_key: str) -> str:
+        """Translate schedule state based on HA language."""
+        # Détection de langue basique
+        language = getattr(self.hass.config, 'language', 'en')
+
+        translations = {
+            'en': {
+                'no_schedule': 'No Schedule'
+            },
+            'fr': {
+                'no_schedule': 'Aucune programmation'
+            }
+        }
+
+        return translations.get(language, translations['en']).get(state_key, state_key)
+
     def _parse_cron_time(self, cron_time: str) -> Optional[time]:
         """Parse cron time format 'mm HH * * 0,1,2,3,4,5,6' to time object."""
         try:
@@ -463,7 +507,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         try:
             schedules = self._get_schedules_data()
             if not schedules:
-                return "no_schedule"
+                return self._translate_schedule_state("no_schedule")
 
             # Vérifier s'il y a une programmation active maintenant
             current_schedule = self._get_current_schedule(schedules)
