@@ -157,6 +157,10 @@
         "not_running": "Pas en marche",
         "no_schedule": "Aucune programmation"
       },
+      "pump_speed_status": {
+        "stopped": "Arrêtée",
+        "not_running": "Pas en marche"
+      },
       "pump_speed": {
         "low": "Faible",
         "medium": "Moyenne",
@@ -175,6 +179,9 @@
       },
       "schedule": {
         "active_schedules": "programmations actives"
+      },
+      "schedule_count": {
+        "no_schedule": "Aucune programmation"
       }
     }
   }

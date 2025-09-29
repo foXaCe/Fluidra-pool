@@ -157,6 +157,10 @@
         "not_running": "Not Running",
         "no_schedule": "No Schedule"
       },
+      "pump_speed_status": {
+        "stopped": "Stopped",
+        "not_running": "Not Running"
+      },
       "pump_speed": {
         "low": "Low",
         "medium": "Medium",
@@ -175,6 +179,9 @@
       },
       "schedule": {
         "active_schedules": "active schedules"
+      },
+      "schedule_count": {
+        "no_schedule": "No Schedule"
       }
     }
   }
