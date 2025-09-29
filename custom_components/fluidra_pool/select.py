@@ -41,7 +41,12 @@ async def async_setup_entry(
                 pass  # Skip speed level select for LG heat pumps
 
             # Schedule mode selects for pumps (exclude LG heat pumps)
-            if "pump" in device_type and not device_id.startswith("LG"):
+            if "pump" in device_type and device_type != "heat pump" and not device_id.startswith("LG"):
+                _LOGGER.warning(f"🔍 DEBUG: Creating schedule selects for {device_id} (type: {device_type})")
+            elif device_id.startswith("LG") or device_type == "heat pump":
+                _LOGGER.warning(f"🚫 DEBUG: Skipping LG/heat pump device {device_id} (type: {device_type})")
+
+            if "pump" in device_type and device_type != "heat pump" and not device_id.startswith("LG"):
                 # Create selects for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                     entities.append(FluidraScheduleModeSelect(
