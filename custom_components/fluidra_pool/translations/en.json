@@ -156,6 +156,25 @@
         "stopped": "Stopped",
         "not_running": "Not Running",
         "no_schedule": "No Schedule"
+      },
+      "pump_speed": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "active": "Active"
+      },
+      "signal_quality": {
+        "low": "Low",
+        "very_low": "Very Low"
+      },
+      "pool_status": {
+        "offline": "Offline",
+        "winterized": "Winterized",
+        "connected": "Connected",
+        "unknown_state": "Unknown State"
+      },
+      "schedule": {
+        "active_schedules": "active schedules"
       }
     }
   }
