@@ -40,6 +40,14 @@ async def async_setup_entry(
             if not device_id:
                 continue
 
+            # Optimize for LG heat pumps - only create essential sensors
+            is_lg_device = device_id.startswith("LG")
+            if is_lg_device:
+                _LOGGER.info(f"🔥 Creating minimal sensor set for LG heat pump: {device_id}")
+                # Only create device info sensor for LG heat pumps
+                entities.append(FluidraDeviceInfoSensor(coordinator, coordinator.api, pool["id"], device_id))
+                continue
+
             # Temperature sensors for heaters
             if ("heater" in device_type or "heat" in device_type) and "current_temperature" in device:
                 entities.append(FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "current"))

@@ -224,8 +224,8 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         # Check for pending optimistic preset mode first
         if self._pending_preset_mode is not None:
             import time
-            # Clear pending mode after 10 seconds
-            if time.time() - self._last_preset_action_time > 10:
+            # Clear pending mode after 5 seconds
+            if time.time() - self._last_preset_action_time > 5:
                 self._pending_preset_mode = None
                 self._last_preset_action_time = None
             else:
@@ -251,8 +251,8 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         # Check for pending optimistic HVAC mode first
         if self._pending_hvac_mode is not None:
             import time
-            # Clear pending mode after 10 seconds
-            if time.time() - self._last_hvac_action_time > 10:
+            # Clear pending mode after 5 seconds
+            if time.time() - self._last_hvac_action_time > 5:
                 self._pending_hvac_mode = None
                 self._last_hvac_action_time = None
             else:
@@ -317,6 +317,12 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target hvac mode."""
         try:
+            # Optimistic update - show immediately in UI
+            import time
+            self._pending_hvac_mode = hvac_mode
+            self._last_hvac_action_time = time.time()
+            self.async_write_ha_state()
+
             if hvac_mode == HVACMode.HEAT:
                 _LOGGER.info(f"🚀 Turning on heat pump {self._device_id}")
                 success = await self._api.start_pump(self._device_id)
@@ -325,13 +331,22 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
                 success = await self._api.stop_pump(self._device_id)
             else:
                 _LOGGER.warning(f"Unsupported HVAC mode: {hvac_mode}")
+                # Clear optimistic state for unsupported modes
+                self._pending_hvac_mode = None
+                self._last_hvac_action_time = None
                 return
 
             if success:
                 _LOGGER.info(f"✅ Successfully set HVAC mode to {hvac_mode}")
+                # Clear optimistic state on success
+                self._pending_hvac_mode = None
+                self._last_hvac_action_time = None
                 await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to set HVAC mode to {hvac_mode}")
+                # Clear optimistic state on failure
+                self._pending_hvac_mode = None
+                self._last_hvac_action_time = None
                 # Stocker l'erreur pour affichage utilisateur, mais ne pas modifier l'état
                 # car l'état réel sera lu depuis le component 13
                 device = self._api.get_device_by_id(self._device_id)
@@ -344,6 +359,9 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
         except Exception as e:
             _LOGGER.error(f"❌ Error setting HVAC mode {hvac_mode}: {e}")
+            # Clear optimistic state on error
+            self._pending_hvac_mode = None
+            self._last_hvac_action_time = None
             # Stocker l'erreur pour affichage utilisateur
             device = self._api.get_device_by_id(self._device_id)
             if device:

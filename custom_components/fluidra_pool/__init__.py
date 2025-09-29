@@ -33,7 +33,7 @@ PLATFORMS: list[Platform] = [
     Platform.CLIMATE,   # Pour contrôle température pompes à chaleur
 ]
 
-UPDATE_INTERVAL = timedelta(seconds=30)
+UPDATE_INTERVAL = timedelta(seconds=45)  # Reduced frequency for better performance
 
 # Service schemas
 SERVICE_SET_SCHEDULE = "set_schedule"
