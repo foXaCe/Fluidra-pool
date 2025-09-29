@@ -431,9 +431,8 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
             if success:
                 _LOGGER.info(f"✅ Successfully set preset mode to {preset_mode}")
-                # Clear optimistic state on success
-                self._pending_preset_mode = None
-                self._last_preset_action_time = None
+                # Keep optimistic state until coordinator refresh completes
+                # The property will clear it after 5 seconds automatically
                 await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to set preset mode to {preset_mode}")
