@@ -186,7 +186,13 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     @property
     def supported_features(self) -> int:
         """Return the list of supported features."""
-        return ClimateEntityFeature.TARGET_TEMPERATURE
+        features = ClimateEntityFeature.TARGET_TEMPERATURE
+
+        # Si on peut détecter l'état via component 13, on active les modes ON/OFF
+        if self.device_data.get("heat_pump_reported") is not None:
+            features |= ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
+
+        return features
 
     @property
     def icon(self) -> str:
@@ -210,20 +216,18 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
             if success:
                 _LOGGER.info(f"✅ Successfully set HVAC mode to {hvac_mode}")
-                # Mettre à jour l'état local de manière optimiste
-                device = self._api.get_device_by_id(self._device_id)
-                if device:
-                    device["is_heating"] = (hvac_mode == HVACMode.HEAT)
-                    device["heat_pump_reported"] = 1 if hvac_mode == HVACMode.HEAT else 0
-
                 await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to set HVAC mode to {hvac_mode}")
-                # Mettre à jour les attributs d'erreur pour feedback utilisateur
+                # Stocker l'erreur pour affichage utilisateur, mais ne pas modifier l'état
+                # car l'état réel sera lu depuis le component 13
                 device = self._api.get_device_by_id(self._device_id)
                 if device:
                     device["last_control_error"] = f"Failed to set mode to {hvac_mode}"
                     device["permission_error"] = True
+
+                # Demander un refresh pour obtenir l'état réel depuis l'API
+                await self.coordinator.async_request_refresh()
 
         except Exception as e:
             _LOGGER.error(f"❌ Error setting HVAC mode {hvac_mode}: {e}")
@@ -290,9 +294,13 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             "heat_pump_reported": device_data.get("heat_pump_reported"),
             "is_heating": device_data.get("is_heating"),
             "is_running": device_data.get("is_running"),
-            # Données de température brutes
+            # Données brutes des composants
+            "component_13_raw": device_data.get("component_13_data", {}).get("reportedValue"),
             "component_15_raw": device_data.get("component_15_speed"),
-            "component_15_temperature": device_data.get("target_temperature")
+            "component_15_temperature": device_data.get("target_temperature"),
+            # État de synchronisation
+            "state_sync_working": device_data.get("heat_pump_reported") is not None,
+            "control_working": not device_data.get("permission_error", False)
         }
 
         # Informations d'erreur pour feedback utilisateur

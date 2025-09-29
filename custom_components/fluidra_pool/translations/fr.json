@@ -1,0 +1,162 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configuration Fluidra Pool",
+        "description": "Saisissez vos identifiants Fluidra Pool",
+        "data": {
+          "email": "Adresse e-mail",
+          "password": "Mot de passe"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter à l'API Fluidra",
+      "invalid_auth": "Identifiants invalides. Vérifiez votre e-mail et mot de passe",
+      "no_pools": "Aucune piscine trouvée. Assurez-vous que vos équipements sont configurés dans l'app Fluidra Pool",
+      "unknown": "Erreur inattendue"
+    },
+    "abort": {
+      "already_configured": "Cette compte est déjà configuré"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options Fluidra Pool",
+        "description": "Configurez les options avancées",
+        "data": {
+          "scan_interval": "Intervalle de mise à jour (secondes)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "speed_percent": {
+        "name": "Pourcentage de Vitesse"
+      },
+      "operation_mode": {
+        "name": "Mode de Fonctionnement"
+      },
+      "connectivity": {
+        "name": "Connectivité"
+      },
+      "signal_strength": {
+        "name": "Force du Signal"
+      },
+      "firmware_version": {
+        "name": "Version Firmware"
+      },
+      "hardware_errors": {
+        "name": "Erreurs Matériel"
+      },
+      "comm_errors": {
+        "name": "Erreurs Communication"
+      },
+      "network_status": {
+        "name": "État Réseau"
+      },
+      "schedule_count": {
+        "name": "Plannings Actifs"
+      },
+      "next_schedule": {
+        "name": "Prochain Planning"
+      },
+      "current_temperature": {
+        "name": "Température Actuelle"
+      },
+      "target_temperature": {
+        "name": "Température Cible"
+      },
+      "weather_temperature": {
+        "name": "Température Météo"
+      },
+      "device_info": {
+        "name": "Informations Appareil"
+      },
+      "pool_status": {
+        "name": "Statut Piscine"
+      },
+      "pool_location": {
+        "name": "Localisation Piscine"
+      },
+      "water_quality": {
+        "name": "Qualité de l'Eau"
+      }
+    },
+    "switch": {
+      "pump": {
+        "name": "Pompe"
+      },
+      "auto_mode": {
+        "name": "Mode Auto"
+      },
+      "heat_pump": {
+        "name": "Pompe à Chaleur"
+      },
+      "heater": {
+        "name": "Chauffage"
+      },
+      "schedule_enable": {
+        "name": "Planning {schedule_id}"
+      }
+    },
+    "climate": {
+      "heat_pump": {
+        "name": "Pompe à Chaleur"
+      }
+    },
+    "number": {
+      "speed_control": {
+        "name": "Contrôle Vitesse"
+      },
+      "pump_vitesse": {
+        "name": "Réglage {device_name} Vitesse"
+      }
+    },
+    "time": {
+      "schedule_start": {
+        "name": "Planning {schedule_id} Début"
+      },
+      "schedule_end": {
+        "name": "Planning {schedule_id} Fin"
+      }
+    },
+    "select": {
+      "schedule_mode": {
+        "name": "Planning {schedule_id} Mode",
+        "state": {
+          "0": "Faible",
+          "1": "Moyenne",
+          "2": "Élevée"
+        }
+      }
+    }
+  },
+  "state": {
+    "sensor": {
+      "operation_mode": {
+        "auto": "Auto",
+        "manual": "Manuel",
+        "off": "Arrêt",
+        "unknown": "Inconnu"
+      },
+      "connectivity": {
+        "online": "En ligne",
+        "offline": "Hors ligne",
+        "unknown": "Inconnu"
+      },
+      "network_status": {
+        "connected": "Connecté",
+        "disconnected": "Déconnecté",
+        "unknown": "Inconnu"
+      },
+      "pump_status": {
+        "stopped": "Arrêtée",
+        "not_running": "Pas en marche",
+        "no_schedule": "Aucune programmation"
+      }
+    }
+  }
+}

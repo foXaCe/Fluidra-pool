@@ -1,0 +1,162 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Fluidra Pool Configuration",
+        "description": "Enter your Fluidra Pool credentials",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to Fluidra API",
+      "invalid_auth": "Invalid credentials. Check your email and password",
+      "no_pools": "No pools found. Make sure your equipment is configured in the Fluidra Pool app",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This account is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Fluidra Pool Options",
+        "description": "Configure advanced options",
+        "data": {
+          "scan_interval": "Update interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "speed_percent": {
+        "name": "Speed Percentage"
+      },
+      "operation_mode": {
+        "name": "Operation Mode"
+      },
+      "connectivity": {
+        "name": "Connectivity"
+      },
+      "signal_strength": {
+        "name": "Signal Strength"
+      },
+      "firmware_version": {
+        "name": "Firmware Version"
+      },
+      "hardware_errors": {
+        "name": "Hardware Errors"
+      },
+      "comm_errors": {
+        "name": "Communication Errors"
+      },
+      "network_status": {
+        "name": "Network Status"
+      },
+      "schedule_count": {
+        "name": "Active Schedules"
+      },
+      "next_schedule": {
+        "name": "Next Schedule"
+      },
+      "current_temperature": {
+        "name": "Current Temperature"
+      },
+      "target_temperature": {
+        "name": "Target Temperature"
+      },
+      "weather_temperature": {
+        "name": "Weather Temperature"
+      },
+      "device_info": {
+        "name": "Device Information"
+      },
+      "pool_status": {
+        "name": "Pool Status"
+      },
+      "pool_location": {
+        "name": "Pool Location"
+      },
+      "water_quality": {
+        "name": "Water Quality"
+      }
+    },
+    "switch": {
+      "pump": {
+        "name": "Pump"
+      },
+      "auto_mode": {
+        "name": "Auto Mode"
+      },
+      "heat_pump": {
+        "name": "Heat Pump"
+      },
+      "heater": {
+        "name": "Heater"
+      },
+      "schedule_enable": {
+        "name": "Schedule {schedule_id}"
+      }
+    },
+    "climate": {
+      "heat_pump": {
+        "name": "Heat Pump"
+      }
+    },
+    "number": {
+      "speed_control": {
+        "name": "Speed Control"
+      },
+      "pump_vitesse": {
+        "name": "{device_name} Speed Setting"
+      }
+    },
+    "time": {
+      "schedule_start": {
+        "name": "Schedule {schedule_id} Start"
+      },
+      "schedule_end": {
+        "name": "Schedule {schedule_id} End"
+      }
+    },
+    "select": {
+      "schedule_mode": {
+        "name": "Schedule {schedule_id} Mode",
+        "state": {
+          "0": "Low",
+          "1": "Medium",
+          "2": "High"
+        }
+      }
+    }
+  },
+  "state": {
+    "sensor": {
+      "operation_mode": {
+        "auto": "Auto",
+        "manual": "Manual",
+        "off": "Off",
+        "unknown": "Unknown"
+      },
+      "connectivity": {
+        "online": "Online",
+        "offline": "Offline",
+        "unknown": "Unknown"
+      },
+      "network_status": {
+        "connected": "Connected",
+        "disconnected": "Disconnected",
+        "unknown": "Unknown"
+      },
+      "pump_status": {
+        "stopped": "Stopped",
+        "not_running": "Not Running",
+        "no_schedule": "No Schedule"
+      }
+    }
+  }
+}
