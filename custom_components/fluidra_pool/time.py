@@ -35,8 +35,14 @@ async def async_setup_entry(
             if not device_id:
                 continue
 
-            # Time entities for pumps only
-            if "pump" in device_type:
+            # Time entities for pumps only (exclude LG heat pumps)
+            if "pump" in device_type and not device_id.startswith("LG"):
+                _LOGGER.info(f"✅ Creating time entities for non-LG pump: {device_id}")
+            elif "pump" in device_type and device_id.startswith("LG"):
+                _LOGGER.info(f"🚫 Skipping time entities for LG heat pump: {device_id}")
+                continue
+
+            if "pump" in device_type and not device_id.startswith("LG"):
                 # Create time entities for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                     # Create start time entity
