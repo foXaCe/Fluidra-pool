@@ -48,13 +48,15 @@ async def async_setup_entry(
                 entities.append(FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "target"))
 
 
-            # Schedule sensor for pumps
-            if "pump" in device_type:
+            # Schedule and speed sensors for pumps (exclude LG heat pumps)
+            if "pump" in device_type and not device_id.startswith("LG"):
                 entities.append(FluidraPumpScheduleSensor(coordinator, coordinator.api, pool["id"], device_id))
-                # Device info sensors
-                entities.append(FluidraDeviceInfoSensor(coordinator, coordinator.api, pool["id"], device_id))
                 # Speed sensor for pumps
                 entities.append(FluidraPumpSpeedSensor(coordinator, coordinator.api, pool["id"], device_id))
+
+            # Device info sensors for all pumps
+            if "pump" in device_type:
+                entities.append(FluidraDeviceInfoSensor(coordinator, coordinator.api, pool["id"], device_id))
 
             # Brightness sensor for lights
             if "light" in device_type and "brightness" in device:
@@ -774,8 +776,8 @@ class FluidraPoolWeatherSensor(FluidraPoolSensorBase):
         status_data = pool_data.get("status_data", {})
         weather = status_data.get("weather", {})
         if weather.get("status") == "ok":
-            weather_value = weather.get("value", {})
-            if weather_value:
+            weather_value = weather.get("value")
+            if weather_value is not None:
                 current = weather_value.get("current", {})
                 if "main" in current and "temp" in current["main"]:
                     # Convertir de Kelvin vers Celsius
@@ -913,8 +915,8 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
         status_data = pool_data.get("status_data", {})
         weather = status_data.get("weather", {})
         if weather.get("status") == "ok":
-            weather_value = weather.get("value", {})
-            if weather_value:
+            weather_value = weather.get("value")
+            if weather_value is not None:
                 current = weather_value.get("current", {})
                 if current:
                     attrs["weather_available"] = True
@@ -984,8 +986,8 @@ class FluidraPoolLocationSensor(FluidraPoolSensorBase):
         status_data = pool_data.get("status_data", {})
         weather = status_data.get("weather", {})
         if weather.get("status") == "ok":
-            weather_value = weather.get("value", {})
-            if weather_value:
+            weather_value = weather.get("value")
+            if weather_value is not None:
                 current = weather_value.get("current", {})
                 if current:
                     attrs["weather_country"] = current.get("sys", {}).get("country")
