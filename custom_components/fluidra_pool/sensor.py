@@ -777,9 +777,9 @@ class FluidraPoolWeatherSensor(FluidraPoolSensorBase):
         weather = status_data.get("weather", {})
         if weather.get("status") == "ok":
             weather_value = weather.get("value")
-            if weather_value is not None:
+            if weather_value is not None and isinstance(weather_value, dict):
                 current = weather_value.get("current", {})
-                if "main" in current and "temp" in current["main"]:
+                if isinstance(current, dict) and "main" in current and "temp" in current["main"]:
                     # Convertir de Kelvin vers Celsius
                     temp_kelvin = current["main"]["temp"]
                     return round(temp_kelvin - 273.15, 1)

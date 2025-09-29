@@ -185,12 +185,13 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         """Return the supported features."""
         features = ClimateEntityFeature.TARGET_TEMPERATURE
 
-        # Add preset modes for LG heat pumps
+        # Force preset modes and HVAC controls for LG heat pumps
         if self._device_id.startswith("LG"):
+            _LOGGER.info(f"🌡️ Adding preset mode and HVAC features for LG device {self._device_id}")
             features |= ClimateEntityFeature.PRESET_MODE
-
-        # Si on peut détecter l'état via component 13, on active les modes ON/OFF
-        if self.device_data.get("heat_pump_reported") is not None:
+            features |= ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
+        elif self.device_data.get("heat_pump_reported") is not None:
+            # Si on peut détecter l'état via component 13, on active les modes ON/OFF
             features |= ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
 
         return features
@@ -203,7 +204,9 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     @property
     def preset_modes(self) -> List[str]:
         """Return available preset modes for LG heat pumps."""
+        # Force preset modes for LG heat pumps
         if self._device_id.startswith("LG"):
+            _LOGGER.info(f"🌡️ Providing preset modes for LG device {self._device_id}: {LG_PRESET_MODES}")
             return LG_PRESET_MODES
         return []
 
