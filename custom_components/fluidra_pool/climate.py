@@ -80,9 +80,14 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     @property
     def name(self) -> str:
         """Return the name of the climate entity."""
-        pool_name = self.pool_data.get('name', 'Piscine')
-        device_name = self.device_data.get('name', 'Pompe à chaleur')
+        pool_name = self.pool_data.get('name', 'Pool')
+        device_name = self.device_data.get('name', 'Heat Pump')
         return f"{pool_name} {device_name}"
+
+    @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "heat_pump"
 
     @property
     def device_info(self) -> dict:
@@ -150,8 +155,25 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     @property
     def hvac_mode(self) -> HVACMode:
         """Return current hvac operation mode."""
-        if self.device_data.get("is_heating", False):
+        # Utiliser plusieurs sources pour déterminer l'état de chauffage
+        device_data = self.device_data
+
+        # 1. Priorité: heat_pump_reported (état spécifique pompe à chaleur)
+        heat_pump_reported = device_data.get("heat_pump_reported")
+        if heat_pump_reported is not None:
+            if heat_pump_reported:
+                return HVACMode.HEAT
+            else:
+                return HVACMode.OFF
+
+        # 2. Fallback: is_heating (compatibilité)
+        if device_data.get("is_heating", False):
             return HVACMode.HEAT
+
+        # 3. Fallback: is_running (état général)
+        if device_data.get("is_running", False):
+            return HVACMode.HEAT
+
         return HVACMode.OFF
 
     @property
@@ -188,12 +210,28 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
             if success:
                 _LOGGER.info(f"✅ Successfully set HVAC mode to {hvac_mode}")
+                # Mettre à jour l'état local de manière optimiste
+                device = self._api.get_device_by_id(self._device_id)
+                if device:
+                    device["is_heating"] = (hvac_mode == HVACMode.HEAT)
+                    device["heat_pump_reported"] = 1 if hvac_mode == HVACMode.HEAT else 0
+
                 await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to set HVAC mode to {hvac_mode}")
+                # Mettre à jour les attributs d'erreur pour feedback utilisateur
+                device = self._api.get_device_by_id(self._device_id)
+                if device:
+                    device["last_control_error"] = f"Failed to set mode to {hvac_mode}"
+                    device["permission_error"] = True
 
         except Exception as e:
             _LOGGER.error(f"❌ Error setting HVAC mode {hvac_mode}: {e}")
+            # Stocker l'erreur pour affichage utilisateur
+            device = self._api.get_device_by_id(self._device_id)
+            if device:
+                device["last_control_error"] = str(e)
+                device["permission_error"] = "403" in str(e) or "permission" in str(e).lower()
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
@@ -235,24 +273,40 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     @property
     def extra_state_attributes(self) -> dict:
         """Return extra state attributes."""
+        device_data = self.device_data
         attrs = {
             "device_type": "heat_pump",
             "device_id": self._device_id,
             "pool_id": self._pool_id,
-            "model": self.device_data.get("model", "Heat Pump"),
-            "family": self.device_data.get("family", ""),
+            "model": device_data.get("model", "Heat Pump"),
+            "family": device_data.get("family", ""),
             # API data
-            "connectivity": self.device_data.get("connectivity", {}),
-            "last_update": self.device_data.get("last_update"),
+            "connectivity": device_data.get("connectivity", {}),
+            "last_update": device_data.get("last_update"),
             # UI responsiveness indicators
             "pending_temperature": self._pending_temperature is not None,
-            "action_timestamp": self._last_action_time
+            "action_timestamp": self._last_action_time,
+            # State sources pour debugging
+            "heat_pump_reported": device_data.get("heat_pump_reported"),
+            "is_heating": device_data.get("is_heating"),
+            "is_running": device_data.get("is_running"),
+            # Données de température brutes
+            "component_15_raw": device_data.get("component_15_speed"),
+            "component_15_temperature": device_data.get("target_temperature")
         }
 
+        # Informations d'erreur pour feedback utilisateur
+        if device_data.get("permission_error"):
+            attrs["permission_error"] = True
+            attrs["error_message"] = "Insufficient permissions to control this device"
+
+        if device_data.get("last_control_error"):
+            attrs["last_control_error"] = device_data["last_control_error"]
+
         # Ajouter les informations de firmware si disponibles
-        if "firmware_version" in self.device_data:
-            attrs["firmware_version"] = self.device_data["firmware_version"]
-        if "ip_address" in self.device_data:
-            attrs["ip_address"] = self.device_data["ip_address"]
+        if "firmware_version" in device_data:
+            attrs["firmware_version"] = device_data["firmware_version"]
+        if "ip_address" in device_data:
+            attrs["ip_address"] = device_data["ip_address"]
 
         return attrs

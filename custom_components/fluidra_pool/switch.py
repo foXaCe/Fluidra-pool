@@ -241,9 +241,14 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        pool_name = self.pool_data.get('name', 'Piscine')
-        device_name = self.device_data.get('name', 'Pompe')
+        pool_name = self.pool_data.get('name', 'Pool')
+        device_name = self.device_data.get('name', 'Pump')
         return f"{pool_name} {device_name}"
+
+    @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "pump"
 
     @property
     def icon(self) -> str:
@@ -370,14 +375,19 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        pool_name = self.pool_data.get('name', 'Piscine')
-        device_name = self.device_data.get('name', 'Pompe à chaleur')
+        pool_name = self.pool_data.get('name', 'Pool')
+        device_name = self.device_data.get('name', 'Heat Pump')
 
         # Vérifier si c'est un Eco Elyo pour un nom plus spécifique
         if _is_eco_elyo_heat_pump(self.device_data):
             return f"{pool_name} Eco Elyo"
 
         return f"{pool_name} {device_name}"
+
+    @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "heat_pump"
 
     @property
     def icon(self) -> str:
@@ -538,6 +548,11 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
         return f"{pool_name} {device_name}"
 
     @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "heater"
+
+    @property
     def icon(self) -> str:
         """Return the icon of the switch."""
         if self.is_on:
@@ -597,9 +612,14 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        pool_name = self.pool_data.get('name', 'Piscine')
-        device_name = self.device_data.get('name', 'Pompe')
-        return f"{pool_name} {device_name} Mode Auto"
+        pool_name = self.pool_data.get('name', 'Pool')
+        device_name = self.device_data.get('name', 'Pump')
+        return f"{pool_name} {device_name} Auto Mode"
+
+    @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "auto_mode"
 
     @property
     def unique_id(self) -> str:

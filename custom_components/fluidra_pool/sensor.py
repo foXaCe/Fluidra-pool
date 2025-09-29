@@ -134,6 +134,11 @@ class FluidraTemperatureSensor(FluidraPoolSensorEntity):
         return f"{pool_name} {device_name} {temp_type} Temperature"
 
     @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "current_temperature" if self._sensor_type == "current" else "target_temperature"
+
+    @property
     def native_value(self) -> Optional[float]:
         """Return the state of the sensor."""
         if self._sensor_type == "current":
@@ -212,7 +217,12 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
-        return f"{device_name} Vitesse"
+        return f"{device_name} Speed"
+
+    @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "speed_percent"
 
     @property
     def icon(self) -> str:
@@ -371,7 +381,12 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
-        return f"{device_name} Programmations"
+        return f"{device_name} Schedules"
+
+    @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "schedule_count"
 
     @property
     def icon(self) -> str:
@@ -523,7 +538,12 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
-        return f"{device_name} Informations"
+        return f"{device_name} Information"
+
+    @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "device_info"
 
     @property
     def icon(self) -> str:
@@ -692,7 +712,12 @@ class FluidraPoolWeatherSensor(FluidraPoolSensorBase):
     def name(self) -> str:
         """Return the name of the sensor."""
         pool_name = self.pool_data.get("name", f"Pool {self._pool_id}")
-        return f"{pool_name} Température extérieure"
+        return f"{pool_name} Weather Temperature"
+
+    @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "weather_temperature"
 
     @property
     def native_value(self) -> Optional[float]:
@@ -744,7 +769,7 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
     def name(self) -> str:
         """Return the name of the sensor."""
         pool_name = self.pool_data.get("name", f"Pool {self._pool_id}")
-        return f"{pool_name} Statut"
+        return f"{pool_name} Status"
 
     @property
     def native_value(self) -> str:
@@ -866,7 +891,7 @@ class FluidraPoolLocationSensor(FluidraPoolSensorBase):
     def name(self) -> str:
         """Return the name of the sensor."""
         pool_name = self.pool_data.get("name", f"Pool {self._pool_id}")
-        return f"{pool_name} Localisation"
+        return f"{pool_name} Location"
 
     @property
     def native_value(self) -> str:
@@ -931,7 +956,7 @@ class FluidraPoolWaterQualitySensor(FluidraPoolSensorBase):
     def name(self) -> str:
         """Return the name of the sensor."""
         pool_name = self.pool_data.get("name", f"Pool {self._pool_id}")
-        return f"{pool_name} Qualité de l'eau"
+        return f"{pool_name} Water Quality"
 
     @property
     def native_value(self) -> str:

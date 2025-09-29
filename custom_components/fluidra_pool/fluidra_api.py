@@ -742,24 +742,36 @@ class FluidraPoolAPI:
         try:
             _LOGGER.info(f"🌡️ Setting heat pump {device_id} temperature to {temperature}°C")
 
-            # Pour les pompes à chaleur, il faut découvrir le bon composant
-            # Commençons par tester le composant 12 (souvent utilisé pour température)
-            # ou 13, 14, etc. selon le modèle
-            component_id = 12  # À ajuster selon les tests réels
+            # Pour les pompes à chaleur, utiliser component 15 (température × 10)
+            # Basé sur l'observation: Component 15 reporte 380 pour 38°C, 400 pour 40°C
+            component_id = 15
 
-            # Convertir la température en valeur entière ou selon le format API
-            temperature_value = int(temperature)
+            # Convertir la température en valeur × 10 pour l'API
+            temperature_value = int(temperature * 10)
+            _LOGGER.debug(f"🔧 Converting temperature {temperature}°C to API value: {temperature_value}")
 
             success = await self.control_device_component(device_id, component_id, temperature_value)
             if success:
-                _LOGGER.info(f"✅ Successfully set heat pump temperature to {temperature}°C")
+                _LOGGER.info(f"✅ Successfully set heat pump temperature to {temperature}°C (API value: {temperature_value})")
                 # Mettre à jour l'état local
                 device = self.get_device_by_id(device_id)
                 if device:
                     device["target_temperature"] = temperature
                 return True
             else:
-                _LOGGER.error(f"❌ Failed to set heat pump temperature to {temperature}°C")
+                _LOGGER.error(f"❌ Failed to set heat pump temperature to {temperature}°C (tried component {component_id})")
+
+                # Fallback: essayer d'autres composants possibles
+                for fallback_component in [12, 13, 14, 16]:
+                    _LOGGER.info(f"🔄 Trying fallback component {fallback_component} for temperature setting")
+                    success = await self.control_device_component(device_id, fallback_component, temperature_value)
+                    if success:
+                        _LOGGER.info(f"✅ Successfully set temperature using fallback component {fallback_component}")
+                        device = self.get_device_by_id(device_id)
+                        if device:
+                            device["target_temperature"] = temperature
+                        return True
+
                 return False
 
         except Exception as e:
