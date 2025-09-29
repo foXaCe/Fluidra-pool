@@ -293,9 +293,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                     self._previous_schedule_entities[device_key] = current_schedule_count
                                 elif component_id == 21:  # Network Status
                                     device["network_status_component"] = reported_value
-                                elif component_id == 13:  # Component 13 - pas le bon pour manuel
+                                elif component_id == 13:  # Component 13 - État pompe à chaleur
                                     _LOGGER.debug(f"📊 Component 13: {component_state}")
                                     device["component_13_data"] = component_state
+
+                                    # Pour les pompes à chaleur, component 13 indique l'état de chauffage
+                                    if device.get("type", "").lower() == "heat_pump":
+                                        device["heat_pump_reported"] = reported_value
+                                        device["is_heating"] = bool(reported_value)
+                                        _LOGGER.debug(f"🌡️ Heat pump {device_id} heating state from component 13: {bool(reported_value)}")
                                 elif component_id == 14:  # Component 14 exploration
                                     _LOGGER.debug(f"📊 Component 14: {component_state}")
                                     device["component_14_data"] = component_state
