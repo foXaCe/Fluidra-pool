@@ -255,9 +255,21 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                             else:
                                                 device["speed_percent"] = 0   # Défaut
                                             _LOGGER.debug(f"✅ MANUAL Mode - Speed level {reported_value} → speed_percent = {device['speed_percent']}")
-                                elif component_id == 15:  # Vitesse élevée (référence)
+                                elif component_id == 15:  # Température de référence pour pompes à chaleur
                                     _LOGGER.debug(f"📊 Component 15 (Référence): {component_state}")
                                     device["component_15_speed"] = reported_value or component_state.get("desiredValue") or 0
+
+                                    # Pour les pompes à chaleur, component 15 peut contenir la température × 10
+                                    if device.get("type", "").lower() == "heat_pump" and reported_value:
+                                        try:
+                                            # Convertir la valeur brute en température (diviser par 10)
+                                            temp_value = float(reported_value) / 10.0
+                                            # Valider la plage de température (10-50°C)
+                                            if 10.0 <= temp_value <= 50.0:
+                                                device["target_temperature"] = temp_value
+                                                _LOGGER.debug(f"🌡️ Heat pump {device_id} target temperature from component 15: {temp_value}°C")
+                                        except (ValueError, TypeError):
+                                            _LOGGER.warning(f"⚠️ Invalid temperature value in component 15: {reported_value}")
                                     # Note: Component 15 n'est plus utilisé pour le mode manuel, remplacé par Component 13
                                 elif component_id == 19:  # Timezone
                                     device["timezone_component"] = reported_value
