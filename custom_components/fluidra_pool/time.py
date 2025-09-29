@@ -37,30 +37,25 @@ async def async_setup_entry(
 
             # Time entities for pumps only (exclude LG heat pumps)
             if "pump" in device_type and not device_id.startswith("LG"):
-                pass  # Create time entities for regular pumps
-            elif "pump" in device_type and device_id.startswith("LG"):
-                continue  # Skip time entities for LG heat pumps
+                # Create time entities for the actual 8 schedulers found
+                for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
+                    # Create start time entity
+                    entities.append(FluidraScheduleStartTimeEntity(
+                        coordinator,
+                        coordinator.api,
+                        pool["id"],
+                        device_id,
+                        schedule_id
+                    ))
 
-            # Create time entities for pumps (only non-LG reach here)
-            # Create time entities for the actual 8 schedulers found
-            for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
-                # Create start time entity
-                entities.append(FluidraScheduleStartTimeEntity(
-                    coordinator,
-                    coordinator.api,
-                    pool["id"],
-                    device_id,
-                    schedule_id
-                ))
-
-                # Create end time entity
-                entities.append(FluidraScheduleEndTimeEntity(
-                    coordinator,
-                    coordinator.api,
-                    pool["id"],
-                    device_id,
-                    schedule_id
-                ))
+                    # Create end time entity
+                    entities.append(FluidraScheduleEndTimeEntity(
+                        coordinator,
+                        coordinator.api,
+                        pool["id"],
+                        device_id,
+                        schedule_id
+                    ))
 
     async_add_entities(entities)
 
