@@ -778,9 +778,18 @@ class FluidraPoolAPI:
             _LOGGER.error(f"❌ Error setting heat pump temperature: {e}")
             return False
 
+    def _is_lg_heat_pump(self, device_id: str) -> bool:
+        """Check if device is an LG heat pump (like LG24350023)."""
+        return device_id.startswith("LG")
+
     async def start_pump(self, device_id: str) -> bool:
-        """Start pump using component 9 and set default speed (like the official app)."""
-        # D'abord allumer la pompe via Component 9
+        """Start pump using appropriate component based on device type."""
+        # LG heat pumps use component 13 for ON/OFF
+        if self._is_lg_heat_pump(device_id):
+            _LOGGER.info(f"🌡️ Starting LG heat pump {device_id} using component 13")
+            return await self.control_device_component(device_id, 13, 1)
+
+        # Standard pumps use component 9
         start_success = await self.control_device_component(device_id, 9, 1)
 
         if start_success:
@@ -797,8 +806,14 @@ class FluidraPoolAPI:
         return False
 
     async def stop_pump(self, device_id: str) -> bool:
-        """Stop pump using component 9."""
-        return await self.control_device_component(device_id, 9, 0)  # Use component 9 for stop
+        """Stop pump using appropriate component based on device type."""
+        # LG heat pumps use component 13 for ON/OFF
+        if self._is_lg_heat_pump(device_id):
+            _LOGGER.info(f"🌡️ Stopping LG heat pump {device_id} using component 13")
+            return await self.control_device_component(device_id, 13, 0)
+
+        # Standard pumps use component 9
+        return await self.control_device_component(device_id, 9, 0)
 
     async def set_pump_speed(self, device_id: str, speed_percent: int) -> bool:
         """Set pump speed using the real component 11 speed control.
