@@ -222,13 +222,13 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
     @property
     def translation_key(self) -> str:
         """Return the translation key."""
-        return "speed_percent"
+        return "pump_speed_status"
 
     @property
     def icon(self) -> str:
         """Return the icon for the entity."""
         speed_mode = self._get_speed_mode()
-        if "Arrêtée" in speed_mode or "Pas en marche" in speed_mode:
+        if speed_mode in ["stopped", "not_running"]:
             return "mdi:pump-off"
         elif "Auto" in speed_mode:
             return "mdi:autorenew"
@@ -251,13 +251,13 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
 
         # Si pompe arrêtée
         if not is_running:
-            return "Arrêtée"
+            return "stopped"
 
         # Récupérer le pourcentage actuel
         current_speed = self.device_data.get("speed_percent", 0)
 
         if current_speed == 0:
-            return "Pas en marche"
+            return "not_running"
 
         # Afficher simplement le pourcentage avec le mode
         if auto_mode:
@@ -461,7 +461,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         try:
             schedules = self._get_schedules_data()
             if not schedules:
-                return "Aucune programmation"
+                return "no_schedule"
 
             # Vérifier s'il y a une programmation active maintenant
             current_schedule = self._get_current_schedule(schedules)
