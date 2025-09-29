@@ -38,7 +38,7 @@ async def async_setup_entry(
             if device.get("variable_speed") and not device_id.startswith("LG"):
                 entities.append(FluidraPumpSpeedSelect(coordinator, coordinator.api, pool["id"], device_id))
             elif device.get("variable_speed") and device_id.startswith("LG"):
-                _LOGGER.info(f"🚫 Skipping speed level select for LG heat pump: {device_id}")
+                pass  # Skip speed level select for LG heat pumps
 
             # Schedule mode selects for pumps (exclude LG heat pumps)
             if "pump" in device_type and not device_id.startswith("LG"):
