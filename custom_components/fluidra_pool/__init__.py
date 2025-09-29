@@ -100,14 +100,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create data update coordinator
     coordinator = FluidraDataUpdateCoordinator(hass, api)
 
-    # Fetch initial data so we have data when entities are added
-    await coordinator.async_config_entry_first_refresh()
-
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    # Set up platforms
+    # Set up platforms immediately (non-blocking)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Start data refresh in background (non-blocking)
+    hass.async_create_task(coordinator.async_config_entry_first_refresh())
 
     # Register services
     await _async_register_services(hass, coordinator)
