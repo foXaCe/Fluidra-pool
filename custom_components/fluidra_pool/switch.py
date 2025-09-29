@@ -135,6 +135,8 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
     @property
     def device_data(self) -> dict:
         """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
         pool = self.coordinator.data.get(self._pool_id)
         if pool:
             for device in pool.get("devices", []):
@@ -145,6 +147,8 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
     @property
     def pool_data(self) -> dict:
         """Get pool data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
         return self.coordinator.data.get(self._pool_id, {})
 
     @property

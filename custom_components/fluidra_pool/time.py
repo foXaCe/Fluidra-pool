@@ -80,6 +80,8 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
     @property
     def device_data(self) -> dict:
         """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
         pool = self.coordinator.data.get(self._pool_id)
         if pool:
             for device in pool.get("devices", []):
