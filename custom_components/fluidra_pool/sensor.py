@@ -775,11 +775,12 @@ class FluidraPoolWeatherSensor(FluidraPoolSensorBase):
         weather = status_data.get("weather", {})
         if weather.get("status") == "ok":
             weather_value = weather.get("value", {})
-            current = weather_value.get("current", {})
-            if "main" in current and "temp" in current["main"]:
-                # Convertir de Kelvin vers Celsius
-                temp_kelvin = current["main"]["temp"]
-                return round(temp_kelvin - 273.15, 1)
+            if weather_value:
+                current = weather_value.get("current", {})
+                if "main" in current and "temp" in current["main"]:
+                    # Convertir de Kelvin vers Celsius
+                    temp_kelvin = current["main"]["temp"]
+                    return round(temp_kelvin - 273.15, 1)
 
         return None
 
@@ -913,15 +914,16 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
         weather = status_data.get("weather", {})
         if weather.get("status") == "ok":
             weather_value = weather.get("value", {})
-            current = weather_value.get("current", {})
-            if current:
-                attrs["weather_available"] = True
-                if "main" in current:
-                    attrs["air_temperature"] = round(current["main"]["temp"] - 273.15, 1)
-                    attrs["humidity"] = current["main"]["humidity"]
-                    attrs["pressure"] = current["main"]["pressure"]
-                if "wind" in current:
-                    attrs["wind_speed"] = current["wind"]["speed"]
+            if weather_value:
+                current = weather_value.get("current", {})
+                if current:
+                    attrs["weather_available"] = True
+                    if "main" in current:
+                        attrs["air_temperature"] = round(current["main"]["temp"] - 273.15, 1)
+                        attrs["humidity"] = current["main"]["humidity"]
+                        attrs["pressure"] = current["main"]["pressure"]
+                    if "wind" in current:
+                        attrs["wind_speed"] = current["wind"]["speed"]
 
         return attrs
 

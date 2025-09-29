@@ -80,9 +80,11 @@ async def async_setup_entry(
                 _LOGGER.info(f"🌡️ Detected Eco Elyo heat pump: {device_id}")
                 # Create heat pump switch instead of pump switches
                 entities.append(FluidraHeatPumpSwitch(coordinator, coordinator.api, pool["id"], device_id))
-                # Also create an auto mode switch for Eco Elyo if it supports it
-                if device.get("auto_mode_enabled") is not None or device.get("auto_reported") is not None:
-                    entities.append(FluidraAutoModeSwitch(coordinator, coordinator.api, pool["id"], device_id))
+                # Skip auto mode for LG heat pumps (they have native smart modes)
+                # Only create auto mode switch for non-LG heat pumps
+                if not device_id.startswith("LG"):
+                    if device.get("auto_mode_enabled") is not None or device.get("auto_reported") is not None:
+                        entities.append(FluidraAutoModeSwitch(coordinator, coordinator.api, pool["id"], device_id))
                 # Skip pump and scheduler creation for Eco Elyo
                 continue
 
