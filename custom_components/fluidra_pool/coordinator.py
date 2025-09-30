@@ -29,6 +29,14 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=UPDATE_INTERVAL,
         )
 
+        # Déclencher le scan complet après le démarrage complet de HA
+        async def _on_ha_started(event):
+            """Trigger full refresh when Home Assistant has fully started."""
+            _LOGGER.info("🚀 Home Assistant started, triggering full component scan")
+            await self.async_request_refresh()
+
+        hass.bus.async_listen_once("homeassistant_started", _on_ha_started)
+
     def register_optimistic_entity(self, entity_id: str):
         """Enregistrer une entité comme ayant un état optimiste actif."""
         self._optimistic_entities.add(entity_id)
