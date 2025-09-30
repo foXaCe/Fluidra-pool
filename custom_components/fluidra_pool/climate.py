@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, DEVICE_TYPE_HEAT_PUMP
 from .coordinator import FluidraDataUpdateCoordinator
+from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,13 +68,11 @@ async def async_setup_entry(
     pools = await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
-            device_type = device.get("type", "").lower()
+            device_id = device.get("device_id")
 
-            # Create climate entities for heat pumps only
-            if "heat_pump" in device_type:
-                device_id = device.get("device_id")
-                if device_id:
-                    entities.append(FluidraHeatPumpClimate(coordinator, coordinator.api, pool["id"], device_id))
+            # Create climate entities based on device registry
+            if device_id and DeviceIdentifier.should_create_entity(device, "climate"):
+                entities.append(FluidraHeatPumpClimate(coordinator, coordinator.api, pool["id"], device_id))
 
     async_add_entities(entities)
 
@@ -195,13 +194,12 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         """Return the supported features."""
         features = ClimateEntityFeature.TARGET_TEMPERATURE
 
-        # Force preset modes and HVAC controls for LG heat pumps
-        if self._device_id.startswith("LG"):
+        # Use device registry to determine features
+        if DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
             features |= ClimateEntityFeature.PRESET_MODE
-            features |= ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
-        elif self.device_data.get("heat_pump_reported") is not None:
-            # Si on peut détecter l'état via component 13, on active les modes ON/OFF
-            features |= ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
+
+        # Always enable HVAC controls for heat pumps
+        features |= ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
 
         return features
 
@@ -212,16 +210,15 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
     @property
     def preset_modes(self) -> List[str]:
-        """Return available preset modes for LG heat pumps."""
-        # Force preset modes for LG heat pumps
-        if self._device_id.startswith("LG"):
+        """Return available preset modes for heat pumps with this feature."""
+        if DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
             return LG_PRESET_MODES
         return []
 
     @property
     def preset_mode(self) -> str:
-        """Return current preset mode for LG heat pumps."""
-        if not self._device_id.startswith("LG"):
+        """Return current preset mode for heat pumps with this feature."""
+        if not DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
             return None
 
         # Check for pending optimistic preset mode first
@@ -265,11 +262,11 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         if self._pending_preset_mode is not None:
             return HVACMode.HEAT
 
-        # Use same logic as switch for LG heat pumps
+        # Use same logic as switch for heat pumps
         device_data = self.device_data
 
-        # For LG heat pumps, use multiple sources like the switch
-        if self._device_id.startswith("LG"):
+        # For heat pumps with preset modes, use multiple sources like the switch
+        if DeviceIdentifier.has_feature(device_data, "preset_modes"):
             # 1. heat_pump_reported from real-time polling
             heat_pump_reported = device_data.get("heat_pump_reported")
             if heat_pump_reported is not None:
@@ -413,8 +410,8 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             self._last_action_time = None
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
-        """Set new preset mode for LG heat pumps."""
-        if not self._device_id.startswith("LG"):
+        """Set new preset mode for heat pumps with this feature."""
+        if not DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
             _LOGGER.warning(f"Preset modes not supported for device {self._device_id}")
             return
 
