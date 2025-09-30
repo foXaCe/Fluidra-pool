@@ -114,7 +114,6 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                     schedule_id = schedule.get("id")
                     # Compare both as string and int to handle type mismatch
                     if str(schedule_id) == str(self._schedule_id):
-                        _LOGGER.info(f"[TIME {self._schedule_id}] ✅ Found matching schedule!")
                         return schedule
 
                 _LOGGER.debug(f"[TIME {self._schedule_id}] Schedule not found in {len(schedules)} schedules")
