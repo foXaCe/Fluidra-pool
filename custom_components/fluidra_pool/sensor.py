@@ -831,6 +831,7 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
     def __init__(self, coordinator, api, pool_id: str):
         """Initialize the pool status sensor."""
         super().__init__(coordinator, api, pool_id, "status")
+        self._attr_translation_key = "pool_status"
 
     @property
     def name(self) -> str:
@@ -843,30 +844,23 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
         """Return the pool status."""
         pool_data = self.pool_data
 
-        # Vérifier l'état de la piscine depuis l'API
+        # Return state key for translation
         state = pool_data.get("state", "unknown")
 
         if state == "using":
-            # Piscine en utilisation - vérifier les équipements
-            devices = pool_data.get("devices", [])
-            total_devices = len(devices)
-
-            if total_devices > 0:
-                return f"En service ({total_devices} équipement{'s' if total_devices > 1 else ''})"
-            else:
-                return "En service"
+            return "using"
         elif state == "maintenance":
-            return "En maintenance"
+            return "maintenance"
         elif state == "offline":
-            return "Hors ligne"
+            return "offline"
         elif state == "winterized":
-            return "Hivernage"
+            return "winterized"
         else:
             # État par défaut basé sur les données disponibles
             if pool_data.get("name"):
-                return "Connectée"
+                return "connected"
             else:
-                return "État inconnu"
+                return "unknown_state"
 
     @property
     def icon(self) -> str:

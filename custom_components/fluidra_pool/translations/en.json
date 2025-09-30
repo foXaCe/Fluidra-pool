@@ -131,6 +131,14 @@
           "1": "Medium",
           "2": "High"
         }
+      },
+      "chlorinator_mode": {
+        "name": "Mode",
+        "state": {
+          "off": "Off",
+          "on": "On",
+          "auto": "Auto"
+        }
       }
     }
   },
@@ -175,6 +183,8 @@
         "very_low": "Very Low"
       },
       "pool_status": {
+        "using": "In Service",
+        "maintenance": "Maintenance",
         "offline": "Offline",
         "winterized": "Winterized",
         "connected": "Connected",

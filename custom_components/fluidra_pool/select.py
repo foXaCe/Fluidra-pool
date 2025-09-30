@@ -602,22 +602,23 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
 
         self._attr_name = f"{device_name} Mode"
         self._attr_unique_id = f"fluidra_{self._device_id}_mode"
+        self._attr_translation_key = "chlorinator_mode"
 
-        # Mode options: OFF, ON, AUTO
-        self._attr_options = ["Arrêt", "Marche", "Auto"]
+        # Mode options: OFF, ON, AUTO (internal values in English)
+        self._attr_options = ["off", "on", "auto"]
 
         # Mapping options → component 20 values
         self._mode_mapping = {
-            "Arrêt": 0,
-            "Marche": 1,
-            "Auto": 2
+            "off": 0,
+            "on": 1,
+            "auto": 2
         }
 
         # Inverse mapping for display
         self._value_to_mode = {
-            0: "Arrêt",
-            1: "Marche",
-            2: "Auto"
+            0: "off",
+            1: "on",
+            2: "auto"
         }
 
     @property
