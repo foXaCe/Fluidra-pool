@@ -106,17 +106,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up platforms immediately (non-blocking)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Start data refresh in background (non-blocking)
-    # First refresh: minimal scan for fast startup
-    hass.async_create_task(coordinator.async_config_entry_first_refresh())
-
-    # Schedule full scan 3 seconds after startup
-    async def _delayed_full_scan():
-        await asyncio.sleep(3)
-        _LOGGER.info("🔄 Triggering full component scan")
-        await coordinator.async_request_refresh()
-
-    hass.async_create_task(_delayed_full_scan())
+    # Don't force first refresh - let it happen naturally on first update cycle
+    # This prevents blocking during startup
 
     # Register services
     await _async_register_services(hass, coordinator)
