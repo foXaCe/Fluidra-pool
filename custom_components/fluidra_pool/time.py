@@ -103,6 +103,10 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
             # Get schedules from device data like the sensor does
             device_data = self.device_data
 
+            # Si aucune donnée n'est disponible, retourner None
+            if not device_data:
+                return None
+
             if "schedule_data" in device_data:
                 schedules = device_data["schedule_data"]
 
@@ -113,9 +117,9 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                         _LOGGER.info(f"[TIME {self._schedule_id}] ✅ Found matching schedule!")
                         return schedule
 
-                _LOGGER.warning(f"[TIME {self._schedule_id}] ❌ Schedule not found in {len(schedules)} schedules")
+                _LOGGER.debug(f"[TIME {self._schedule_id}] Schedule not found in {len(schedules)} schedules")
             else:
-                _LOGGER.warning(f"[TIME {self._schedule_id}] ❌ No 'schedule_data' key in device data")
+                _LOGGER.debug(f"[TIME {self._schedule_id}] No 'schedule_data' yet (may be loading)")
 
         except Exception as e:
             _LOGGER.error(f"[TIME {self._schedule_id}] Error getting schedule data: {e}")

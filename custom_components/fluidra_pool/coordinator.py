@@ -190,11 +190,28 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
                         # Polling intensif de TOUS les components pour trouver la vitesse manuelle
                         # Pour les pompes à chaleur, étendre la plage pour capturer les températures (components 62, 65, 67)
-                        component_range = 70 if device.get("type", "").lower() == "heat_pump" else 25
+                        # Pour les pompes E30iQ, s'assurer de récupérer jusqu'au component 21 minimum (incluant component 20 pour les schedules)
+                        device_type = device.get("type", "").lower()
+                        if device_type == "heat_pump":
+                            component_range = 70
+                        elif "pump" in device_type:
+                            component_range = 25  # Inclut component 20 (schedules) et 21 (network)
+                        else:
+                            component_range = 25
+
                         for component_id in range(0, component_range):
                             component_state = await self.api.get_component_state(device_id, component_id)
+
+                            # Debug pour component 20 (schedules)
+                            if component_id == 20:
+                                _LOGGER.info(f"🔍 Device {device_id} - Component 20 state: {component_state}")
+
                             if component_state and isinstance(component_state, dict):
                                 reported_value = component_state.get("reportedValue")
+
+                                # Debug pour component 20
+                                if component_id == 20:
+                                    _LOGGER.info(f"🔍 Device {device_id} - Component 20 reported_value: {reported_value}")
 
                                 # Stocker TOUTES les données de component dans la structure components
                                 device["components"][str(component_id)] = component_state
@@ -271,8 +288,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                         except (ValueError, TypeError):
                                             pass
                                 elif component_id == 20:  # Programmations
-                                    schedule_data = reported_value or []
+                                    schedule_data = reported_value if isinstance(reported_value, list) else []
                                     device["schedule_data"] = schedule_data
+                                    _LOGGER.info(f"📅 Device {device_id} - Loaded {len(schedule_data)} schedule(s)")
 
                                     # Track current scheduler count for this device
                                     current_schedule_count = len(schedule_data)
