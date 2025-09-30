@@ -12,6 +12,7 @@ from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN
 from .coordinator import FluidraDataUpdateCoordinator
+from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,15 +30,17 @@ async def async_setup_entry(
     pools = await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
-            device_type = device.get("type", "").lower()
             device_id = device.get("device_id")
 
             if not device_id:
                 continue
 
-            # Time entities for pumps only (exclude LG heat pumps)
-            if ("pump" in device_type and device_type != "heat pump" and
-                not device_id.startswith("LG")):
+            # Skip devices that don't support schedules (heat pumps)
+            if DeviceIdentifier.has_feature(device, "skip_schedules"):
+                continue
+
+            # Only create time entities for devices that should have them
+            if DeviceIdentifier.should_create_entity(device, "time"):
                 # Create time entities for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                     # Create start time entity

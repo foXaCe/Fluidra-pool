@@ -41,55 +41,104 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         name_patterns=["eco", "elyo"],
         family_patterns=["eco elyo"],
         model_patterns=["astralpool"],
-        components_range=70,  # Extended range pour capturer températures
-        required_components=[0, 1, 2, 3, 13, 14, 19],  # Components essentiels LG
+        components_range=5,  # Minimal scan, specific components below
+        required_components=[0, 1, 2, 3],
         entities=["climate", "switch", "sensor_info"],
         features={
             "preset_modes": True,
             "temperature_control": True,
             "hvac_modes": ["off", "heat"],
-            "skip_auto_mode": True,  # LG a ses propres modes smart
-            "skip_schedules": True,  # Pas de schedules pour LG
+            "skip_auto_mode": True,
+            "skip_schedules": True,
+            "specific_components": [13, 14, 15, 19],  # ON/OFF, target temp, current temp, water temp
         },
-        priority=100,  # Haute priorité car très spécifique
+        priority=100,
+    ),
+
+    "z250iq_heat_pump": DeviceConfig(
+        device_type="heat_pump",
+        identifier_patterns=["LF*"],
+        name_patterns=["z250", "z25"],
+        family_patterns=["heat pump"],
+        components_range=5,  # Minimal scan, specific components below
+        required_components=[0, 1, 2, 3],
+        entities=["climate", "switch", "sensor_info"],
+        features={
+            "preset_modes": True,
+            "temperature_control": True,
+            "hvac_modes": ["off", "heat"],
+            "skip_auto_mode": True,
+            "skip_schedules": True,
+            "specific_components": [13, 14, 15, 19],  # ON/OFF, target temp, current temp, water temp
+        },
+        priority=95,
+    ),
+
+    "chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["*.nn_*"],  # Bridged devices
+        family_patterns=["chlorinator"],
+        components_range=25,  # Scan only basic components, specific ones added below
+        required_components=[0, 1, 2, 3],  # Basic device info
+        entities=["switch", "select", "number", "sensor_info"],
+        features={
+            "chlorination_level": True,  # Component 4 (write) / 164 (read)
+            "mode_control": True,  # Component 20: 0=OFF, 1=ON, 2=AUTO
+            "ph_control": True,  # Component 8 (write) / 172 (read)
+            "orp_control": True,  # Component 11 (write) / 177 (read)
+            "boost_mode": True,  # Component 245
+            "sensors": {
+                "ph": 172,  # pH reading
+                "orp": 177,  # ORP/Redox (mV)
+                "free_chlorine": 178,  # Free chlorine (mg/l)
+                "temperature": 183,  # Pool temperature (°C * 10)
+                "salinity": 185,  # Salinity (g/L * 100)
+            },
+            # List specific components to scan for chlorinator (avoids scanning 0-300)
+            "specific_components": [4, 8, 11, 20, 164, 172, 177, 178, 183, 185, 245],
+        },
+        priority=80,  # Haute priorité pour éviter confusion avec pumps
     ),
 
     "e30iq_pump": DeviceConfig(
         device_type="pump",
-        identifier_patterns=["E30*", "PUMP*"],  # Patterns génériques pompes
-        components_range=25,  # Inclut component 20 (schedules) et 21 (network)
-        required_components=[0, 1, 2, 3, 9, 10, 11, 20],  # Components essentiels E30iQ
+        identifier_patterns=["E30*", "PUMP*"],
+        components_range=5,  # Minimal scan
+        required_components=[0, 1, 2, 3],
         entities=["switch", "switch_auto", "select", "number", "sensor_speed", "sensor_schedule", "sensor_info", "time"],
         features={
             "auto_mode": True,
             "speed_control": True,
             "schedules": True,
-            "schedule_count": 8,  # 8 programmations possibles
+            "schedule_count": 8,
+            "specific_components": [9, 10, 11, 15, 20, 21],  # ON/OFF, auto, speed, speed%, schedules, network
         },
-        priority=50,  # Priorité moyenne
+        priority=50,
     ),
 
     "generic_heat_pump": DeviceConfig(
         device_type="heat_pump",
-        components_range=70,
-        required_components=[0, 1, 2, 3, 13],
+        components_range=5,
+        required_components=[0, 1, 2, 3],
         entities=["climate", "switch", "sensor_info"],
         features={
             "temperature_control": True,
             "hvac_modes": ["off", "heat"],
+            "specific_components": [13, 14, 15],
         },
-        priority=30,  # Plus bas que LG
+        priority=30,
     ),
 
     "generic_pump": DeviceConfig(
         device_type="pump",
-        components_range=25,
-        required_components=[0, 1, 2, 3, 9],
+        components_range=5,
+        required_components=[0, 1, 2, 3],
         entities=["switch", "switch_auto", "sensor_info"],
         features={
             "auto_mode": True,
+            "specific_components": [9, 10],
         },
-        priority=10,  # Fallback générique
+        priority=10,
     ),
 
     "generic_heater": DeviceConfig(
@@ -119,15 +168,16 @@ class DeviceIdentifier:
         if not value or not patterns:
             return False
 
+        import re
         value_lower = value.lower()
         for pattern in patterns:
             pattern_lower = pattern.lower()
             if "*" in pattern_lower:
-                # Wildcard matching
-                pattern_prefix = pattern_lower.replace("*", "")
-                if pattern_lower.endswith("*") and value_lower.startswith(pattern_prefix):
-                    return True
-                elif pattern_lower.startswith("*") and value_lower.endswith(pattern_prefix):
+                # Convert wildcard pattern to regex
+                # Escape special regex chars except *
+                regex_pattern = re.escape(pattern_lower).replace(r'\*', '.*')
+                regex_pattern = f'^{regex_pattern}$'
+                if re.match(regex_pattern, value_lower):
                     return True
             elif pattern_lower in value_lower:
                 return True
@@ -160,6 +210,10 @@ class DeviceIdentifier:
         family = device.get("family", "")
         model = device.get("model", "")
         device_type_hint = device.get("type", "").lower()
+
+        # Skip bridges - they are not controllable devices
+        if family and "bridge" in family.lower():
+            return None
 
         # Sort configs by priority (highest first)
         sorted_configs = sorted(

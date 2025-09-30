@@ -1,7 +1,7 @@
 """Switch platform for Fluidra Pool integration."""
 
 import logging
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
@@ -65,6 +65,11 @@ async def async_setup_entry(
                         device_id,
                         schedule_id
                     ))
+
+            # Create boost mode switch for chlorinator
+            if DeviceIdentifier.has_feature(device, "boost_mode"):
+                entities.append(FluidraChlorinatorBoostSwitch(coordinator, coordinator.api, pool["id"], device_id))
+                _LOGGER.info(f"✅ Adding boost mode switch for chlorinator {device_id}")
 
     async_add_entities(entities)
 
@@ -335,7 +340,8 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
         device_name = self.device_data.get('name', 'Heat Pump')
 
         # Vérifier si c'est un Eco Elyo pour un nom plus spécifique
-        if _is_eco_elyo_heat_pump(self.device_data):
+        device_config = DeviceIdentifier.identify_device(self.device_data)
+        if device_config and "lg" in device_config.identifier_patterns[0].lower():
             return f"{pool_name} Eco Elyo"
 
         return f"{pool_name} {device_name}"
@@ -961,3 +967,112 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         })
 
         return attrs
+
+
+class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
+    """Switch for chlorinator boost mode."""
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the boost mode switch."""
+        super().__init__(coordinator)
+        self._api = api
+        self._pool_id = pool_id
+        self._device_id = device_id
+
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+
+        self._attr_name = f"{device_name} Boost Mode"
+        self._attr_unique_id = f"fluidra_{self._device_id}_boost_mode"
+        self._attr_icon = "mdi:rocket-launch"
+
+    @property
+    def device_data(self) -> dict:
+        """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
+        pool = self.coordinator.data.get(self._pool_id)
+        if pool:
+            for device in pool.get("devices", []):
+                if device.get("device_id") == self._device_id:
+                    return device
+        return {}
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        return {
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": device_name,
+            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
+            "model": self.device_data.get("model", "Chlorinator"),
+            "via_device": (DOMAIN, self._pool_id),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (
+            self.coordinator.last_update_success
+            and self.device_data.get("online", False)
+        )
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if boost mode is on."""
+        components = self.device_data.get("components", {})
+        component_245 = components.get("245", {})
+        boost_value = component_245.get("reportedValue", False)
+        return bool(boost_value)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn boost mode on."""
+        _LOGGER.info(f"Turning ON boost mode for chlorinator {self._device_id}")
+
+        try:
+            success = await self._api.control_device_component(self._device_id, 245, True)
+
+            if success:
+                _LOGGER.info(f"✅ Boost mode enabled for chlorinator {self._device_id}")
+                import asyncio
+                await asyncio.sleep(2)
+                await self.coordinator.async_request_refresh()
+            else:
+                _LOGGER.error(f"❌ Failed to enable boost mode for chlorinator {self._device_id}")
+
+        except Exception as err:
+            _LOGGER.error(f"Error enabling boost mode: {err}")
+            raise
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn boost mode off."""
+        _LOGGER.info(f"Turning OFF boost mode for chlorinator {self._device_id}")
+
+        try:
+            success = await self._api.control_device_component(self._device_id, 245, False)
+
+            if success:
+                _LOGGER.info(f"✅ Boost mode disabled for chlorinator {self._device_id}")
+                import asyncio
+                await asyncio.sleep(2)
+                await self.coordinator.async_request_refresh()
+            else:
+                _LOGGER.error(f"❌ Failed to disable boost mode for chlorinator {self._device_id}")
+
+        except Exception as err:
+            _LOGGER.error(f"Error disabling boost mode: {err}")
+            raise
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional state attributes."""
+        return {
+            "component": 245,
+            "device_id": self._device_id,
+        }

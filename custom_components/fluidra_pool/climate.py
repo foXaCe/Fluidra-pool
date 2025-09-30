@@ -86,13 +86,11 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         self._api = api
         self._pool_id = pool_id
         self._device_id = device_id
+        # Optimistic state management
         self._pending_temperature = None
-        self._last_action_time = None
-        # Optimistic state updates
         self._pending_preset_mode = None
         self._pending_hvac_mode = None
-        self._last_preset_action_time = None
-        self._last_hvac_action_time = None
+        self._is_updating = False  # Indicates an action is in progress
 
     @property
     def device_data(self) -> dict:
@@ -162,17 +160,17 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     @property
     def target_temperature(self) -> Optional[float]:
         """Return the target temperature."""
-        # Si on a une température en attente, l'utiliser
+        actual_temp = self.device_data.get("target_temperature")
+
+        # Return optimistic temperature while waiting for server confirmation
         if self._pending_temperature is not None:
-            import time
-            # Effacer la température en attente après 15 secondes
-            if time.time() - self._last_action_time > 15:
+            # Clear optimistic state if server confirmed the change
+            if actual_temp == self._pending_temperature:
                 self._pending_temperature = None
-                self._last_action_time = None
             else:
                 return self._pending_temperature
 
-        return self.device_data.get("target_temperature")
+        return actual_temp
 
     @property
     def min_temp(self) -> float:
@@ -477,7 +475,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             "last_update": device_data.get("last_update"),
             # UI responsiveness indicators
             "pending_temperature": self._pending_temperature is not None,
-            "action_timestamp": self._last_action_time,
+            "is_updating": self._is_updating,
             # State sources pour debugging
             "heat_pump_reported": device_data.get("heat_pump_reported"),
             "is_heating": device_data.get("is_heating"),
