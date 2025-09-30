@@ -112,12 +112,8 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
         component_data = components.get(str(self._component_id), {})
 
         # Debug logging
-        _LOGGER.debug(f"Component {self._component_id}: device_data keys: {list(self.device_data.keys())}")
-        _LOGGER.debug(f"Component {self._component_id}: components keys: {list(components.keys())}")
-        _LOGGER.debug(f"Component {self._component_id}: component_data: {component_data}")
 
         reported_value = component_data.get("reportedValue", 0)
-        _LOGGER.debug(f"Component {self._component_id}: reported_value: {reported_value}")
 
         return reported_value
 
@@ -228,7 +224,6 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
         component_15_data = components.get("15", {})
         current_value = component_15_data.get("reportedValue", 50)
 
-        _LOGGER.debug(f"Speed control - current value: {current_value}")
         return current_value
 
     async def async_set_native_value(self, value: float) -> None:
