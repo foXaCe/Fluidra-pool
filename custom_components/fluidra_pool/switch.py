@@ -798,7 +798,6 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                     schedule_id = schedule.get("id")
                     # Compare both as string and int to handle type mismatch
                     if str(schedule_id) == str(self._schedule_id):
-                        _LOGGER.info(f"[{self._schedule_id}] ✅ Found matching schedule!")
                         return schedule
 
                 _LOGGER.debug(f"[{self._schedule_id}] Schedule not found in {len(schedules)} schedules")
