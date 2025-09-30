@@ -189,7 +189,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                             device["components"] = {}
 
                         # Polling intensif de TOUS les components pour trouver la vitesse manuelle
-                        for component_id in range(0, 25):  # Test de tous les components 0-24
+                        # Pour les pompes à chaleur, étendre la plage pour capturer les températures (components 62, 65, 67)
+                        component_range = 70 if device.get("type", "").lower() == "heat_pump" else 25
+                        for component_id in range(0, component_range):
                             component_state = await self.api.get_component_state(device_id, component_id)
                             if component_state and isinstance(component_state, dict):
                                 reported_value = component_state.get("reportedValue")
