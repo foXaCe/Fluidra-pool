@@ -506,7 +506,6 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         if "schedule_data" in device_data:
             schedules = device_data["schedule_data"]
             _LOGGER.info(f"[SENSOR] ✅ Found {len(schedules)} schedules in schedule_data")
-            for i, schedule in enumerate(schedules):
             return schedules
         else:
             _LOGGER.warning(f"[SENSOR] ❌ No 'schedule_data' key found in device data")
