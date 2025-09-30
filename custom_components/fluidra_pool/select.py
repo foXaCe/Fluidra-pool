@@ -11,6 +11,7 @@ from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN
 from .coordinator import FluidraDataUpdateCoordinator
+from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,21 +29,27 @@ async def async_setup_entry(
     pools = await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
-            device_type = device.get("type", "").lower()
             device_id = device.get("device_id")
+            device_type = device.get("type", "")
 
             if not device_id:
                 continue
 
-            # Speed select for variable speed pumps (exclude LG heat pumps)
-            if device.get("variable_speed") and not device_id.startswith("LG"):
-                entities.append(FluidraPumpSpeedSelect(coordinator, coordinator.api, pool["id"], device_id))
-            elif device.get("variable_speed") and device_id.startswith("LG"):
-                pass  # Skip speed level select for LG heat pumps
+            # Chlorinator mode select (OFF/ON/AUTO)
+            if device_type == "chlorinator":
+                entities.append(FluidraChlorinatorModeSelect(coordinator, coordinator.api, pool["id"], device_id))
+                _LOGGER.info(f"✅ Adding chlorinator mode select for {device_id}")
 
-            # Schedule mode selects for pumps (exclude LG heat pumps and devices without schedule_data)
-            if ("pump" in device_type and device_type != "heat pump" and
-                not device_id.startswith("LG") and device.get("schedule_data")):
+            # Skip heat pumps - they don't have speed or schedule controls
+            if DeviceIdentifier.has_feature(device, "skip_schedules"):
+                continue
+
+            # Speed select for variable speed pumps
+            if DeviceIdentifier.should_create_entity(device, "select") and device.get("variable_speed"):
+                entities.append(FluidraPumpSpeedSelect(coordinator, coordinator.api, pool["id"], device_id))
+
+            # Schedule mode selects for pumps with schedules
+            if DeviceIdentifier.should_create_entity(device, "select") and device.get("schedule_data"):
                 # Create selects for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                     entities.append(FluidraScheduleModeSelect(
@@ -572,3 +579,143 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
             })
 
         return attrs
+
+
+class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
+    """Select entity for chlorinator mode (OFF/ON/AUTO)."""
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the chlorinator mode select."""
+        super().__init__(coordinator)
+        self._api = api
+        self._pool_id = pool_id
+        self._device_id = device_id
+        self._optimistic_option = None
+
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+
+        self._attr_name = f"{device_name} Mode"
+        self._attr_unique_id = f"fluidra_{self._device_id}_mode"
+
+        # Mode options: OFF, ON, AUTO
+        self._attr_options = ["Arrêt", "Marche", "Auto"]
+
+        # Mapping options → component 20 values
+        self._mode_mapping = {
+            "Arrêt": 0,
+            "Marche": 1,
+            "Auto": 2
+        }
+
+        # Inverse mapping for display
+        self._value_to_mode = {
+            0: "Arrêt",
+            1: "Marche",
+            2: "Auto"
+        }
+
+    @property
+    def device_data(self) -> dict:
+        """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
+        pool = self.coordinator.data.get(self._pool_id)
+        if pool:
+            for device in pool.get("devices", []):
+                if device.get("device_id") == self._device_id:
+                    return device
+        return {}
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        return {
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": device_name,
+            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
+            "model": self.device_data.get("model", "Chlorinator"),
+            "via_device": (DOMAIN, self._pool_id),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (
+            self.coordinator.last_update_success
+            and self.device_data.get("online", False)
+        )
+
+    @property
+    def current_option(self) -> Optional[str]:
+        """Return the current mode option."""
+        # Use optimistic option if set
+        if self._optimistic_option is not None:
+            return self._optimistic_option
+
+        # Get current mode from component 20
+        mode_value = self.device_data.get("mode_reported", 0)
+        return self._value_to_mode.get(mode_value, "Arrêt")
+
+    async def async_select_option(self, option: str) -> None:
+        """Select new mode option."""
+        if option not in self._mode_mapping:
+            _LOGGER.error(f"Invalid chlorinator mode option: {option}")
+            return
+
+        mode_value = self._mode_mapping[option]
+
+        _LOGGER.info(f"Setting chlorinator {self._device_id} to mode {option} (value={mode_value})")
+
+        try:
+            # Set optimistic option immediately
+            self._optimistic_option = option
+            self.async_write_ha_state()
+
+            # Small delay for UI update
+            import asyncio
+            await asyncio.sleep(0.1)
+
+            # Send command to API (component 20)
+            success = await self._api.control_device_component(self._device_id, 20, mode_value)
+
+            if success:
+                _LOGGER.info(f"✅ Chlorinator mode set to {option}")
+                await asyncio.sleep(2)
+                await self.coordinator.async_request_refresh()
+            else:
+                _LOGGER.error(f"❌ Failed to set chlorinator mode to {option}")
+
+        except Exception as err:
+            _LOGGER.error(f"Error setting chlorinator mode to {option}: {err}")
+            raise
+        finally:
+            # Clear optimistic option
+            self._optimistic_option = None
+            self.async_write_ha_state()
+
+    @property
+    def icon(self) -> str:
+        """Return the icon for the entity."""
+        current = self.current_option
+        if current == "Arrêt":
+            return "mdi:water-off"
+        elif current == "Marche":
+            return "mdi:water"
+        else:  # Auto
+            return "mdi:water-sync"
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional state attributes."""
+        return {
+            "device_id": self._device_id,
+            "mode_component": 20,
+            "optimistic_option": self._optimistic_option,
+        }

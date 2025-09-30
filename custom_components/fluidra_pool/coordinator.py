@@ -21,6 +21,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         self.api = api
         self._optimistic_entities = set()  # Entités avec état optimiste actif
         self._previous_schedule_entities = {}  # Track scheduler entities per device for cleanup
+        self._first_update = True  # Skip heavy polling on first update for faster startup
         super().__init__(
             hass,
             _LOGGER,
@@ -156,6 +157,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             # D'abord, récupérer la structure des pools
             pools = await self.api.get_pools()
 
+            # Premier démarrage : scan minimal pour démarrer vite
+            if self._first_update:
+                _LOGGER.info("🚀 First update: minimal scan for fast startup")
+                self._first_update = False
+                # Le prochain refresh normal (30s) fera le scan complet
+                return {pool['id']: pool for pool in pools}
+
             # Pour chaque pool, faire le polling temps réel des devices
             for pool in pools:
                 pool_id = pool["id"]
@@ -189,11 +197,20 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                         if "components" not in device:
                             device["components"] = {}
 
-                        # Polling intensif de TOUS les components
+                        # Polling des components
                         # Utiliser le registry pour déterminer la plage de composants à scanner
                         component_range = DeviceIdentifier.get_components_range(device)
 
-                        for component_id in range(0, component_range):
+                        # Check if device has specific components to scan (optimization for chlorinator)
+                        specific_components = DeviceIdentifier.get_feature(device, "specific_components", [])
+
+                        # Build list of components to scan
+                        components_to_scan = list(range(0, component_range))
+                        if specific_components:
+                            # Add specific components, avoiding duplicates
+                            components_to_scan.extend([c for c in specific_components if c not in components_to_scan])
+
+                        for component_id in components_to_scan:
                             component_state = await self.api.get_component_state(device_id, component_id)
                             if component_state and isinstance(component_state, dict):
                                 reported_value = component_state.get("reportedValue")
@@ -272,23 +289,34 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                                 _LOGGER.info(f"🌡️ Heat pump {device_id} water temperature from component 19: {water_temp_value}°C")
                                         except (ValueError, TypeError):
                                             pass
-                                elif component_id == 20:  # Programmations
-                                    schedule_data = reported_value if isinstance(reported_value, list) else []
-                                    device["schedule_data"] = schedule_data
+                                elif component_id == 20:
+                                    # Component 20 has different meanings:
+                                    # - For pumps: schedules (list)
+                                    # - For chlorinators: mode (0=OFF, 1=ON, 2=AUTO)
+                                    device_type = device.get("type", "")
 
-                                    # Track current scheduler count for this device
-                                    current_schedule_count = len(schedule_data)
-                                    device_key = f"{pool_id}_{device_id}"
+                                    if device_type == "chlorinator":
+                                        # Chlorinator mode
+                                        if isinstance(reported_value, int):
+                                            device["mode_reported"] = reported_value
+                                    else:
+                                        # Pump schedules
+                                        schedule_data = reported_value if isinstance(reported_value, list) else []
+                                        device["schedule_data"] = schedule_data
 
-                                    # Check if we had schedulers before and now have fewer (indicating deletion)
-                                    previous_count = self._previous_schedule_entities.get(device_key, 0)
-                                    if previous_count > 0 and current_schedule_count < previous_count:
-                                        _LOGGER.info(f"🗑️ Schedule count decreased for device {device_id}: {previous_count} → {current_schedule_count}")
-                                        # Trigger entity registry cleanup for this device's schedule sensor
-                                        await self._cleanup_schedule_sensor_if_empty(pool_id, device_id, schedule_data)
+                                        # Track current scheduler count for this device
+                                        current_schedule_count = len(schedule_data)
+                                        device_key = f"{pool_id}_{device_id}"
 
-                                    # Update tracking count
-                                    self._previous_schedule_entities[device_key] = current_schedule_count
+                                        # Check if we had schedulers before and now have fewer (indicating deletion)
+                                        previous_count = self._previous_schedule_entities.get(device_key, 0)
+                                        if previous_count > 0 and current_schedule_count < previous_count:
+                                            _LOGGER.info(f"🗑️ Schedule count decreased for device {device_id}: {previous_count} → {current_schedule_count}")
+                                            # Trigger entity registry cleanup for this device's schedule sensor
+                                            await self._cleanup_schedule_sensor_if_empty(pool_id, device_id, schedule_data)
+
+                                        # Update tracking count
+                                        self._previous_schedule_entities[device_key] = current_schedule_count
                                 elif component_id == 21:  # Network Status
                                     device["network_status_component"] = reported_value
                                 elif component_id == 13:  # Component 13 - État pompe à chaleur

@@ -62,6 +62,21 @@ async def async_setup_entry(
                 if "brightness" in device:
                     entities.append(FluidraLightBrightnessSensor(coordinator, coordinator.api, pool["id"], device_id))
 
+            # Chlorinator sensors
+            device_type = device.get("type", "")
+            if device_type == "chlorinator":
+                # pH sensor (component 172)
+                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "ph", 172))
+                # ORP sensor (component 177)
+                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "orp", 177))
+                # Free chlorine sensor (component 178)
+                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "free_chlorine", 178))
+                # Temperature sensor (component 183)
+                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "temperature", 183))
+                # Salinity sensor (component 185)
+                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "salinity", 185))
+                _LOGGER.info(f"✅ Adding 5 chlorinator sensors for {device_id}")
+
         # Sensors spécifiques à la piscine (pas liés aux devices)
         entities.append(FluidraPoolWeatherSensor(coordinator, coordinator.api, pool["id"]))
         entities.append(FluidraPoolStatusSensor(coordinator, coordinator.api, pool["id"]))
@@ -1097,3 +1112,141 @@ class FluidraPoolWaterQualitySensor(FluidraPoolSensorBase):
             attrs["waterproof"] = characteristics.get("waterproof")
 
         return attrs
+
+
+class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
+    """Sensor for chlorinator measurements (pH, ORP, chlorine, temperature, salinity)."""
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api,
+        pool_id: str,
+        device_id: str,
+        sensor_type: str,
+        component_id: int,
+    ) -> None:
+        """Initialize the chlorinator sensor."""
+        super().__init__(coordinator)
+        self._api = api
+        self._pool_id = pool_id
+        self._device_id = device_id
+        self._sensor_type = sensor_type
+        self._component_id = component_id
+
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+
+        # Sensor configuration based on type
+        self._sensor_config = {
+            "ph": {
+                "name": f"{device_name} pH",
+                "unit": None,
+                "device_class": None,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "icon": "mdi:ph",
+                "divisor": 100,  # Component value is pH * 100 (720 = 7.20)
+            },
+            "orp": {
+                "name": f"{device_name} ORP",
+                "unit": "mV",
+                "device_class": SensorDeviceClass.VOLTAGE,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "icon": "mdi:lightning-bolt",
+                "divisor": 1,
+            },
+            "free_chlorine": {
+                "name": f"{device_name} Free Chlorine",
+                "unit": "mg/L",
+                "device_class": None,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "icon": "mdi:test-tube",
+                "divisor": 100,  # Component value is mg/L * 100
+            },
+            "temperature": {
+                "name": f"{device_name} Water Temperature",
+                "unit": UnitOfTemperature.CELSIUS,
+                "device_class": SensorDeviceClass.TEMPERATURE,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "icon": "mdi:thermometer",
+                "divisor": 10,  # Component value is °C * 10
+            },
+            "salinity": {
+                "name": f"{device_name} Salinity",
+                "unit": "g/L",
+                "device_class": None,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "icon": "mdi:water-opacity",
+                "divisor": 100,  # Component value is g/L * 100
+            },
+        }
+
+        config = self._sensor_config.get(sensor_type, {})
+        self._attr_name = config.get("name", f"{device_name} {sensor_type}")
+        self._attr_unique_id = f"fluidra_{self._device_id}_{sensor_type}"
+        self._attr_native_unit_of_measurement = config.get("unit")
+        self._attr_device_class = config.get("device_class")
+        self._attr_state_class = config.get("state_class")
+        self._attr_icon = config.get("icon")
+        self._divisor = config.get("divisor", 1)
+
+    @property
+    def device_data(self) -> dict:
+        """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
+        pool = self.coordinator.data.get(self._pool_id)
+        if pool:
+            for device in pool.get("devices", []):
+                if device.get("device_id") == self._device_id:
+                    return device
+        return {}
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        return {
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": device_name,
+            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
+            "model": self.device_data.get("model", "Chlorinator"),
+            "via_device": (DOMAIN, self._pool_id),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (
+            self.coordinator.last_update_success
+            and self.device_data.get("online", False)
+        )
+
+    @property
+    def native_value(self) -> Optional[float]:
+        """Return the sensor value."""
+        components = self.device_data.get("components", {})
+        component_data = components.get(str(self._component_id), {})
+        raw_value = component_data.get("reportedValue")
+
+        if raw_value is None:
+            return None
+
+        try:
+            # Apply divisor to get actual value
+            return float(raw_value) / self._divisor
+        except (ValueError, TypeError):
+            return None
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional state attributes."""
+        components = self.device_data.get("components", {})
+        component_data = components.get(str(self._component_id), {})
+
+        return {
+            "component_id": self._component_id,
+            "sensor_type": self._sensor_type,
+            "raw_value": component_data.get("reportedValue"),
+            "divisor": self._divisor,
+            "device_id": self._device_id,
+        }

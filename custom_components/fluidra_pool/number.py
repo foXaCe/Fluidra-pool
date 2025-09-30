@@ -29,9 +29,15 @@ async def async_setup_entry(
     pools = await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
-            if device.get("type") == DEVICE_TYPE_PUMP:
-                device_id = device["device_id"]
+            device_id = device.get("device_id")
+            device_type = device.get("type", "")
 
+            # Chlorinator chlorination level
+            if device_type == "chlorinator":
+                entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool["id"], device_id))
+                _LOGGER.info(f"✅ Adding chlorinator level number for {device_id}")
+
+            if device_type == DEVICE_TYPE_PUMP:
                 # Groupe Réglages - Contrôles de vitesse temporairement désactivés
                 pass
 
@@ -270,6 +276,124 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
             "speed_level": speed_level,
             "pump_model": self.device_data.get("model", "E30iQ"),
             "online": self.device_data.get("online", False),
+        }
+
+
+class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
+    """Number entity for chlorinator chlorination level (0-100%)."""
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the chlorinator level control."""
+        super().__init__(coordinator)
+        self._api = api
+        self._pool_id = pool_id
+        self._device_id = device_id
+
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+
+        self._attr_name = f"{device_name} Chlorination Level"
+        self._attr_unique_id = f"fluidra_{self._device_id}_chlorination_level"
+        self._attr_mode = "slider"
+
+        self._attr_native_min_value = 0
+        self._attr_native_max_value = 100
+        self._attr_native_step = 1
+        self._attr_native_unit_of_measurement = PERCENTAGE
+        self._attr_device_class = NumberDeviceClass.POWER_FACTOR
+
+    @property
+    def device_data(self) -> dict:
+        """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
+        pool = self.coordinator.data.get(self._pool_id)
+        if pool:
+            for device in pool.get("devices", []):
+                if device.get("device_id") == self._device_id:
+                    return device
+        return {}
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        return {
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": device_name,
+            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
+            "model": self.device_data.get("model", "Chlorinator"),
+            "via_device": (DOMAIN, self._pool_id),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (
+            self.coordinator.last_update_success
+            and self.device_data.get("online", False)
+        )
+
+    @property
+    def native_value(self) -> Optional[float]:
+        """Return the current chlorination level from component 4."""
+        components = self.device_data.get("components", {})
+        component_4_data = components.get("4", {})
+        current_value = component_4_data.get("reportedValue", 0)
+
+        return current_value
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the chlorination level via component 4."""
+        int_value = int(value)
+
+        _LOGGER.info(f"Setting chlorinator {self._device_id} chlorination level to {int_value}%")
+
+        try:
+            # Write to component 4
+            success = await self._api.control_device_component(self._device_id, 4, int_value)
+
+            if success:
+                _LOGGER.info(f"✅ Chlorination level set to {int_value}%")
+                import asyncio
+                await asyncio.sleep(2)
+                await self.coordinator.async_request_refresh()
+            else:
+                _LOGGER.error(f"❌ Failed to set chlorination level to {int_value}%")
+
+        except Exception as err:
+            _LOGGER.error(f"Error setting chlorination level: {err}")
+            raise
+
+    @property
+    def icon(self) -> str:
+        """Return the icon for the entity."""
+        current_level = self.native_value or 0
+        if current_level == 0:
+            return "mdi:water-percent-alert"
+        elif current_level < 30:
+            return "mdi:water-percent"
+        elif current_level < 70:
+            return "mdi:water-percent"
+        else:
+            return "mdi:water-percent"
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional state attributes."""
+        current_level = self.native_value or 0
+
+        return {
+            "chlorination_range": "0-100%",
+            "read_component": 164,
+            "write_component": 4,
+            "current_level": current_level,
+            "device_id": self._device_id,
         }
 
 

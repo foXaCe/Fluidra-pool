@@ -11,6 +11,8 @@ import asyncio
 import json
 from typing import Dict, List, Any, Optional
 
+from .device_registry import DeviceIdentifier
+
 # API endpoints discovered through reverse engineering
 FLUIDRA_EMEA_BASE = "https://api.fluidra-emea.com"
 COGNITO_ENDPOINT = "https://cognito-idp.eu-west-1.amazonaws.com/"
@@ -262,36 +264,58 @@ class FluidraPoolAPI:
 
                     _LOGGER.info(f"   📋 Extracted: ID={device_id}, name={device_name}, family={family}, type={device_type}")
 
+                    # Skip bridges - they are not controllable devices, only their children are
+                    is_bridge = "bridge" in family.lower() or "devices" in device
+
+                    if is_bridge:
+                        _LOGGER.info(f"   🔗 Device {device_id} is a bridge, processing children only")
+                        # Handle bridged devices (e.g., chlorinator under bridge)
+                        if "devices" in device and isinstance(device["devices"], list):
+                            _LOGGER.info(f"      Bridge has {len(device['devices'])} child(ren)")
+                            for child_device in device["devices"]:
+                                child_device_id = child_device.get("id")
+                                child_info = child_device.get("info", {})
+                                child_device_name = child_info.get("name", f"Device {child_device_id}")
+                                child_family = child_info.get("family", "")
+                                child_connection_type = child_device.get("type", "unknown")
+
+                                _LOGGER.info(f"      └─ Child: ID={child_device_id}, name={child_device_name}, family={child_family}")
+
+                                # Determine child device type
+                                child_family_lower = child_family.lower()
+                                if "chlorinator" in child_family_lower or "electrolyseur" in child_family_lower:
+                                    child_device_type = "chlorinator"
+                                elif "pump" in child_family_lower:
+                                    child_device_type = "pump"
+                                else:
+                                    child_device_type = "unknown"
+
+                                child_device_info = {
+                                    "pool_id": pool_id,
+                                    "device_id": child_device_id,
+                                    "name": child_device_name,
+                                    "type": child_device_type,
+                                    "family": child_family,
+                                    "connection_type": child_connection_type,
+                                    "model": child_device_name,
+                                    "manufacturer": "Fluidra",
+                                    "online": child_connection_type == "connected",
+                                    "is_running": False,
+                                    "auto_mode_enabled": False,
+                                    "operation_mode": 0,
+                                    "speed_percent": 0,
+                                    "parent_id": device_id,  # Link to parent bridge
+                                }
+                                self.devices.append(child_device_info)
+                                _LOGGER.info(f"      ✅ Added child device {child_device_id} ({child_device_type})")
+                        continue  # Skip adding the bridge itself
+
+                    # Don't fetch initial states during discovery - let first polling do it
+                    # This speeds up Home Assistant startup significantly
                     is_running = False
                     operation_mode = 0
                     speed_percent = 0
                     auto_mode_enabled = False
-
-                    if "pump" in device_type:
-                        # Get pump on/off state (component 9) - PRIMAIRE pour savoir si running
-                        pump_running = False
-                        pump_state_data = await self.get_device_component_state(device_id, 9)
-                        if pump_state_data:
-                            pump_running = bool(pump_state_data.get("reportedValue", 0))
-
-                        # Get pump speed state (component 11) - vitesse seulement si running
-                        speed_level = 0
-                        speed_state_data = await self.get_device_component_state(device_id, 11)
-                        if speed_state_data:
-                            speed_level = speed_state_data.get("reportedValue", 0)
-
-                        # Logique finale: si pompe arrêtée, speed = 0, sinon utiliser mapping
-                        if pump_running:
-                            is_running = True
-                            speed_percent = self.speed_percentages.get(speed_level, 45)
-                        else:
-                            is_running = False
-                            speed_percent = 0
-
-                        # Get auto mode state (component 10)
-                        auto_mode_state_data = await self.get_device_component_state(device_id, 10)
-                        if auto_mode_state_data:
-                            auto_mode_enabled = bool(auto_mode_state_data.get("reportedValue", 0))
 
                     device_info = {
                         "pool_id": pool_id,
@@ -312,11 +336,24 @@ class FluidraPoolAPI:
                     }
                     self.devices.append(device_info)
 
-                _LOGGER.info(f"✅ Pool {pool_id}: {len(pool_devices)} équipement(s) découvert(s)")
+                # Count all devices including bridged ones
+                total_devices = len(pool_devices)
+                for device in pool_devices:
+                    if "devices" in device and isinstance(device["devices"], list):
+                        total_devices += len(device["devices"])
+
+                _LOGGER.info(f"✅ Pool {pool_id}: {total_devices} équipement(s) découvert(s)")
                 for device in pool_devices:
                     info = device.get("info", {})
                     device_name = info.get("name", f"Device {device.get('id')}")
                     _LOGGER.info(f"   📱 Device: {device_name} ({device.get('id')})")
+
+                    # Log bridged devices
+                    if "devices" in device and isinstance(device["devices"], list):
+                        for child_device in device["devices"]:
+                            child_info = child_device.get("info", {})
+                            child_device_name = child_info.get("name", f"Device {child_device.get('id')}")
+                            _LOGGER.info(f"      └─ {child_device_name} ({child_device.get('id')})")
             else:
                 error_text = await response.text()
                 _LOGGER.warning(f"⚠️ Impossible de récupérer les équipements pour pool {pool_id}: {response.status} - {error_text}")
@@ -487,10 +524,16 @@ class FluidraPoolAPI:
                 if response.status == 200:
                     devices = await response.json()
 
-                    # Recherche du device dans la réponse
+                    # Recherche du device dans la réponse (y compris les périphériques bridgés)
                     for device in devices:
                         if device.get('id') == device_id:
                             return device
+
+                        # Check bridged devices (e.g., chlorinator under bridge)
+                        if "devices" in device and isinstance(device["devices"], list):
+                            for child_device in device["devices"]:
+                                if child_device.get('id') == device_id:
+                                    return child_device
 
                     _LOGGER.warning(f"Device {device_id} non trouvé dans la réponse polling")
                     return None
@@ -752,15 +795,20 @@ class FluidraPoolAPI:
             _LOGGER.error(f"❌ Error setting heat pump temperature: {e}")
             return False
 
-    def _is_lg_heat_pump(self, device_id: str) -> bool:
-        """Check if device is an LG heat pump (like LG24350023)."""
-        return device_id.startswith("LG")
+    def _is_heat_pump(self, device_id: str) -> bool:
+        """Check if device is a heat pump (LG Eco Elyo or Z250iQ)."""
+        device = self.get_device_by_id(device_id)
+        if not device:
+            return False
+
+        device_config = DeviceIdentifier.identify_device(device)
+        return device_config and device_config.device_type == "heat_pump"
 
     async def start_pump(self, device_id: str) -> bool:
         """Start pump using appropriate component based on device type."""
-        # LG heat pumps use component 13 for ON/OFF
-        if self._is_lg_heat_pump(device_id):
-            _LOGGER.info(f"🌡️ Starting LG heat pump {device_id} using component 13")
+        # Heat pumps (LG Eco Elyo, Z250iQ) use component 13 for ON/OFF
+        if self._is_heat_pump(device_id):
+            _LOGGER.info(f"🌡️ Starting heat pump {device_id} using component 13")
             return await self.control_device_component(device_id, 13, 1)
 
         # Standard pumps use component 9
@@ -781,9 +829,9 @@ class FluidraPoolAPI:
 
     async def stop_pump(self, device_id: str) -> bool:
         """Stop pump using appropriate component based on device type."""
-        # LG heat pumps use component 13 for ON/OFF
-        if self._is_lg_heat_pump(device_id):
-            _LOGGER.info(f"🌡️ Stopping LG heat pump {device_id} using component 13")
+        # Heat pumps (LG Eco Elyo, Z250iQ) use component 13 for ON/OFF
+        if self._is_heat_pump(device_id):
+            _LOGGER.info(f"🌡️ Stopping heat pump {device_id} using component 13")
             return await self.control_device_component(device_id, 13, 0)
 
         # Standard pumps use component 9
