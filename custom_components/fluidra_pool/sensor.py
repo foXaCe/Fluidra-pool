@@ -502,13 +502,11 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         """Get schedules data from device data."""
         # Chercher dans les données du coordinateur d'abord
         device_data = self.device_data
-        _LOGGER.debug(f"[SENSOR] Device data keys: {list(device_data.keys())}")
 
         if "schedule_data" in device_data:
             schedules = device_data["schedule_data"]
             _LOGGER.info(f"[SENSOR] ✅ Found {len(schedules)} schedules in schedule_data")
             for i, schedule in enumerate(schedules):
-                _LOGGER.debug(f"[SENSOR] Schedule {i}: id={schedule.get('id')}, enabled={schedule.get('enabled')}")
             return schedules
         else:
             _LOGGER.warning(f"[SENSOR] ❌ No 'schedule_data' key found in device data")

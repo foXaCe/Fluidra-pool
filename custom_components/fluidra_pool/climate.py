@@ -467,6 +467,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     def extra_state_attributes(self) -> dict:
         """Return extra state attributes."""
         device_data = self.device_data
+        pool_data = self.pool_data
         attrs = {
             "device_type": "heat_pump",
             "device_id": self._device_id,
@@ -491,6 +492,21 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             "state_sync_working": device_data.get("heat_pump_reported") is not None,
             "control_working": not device_data.get("permission_error", False)
         }
+
+        # Ajouter la température de l'eau de la piscine si disponible
+        water_quality = pool_data.get("water_quality", {})
+        if water_quality and isinstance(water_quality, dict):
+            # La température de l'eau peut être dans différentes structures
+            water_temp = None
+            if "temperature" in water_quality:
+                water_temp = water_quality["temperature"]
+            elif "waterTemperature" in water_quality:
+                water_temp = water_quality["waterTemperature"]
+            elif "water_temperature" in water_quality:
+                water_temp = water_quality["water_temperature"]
+
+            if water_temp is not None:
+                attrs["water_temperature"] = water_temp
 
         # Informations d'erreur pour feedback utilisateur
         if device_data.get("permission_error"):

@@ -102,11 +102,9 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
         try:
             # Get schedules from device data like the sensor does
             device_data = self.device_data
-            _LOGGER.debug(f"[TIME {self._schedule_id}] Device data keys: {list(device_data.keys())}")
 
             if "schedule_data" in device_data:
                 schedules = device_data["schedule_data"]
-                _LOGGER.debug(f"[TIME {self._schedule_id}] Found {len(schedules)} schedules in device data")
 
                 for schedule in schedules:
                     schedule_id = schedule.get("id")
@@ -127,7 +125,6 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
     def available(self) -> bool:
         """Return True if the schedule exists."""
         result = self._get_schedule_data() is not None
-        _LOGGER.debug(f"[TIME {self._schedule_id}] Time available: {result}")
         return result
 
     def _parse_cron_time(self, cron_time: str) -> Optional[time]:

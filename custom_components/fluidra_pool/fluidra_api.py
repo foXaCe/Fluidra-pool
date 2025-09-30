@@ -112,8 +112,6 @@ class FluidraPoolAPI:
         }
 
         _LOGGER.info(f"🔐 Authentification Cognito pour {self.email}")
-        _LOGGER.debug(f"📡 Payload Cognito: {auth_payload}")
-        _LOGGER.debug(f"📡 Headers Cognito: {headers}")
 
         async with self._session.post(
             COGNITO_ENDPOINT,
@@ -128,17 +126,14 @@ class FluidraPoolAPI:
 
             # AWS Cognito renvoie application/x-amz-json-1.1, il faut forcer le décodage
             response_text = await response.text()
-            _LOGGER.debug(f"📄 Réponse brute Cognito: {response_text[:200]}...")
 
             try:
                 auth_data = json.loads(response_text)
-                _LOGGER.debug(f"📄 Données parsées Cognito: {auth_data.keys() if isinstance(auth_data, dict) else 'Not a dict'}")
             except json.JSONDecodeError as e:
                 _LOGGER.error(f"❌ Erreur parsing JSON Cognito: {e}")
                 raise FluidraAuthError(f"Invalid JSON response: {e}")
 
             auth_result = auth_data.get("AuthenticationResult", {})
-            _LOGGER.debug(f"📄 AuthenticationResult keys: {auth_result.keys() if auth_result else 'Empty'}")
 
             self.access_token = auth_result.get("AccessToken")
             self.refresh_token = auth_result.get("RefreshToken")
@@ -166,15 +161,12 @@ class FluidraPoolAPI:
 
         profile_url = f"{FLUIDRA_EMEA_BASE}/mobile/consumers/me"
 
-        _LOGGER.debug(f"📡 Requête profil: {profile_url}")
-        _LOGGER.debug(f"📡 Headers profil: {headers}")
 
         async with self._session.get(profile_url, headers=headers) as response:
             _LOGGER.info(f"📄 Réponse profil: Status={response.status}")
             if response.status == 200:
                 profile_data = await response.json()
                 _LOGGER.info(f"✅ Profil utilisateur récupéré: {profile_data.get('email', 'N/A')}")
-                _LOGGER.debug(f"📄 Données profil: {profile_data}")
                 return profile_data
             else:
                 error_text = await response.text()
@@ -194,23 +186,17 @@ class FluidraPoolAPI:
         # Découvrir les piscines
         pools_url = f"{FLUIDRA_EMEA_BASE}/generic/users/me/pools"
 
-        _LOGGER.debug(f"📡 Requête piscines: {pools_url}")
-        _LOGGER.debug(f"📡 Headers piscines: {headers}")
 
         async with self._session.get(pools_url, headers=headers) as response:
             _LOGGER.info(f"📄 Réponse piscines: Status={response.status}")
             if response.status == 200:
                 pools_data = await response.json()
-                _LOGGER.debug(f"📄 Type données piscines: {type(pools_data)}")
-                _LOGGER.debug(f"📄 Données piscines brutes: {pools_data}")
 
                 # Handle both formats: direct list or dict with "pools" key
                 if isinstance(pools_data, list):
                     self.user_pools = pools_data
-                    _LOGGER.debug("📄 Format: liste directe")
                 else:
                     self.user_pools = pools_data.get("pools", [])
-                    _LOGGER.debug(f"📄 Format: dictionnaire avec clés {pools_data.keys() if isinstance(pools_data, dict) else 'N/A'}")
 
                 _LOGGER.info(f"✅ {len(self.user_pools)} piscine(s) découverte(s)")
                 for i, pool in enumerate(self.user_pools):
@@ -232,27 +218,21 @@ class FluidraPoolAPI:
         devices_url = f"{FLUIDRA_EMEA_BASE}/generic/devices"
         params = {"poolId": pool_id, "format": "tree"}
 
-        _LOGGER.debug(f"📡 Requête équipements: {devices_url}?{params}")
 
         async with self._session.get(devices_url, headers=headers, params=params) as response:
             _LOGGER.info(f"📄 Réponse équipements: Status={response.status}")
             if response.status == 200:
                 devices_data = await response.json()
-                _LOGGER.debug(f"📄 Type données équipements: {type(devices_data)}")
-                _LOGGER.debug(f"📄 Données équipements brutes: {devices_data}")
 
                 # Handle both formats: direct list or dict with "devices" key
                 if isinstance(devices_data, list):
                     pool_devices = devices_data
-                    _LOGGER.debug("📄 Format équipements: liste directe")
                 else:
                     pool_devices = devices_data.get("devices", [])
-                    _LOGGER.debug(f"📄 Format équipements: dictionnaire avec clés {devices_data.keys() if isinstance(devices_data, dict) else 'N/A'}")
 
                 _LOGGER.info(f"🔧 Processing {len(pool_devices)} devices for pool {pool_id}")
 
                 for device in pool_devices:
-                    _LOGGER.debug(f"📱 Raw device: {json.dumps(device, indent=2)}")
 
                     # Extract real device info from API structure
                     device_id = device.get("id")
@@ -510,7 +490,6 @@ class FluidraPoolAPI:
                     # Recherche du device dans la réponse
                     for device in devices:
                         if device.get('id') == device_id:
-                            _LOGGER.debug(f"Device {device_id} trouvé dans le polling")
                             return device
 
                     _LOGGER.warning(f"Device {device_id} non trouvé dans la réponse polling")
@@ -595,7 +574,6 @@ class FluidraPoolAPI:
                     else:
                         raise FluidraAuthError("Token refresh failed")
                 else:
-                    _LOGGER.debug(f"Impossible d'accéder au component {component_id}: {response.status}")
                     return None
         except Exception as e:
             _LOGGER.error(f"Exception get component state: {e}")
@@ -615,7 +593,6 @@ class FluidraPoolAPI:
             "User-Agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)"
         }
 
-        _LOGGER.debug(f"🚀 GET_STATE: GET {url}")
 
         if not self._session:
             self._session = aiohttp.ClientSession()
@@ -623,7 +600,6 @@ class FluidraPoolAPI:
         try:
             async with self._session.get(url, headers=headers) as response:
                 response_text = await response.text()
-                _LOGGER.debug(f"🎯 Get state response: {response.status} - {response_text}")
 
                 if response.status == 200:
                     state_data = await response.json()
@@ -658,7 +634,6 @@ class FluidraPoolAPI:
         payload = {"desiredValue": value}
 
         _LOGGER.info(f"🚀 CONTROL: PUT {url} with payload {payload}")
-        _LOGGER.debug(f"Using access token: {self.access_token[:50] if self.access_token else 'None'}...")
 
         if not self._session:
             self._session = aiohttp.ClientSession()
@@ -748,7 +723,6 @@ class FluidraPoolAPI:
 
             # Convertir la température en valeur × 10 pour l'API
             temperature_value = int(temperature * 10)
-            _LOGGER.debug(f"🔧 Converting temperature {temperature}°C to API value: {temperature_value}")
 
             success = await self.control_device_component(device_id, component_id, temperature_value)
             if success:
@@ -883,7 +857,6 @@ class FluidraPoolAPI:
         payload = {"desiredValue": schedules}
 
         _LOGGER.info(f"🚀 SCHEDULE: PUT {url}")
-        _LOGGER.debug(f"Payload: {json.dumps(payload, indent=2)}")
 
         if not self._session:
             self._session = aiohttp.ClientSession()
@@ -892,7 +865,6 @@ class FluidraPoolAPI:
             async with self._session.put(url, headers=headers, json=payload) as response:
                 response_text = await response.text()
 
-                _LOGGER.debug(f"Schedule API Response: {response.status} - {response_text}")
 
                 if response.status == 200:
                     _LOGGER.info("✅ Schedule updated successfully")
@@ -943,7 +915,6 @@ class FluidraPoolAPI:
         payload = {"desiredValue": value}
 
         _LOGGER.info(f"🚀 COMPONENT: PUT {url}")
-        _LOGGER.debug(f"Payload: {json.dumps(payload, indent=2)}")
 
         if not self._session:
             self._session = aiohttp.ClientSession()
@@ -952,7 +923,6 @@ class FluidraPoolAPI:
             async with self._session.put(url, headers=headers, json=payload) as response:
                 response_text = await response.text()
 
-                _LOGGER.debug(f"Component API Response: {response.status} - {response_text}")
 
                 if response.status == 200:
                     _LOGGER.info(f"✅ Component {component_id} set to {value} successfully")
@@ -999,7 +969,6 @@ class FluidraPoolAPI:
                 if response.status == 200:
                     pool_details = await response.json()
                     pool_data.update(pool_details)
-                    _LOGGER.debug(f"Pool details retrieved for {pool_id}")
                 elif response.status == 403:
                     if await self.refresh_access_token():
                         return await self.get_pool_details(pool_id)
@@ -1015,7 +984,6 @@ class FluidraPoolAPI:
                 if response.status == 200:
                     status_data = await response.json()
                     pool_data["status_data"] = status_data
-                    _LOGGER.debug(f"Pool status retrieved for {pool_id}")
         except Exception as e:
             _LOGGER.error(f"Exception récupération statut piscine: {e}")
 
@@ -1048,7 +1016,6 @@ class FluidraPoolAPI:
             async with self._session.get(url, headers=headers) as response:
                 if response.status == 200:
                     user_pools = await response.json()
-                    _LOGGER.debug(f"User pools retrieved: {len(user_pools) if user_pools else 0} pools")
                     return user_pools
                 elif response.status == 403:
                     # Token expiré, essayer de le rafraîchir

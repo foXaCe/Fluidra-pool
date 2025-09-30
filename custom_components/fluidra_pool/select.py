@@ -401,11 +401,9 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         try:
             # Get schedules from device data like the sensor does
             device_data = self.device_data
-            _LOGGER.debug(f"[SELECT {self._schedule_id}] Device data keys: {list(device_data.keys())}")
 
             if "schedule_data" in device_data:
                 schedules = device_data["schedule_data"]
-                _LOGGER.debug(f"[SELECT {self._schedule_id}] Found {len(schedules)} schedules in device data")
 
                 for schedule in schedules:
                     schedule_id = schedule.get("id")
@@ -426,7 +424,6 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
     def available(self) -> bool:
         """Return True if the schedule exists."""
         result = self._get_schedule_data() is not None
-        _LOGGER.debug(f"[SELECT {self._schedule_id}] Select available: {result}")
         return result
 
     def _operation_to_mode(self, operation: str) -> str:

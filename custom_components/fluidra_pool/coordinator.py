@@ -30,12 +30,10 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     def register_optimistic_entity(self, entity_id: str):
         """Enregistrer une entité comme ayant un état optimiste actif."""
         self._optimistic_entities.add(entity_id)
-        _LOGGER.debug(f"🎯 COORDINATOR: Registering optimistic entity {entity_id}")
 
     def unregister_optimistic_entity(self, entity_id: str):
         """Désenregistrer une entité de l'état optimiste."""
         self._optimistic_entities.discard(entity_id)
-        _LOGGER.debug(f"🔄 COORDINATOR: Unregistering optimistic entity {entity_id}")
 
     def has_optimistic_entities(self) -> bool:
         """Vérifier si des entités ont un état optimiste actif."""
@@ -61,8 +59,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                         _LOGGER.info(f"🗑️ Removing empty schedule sensor entity: {entity_id} (no schedules remaining)")
                         entity_registry.async_remove(entity_id)
                         break
-            else:
-                _LOGGER.debug(f"📊 Schedule sensor kept for device {device_id} ({len(schedule_data)} schedules remaining)")
 
         except Exception as e:
             _LOGGER.error(f"Error cleaning up schedule sensor for device {device_id}: {e}")
@@ -74,7 +70,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
             schedule_data = device.get("schedule_data", [])
             if not schedule_data:
-                _LOGGER.debug("No schedule data available, defaulting to 0%")
                 return 0
 
             now = datetime.now()
@@ -135,11 +130,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     if start_time_obj <= current_time <= end_time_obj:
                         operation = schedule.get("startActions", {}).get("operationName", "0")
                         speed_percent = operation_to_percent.get(operation, 0)
-                        _LOGGER.debug(f"✅ Active schedule found: {schedule.get('id')} - operation {operation} = {speed_percent}%")
                         return speed_percent
 
-            # No active schedule found = "Pas en marche"
-            _LOGGER.debug("No active schedule found, returning 0%")
             return 0
 
         except Exception as e:
@@ -151,7 +143,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             # Si des entités ont un état optimiste actif, réduire les mises à jour pour éviter les conflits
             if self.has_optimistic_entities():
-                _LOGGER.debug(f"🚫 COORDINATOR: Skipping aggressive polling - {len(self._optimistic_entities)} optimistic entities active")
                 # Retourner les données actuelles sans nouveau polling intensif
                 current_data = getattr(self, 'data', None)
                 if current_data:
@@ -177,7 +168,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     pool.update(pool_details)
                     # Restaurer les devices pour ne pas les écraser
                     pool["devices"] = existing_devices
-                    _LOGGER.debug(f"Pool details updated for {pool_id}")
 
                 # Polling télémétrie qualité de l'eau
                 water_quality = await self.api.poll_water_quality(pool_id)
@@ -230,20 +220,17 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                 elif component_id == 11:  # Vitesse levels (utilisé en auto ET manuel)
                                     device["speed_level_reported"] = reported_value
                                     device["speed_level_desired"] = component_state.get("desiredValue")
-                                    _LOGGER.debug(f"🔍 Component 11: reported={reported_value}, desired={component_state.get('desiredValue')}")
 
                                     # Component 11 : Vitesse en mode MANUEL uniquement
                                     if not device.get("is_running", False):
                                         # Pompe arrêtée = toujours 0%
                                         device["speed_percent"] = 0
-                                        _LOGGER.debug(f"✅ Pump stopped → speed_percent = 0")
                                     else:
                                         auto_mode = device.get("auto_mode_enabled", False)
                                         if auto_mode:
                                             # MODE AUTO : Calculer à partir des schedules actifs
                                             current_speed = self._calculate_auto_speed_from_schedules(device)
                                             device["speed_percent"] = current_speed
-                                            _LOGGER.debug(f"✅ AUTO Mode - Schedule-based speed: {current_speed}%")
                                         else:
                                             # MODE MANUEL : Utiliser Component 11
                                             if reported_value == 0:
@@ -254,9 +241,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                                 device["speed_percent"] = 100 # Élevée
                                             else:
                                                 device["speed_percent"] = 0   # Défaut
-                                            _LOGGER.debug(f"✅ MANUAL Mode - Speed level {reported_value} → speed_percent = {device['speed_percent']}")
                                 elif component_id == 15:  # Température de référence pour pompes à chaleur
-                                    _LOGGER.debug(f"📊 Component 15 (Référence): {component_state}")
                                     device["component_15_speed"] = reported_value or component_state.get("desiredValue") or 0
 
                                     # Pour les pompes à chaleur, component 15 peut contenir la température × 10
@@ -267,7 +252,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                             # Valider la plage de température (10-50°C)
                                             if 10.0 <= temp_value <= 50.0:
                                                 device["target_temperature"] = temp_value
-                                                _LOGGER.debug(f"🌡️ Heat pump {device_id} target temperature from component 15: {temp_value}°C")
                                         except (ValueError, TypeError):
                                             _LOGGER.warning(f"⚠️ Invalid temperature value in component 15: {reported_value}")
                                     # Note: Component 15 n'est plus utilisé pour le mode manuel, remplacé par Component 13
@@ -276,7 +260,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                 elif component_id == 20:  # Programmations
                                     schedule_data = reported_value or []
                                     device["schedule_data"] = schedule_data
-                                    _LOGGER.debug(f"📅 Updated schedules for device {device_id}: {len(schedule_data)} schedules")
 
                                     # Track current scheduler count for this device
                                     current_schedule_count = len(schedule_data)
@@ -294,37 +277,17 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                 elif component_id == 21:  # Network Status
                                     device["network_status_component"] = reported_value
                                 elif component_id == 13:  # Component 13 - État pompe à chaleur
-                                    _LOGGER.debug(f"📊 Component 13: {component_state}")
                                     device["component_13_data"] = component_state
 
                                     # Pour les pompes à chaleur, component 13 indique l'état de chauffage
                                     if device.get("type", "").lower() == "heat_pump":
                                         device["heat_pump_reported"] = reported_value
                                         device["is_heating"] = bool(reported_value)
-                                        _LOGGER.debug(f"🌡️ Heat pump {device_id} heating state from component 13: {bool(reported_value)}")
                                 elif component_id == 14:  # Component 14 exploration
-                                    _LOGGER.debug(f"📊 Component 14: {component_state}")
                                     device["component_14_data"] = component_state
                                 else:  # TOUS les autres components - exploration intensive
-                                    if reported_value is not None and reported_value != 0:
-                                        # Safe access to desiredValue
-                                        desired_value = component_state.get('desiredValue') if isinstance(component_state, dict) else None
-                                        _LOGGER.debug(f"🔍 COMPONENT {component_id}: reported={reported_value}, desired={desired_value}, full={component_state}")
                                     device[f"component_{component_id}_data"] = component_state
 
-                        # Logging final des résultats
-                        for device in pool.get("devices", []):
-                            device_id = device.get("device_id")
-                            if device_id:
-                                is_running = device.get("is_running", False)
-                                auto_mode = device.get("auto_mode_enabled", False)
-                                component_15_value = device.get("component_15_speed", 0)
-                                current_speed_percent = device.get("speed_percent", 0)
-                                speed_level = device.get("speed_level_reported", "unknown")
-
-                                _LOGGER.debug(f"🔧 Device {device_id}: running={is_running}, auto={auto_mode}, speed_level={speed_level}, final_speed={current_speed_percent}")
-
-            _LOGGER.debug(f"🔄 Polling temps réel terminé pour {len(pools)} pool(s)")
             return {pool['id']: pool for pool in pools}
 
         except Exception as err:
