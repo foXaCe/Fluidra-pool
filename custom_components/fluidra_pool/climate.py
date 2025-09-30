@@ -495,18 +495,42 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
         # Ajouter la température de l'eau de la piscine si disponible
         water_quality = pool_data.get("water_quality", {})
+        _LOGGER.info(f"🌡️ DEBUG water_quality data: {water_quality}")
+
         if water_quality and isinstance(water_quality, dict):
             # La température de l'eau peut être dans différentes structures
             water_temp = None
+
+            # Chercher dans la structure water_quality directement
             if "temperature" in water_quality:
                 water_temp = water_quality["temperature"]
+                _LOGGER.info(f"🌡️ Found water temp in 'temperature': {water_temp}")
             elif "waterTemperature" in water_quality:
                 water_temp = water_quality["waterTemperature"]
+                _LOGGER.info(f"🌡️ Found water temp in 'waterTemperature': {water_temp}")
             elif "water_temperature" in water_quality:
                 water_temp = water_quality["water_temperature"]
+                _LOGGER.info(f"🌡️ Found water temp in 'water_temperature': {water_temp}")
+
+            # Chercher dans une structure imbriquée (ex: jobs[0].result)
+            if water_temp is None and "jobs" in water_quality:
+                jobs = water_quality.get("jobs", [])
+                if jobs and len(jobs) > 0:
+                    result = jobs[0].get("result", {})
+                    _LOGGER.info(f"🌡️ Found jobs[0].result: {result}")
+                    if "temperature" in result:
+                        water_temp = result["temperature"]
+                        _LOGGER.info(f"🌡️ Found water temp in jobs[0].result.temperature: {water_temp}")
+                    elif "waterTemperature" in result:
+                        water_temp = result["waterTemperature"]
+                        _LOGGER.info(f"🌡️ Found water temp in jobs[0].result.waterTemperature: {water_temp}")
 
             if water_temp is not None:
                 attrs["water_temperature"] = water_temp
+                _LOGGER.info(f"🌡️ Added water_temperature to attrs: {water_temp}")
+            else:
+                _LOGGER.warning(f"🌡️ No water temperature found in water_quality data")
+                attrs["water_quality_debug"] = water_quality  # Pour debug
 
         # Informations d'erreur pour feedback utilisateur
         if device_data.get("permission_error"):
