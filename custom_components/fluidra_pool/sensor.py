@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import FluidraDataUpdateCoordinator
+from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,40 +35,32 @@ async def async_setup_entry(
     pools = await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
-            device_type = device.get("type", "").lower()
             device_id = device.get("device_id")
 
             if not device_id:
                 continue
 
-            # Optimize for LG heat pumps - only create essential sensors
-            is_lg_device = device_id.startswith("LG")
-            if is_lg_device:
-                # Only create device info sensor for LG heat pumps
+            # Use device registry to determine which sensors to create
+            if DeviceIdentifier.should_create_entity(device, "sensor_info"):
                 entities.append(FluidraDeviceInfoSensor(coordinator, coordinator.api, pool["id"], device_id))
-                continue
 
-            # Temperature sensors for heaters
-            if ("heater" in device_type or "heat" in device_type) and "current_temperature" in device:
-                entities.append(FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "current"))
-
-            if ("heater" in device_type or "heat" in device_type) and "target_temperature" in device:
-                entities.append(FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "target"))
-
-
-            # Schedule and speed sensors for pumps (exclude LG heat pumps)
-            if "pump" in device_type and not device_id.startswith("LG"):
+            if DeviceIdentifier.should_create_entity(device, "sensor_schedule"):
                 entities.append(FluidraPumpScheduleSensor(coordinator, coordinator.api, pool["id"], device_id))
-                # Speed sensor for pumps
+
+            if DeviceIdentifier.should_create_entity(device, "sensor_speed"):
                 entities.append(FluidraPumpSpeedSensor(coordinator, coordinator.api, pool["id"], device_id))
 
-            # Device info sensors for all pumps
-            if "pump" in device_type:
-                entities.append(FluidraDeviceInfoSensor(coordinator, coordinator.api, pool["id"], device_id))
+            if DeviceIdentifier.should_create_entity(device, "sensor_temperature"):
+                # Temperature sensors for heaters
+                if "current_temperature" in device:
+                    entities.append(FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "current"))
+                if "target_temperature" in device:
+                    entities.append(FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "target"))
 
-            # Brightness sensor for lights
-            if "light" in device_type and "brightness" in device:
-                entities.append(FluidraLightBrightnessSensor(coordinator, coordinator.api, pool["id"], device_id))
+            if DeviceIdentifier.should_create_entity(device, "sensor_brightness"):
+                # Brightness sensor for lights
+                if "brightness" in device:
+                    entities.append(FluidraLightBrightnessSensor(coordinator, coordinator.api, pool["id"], device_id))
 
         # Sensors spécifiques à la piscine (pas liés aux devices)
         entities.append(FluidraPoolWeatherSensor(coordinator, coordinator.api, pool["id"]))

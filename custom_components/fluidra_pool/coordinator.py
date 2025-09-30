@@ -6,6 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .fluidra_api import FluidraPoolAPI
+from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -188,16 +189,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                         if "components" not in device:
                             device["components"] = {}
 
-                        # Polling intensif de TOUS les components pour trouver la vitesse manuelle
-                        # Pour les pompes à chaleur, étendre la plage pour capturer les températures (components 62, 65, 67)
-                        # Pour les pompes E30iQ, s'assurer de récupérer jusqu'au component 21 minimum (incluant component 20 pour les schedules)
-                        device_type = device.get("type", "").lower()
-                        if device_type == "heat_pump":
-                            component_range = 70
-                        elif "pump" in device_type:
-                            component_range = 25  # Inclut component 20 (schedules) et 21 (network)
-                        else:
-                            component_range = 25
+                        # Polling intensif de TOUS les components
+                        # Utiliser le registry pour déterminer la plage de composants à scanner
+                        component_range = DeviceIdentifier.get_components_range(device)
 
                         for component_id in range(0, component_range):
                             component_state = await self.api.get_component_state(device_id, component_id)
