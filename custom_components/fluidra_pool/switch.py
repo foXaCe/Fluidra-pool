@@ -105,9 +105,9 @@ async def async_setup_entry(
             elif "heater" in device_type or "heat" in device_type:
                 entities.append(FluidraHeaterSwitch(coordinator, pool, device))
 
-            # Create schedule enable switches ONLY for regular pumps (not Eco Elyo and only if schedule_data exists)
+            # Create schedule enable switches ONLY for regular pumps (not Eco Elyo)
             if ("pump" in device_type and not is_eco_elyo and
-                device_type != "heat pump" and device.get("schedule_data")):
+                device_type != "heat pump"):
                 # Create switches for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                     entities.append(FluidraScheduleEnableSwitch(
