@@ -35,9 +35,9 @@ async def async_setup_entry(
             if not device_id:
                 continue
 
-            # Time entities for pumps only (exclude LG heat pumps and devices without schedule_data)
+            # Time entities for pumps only (exclude LG heat pumps)
             if ("pump" in device_type and device_type != "heat pump" and
-                not device_id.startswith("LG") and device.get("schedule_data")):
+                not device_id.startswith("LG")):
                 # Create time entities for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                     # Create start time entity
