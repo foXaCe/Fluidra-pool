@@ -255,8 +255,19 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                         except (ValueError, TypeError):
                                             _LOGGER.warning(f"⚠️ Invalid temperature value in component 15: {reported_value}")
                                     # Note: Component 15 n'est plus utilisé pour le mode manuel, remplacé par Component 13
-                                elif component_id == 19:  # Timezone
+                                elif component_id == 19:  # Température de l'eau (pour pompes à chaleur)
                                     device["timezone_component"] = reported_value
+                                    # Component 19 peut contenir la température de l'eau de la piscine × 10
+                                    if device.get("type", "").lower() == "heat_pump" and reported_value:
+                                        try:
+                                            # Convertir la valeur brute en température (diviser par 10)
+                                            water_temp_value = float(reported_value) / 10.0
+                                            # Valider la plage de température (5-35°C pour l'eau)
+                                            if 5.0 <= water_temp_value <= 35.0:
+                                                device["water_temperature"] = water_temp_value
+                                                _LOGGER.info(f"🌡️ Heat pump {device_id} water temperature from component 19: {water_temp_value}°C")
+                                        except (ValueError, TypeError):
+                                            pass
                                 elif component_id == 20:  # Programmations
                                     schedule_data = reported_value or []
                                     device["schedule_data"] = schedule_data
@@ -285,6 +296,19 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                         device["is_heating"] = bool(reported_value)
                                 elif component_id == 14:  # Component 14 exploration
                                     device["component_14_data"] = component_state
+                                elif component_id in [62, 65]:  # Température de l'eau alternative
+                                    # Components 62 et 65 peuvent aussi contenir la température de l'eau × 10
+                                    if device.get("type", "").lower() == "heat_pump" and reported_value:
+                                        try:
+                                            water_temp_value = float(reported_value) / 10.0
+                                            if 5.0 <= water_temp_value <= 35.0:
+                                                # Utiliser seulement si pas déjà défini par component 19
+                                                if "water_temperature" not in device:
+                                                    device["water_temperature"] = water_temp_value
+                                                    _LOGGER.info(f"🌡️ Heat pump {device_id} water temperature from component {component_id}: {water_temp_value}°C")
+                                        except (ValueError, TypeError):
+                                            pass
+                                    device[f"component_{component_id}_data"] = component_state
                                 else:  # TOUS les autres components - exploration intensive
                                     device[f"component_{component_id}_data"] = component_state
 
