@@ -22,31 +22,12 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         self._optimistic_entities = set()  # Entités avec état optimiste actif
         self._previous_schedule_entities = {}  # Track scheduler entities per device for cleanup
         self._first_update = True  # Skip heavy polling on first update for faster startup
-        self._full_scan_done = False  # Track if full scan has been triggered
         super().__init__(
             hass,
             _LOGGER,
             name="fluidra_pool",
             update_interval=UPDATE_INTERVAL,
         )
-
-        # Trigger full scan when Home Assistant has started
-        async def _on_ha_started(event):
-            """Trigger full refresh when Home Assistant has fully started."""
-            if not self._full_scan_done:
-                _LOGGER.info("🚀 Home Assistant started, triggering full component scan")
-                self._full_scan_done = True
-                await self.async_request_refresh()
-
-        # Listen for homeassistant_started event
-        hass.bus.async_listen_once("homeassistant_started", _on_ha_started)
-
-        # If HA is already started (reload case), trigger immediately
-        from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
-        if hass.is_running:
-            _LOGGER.info("🚀 Home Assistant already running, triggering full component scan")
-            self._full_scan_done = True
-            hass.async_create_task(self.async_request_refresh())
 
     def register_optimistic_entity(self, entity_id: str):
         """Enregistrer une entité comme ayant un état optimiste actif."""
