@@ -156,8 +156,9 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
     @property
     def current_temperature(self) -> Optional[float]:
-        """Return the current temperature."""
-        return self.device_data.get("current_temperature")
+        """Return the current temperature (pool water temperature)."""
+        # Afficher la température de l'eau de la piscine comme température actuelle
+        return self.device_data.get("water_temperature")
 
     @property
     def target_temperature(self) -> Optional[float]:
