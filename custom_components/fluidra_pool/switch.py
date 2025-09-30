@@ -12,46 +12,9 @@ from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN, DEVICE_TYPE_PUMP, DEVICE_TYPE_HEAT_PUMP, DEVICE_TYPE_HEATER
 from .coordinator import FluidraDataUpdateCoordinator
+from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _is_eco_elyo_heat_pump(device: dict) -> bool:
-    """Detect if device is an Eco Elyo heat pump based on device signature."""
-    if not isinstance(device, dict):
-        return False
-
-    device_id = device.get("device_id", "")
-    device_name = device.get("name", "").lower()
-    family = device.get("family", "").lower()
-    model = device.get("model", "").lower()
-
-    # Check for specific Eco Elyo signatures
-    eco_elyo_indicators = [
-        # Device ID patterns
-        device_id.startswith("LG"),  # LG24350023 pattern
-        # Name/model indicators
-        "eco" in device_name and "elyo" in device_name,
-        "astralpool" in model,
-        "eco elyo" in family,
-    ]
-
-    # Component 7 check with safe type handling
-    try:
-        components = device.get("components", [])
-        if components:
-            for comp in components:
-                # Handle both dict and string components safely
-                if isinstance(comp, dict) and comp.get("id") == 7:
-                    reported_value = str(comp.get("reportedValue", ""))
-                    if "BXWAA" in reported_value:
-                        eco_elyo_indicators.append(True)
-                        break
-    except (AttributeError, TypeError):
-        # If component analysis fails, continue with other indicators
-        pass
-
-    return any(eco_elyo_indicators)
 
 
 async def async_setup_entry(
@@ -67,49 +30,34 @@ async def async_setup_entry(
     pools = await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
-            device_type = device.get("type", "").lower()
             device_id = device.get("device_id")
 
             if not device_id:
                 continue
 
-            # Check if this is an Eco Elyo heat pump (special case)
-            is_eco_elyo = _is_eco_elyo_heat_pump(device)
+            # Use device registry to determine which switches to create
+            if DeviceIdentifier.should_create_entity(device, "switch"):
+                # Determine switch type based on device type
+                device_config = DeviceIdentifier.identify_device(device)
+                if device_config:
+                    device_type = device_config.device_type
 
-            if is_eco_elyo:
-                # Create heat pump switch instead of pump switches
-                entities.append(FluidraHeatPumpSwitch(coordinator, coordinator.api, pool["id"], device_id))
-                # Skip auto mode for LG heat pumps (they have native smart modes)
-                # Only create auto mode switch for non-LG heat pumps
-                if not device_id.startswith("LG"):
-                    if device.get("auto_mode_enabled") is not None or device.get("auto_reported") is not None:
-                        entities.append(FluidraAutoModeSwitch(coordinator, coordinator.api, pool["id"], device_id))
-                else:
-                    pass  # Skip auto mode for LG heat pumps
-                # Skip pump and scheduler creation for Eco Elyo
-                continue
+                    if device_type == "heat_pump":
+                        entities.append(FluidraHeatPumpSwitch(coordinator, coordinator.api, pool["id"], device_id))
+                    elif device_type == "pump":
+                        entities.append(FluidraPumpSwitch(coordinator, coordinator.api, pool["id"], device_id))
+                    elif device_type == "heater":
+                        entities.append(FluidraHeaterSwitch(coordinator, pool, device))
 
-            # Create pump switches (for regular pumps)
-            if "pump" in device_type:
-                # Switch pour pompe ON/OFF
-                entities.append(FluidraPumpSwitch(coordinator, coordinator.api, pool["id"], device_id))
-                # Switch pour mode auto ON/OFF
-                entities.append(FluidraAutoModeSwitch(coordinator, coordinator.api, pool["id"], device_id))
+            # Create auto mode switch if device supports it
+            if DeviceIdentifier.should_create_entity(device, "switch_auto"):
+                if not DeviceIdentifier.has_feature(device, "skip_auto_mode"):
+                    entities.append(FluidraAutoModeSwitch(coordinator, coordinator.api, pool["id"], device_id))
 
-            # Create heat pump switches (for devices already detected as heat_pump)
-            elif "heat_pump" in device_type:
-                # Switch pour pompe à chaleur ON/OFF
-                entities.append(FluidraHeatPumpSwitch(coordinator, coordinator.api, pool["id"], device_id))
-
-            # Create heater switches
-            elif "heater" in device_type or "heat" in device_type:
-                entities.append(FluidraHeaterSwitch(coordinator, pool, device))
-
-            # Create schedule enable switches ONLY for regular pumps (not Eco Elyo)
-            if ("pump" in device_type and not is_eco_elyo and
-                device_type != "heat pump"):
-                # Create switches for the actual 8 schedulers found
-                for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
+            # Create schedule enable switches if device supports schedules
+            if DeviceIdentifier.has_feature(device, "schedules"):
+                schedule_count = DeviceIdentifier.get_feature(device, "schedule_count", 8)
+                for schedule_id in [str(i) for i in range(1, schedule_count + 1)]:
                     entities.append(FluidraScheduleEnableSwitch(
                         coordinator,
                         coordinator.api,
