@@ -758,7 +758,7 @@ class FluidraPoolAPI:
     async def set_heat_pump_temperature(self, device_id: str, temperature: float) -> bool:
         """Set heat pump target temperature using API control."""
         try:
-            _LOGGER.info(f"🌡️ Setting heat pump {device_id} temperature to {temperature}°C")
+            _LOGGER.info(f"Setting heat pump {device_id} temperature to {temperature}°C")
 
             # Pour les pompes à chaleur, utiliser component 15 (température × 10)
             # Basé sur l'observation: Component 15 reporte 380 pour 38°C, 400 pour 40°C
@@ -808,7 +808,7 @@ class FluidraPoolAPI:
         """Start pump using appropriate component based on device type."""
         # Heat pumps (LG Eco Elyo, Z250iQ) use component 13 for ON/OFF
         if self._is_heat_pump(device_id):
-            _LOGGER.info(f"🌡️ Starting heat pump {device_id} using component 13")
+            _LOGGER.info(f"Starting heat pump {device_id} using component 13")
             return await self.control_device_component(device_id, 13, 1)
 
         # Standard pumps use component 9
@@ -831,7 +831,7 @@ class FluidraPoolAPI:
         """Stop pump using appropriate component based on device type."""
         # Heat pumps (LG Eco Elyo, Z250iQ) use component 13 for ON/OFF
         if self._is_heat_pump(device_id):
-            _LOGGER.info(f"🌡️ Stopping heat pump {device_id} using component 13")
+            _LOGGER.info(f"Stopping heat pump {device_id} using component 13")
             return await self.control_device_component(device_id, 13, 0)
 
         # Standard pumps use component 9

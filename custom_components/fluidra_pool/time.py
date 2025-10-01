@@ -119,10 +119,6 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
 
-                _LOGGER.debug(f"[TIME {self._schedule_id}] Schedule not found in {len(schedules)} schedules")
-            else:
-                _LOGGER.debug(f"[TIME {self._schedule_id}] No 'schedule_data' yet (may be loading)")
-
         except Exception as e:
             _LOGGER.error(f"[TIME {self._schedule_id}] Error getting schedule data: {e}")
         return None
@@ -305,7 +301,7 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                                     else:  # Monday-Saturday: 1-6 -> 1-6
                                         days.append(day)
                                 days = sorted(days)
-                            except:
+                            except (ValueError, TypeError, AttributeError):
                                 pass
 
                     start_time = self._format_time_to_cron(value, days)
@@ -422,7 +418,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                                     else:  # Monday-Saturday: 1-6 -> 1-6
                                         days.append(day)
                                 days = sorted(days)
-                            except:
+                            except (ValueError, TypeError, AttributeError):
                                 pass
 
                     end_time = self._format_time_to_cron(value, days)

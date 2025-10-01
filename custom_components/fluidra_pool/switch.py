@@ -754,10 +754,6 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
 
-                _LOGGER.debug(f"[{self._schedule_id}] Schedule not found in {len(schedules)} schedules")
-            else:
-                _LOGGER.debug(f"[{self._schedule_id}] No 'schedule_data' yet (may be loading)")
-
         except Exception as e:
             _LOGGER.error(f"[{self._schedule_id}] Error getting schedule data: {e}")
         return None
