@@ -1014,6 +1014,7 @@ class FluidraPoolWaterQualitySensor(FluidraPoolSensorBase):
     def __init__(self, coordinator, api, pool_id: str):
         """Initialize the pool water quality sensor."""
         super().__init__(coordinator, api, pool_id, "water_quality")
+        self._attr_translation_key = "water_quality"
 
     @property
     def name(self) -> str:
@@ -1029,16 +1030,14 @@ class FluidraPoolWaterQualitySensor(FluidraPoolSensorBase):
         # Chercher dans les données de désinfection
         disinfection = pool_data.get("disinfection", {})
         if disinfection:
-            method = disinfection.get("method", {})
-            disinfection_name = method.get("name", "Inconnu")
             automatic = disinfection.get("automatic", False)
 
             if automatic:
-                return f"Auto - {disinfection_name}"
+                return "auto"
             else:
-                return f"Manuel - {disinfection_name}"
+                return "manual"
 
-        return "Non configuré"
+        return "not_configured"
 
     @property
     def icon(self) -> str:

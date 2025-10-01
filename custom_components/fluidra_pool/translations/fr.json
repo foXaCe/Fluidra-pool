@@ -195,6 +195,11 @@
       },
       "schedule_count": {
         "no_schedule": "Aucune programmation"
+      },
+      "water_quality": {
+        "auto": "Auto",
+        "manual": "Manuel",
+        "not_configured": "Non configuré"
       }
     }
   }
