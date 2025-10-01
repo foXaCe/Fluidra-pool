@@ -494,7 +494,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         water_temp = device_data.get("water_temperature")
         if water_temp is not None:
             attrs["water_temperature"] = water_temp
-            _LOGGER.info(f"🌡️ Water temperature added to climate: {water_temp}°C")
+            _LOGGER.info(f"Water temperature added to climate: {water_temp}°C")
 
         # Informations d'erreur pour feedback utilisateur
         if device_data.get("permission_error"):
