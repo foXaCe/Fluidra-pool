@@ -32,6 +32,68 @@ Une intégration pour Home Assistant permettant de contrôler les équipements d
 
 ---
 
+## 🔌 Matériel Supporté
+
+### ✅ **Équipements Testés et Fonctionnels**
+
+#### **Pompes à Vitesse Variable**
+- **E30iQ** - Pompe à vitesse variable
+  - Contrôle 3 vitesses (Faible 45%, Moyenne 65%, Élevée 100%)
+  - Mode automatique avec programmations
+  - Contrôle vitesse personnalisée (0-100%)
+  - Gestion de 8 créneaux horaires/jour
+
+#### **Électrolyseurs au Sel / Chlorinateurs**
+- **Chlorinateurs Fluidra** (via bridge)
+  - Contrôle niveau de chlorination (0-100%)
+  - **Contrôle pH** : Setpoint réglable (6.8-7.6)
+  - **Contrôle ORP/Redox** : Setpoint réglable (650-750 mV)
+  - Mode AUTO/ON/OFF
+  - Capteurs : pH, ORP, chlore libre, température, salinité
+
+### ⚠️ **Équipements Implémentés (Tests Utilisateurs Requis)**
+
+#### **Pompes à Chaleur**
+- **LG Eco Elyo** - Pompe à chaleur réversible
+  - Modes : Smart Heating, Smart Cooling, Boost, Silence
+  - Contrôle température (10-40°C)
+  - Capteur température eau
+
+- **Z250iQ / Z25iQ** - Pompe à chaleur Fluidra
+  - Contrôle marche/arrêt
+  - Réglage température cible
+  - Capteur température actuelle
+
+#### **Chauffages**
+- Support générique pour chauffages piscine
+  - Capteurs température (actuelle/cible)
+  - Contrôle marche/arrêt
+
+#### **Éclairage**
+- Support générique pour éclairage LED piscine
+  - Contrôle marche/arrêt
+  - Réglage luminosité (0-100%)
+
+### 🆕 **Ajouter un Nouvel Équipement**
+
+Votre équipement n'est pas listé ? Aidez-nous à l'ajouter !
+
+1. **Activez les logs debug** :
+   ```yaml
+   logger:
+     logs:
+       custom_components.fluidra_pool: debug
+   ```
+
+2. **Créez une Issue** avec :
+   - Modèle de votre équipement
+   - Logs de détection (device discovery)
+   - Fonctionnalités disponibles dans l'app Fluidra
+
+3. **Testez et partagez** vos résultats
+
+---
+
 ## 🚀 Installation
 
 ### Méthode HACS (Recommandée)
