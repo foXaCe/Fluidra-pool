@@ -35,7 +35,9 @@ async def async_setup_entry(
             # Chlorinator chlorination level
             if device_type == "chlorinator":
                 entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool["id"], device_id))
-                _LOGGER.info(f"✅ Adding chlorinator level number for {device_id}")
+                entities.append(FluidraChlorinatorPhSetpoint(coordinator, coordinator.api, pool["id"], device_id))
+                entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool["id"], device_id))
+                _LOGGER.info(f"✅ Adding chlorinator controls (level, pH, ORP) for {device_id}")
 
             if device_type == DEVICE_TYPE_PUMP:
                 # Groupe Réglages - Contrôles de vitesse temporairement désactivés
@@ -393,6 +395,253 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
             "read_component": 164,
             "write_component": 4,
             "current_level": current_level,
+            "device_id": self._device_id,
+        }
+
+
+class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
+    """Number entity for chlorinator pH setpoint control."""
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the pH setpoint control."""
+        super().__init__(coordinator)
+        self._api = api
+        self._pool_id = pool_id
+        self._device_id = device_id
+
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+
+        self._attr_name = f"{device_name} pH Setpoint"
+        self._attr_unique_id = f"fluidra_{self._device_id}_ph_setpoint"
+        self._attr_mode = "slider"
+
+        # pH range: 6.8-7.6 (typical pool values)
+        self._attr_native_min_value = 6.8
+        self._attr_native_max_value = 7.6
+        self._attr_native_step = 0.1
+        self._attr_native_unit_of_measurement = None
+        self._attr_device_class = None
+
+    @property
+    def device_data(self) -> dict:
+        """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
+        pool = self.coordinator.data.get(self._pool_id)
+        if pool:
+            for device in pool.get("devices", []):
+                if device.get("device_id") == self._device_id:
+                    return device
+        return {}
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        return {
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": device_name,
+            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
+            "model": self.device_data.get("model", "Chlorinator"),
+            "via_device": (DOMAIN, self._pool_id),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (
+            self.coordinator.last_update_success
+            and self.device_data.get("online", False)
+        )
+
+    @property
+    def native_value(self) -> Optional[float]:
+        """Return the current pH setpoint from component 8."""
+        components = self.device_data.get("components", {})
+        component_8_data = components.get("8", {})
+        # Component value is pH * 100 (e.g., 720 = 7.20)
+        raw_value = component_8_data.get("reportedValue")
+
+        if raw_value is None:
+            return 7.2  # Default value
+
+        try:
+            return float(raw_value) / 100
+        except (ValueError, TypeError):
+            return 7.2
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the pH setpoint via component 8."""
+        # Convert pH value to API format (multiply by 100)
+        int_value = int(value * 100)
+
+        _LOGGER.info(f"Setting chlorinator {self._device_id} pH setpoint to {value} (API value: {int_value})")
+
+        try:
+            # Write to component 8
+            success = await self._api.control_device_component(self._device_id, 8, int_value)
+
+            if success:
+                _LOGGER.info(f"✅ pH setpoint set to {value}")
+                import asyncio
+                await asyncio.sleep(2)
+                await self.coordinator.async_request_refresh()
+            else:
+                _LOGGER.error(f"❌ Failed to set pH setpoint to {value}")
+
+        except Exception as err:
+            _LOGGER.error(f"Error setting pH setpoint: {err}")
+            raise
+
+    @property
+    def icon(self) -> str:
+        """Return the icon for the entity."""
+        return "mdi:ph"
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional state attributes."""
+        # Get current pH reading from component 172
+        components = self.device_data.get("components", {})
+        component_172_data = components.get("172", {})
+        raw_reading = component_172_data.get("reportedValue")
+
+        current_ph = None
+        if raw_reading is not None:
+            try:
+                current_ph = float(raw_reading) / 100
+            except (ValueError, TypeError):
+                pass
+
+        return {
+            "ph_range": "6.8-7.6",
+            "read_component": 172,
+            "write_component": 8,
+            "current_ph_reading": current_ph,
+            "device_id": self._device_id,
+        }
+
+
+class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
+    """Number entity for chlorinator ORP/Redox setpoint control."""
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the ORP setpoint control."""
+        super().__init__(coordinator)
+        self._api = api
+        self._pool_id = pool_id
+        self._device_id = device_id
+
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+
+        self._attr_name = f"{device_name} ORP Setpoint"
+        self._attr_unique_id = f"fluidra_{self._device_id}_orp_setpoint"
+        self._attr_mode = "slider"
+
+        # ORP range: 650-750 mV (typical pool values)
+        self._attr_native_min_value = 650
+        self._attr_native_max_value = 750
+        self._attr_native_step = 10
+        self._attr_native_unit_of_measurement = "mV"
+        self._attr_device_class = NumberDeviceClass.VOLTAGE
+
+    @property
+    def device_data(self) -> dict:
+        """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
+        pool = self.coordinator.data.get(self._pool_id)
+        if pool:
+            for device in pool.get("devices", []):
+                if device.get("device_id") == self._device_id:
+                    return device
+        return {}
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        return {
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": device_name,
+            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
+            "model": self.device_data.get("model", "Chlorinator"),
+            "via_device": (DOMAIN, self._pool_id),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (
+            self.coordinator.last_update_success
+            and self.device_data.get("online", False)
+        )
+
+    @property
+    def native_value(self) -> Optional[float]:
+        """Return the current ORP setpoint from component 11."""
+        components = self.device_data.get("components", {})
+        component_11_data = components.get("11", {})
+        # Component value is in mV directly
+        raw_value = component_11_data.get("reportedValue")
+
+        if raw_value is None:
+            return 700  # Default value
+
+        return raw_value
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the ORP setpoint via component 11."""
+        int_value = int(value)
+
+        _LOGGER.info(f"Setting chlorinator {self._device_id} ORP setpoint to {int_value} mV")
+
+        try:
+            # Write to component 11
+            success = await self._api.control_device_component(self._device_id, 11, int_value)
+
+            if success:
+                _LOGGER.info(f"✅ ORP setpoint set to {int_value} mV")
+                import asyncio
+                await asyncio.sleep(2)
+                await self.coordinator.async_request_refresh()
+            else:
+                _LOGGER.error(f"❌ Failed to set ORP setpoint to {int_value} mV")
+
+        except Exception as err:
+            _LOGGER.error(f"Error setting ORP setpoint: {err}")
+            raise
+
+    @property
+    def icon(self) -> str:
+        """Return the icon for the entity."""
+        return "mdi:lightning-bolt"
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional state attributes."""
+        # Get current ORP reading from component 177
+        components = self.device_data.get("components", {})
+        component_177_data = components.get("177", {})
+        current_orp = component_177_data.get("reportedValue")
+
+        return {
+            "orp_range": "650-750 mV",
+            "read_component": 177,
+            "write_component": 11,
+            "current_orp_reading": current_orp,
             "device_id": self._device_id,
         }
 
