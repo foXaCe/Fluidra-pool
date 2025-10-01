@@ -32,6 +32,68 @@ A Home Assistant integration for Fluidra pool equipment control.
 
 ---
 
+## 🔌 Supported Hardware
+
+### ✅ **Tested and Functional Equipment**
+
+#### **Variable Speed Pumps**
+- **E30iQ** - Variable speed pump
+  - 3-speed control (Low 45%, Medium 65%, High 100%)
+  - Automatic mode with schedules
+  - Custom speed control (0-100%)
+  - Management of 8 time slots/day
+
+#### **Salt Chlorinators / Electrolyzers**
+- **Fluidra Chlorinators** (via bridge)
+  - Chlorination level control (0-100%)
+  - **pH Control**: Adjustable setpoint (6.8-7.6)
+  - **ORP/Redox Control**: Adjustable setpoint (650-750 mV)
+  - AUTO/ON/OFF mode
+  - Sensors: pH, ORP, free chlorine, temperature, salinity
+
+### ⚠️ **Implemented Equipment (User Testing Required)**
+
+#### **Heat Pumps**
+- **LG Eco Elyo** - Reversible heat pump
+  - Modes: Smart Heating, Smart Cooling, Boost, Silence
+  - Temperature control (10-40°C)
+  - Water temperature sensor
+
+- **Z250iQ / Z25iQ** - Fluidra heat pump
+  - On/off control
+  - Target temperature adjustment
+  - Current temperature sensor
+
+#### **Heaters**
+- Generic support for pool heaters
+  - Temperature sensors (current/target)
+  - On/off control
+
+#### **Lighting**
+- Generic support for LED pool lighting
+  - On/off control
+  - Brightness adjustment (0-100%)
+
+### 🆕 **Adding New Equipment**
+
+Your equipment is not listed? Help us add it!
+
+1. **Enable debug logs**:
+   ```yaml
+   logger:
+     logs:
+       custom_components.fluidra_pool: debug
+   ```
+
+2. **Create an Issue** with:
+   - Your equipment model
+   - Detection logs (device discovery)
+   - Features available in the Fluidra app
+
+3. **Test and share** your results
+
+---
+
 ## 🚀 Installation
 
 ### HACS Method (Recommended)
