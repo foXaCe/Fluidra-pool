@@ -421,9 +421,9 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         self._attr_unique_id = f"fluidra_{self._device_id}_ph_setpoint"
         self._attr_mode = "slider"
 
-        # pH range: 6.8-7.6 (typical pool values)
-        self._attr_native_min_value = 6.8
-        self._attr_native_max_value = 7.6
+        # pH range: 7.0-7.8 (typical pool values)
+        self._attr_native_min_value = 7.0
+        self._attr_native_max_value = 7.8
         self._attr_native_step = 0.1
         self._attr_native_unit_of_measurement = None
         self._attr_device_class = None
@@ -550,9 +550,9 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         self._attr_unique_id = f"fluidra_{self._device_id}_orp_setpoint"
         self._attr_mode = "slider"
 
-        # ORP range: 650-750 mV (typical pool values)
-        self._attr_native_min_value = 650
-        self._attr_native_max_value = 750
+        # ORP range: 600-850 mV (typical pool values)
+        self._attr_native_min_value = 600
+        self._attr_native_max_value = 850
         self._attr_native_step = 10
         self._attr_native_unit_of_measurement = "mV"
         self._attr_device_class = NumberDeviceClass.VOLTAGE
