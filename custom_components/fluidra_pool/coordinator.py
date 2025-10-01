@@ -283,8 +283,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                         try:
                                             # Convertir la valeur brute en température (diviser par 10)
                                             water_temp_value = float(reported_value) / 10.0
-                                            # Valider la plage de température (5-35°C pour l'eau)
-                                            if 5.0 <= water_temp_value <= 35.0:
+                                            # Valider la plage de température (5-50°C pour l'eau, permettant le chauffage)
+                                            if 5.0 <= water_temp_value <= 50.0:
                                                 device["water_temperature"] = water_temp_value
                                                 _LOGGER.info(f"🌡️ Heat pump {device_id} water temperature from component 19: {water_temp_value}°C")
                                         except (ValueError, TypeError):
@@ -333,7 +333,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                     if device.get("type", "").lower() == "heat_pump" and reported_value:
                                         try:
                                             water_temp_value = float(reported_value) / 10.0
-                                            if 5.0 <= water_temp_value <= 35.0:
+                                            if 5.0 <= water_temp_value <= 50.0:
                                                 # Utiliser seulement si pas déjà défini par component 19
                                                 if "water_temperature" not in device:
                                                     device["water_temperature"] = water_temp_value
