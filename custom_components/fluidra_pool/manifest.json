@@ -11,7 +11,6 @@
   "loggers": ["fluidra_pool"],
   "requirements": ["aiohttp>=3.8.0", "PyJWT>=2.0.0"],
   "ssdp": [],
-  "version": "1.0.0",
-  "zeroconf": [],
-  "icon": "mdi:pool"
+  "version": "2.5.6",
+  "zeroconf": []
 }
