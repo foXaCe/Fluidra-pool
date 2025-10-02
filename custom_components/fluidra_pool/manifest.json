@@ -13,5 +13,5 @@
   "ssdp": [],
   "version": "1.0.0",
   "zeroconf": [],
-  "icon": "mdi:pool"
+  "icon": "https://github.com/home-assistant/brands/blob/master/custom_integrations/fluidra_pool/icon.png"
 }
