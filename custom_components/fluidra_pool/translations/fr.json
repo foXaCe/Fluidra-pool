@@ -124,6 +124,15 @@
       }
     },
     "select": {
+      "pump_speed": {
+        "name": "Niveau de Vitesse",
+        "state": {
+          "stopped": "Pas en marche",
+          "low": "Faible",
+          "medium": "Moyenne",
+          "high": "Élevée"
+        }
+      },
       "schedule_mode": {
         "name": "Planning {schedule_id} Mode",
         "state": {
