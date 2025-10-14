@@ -236,9 +236,6 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
     ) -> None:
         """Initialize the speed sensor."""
         super().__init__(coordinator, api, pool_id, device_id, "speed")
-        self._attr_translation_key = "pump_speed_status"
-        self._attr_device_class = SensorDeviceClass.ENUM
-        self._attr_options = ["stopped", "not_running", "low", "medium", "high"]
 
     @property
     def name(self) -> str:
@@ -256,8 +253,19 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         else:
             return "mdi:pump"
 
+    def _translate_speed_state(self, state_key: str) -> str:
+        """Translate speed state to French."""
+        translations = {
+            'stopped': 'Arrêtée',
+            'not_running': 'Pas en marche',
+            'low': 'Faible',
+            'medium': 'Moyenne',
+            'high': 'Élevée'
+        }
+        return translations.get(state_key, state_key)
+
     def _get_speed_mode(self) -> str:
-        """Get the current speed mode - returns state key for HA translation."""
+        """Get the current speed mode - returns state key."""
         # État de la pompe
         is_running = self.device_data.get("is_running", False)
         pump_reported = self.device_data.get("pump_reported")
@@ -291,7 +299,8 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
     @property
     def native_value(self) -> str:
         """Return the state of the sensor."""
-        return self._get_speed_mode()
+        state_key = self._get_speed_mode()
+        return self._translate_speed_state(state_key)
 
     @property
     def extra_state_attributes(self) -> dict:
