@@ -354,6 +354,20 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         int_value = int(value)
         _LOGGER.info(f"Setting chlorinator {self._device_id} to {int_value}%")
 
+        # Optimistic update: Update local state immediately for responsive UI
+        if self.coordinator.data:
+            pool = self.coordinator.data.get(self._pool_id)
+            if pool:
+                for device in pool.get("devices", []):
+                    if device.get("device_id") == self._device_id:
+                        if "components" not in device:
+                            device["components"] = {}
+                        if "10" not in device["components"]:
+                            device["components"]["10"] = {}
+                        device["components"]["10"]["desiredValue"] = int_value
+                        self.async_write_ha_state()  # Force UI update
+                        break
+
         try:
             success = await self._api.control_device_component(self._device_id, 10, int_value)
             if success:

@@ -701,12 +701,23 @@ class FluidraPoolAPI:
                         # Update local device state with real API response
                         device = self.get_device_by_id(device_id)
                         if device:
+                            # IMPORTANT: Update components desiredValue for optimistic UI update
+                            if "components" not in device:
+                                device["components"] = {}
+                            if str(component_id) not in device["components"]:
+                                device["components"][str(component_id)] = {}
+
+                            device["components"][str(component_id)]["desiredValue"] = desired_value
+                            device["components"][str(component_id)]["reportedValue"] = reported_value
+                            device["components"][str(component_id)]["ts"] = component_ts
+
+                            # Update legacy fields for backward compatibility
                             if component_id == 9:  # Pump control
                                 device["is_running"] = bool(reported_value)
                                 device["operation_mode"] = reported_value or value
                                 device["desired_state"] = desired_value
                                 device["last_updated"] = component_ts
-                            elif component_id == 10:  # Auto mode
+                            elif component_id == 10:  # Auto mode (also chlorinator for some models)
                                 device["auto_mode_enabled"] = bool(reported_value)
                                 device["auto_mode_desired"] = desired_value
                                 device["last_updated"] = component_ts
