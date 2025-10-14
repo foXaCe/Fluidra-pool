@@ -364,48 +364,19 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         return "mdi:calendar-clock"
 
     def _translate_schedule_state(self, state_key: str) -> str:
-        """Translate schedule state based on HA language."""
-        # Try multiple methods to detect language
-        language = 'en'  # Default
-
-        # Method 1: Direct attribute
-        if hasattr(self.hass.config, 'language'):
-            language = self.hass.config.language
-            _LOGGER.warning(f"[SCHEDULE] Language from config.language: {language}")
-
-        _LOGGER.warning(f"[SCHEDULE] Final language used: {language}, translating key: {state_key}")
-
+        """Return schedule state text in English."""
+        # Always return English for dynamic text
+        # HA config.language returns system language, not user interface language
         translations = {
-            'en': {
-                'no_schedule': 'No Schedule',
-                'active': 'Active',
-                'active_schedules': 'active schedules',
-                'error': 'Error',
-                'low': 'Low',
-                'medium': 'Medium',
-                'high': 'High'
-            },
-            'fr': {
-                'no_schedule': 'Aucune programmation',
-                'active': 'Actif',
-                'active_schedules': 'programmations actives',
-                'error': 'Erreur',
-                'low': 'Faible',
-                'medium': 'Moyenne',
-                'high': 'Élevée'
-            },
-            'pt': {
-                'no_schedule': 'Sem programação',
-                'active': 'Ativo',
-                'active_schedules': 'programações ativas',
-                'error': 'Erro',
-                'low': 'Baixa',
-                'medium': 'Média',
-                'high': 'Alta'
-            }
+            'no_schedule': 'No Schedule',
+            'active': 'Active',
+            'active_schedules': 'active schedules',
+            'error': 'Error',
+            'low': 'Low',
+            'medium': 'Medium',
+            'high': 'High'
         }
-
-        return translations.get(language, translations['en']).get(state_key, state_key)
+        return translations.get(state_key, state_key)
 
     def _parse_cron_time(self, cron_time: str) -> Optional[time]:
         """Parse cron time format 'mm HH * * 0,1,2,3,4,5,6' to time object."""
@@ -566,67 +537,23 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
         return "mdi:information-outline"
 
     def _translate_device_info(self, key: str) -> str:
-        """Translate device info text based on HA language."""
-        # Try multiple methods to detect language
-        language = 'en'  # Default
-
-        # Method 1: Direct attribute
-        if hasattr(self.hass.config, 'language'):
-            language = self.hass.config.language
-            _LOGGER.warning(f"[DEVICE INFO] Language from config.language: {language}")
-
-        # Method 2: Safe get with getattr
-        lang_getattr = getattr(self.hass.config, 'language', None)
-        if lang_getattr:
-            _LOGGER.warning(f"[DEVICE INFO] Language from getattr: {lang_getattr}")
-
-        # Log complete config for debugging
-        _LOGGER.warning(f"[DEVICE INFO] HA Config attributes: {dir(self.hass.config)}")
-        _LOGGER.warning(f"[DEVICE INFO] Final language used: {language}, translating key: {key}")
-
+        """Return device info text in English (technical terms)."""
+        # Always return English for technical dynamic text
+        # HA config.language returns system language, not user interface language
         translations = {
-            'en': {
-                'unknown': 'Unknown',
-                'firmware': 'Firmware',
-                'signal': 'Signal',
-                'error': 'Error',
-                'excellent': 'Excellent',
-                'very_good': 'Very Good',
-                'good': 'Good',
-                'low': 'Low',
-                'very_low': 'Very Low',
-                'connected': 'Connected',
-                'disconnected': 'Disconnected'
-            },
-            'fr': {
-                'unknown': 'Inconnu',
-                'firmware': 'Firmware',
-                'signal': 'Signal',
-                'error': 'Erreur',
-                'excellent': 'Excellent',
-                'very_good': 'Très bon',
-                'good': 'Bon',
-                'low': 'Faible',
-                'very_low': 'Très faible',
-                'connected': 'Connecté',
-                'disconnected': 'Déconnecté'
-            },
-            'pt': {
-                'unknown': 'Desconhecido',
-                'firmware': 'Firmware',
-                'signal': 'Sinal',
-                'error': 'Erro',
-                'excellent': 'Excelente',
-                'very_good': 'Muito bom',
-                'good': 'Bom',
-                'low': 'Baixo',
-                'very_low': 'Muito baixo',
-                'connected': 'Conectado',
-                'disconnected': 'Desconectado'
-            }
+            'unknown': 'Unknown',
+            'firmware': 'Firmware',
+            'signal': 'Signal',
+            'error': 'Error',
+            'excellent': 'Excellent',
+            'very_good': 'Very Good',
+            'good': 'Good',
+            'low': 'Low',
+            'very_low': 'Very Low',
+            'connected': 'Connected',
+            'disconnected': 'Disconnected'
         }
-
-        return translations.get(language, translations['en']).get(key, key)
+        return translations.get(key, key)
 
     def _get_device_info_data(self) -> Dict[str, Any]:
         """Get device information from coordinator data."""
