@@ -1178,6 +1178,21 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
         component_data = components.get(str(self._component_id), {})
         raw_value = component_data.get("reportedValue")
 
+        # DEBUG: Log tous les composants du chlorinateur (seulement pour température)
+        if self._sensor_type == "temperature" and "CC24033907" in self._device_id:
+            _LOGGER.warning(f"🔍 DEBUG TEMPERATURE CHLORINATOR {self._device_id}")
+            _LOGGER.warning(f"   Looking for component {self._component_id}, raw_value={raw_value}")
+            _LOGGER.warning(f"   Scanning ALL components for potential temperature values (50-400 range):")
+            for comp_id, comp_data in components.items():
+                if isinstance(comp_data, dict):
+                    reported = comp_data.get("reportedValue")
+                    if reported is not None and reported != 0:
+                        if isinstance(reported, (int, float)) and 50 <= reported <= 400:
+                            temp_c = reported / 10.0
+                            _LOGGER.warning(f"      🌡️  Component {comp_id}: {reported} (÷10 = {temp_c}°C)")
+                        elif isinstance(reported, (int, float)):
+                            _LOGGER.warning(f"       Component {comp_id}: {reported}")
+
         if raw_value is None:
             return None
 
