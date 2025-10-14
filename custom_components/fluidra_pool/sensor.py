@@ -246,11 +246,6 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         return "pump_speed_status"
 
     @property
-    def device_class(self) -> str:
-        """Return device class."""
-        return "fluidra_pool__pump_speed_status"
-
-    @property
     def icon(self) -> str:
         """Return the icon for the entity."""
         speed_mode = self._get_speed_mode()
