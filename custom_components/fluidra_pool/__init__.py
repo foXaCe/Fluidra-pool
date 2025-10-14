@@ -98,7 +98,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
 
     # Create data update coordinator
-    coordinator = FluidraDataUpdateCoordinator(hass, api)
+    coordinator = FluidraDataUpdateCoordinator(hass, api, entry)
 
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator

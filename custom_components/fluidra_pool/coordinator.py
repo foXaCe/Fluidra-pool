@@ -4,9 +4,11 @@ from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .fluidra_api import FluidraPoolAPI
 from .device_registry import DeviceIdentifier
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,9 +18,10 @@ UPDATE_INTERVAL = timedelta(seconds=30)
 class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from the Fluidra Pool API."""
 
-    def __init__(self, hass: HomeAssistant, api: FluidraPoolAPI) -> None:
+    def __init__(self, hass: HomeAssistant, api: FluidraPoolAPI, config_entry=None) -> None:
         """Initialize."""
         self.api = api
+        self.config_entry = config_entry  # Store config entry for device cleanup
         self._optimistic_entities = set()  # Entités avec état optimiste actif
         self._previous_schedule_entities = {}  # Track scheduler entities per device for cleanup
         self._first_update = True  # Skip heavy polling on first update for faster startup
@@ -40,6 +43,57 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     def has_optimistic_entities(self) -> bool:
         """Vérifier si des entités ont un état optimiste actif."""
         return len(self._optimistic_entities) > 0
+
+    async def _cleanup_removed_devices(self, current_device_ids: set):
+        """Remove devices and entities that no longer exist in Fluidra API."""
+        if not self.config_entry:
+            return  # Cannot cleanup without config entry
+
+        try:
+            device_registry = dr.async_get(self.hass)
+            entity_registry = er.async_get(self.hass)
+
+            # Get all devices for this integration
+            devices_to_check = dr.async_entries_for_config_entry(
+                device_registry,
+                self.config_entry.entry_id
+            )
+
+            for device_entry in devices_to_check:
+                # Extract device_id from identifiers
+                device_id = None
+                for identifier in device_entry.identifiers:
+                    if identifier[0] == DOMAIN:
+                        device_id = identifier[1]
+                        break
+
+                if not device_id:
+                    continue
+
+                # Skip pool devices (they are parent devices, not actual equipment)
+                if device_entry.model == "Pool":
+                    continue
+
+                # If device_id not in current API data, remove it
+                if device_id not in current_device_ids:
+                    _LOGGER.info(f"🗑️ Removing device {device_id} ({device_entry.name}) - no longer in Fluidra account")
+
+                    # First, remove all entities associated with this device
+                    entities_to_remove = er.async_entries_for_device(
+                        entity_registry,
+                        device_entry.id,
+                        include_disabled_entities=True
+                    )
+
+                    for entity_entry in entities_to_remove:
+                        _LOGGER.debug(f"  Removing entity {entity_entry.entity_id}")
+                        entity_registry.async_remove(entity_entry.entity_id)
+
+                    # Then remove the device itself
+                    device_registry.async_remove_device(device_entry.id)
+
+        except Exception as e:
+            _LOGGER.error(f"Error cleaning up removed devices: {e}")
 
     async def _cleanup_schedule_sensor_if_empty(self, pool_id: str, device_id: str, schedule_data: list):
         """Clean up schedule sensor entity if no schedules remain."""
@@ -343,6 +397,20 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                     device[f"component_{component_id}_data"] = component_state
                                 else:  # TOUS les autres components - exploration intensive
                                     device[f"component_{component_id}_data"] = component_state
+
+            # Collect all current device IDs from API
+            current_device_ids = set()
+            for pool in pools:
+                # Add pool ID itself
+                current_device_ids.add(pool["id"])
+                # Add all device IDs
+                for device in pool.get("devices", []):
+                    device_id = device.get("device_id")
+                    if device_id:
+                        current_device_ids.add(device_id)
+
+            # Clean up devices that no longer exist in Fluidra API
+            await self._cleanup_removed_devices(current_device_ids)
 
             return {pool['id']: pool for pool in pools}
 
