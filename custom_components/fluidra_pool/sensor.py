@@ -254,45 +254,14 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
     def icon(self) -> str:
         """Return the icon for the entity."""
         speed_mode = self._get_speed_mode()
-        # Vérifier par mots-clés car maintenant on retourne du texte traduit
-        if any(word in speed_mode.lower() for word in ["stopped", "arrêtée", "not running", "pas en marche"]):
+        # Check for stopped states
+        if speed_mode in ["stopped", "not_running"]:
             return "mdi:pump-off"
         else:
             return "mdi:pump"
 
-    def _translate_state(self, state_key: str) -> str:
-        """Translate state based on HA language."""
-        # Détection de langue basique
-        language = getattr(self.hass.config, 'language', 'en')
-
-        translations = {
-            'en': {
-                'stopped': 'Stopped',
-                'not_running': 'Not Running',
-                'low': 'Low',
-                'medium': 'Medium',
-                'high': 'High'
-            },
-            'fr': {
-                'stopped': 'Arrêtée',
-                'not_running': 'Pas en marche',
-                'low': 'Faible',
-                'medium': 'Moyenne',
-                'high': 'Élevée'
-            },
-            'pt': {
-                'stopped': 'Parada',
-                'not_running': 'Não funcionando',
-                'low': 'Baixa',
-                'medium': 'Média',
-                'high': 'Alta'
-            }
-        }
-
-        return translations.get(language, translations['en']).get(state_key, state_key)
-
     def _get_speed_mode(self) -> str:
-        """Get the current speed with percentage display."""
+        """Get the current speed mode - returns state key for HA translation."""
         # État de la pompe
         is_running = self.device_data.get("is_running", False)
         pump_reported = self.device_data.get("pump_reported")
@@ -305,80 +274,23 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         if auto_reported is not None:
             auto_mode = bool(auto_reported)
 
-        # Si pompe arrêtée
+        # Si pompe arrêtée - return state key
         if not is_running:
-            return self._translate_state("stopped")
+            return "stopped"
 
         # Récupérer le pourcentage actuel
         current_speed = self.device_data.get("speed_percent", 0)
 
         if current_speed == 0:
-            return self._translate_state("not_running")
+            return "not_running"
 
-        # Mapper le pourcentage vers des états énumérés
+        # Mapper le pourcentage vers des états énumérés - return state keys
         if current_speed <= 50:
-            return self._translate_state("low")
+            return "low"
         elif current_speed <= 70:
-            return self._translate_state("medium")
+            return "medium"
         else:
-            return self._translate_state("high")
-
-    def _get_current_schedule_mode(self) -> str:
-        """Get current speed mode from active schedule (more reliable than polling)."""
-        try:
-            # Récupérer les données des schedulers depuis le device
-            schedule_data = self.device_data.get("schedule_data", [])
-            if not schedule_data:
-                return ""
-
-            from datetime import datetime, time
-
-            def _parse_cron_time(cron_time: str):
-                """Parse cron time format to time object."""
-                try:
-                    parts = cron_time.split()
-                    if len(parts) >= 2:
-                        minute = int(parts[0])
-                        hour = int(parts[1])
-                        return time(hour, minute)
-                except (ValueError, IndexError):
-                    pass
-                return None
-
-            def _get_operation_name(operation: str) -> str:
-                """Convert operation name to readable format."""
-                operation_map = {
-                    "0": "Faible",
-                    "1": "Moyenne",
-                    "2": "Élevée"
-                }
-                return operation_map.get(operation, f"Mode {operation}")
-
-            # Trouver le schedule actif maintenant
-            now = datetime.now().time()
-            for schedule in schedule_data:
-                if not schedule.get("enabled", False):
-                    continue
-
-                start_time = _parse_cron_time(schedule.get("startTime", ""))
-                end_time = _parse_cron_time(schedule.get("endTime", ""))
-
-                if start_time and end_time:
-                    if start_time <= now <= end_time:
-                        operation = schedule.get("startActions", {}).get("operationName", "0")
-                        mode = _get_operation_name(operation)
-                        # Ajouter l'état du schedule pour debug
-                        state = schedule.get("state", "IDLE")
-                        if state == "RUNNING":
-                            return f"{mode} (Active)"
-                        else:
-                            return mode
-
-        except Exception as e:
-            # En cas d'erreur, ne pas planter le sensor
-            pass
-
-        return ""
+            return "high"
 
     @property
     def native_value(self) -> str:
