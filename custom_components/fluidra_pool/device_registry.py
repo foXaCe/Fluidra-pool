@@ -82,11 +82,11 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         required_components=[0, 1, 2, 3],  # Basic device info
         entities=["switch", "select", "number", "sensor_info"],
         features={
-            "chlorination_level": True,  # Component 4 (write) / 164 (read)
+            "chlorination_level": {"write": 4, "read": 164},  # Component 4 (write) / 164 (read)
             "mode_control": True,  # Component 20: 0=OFF, 1=ON, 2=AUTO
-            "ph_control": True,  # Component 8 (write) / 172 (read)
-            "orp_control": True,  # Component 11 (write) / 177 (read)
-            "boost_mode": True,  # Component 245
+            "ph_setpoint": {"write": 8, "read": 172},  # Component 8 (write) / 172 (read)
+            "orp_setpoint": {"write": 11, "read": 177},  # Component 11 (write) / 177 (read)
+            "boost_mode": 245,  # Component 245
             "sensors": {
                 "ph": 172,  # pH reading
                 "orp": 177,  # ORP/Redox (mV)
@@ -106,12 +106,14 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
+        entities=["switch", "number", "sensor_info"],  # No select, no pH/ORP/Cl sensors
         features={
-            "chlorination_level": True,  # Component 10 (0-100%)
-            "ph_setpoint": True,  # Component 16 (÷100)
-            "orp_setpoint": True,  # Component 20 (mV)
-            "boost_mode": True,  # Component 103 (boolean)
+            "chlorination_level": 10,  # Component 10 (0-100%, no read component)
+            "ph_setpoint": 16,  # Component 16 (÷100)
+            "orp_setpoint": 20,  # Component 20 (mV)
+            "boost_mode": 103,  # Component 103 (boolean)
+            "skip_ph_orp_sensors": True,  # No pH/ORP/Cl sensors available
+            "skip_mode_select": True,  # No mode select available
             "sensors": {
                 "temperature": 183,  # Pool temperature (°C * 10)
                 "salinity": 185,  # Salinity (g/L * 100)

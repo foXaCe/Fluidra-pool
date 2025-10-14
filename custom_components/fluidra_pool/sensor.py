@@ -65,17 +65,24 @@ async def async_setup_entry(
             # Chlorinator sensors
             device_type = device.get("type", "")
             if device_type == "chlorinator":
-                # pH sensor (component 172)
-                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "ph", 172))
-                # ORP sensor (component 177)
-                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "orp", 177))
-                # Free chlorine sensor (component 178)
-                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "free_chlorine", 178))
-                # Temperature sensor (component 183)
+                skip_ph_orp = DeviceIdentifier.has_feature(device, "skip_ph_orp_sensors")
+
+                # pH, ORP, Free chlorine sensors (skip for CC24033907)
+                if not skip_ph_orp:
+                    # pH sensor (component 172)
+                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "ph", 172))
+                    # ORP sensor (component 177)
+                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "orp", 177))
+                    # Free chlorine sensor (component 178)
+                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "free_chlorine", 178))
+
+                # Temperature sensor (component 183) - all chlorinators
                 entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "temperature", 183))
-                # Salinity sensor (component 185)
+                # Salinity sensor (component 185) - all chlorinators
                 entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "salinity", 185))
-                _LOGGER.info(f"✅ Adding 5 chlorinator sensors for {device_id}")
+
+                sensor_count = 2 if skip_ph_orp else 5
+                _LOGGER.info(f"✅ Adding {sensor_count} chlorinator sensors for {device_id}")
 
         # Sensors spécifiques à la piscine (pas liés aux devices)
         entities.append(FluidraPoolWeatherSensor(coordinator, coordinator.api, pool["id"]))
