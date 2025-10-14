@@ -297,8 +297,6 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         self._api = api
         self._pool_id = pool_id
         self._device_id = device_id
-        self._pending_state = None
-        self._last_action_time = None
 
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
 
@@ -313,19 +311,6 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         self._attr_native_step = range_config.get("step", 1)
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_device_class = NumberDeviceClass.POWER_FACTOR
-
-    def _set_pending_state(self, value: float) -> None:
-        """Set pending state for optimistic UI updates."""
-        import time
-        self._pending_state = value
-        self._last_action_time = time.time()
-        self.async_write_ha_state()
-
-    def _clear_pending_state(self) -> None:
-        """Clear pending state after API confirmation."""
-        self._pending_state = None
-        self._last_action_time = None
-        self.async_write_ha_state()
 
     @property
     def device_data(self) -> dict:
@@ -361,7 +346,7 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        """Return the current chlorination level with optimistic state support."""
+        """Return the current chlorination level."""
         # Get component config dynamically
         chlorination_config = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", {"write": 4, "read": 164})
 
@@ -374,36 +359,17 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         components = self.device_data.get("components", {})
         component_data = components.get(str(read_component), {})
 
-        # For CC24033907 chlorinator (component 10), read desiredValue instead of reportedValue
-        # because the physical device takes time to apply changes and reportedValue lags behind
-        # For other chlorinators with separate read/write components, use reportedValue
+        # For single-component chlorinators (CC24033907), read desiredValue
+        # For dual-component chlorinators, read reportedValue from read component
         if isinstance(chlorination_config, int):
-            # Simple component (CC24033907) - use desiredValue
-            current_value = component_data.get("desiredValue", component_data.get("reportedValue", 0))
+            current_value = component_data.get("desiredValue", 0)
         else:
-            # Separate read/write components - use reportedValue
             current_value = component_data.get("reportedValue", 0)
 
-        actual_state = float(current_value)
-
-        # If we have a pending state
-        if self._pending_state is not None:
-            import time
-            # Si le serveur confirme l'état attendu, clear le pending state
-            if actual_state == self._pending_state:
-                self._clear_pending_state()
-                return actual_state
-            # Clear pending state after 10 seconds timeout
-            elif time.time() - self._last_action_time > 10:
-                self._clear_pending_state()
-                return actual_state
-            else:
-                return self._pending_state
-
-        return actual_state
+        return float(current_value)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the chlorination level via dynamic component with optimistic state."""
+        """Set the chlorination level."""
         int_value = int(value)
 
         # Get component config dynamically
@@ -418,27 +384,16 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         _LOGGER.info(f"Setting chlorinator {self._device_id} chlorination level to {int_value}% (component {write_component})")
 
         try:
-            # Set optimistic state immediately for UI responsiveness
-            self._set_pending_state(float(int_value))
-
-            # Write to dynamic component
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if success:
                 _LOGGER.info(f"✅ Chlorination level set to {int_value}%")
-                import asyncio
-                await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
-                # Pending state auto-clears in native_value when server confirms
             else:
                 _LOGGER.error(f"❌ Failed to set chlorination level to {int_value}%")
-                # Clear pending state on failure
-                self._clear_pending_state()
 
         except Exception as err:
             _LOGGER.error(f"Error setting chlorination level: {err}")
-            # Clear pending state on error
-            self._clear_pending_state()
             raise
 
     @property
@@ -494,8 +449,6 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         self._api = api
         self._pool_id = pool_id
         self._device_id = device_id
-        self._pending_state = None
-        self._last_action_time = None
 
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
 
@@ -509,19 +462,6 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         self._attr_native_step = 0.1
         self._attr_native_unit_of_measurement = None
         self._attr_device_class = None
-
-    def _set_pending_state(self, value: float) -> None:
-        """Set pending state for optimistic UI updates."""
-        import time
-        self._pending_state = value
-        self._last_action_time = time.time()
-        self.async_write_ha_state()
-
-    def _clear_pending_state(self) -> None:
-        """Clear pending state after API confirmation."""
-        self._pending_state = None
-        self._last_action_time = None
-        self.async_write_ha_state()
 
     @property
     def device_data(self) -> dict:
@@ -557,7 +497,7 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        """Return the current pH setpoint with optimistic state support."""
+        """Return the current pH setpoint."""
         # Get component config dynamically
         ph_config = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint", {"write": 8, "read": 172})
 
@@ -573,31 +513,15 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         raw_value = component_data.get("reportedValue")
 
         if raw_value is None:
-            actual_state = 7.2  # Default value
-        else:
-            try:
-                actual_state = float(raw_value) / 100
-            except (ValueError, TypeError):
-                actual_state = 7.2
+            return 7.2  # Default value
 
-        # If we have a pending state
-        if self._pending_state is not None:
-            import time
-            # Si le serveur confirme l'état attendu, clear le pending state
-            if abs(actual_state - self._pending_state) < 0.01:  # pH comparison with tolerance
-                self._clear_pending_state()
-                return actual_state
-            # Clear pending state after 10 seconds timeout
-            elif time.time() - self._last_action_time > 10:
-                self._clear_pending_state()
-                return actual_state
-            else:
-                return self._pending_state
-
-        return actual_state
+        try:
+            return float(raw_value) / 100
+        except (ValueError, TypeError):
+            return 7.2
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the pH setpoint via dynamic component with optimistic state."""
+        """Set the pH setpoint."""
         # Convert pH value to API format (multiply by 100)
         int_value = int(value * 100)
 
@@ -613,27 +537,16 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         _LOGGER.info(f"Setting chlorinator {self._device_id} pH setpoint to {value} (API value: {int_value}, component {write_component})")
 
         try:
-            # Set optimistic state immediately for UI responsiveness
-            self._set_pending_state(value)
-
-            # Write to dynamic component
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if success:
                 _LOGGER.info(f"✅ pH setpoint set to {value}")
-                import asyncio
-                await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
-                # Pending state auto-clears in native_value when server confirms
             else:
                 _LOGGER.error(f"❌ Failed to set pH setpoint to {value}")
-                # Clear pending state on failure
-                self._clear_pending_state()
 
         except Exception as err:
             _LOGGER.error(f"Error setting pH setpoint: {err}")
-            # Clear pending state on error
-            self._clear_pending_state()
             raise
 
     @property
@@ -691,8 +604,6 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         self._api = api
         self._pool_id = pool_id
         self._device_id = device_id
-        self._pending_state = None
-        self._last_action_time = None
 
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
 
@@ -706,19 +617,6 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         self._attr_native_step = 10
         self._attr_native_unit_of_measurement = "mV"
         self._attr_device_class = NumberDeviceClass.VOLTAGE
-
-    def _set_pending_state(self, value: float) -> None:
-        """Set pending state for optimistic UI updates."""
-        import time
-        self._pending_state = value
-        self._last_action_time = time.time()
-        self.async_write_ha_state()
-
-    def _clear_pending_state(self) -> None:
-        """Clear pending state after API confirmation."""
-        self._pending_state = None
-        self._last_action_time = None
-        self.async_write_ha_state()
 
     @property
     def device_data(self) -> dict:
@@ -754,7 +652,7 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        """Return the current ORP setpoint with optimistic state support."""
+        """Return the current ORP setpoint."""
         # Get component config dynamically
         orp_config = DeviceIdentifier.get_feature(self.device_data, "orp_setpoint", {"write": 11, "read": 177})
 
@@ -766,29 +664,12 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
 
         components = self.device_data.get("components", {})
         component_data = components.get(str(read_component), {})
-        # Component value is in mV directly
         raw_value = component_data.get("reportedValue")
 
-        actual_state = float(raw_value) if raw_value is not None else 700.0
-
-        # If we have a pending state
-        if self._pending_state is not None:
-            import time
-            # Si le serveur confirme l'état attendu, clear le pending state
-            if actual_state == self._pending_state:
-                self._clear_pending_state()
-                return actual_state
-            # Clear pending state after 10 seconds timeout
-            elif time.time() - self._last_action_time > 10:
-                self._clear_pending_state()
-                return actual_state
-            else:
-                return self._pending_state
-
-        return actual_state
+        return float(raw_value) if raw_value is not None else 700.0
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the ORP setpoint via dynamic component with optimistic state."""
+        """Set the ORP setpoint."""
         int_value = int(value)
 
         # Get component config dynamically
@@ -803,27 +684,16 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         _LOGGER.info(f"Setting chlorinator {self._device_id} ORP setpoint to {int_value} mV (component {write_component})")
 
         try:
-            # Set optimistic state immediately for UI responsiveness
-            self._set_pending_state(float(int_value))
-
-            # Write to dynamic component
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if success:
                 _LOGGER.info(f"✅ ORP setpoint set to {int_value} mV")
-                import asyncio
-                await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
-                # Pending state auto-clears in native_value when server confirms
             else:
                 _LOGGER.error(f"❌ Failed to set ORP setpoint to {int_value} mV")
-                # Clear pending state on failure
-                self._clear_pending_state()
 
         except Exception as err:
             _LOGGER.error(f"Error setting ORP setpoint: {err}")
-            # Clear pending state on error
-            self._clear_pending_state()
             raise
 
     @property
