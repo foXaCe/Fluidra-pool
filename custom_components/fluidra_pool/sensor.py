@@ -279,6 +279,13 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
                 'low': 'Faible',
                 'medium': 'Moyenne',
                 'high': 'Élevée'
+            },
+            'pt': {
+                'stopped': 'Parada',
+                'not_running': 'Não funcionando',
+                'low': 'Baixa',
+                'medium': 'Média',
+                'high': 'Alta'
             }
         }
 
@@ -451,10 +458,31 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
 
         translations = {
             'en': {
-                'no_schedule': 'No Schedule'
+                'no_schedule': 'No Schedule',
+                'active': 'Active',
+                'active_schedules': 'active schedules',
+                'error': 'Error',
+                'low': 'Low',
+                'medium': 'Medium',
+                'high': 'High'
             },
             'fr': {
-                'no_schedule': 'Aucune programmation'
+                'no_schedule': 'Aucune programmation',
+                'active': 'Actif',
+                'active_schedules': 'programmations actives',
+                'error': 'Erreur',
+                'low': 'Faible',
+                'medium': 'Moyenne',
+                'high': 'Élevée'
+            },
+            'pt': {
+                'no_schedule': 'Sem programação',
+                'active': 'Ativo',
+                'active_schedules': 'programações ativas',
+                'error': 'Erro',
+                'low': 'Baixa',
+                'medium': 'Média',
+                'high': 'Alta'
             }
         }
 
@@ -483,12 +511,14 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
 
     def _get_operation_name(self, operation: str) -> str:
         """Convert operation name to readable format."""
-        operation_map = {
-            "0": "Faible (45%)",
-            "1": "Moyenne (65%)",
-            "2": "Élevée (100%)"
-        }
-        return operation_map.get(operation, f"Mode {operation}")
+        speed_key = {
+            "0": "low",
+            "1": "medium",
+            "2": "high"
+        }.get(operation, "low")
+
+        speed_name = self._translate_schedule_state(speed_key)
+        return f"{speed_name} (45%)" if operation == "0" else f"{speed_name} (65%)" if operation == "1" else f"{speed_name} (100%)"
 
     def _get_current_schedule(self, schedules: List[dict]) -> Optional[dict]:
         """Get currently active schedule based on current time."""
@@ -533,15 +563,17 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                 operation = current_schedule.get("startActions", {}).get("operationName", "0")
                 time_range = self._format_schedule_time(current_schedule)
                 mode = self._get_operation_name(operation)
-                return f"Actif: {time_range} - {mode}"
+                active_label = self._translate_schedule_state("active")
+                return f"{active_label}: {time_range} - {mode}"
 
             # Compter les programmations actives
             enabled_count = sum(1 for s in schedules if s.get("enabled", False))
-            return f"{enabled_count} programmations actives"
+            active_schedules_label = self._translate_schedule_state("active_schedules")
+            return f"{enabled_count} {active_schedules_label}"
 
         except Exception as e:
             _LOGGER.error(f"Error getting schedule state: {e}")
-            return "Erreur"
+            return self._translate_schedule_state("error")
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -614,6 +646,54 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
         """Return the icon for the entity."""
         return "mdi:information-outline"
 
+    def _translate_device_info(self, key: str) -> str:
+        """Translate device info text based on HA language."""
+        language = getattr(self.hass.config, 'language', 'en')
+
+        translations = {
+            'en': {
+                'unknown': 'Unknown',
+                'firmware': 'Firmware',
+                'signal': 'Signal',
+                'error': 'Error',
+                'excellent': 'Excellent',
+                'very_good': 'Very Good',
+                'good': 'Good',
+                'low': 'Low',
+                'very_low': 'Very Low',
+                'connected': 'Connected',
+                'disconnected': 'Disconnected'
+            },
+            'fr': {
+                'unknown': 'Inconnu',
+                'firmware': 'Firmware',
+                'signal': 'Signal',
+                'error': 'Erreur',
+                'excellent': 'Excellent',
+                'very_good': 'Très bon',
+                'good': 'Bon',
+                'low': 'Faible',
+                'very_low': 'Très faible',
+                'connected': 'Connecté',
+                'disconnected': 'Déconnecté'
+            },
+            'pt': {
+                'unknown': 'Desconhecido',
+                'firmware': 'Firmware',
+                'signal': 'Sinal',
+                'error': 'Erro',
+                'excellent': 'Excelente',
+                'very_good': 'Muito bom',
+                'good': 'Bom',
+                'low': 'Baixo',
+                'very_low': 'Muito baixo',
+                'connected': 'Conectado',
+                'disconnected': 'Desconectado'
+            }
+        }
+
+        return translations.get(language, translations['en']).get(key, key)
+
     def _get_device_info_data(self) -> Dict[str, Any]:
         """Get device information from coordinator data."""
         # Récupérer les informations du device depuis le coordinateur
@@ -649,17 +729,20 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
             info_data = self._get_device_info_data()
 
             # Afficher le firmware en état principal
-            firmware = info_data.get("firmware_version", "Inconnu")
+            firmware = info_data.get("firmware_version", self._translate_device_info("unknown"))
             signal = info_data.get("signal_strength", 0)
 
+            firmware_label = self._translate_device_info("firmware")
+            signal_label = self._translate_device_info("signal")
+
             if signal and signal != 0:
-                return f"Firmware {firmware} (Signal: {signal} dBm)"
+                return f"{firmware_label} {firmware} ({signal_label}: {signal} dBm)"
             else:
-                return f"Firmware {firmware}"
+                return f"{firmware_label} {firmware}"
 
         except Exception as e:
             _LOGGER.error(f"Error getting device info state: {e}")
-            return "Erreur"
+            return self._translate_device_info("error")
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -682,19 +765,19 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
                 if signal and isinstance(signal, (int, float)):
                     # Convertir dBm en qualité de signal
                     if signal >= -50:
-                        attrs["signal_quality"] = "Excellent"
+                        attrs["signal_quality"] = self._translate_device_info("excellent")
                     elif signal >= -60:
-                        attrs["signal_quality"] = "Très bon"
+                        attrs["signal_quality"] = self._translate_device_info("very_good")
                     elif signal >= -70:
-                        attrs["signal_quality"] = "Bon"
+                        attrs["signal_quality"] = self._translate_device_info("good")
                     elif signal >= -80:
-                        attrs["signal_quality"] = "Faible"
+                        attrs["signal_quality"] = self._translate_device_info("low")
                     else:
-                        attrs["signal_quality"] = "Très faible"
+                        attrs["signal_quality"] = self._translate_device_info("very_low")
 
             if "network_status" in info_data:
                 network_status = info_data["network_status"]
-                attrs["network_status"] = "Connecté" if network_status == 1 else "Déconnecté"
+                attrs["network_status"] = self._translate_device_info("connected") if network_status == 1 else self._translate_device_info("disconnected")
 
             # Informations système
             if "firmware_version" in info_data:
