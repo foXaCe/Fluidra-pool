@@ -373,7 +373,17 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
 
         components = self.device_data.get("components", {})
         component_data = components.get(str(read_component), {})
-        current_value = component_data.get("reportedValue", 0)
+
+        # For CC24033907 chlorinator (component 10), read desiredValue instead of reportedValue
+        # because the physical device takes time to apply changes and reportedValue lags behind
+        # For other chlorinators with separate read/write components, use reportedValue
+        if isinstance(chlorination_config, int):
+            # Simple component (CC24033907) - use desiredValue
+            current_value = component_data.get("desiredValue", component_data.get("reportedValue", 0))
+        else:
+            # Separate read/write components - use reportedValue
+            current_value = component_data.get("reportedValue", 0)
+
         actual_state = float(current_value)
 
         # If we have a pending state
