@@ -990,22 +990,29 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if boost mode is on using optimistic UI."""
-        # Si on a un état en attente, l'utiliser pour la réactivité
-        if self._pending_state is not None:
-            import time
-            # Effacer l'état en attente après 10 secondes de sécurité
-            if time.time() - self._last_action_time > 10:
-                self._clear_pending_state()
-            else:
-                return self._pending_state
-
         # Get component number dynamically from device config
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
 
         components = self.device_data.get("components", {})
         component_data = components.get(str(boost_component), {})
         boost_value = component_data.get("reportedValue", False)
-        return bool(boost_value)
+        actual_state = bool(boost_value)
+
+        # Si on a un état en attente
+        if self._pending_state is not None:
+            import time
+            # Si le serveur confirme l'état attendu, clear le pending state
+            if actual_state == self._pending_state:
+                self._clear_pending_state()
+                return actual_state
+            # Effacer l'état en attente après 10 secondes de sécurité
+            elif time.time() - self._last_action_time > 10:
+                self._clear_pending_state()
+                return actual_state
+            else:
+                return self._pending_state
+
+        return actual_state
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn boost mode on with optimistic UI."""
@@ -1025,7 +1032,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
                 import asyncio
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
-                self._clear_pending_state()
+                # Le pending state se clear automatiquement dans is_on() quand le serveur confirme
             else:
                 _LOGGER.error(f"❌ Failed to enable boost mode for chlorinator {self._device_id}")
                 self._clear_pending_state()
@@ -1053,7 +1060,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
                 import asyncio
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
-                self._clear_pending_state()
+                # Le pending state se clear automatiquement dans is_on() quand le serveur confirme
             else:
                 _LOGGER.error(f"❌ Failed to disable boost mode for chlorinator {self._device_id}")
                 self._clear_pending_state()
