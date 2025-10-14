@@ -146,6 +146,14 @@ class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
 class FluidraTemperatureSensor(FluidraPoolSensorEntity):
     """Temperature sensor for pool heaters."""
 
+    def __init__(self, coordinator, api, pool_id: str, device_id: str, sensor_type: str):
+        """Initialize the temperature sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, sensor_type)
+        if sensor_type == "current":
+            self._attr_translation_key = "current_temperature"
+        else:
+            self._attr_translation_key = "target_temperature"
+
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
@@ -153,11 +161,6 @@ class FluidraTemperatureSensor(FluidraPoolSensorEntity):
         device_name = self.device_data.get('name', f'Device {self._device_id}')
         pool_name = self.pool_data.get('name', 'Pool')
         return f"{pool_name} {device_name} {temp_type} Temperature"
-
-    @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "current_temperature" if self._sensor_type == "current" else "target_temperature"
 
     @property
     def native_value(self) -> Optional[float]:
@@ -233,17 +236,13 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
     ) -> None:
         """Initialize the speed sensor."""
         super().__init__(coordinator, api, pool_id, device_id, "speed")
+        self._attr_translation_key = "pump_speed_status"
 
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         return f"{device_name} Speed"
-
-    @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "pump_speed_status"
 
     @property
     def icon(self) -> str:
@@ -341,17 +340,13 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
     ) -> None:
         """Initialize the schedule sensor."""
         super().__init__(coordinator, api, pool_id, device_id, "schedules")
+        self._attr_translation_key = "schedule_count"
 
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         return f"{device_name} Schedules"
-
-    @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "schedule_count"
 
     @property
     def icon(self) -> str:
@@ -514,17 +509,13 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
     ) -> None:
         """Initialize the device info sensor."""
         super().__init__(coordinator, api, pool_id, device_id, "info")
+        self._attr_translation_key = "device_info"
 
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         return f"{device_name} Information"
-
-    @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "device_info"
 
     @property
     def icon(self) -> str:
@@ -712,17 +703,13 @@ class FluidraPoolWeatherSensor(FluidraPoolSensorBase):
     def __init__(self, coordinator, api, pool_id: str):
         """Initialize the pool weather sensor."""
         super().__init__(coordinator, api, pool_id, "weather")
+        self._attr_translation_key = "weather_temperature"
 
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
         pool_name = self.pool_data.get("name", f"Pool {self._pool_id}")
         return f"{pool_name} Weather Temperature"
-
-    @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "weather_temperature"
 
     @property
     def native_value(self) -> Optional[float]:
@@ -887,6 +874,7 @@ class FluidraPoolLocationSensor(FluidraPoolSensorBase):
     def __init__(self, coordinator, api, pool_id: str):
         """Initialize the pool location sensor."""
         super().__init__(coordinator, api, pool_id, "location")
+        self._attr_translation_key = "pool_location"
 
     @property
     def name(self) -> str:
