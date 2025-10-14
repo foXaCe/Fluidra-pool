@@ -303,9 +303,13 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         self._attr_name = f"{device_name} Chlorination Level"
         self._attr_unique_id = f"fluidra_{self._device_id}_chlorination_level"
         self._attr_mode = "slider"
-        self._attr_native_min_value = 0
-        self._attr_native_max_value = 100
-        self._attr_native_step = 1
+
+        # Get configuration from device registry
+        chlor_range = DeviceIdentifier.get_feature(self.device_data, "chlorination_level_range", {"min": 0, "max": 100, "step": 1})
+        self._attr_native_min_value = chlor_range.get("min", 0)
+        self._attr_native_max_value = chlor_range.get("max", 100)
+        self._attr_native_step = chlor_range.get("step", 1)
+
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_device_class = NumberDeviceClass.POWER_FACTOR
 

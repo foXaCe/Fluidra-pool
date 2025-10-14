@@ -109,7 +109,7 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         entities=["switch", "number", "sensor_info"],  # No select, no pH/ORP/Cl sensors
         features={
             "chlorination_level": 10,  # Component 10 (0-100%, no read component)
-            "chlorination_level_range": {"min": 0, "max": 100, "step": 1},  # Explicit range for slider
+            "chlorination_level_range": {"min": 0, "max": 100, "step": 10},  # Explicit range for slider (10% increments)
             "ph_setpoint": 16,  # Component 16 (÷100)
             "orp_setpoint": 20,  # Component 20 (mV)
             "boost_mode": 103,  # Component 103 (boolean)
