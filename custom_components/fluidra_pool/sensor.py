@@ -237,6 +237,8 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         """Initialize the speed sensor."""
         super().__init__(coordinator, api, pool_id, device_id, "speed")
         self._attr_translation_key = "pump_speed_status"
+        self._attr_device_class = SensorDeviceClass.ENUM
+        self._attr_options = ["stopped", "not_running", "low", "medium", "high"]
 
     @property
     def name(self) -> str:
