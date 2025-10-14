@@ -303,13 +303,9 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         self._attr_name = f"{device_name} Chlorination Level"
         self._attr_unique_id = f"fluidra_{self._device_id}_chlorination_level"
         self._attr_mode = "slider"
-
-        # Get configuration from device registry
-        chlor_range = DeviceIdentifier.get_feature(self.device_data, "chlorination_level_range", {"min": 0, "max": 100, "step": 1})
-        self._attr_native_min_value = chlor_range.get("min", 0)
-        self._attr_native_max_value = chlor_range.get("max", 100)
-        self._attr_native_step = chlor_range.get("step", 1)
-
+        self._attr_native_min_value = 0
+        self._attr_native_max_value = 100
+        self._attr_native_step = 1  # UI step (actual value rounded to 10 in async_set_native_value)
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_device_class = NumberDeviceClass.POWER_FACTOR
 
@@ -355,8 +351,9 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set chlorination level to component 10."""
-        int_value = int(value)
-        _LOGGER.info(f"Setting chlorinator {self._device_id} to {int_value}%")
+        # Round to nearest multiple of 10 for CC24033907 compatibility
+        int_value = round(value / 10) * 10
+        _LOGGER.info(f"Setting chlorinator {self._device_id} to {int_value}% (rounded from {value})")
 
         # Optimistic update: Update local state immediately for responsive UI
         if self.coordinator.data:
