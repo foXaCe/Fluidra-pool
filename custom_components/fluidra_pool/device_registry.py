@@ -116,11 +116,11 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
             "skip_ph_orp_sensors": True,  # No pH/ORP/Cl sensors available
             "skip_mode_select": True,  # No mode select available
             "sensors": {
-                "temperature": 183,  # Pool temperature (°C * 10)
+                "temperature": 21,  # Pool temperature (°C * 10) - Component 21 for CC24033907
                 "salinity": 185,  # Salinity (g/L * 100)
             },
             # Specific components for CC24033907
-            "specific_components": [10, 16, 20, 103, 183, 185],
+            "specific_components": [10, 16, 20, 21, 103, 185],
         },
         priority=85,  # Higher than generic chlorinator
     ),

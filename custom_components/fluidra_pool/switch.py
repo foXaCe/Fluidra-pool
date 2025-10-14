@@ -968,7 +968,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         return attrs
 
 
-class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
+class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
     """Switch for chlorinator boost mode."""
 
     def __init__(
@@ -979,10 +979,7 @@ class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
         device_id: str,
     ) -> None:
         """Initialize the boost mode switch."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
 
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
 
@@ -991,40 +988,17 @@ class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
         self._attr_icon = "mdi:rocket-launch"
 
     @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def device_info(self) -> Dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "Chlorinator"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.device_data.get("online", False)
-        )
-
-    @property
     def is_on(self) -> bool:
-        """Return true if boost mode is on."""
+        """Return true if boost mode is on using optimistic UI."""
+        # Si on a un état en attente, l'utiliser pour la réactivité
+        if self._pending_state is not None:
+            import time
+            # Effacer l'état en attente après 10 secondes de sécurité
+            if time.time() - self._last_action_time > 10:
+                self._clear_pending_state()
+            else:
+                return self._pending_state
+
         # Get component number dynamically from device config
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
 
@@ -1034,13 +1008,16 @@ class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
         return bool(boost_value)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn boost mode on."""
+        """Turn boost mode on with optimistic UI."""
         # Get component number dynamically from device config
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
 
         _LOGGER.info(f"Turning ON boost mode for chlorinator {self._device_id} (component {boost_component})")
 
         try:
+            # Mise à jour optimiste immédiate pour la réactivité
+            self._set_pending_state(True)
+
             success = await self._api.control_device_component(self._device_id, boost_component, True)
 
             if success:
@@ -1048,21 +1025,27 @@ class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
                 import asyncio
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
+                self._clear_pending_state()
             else:
                 _LOGGER.error(f"❌ Failed to enable boost mode for chlorinator {self._device_id}")
+                self._clear_pending_state()
 
         except Exception as err:
             _LOGGER.error(f"Error enabling boost mode: {err}")
+            self._clear_pending_state()
             raise
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn boost mode off."""
+        """Turn boost mode off with optimistic UI."""
         # Get component number dynamically from device config
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
 
         _LOGGER.info(f"Turning OFF boost mode for chlorinator {self._device_id} (component {boost_component})")
 
         try:
+            # Mise à jour optimiste immédiate pour la réactivité
+            self._set_pending_state(False)
+
             success = await self._api.control_device_component(self._device_id, boost_component, False)
 
             if success:
@@ -1070,11 +1053,14 @@ class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
                 import asyncio
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
+                self._clear_pending_state()
             else:
                 _LOGGER.error(f"❌ Failed to disable boost mode for chlorinator {self._device_id}")
+                self._clear_pending_state()
 
         except Exception as err:
             _LOGGER.error(f"Error disabling boost mode: {err}")
+            self._clear_pending_state()
             raise
 
     @property
@@ -1086,4 +1072,6 @@ class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
         return {
             "component": boost_component,
             "device_id": self._device_id,
+            "pending_action": self._pending_state is not None,
+            "action_timestamp": self._last_action_time,
         }

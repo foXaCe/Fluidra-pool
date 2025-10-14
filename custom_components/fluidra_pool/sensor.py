@@ -67,22 +67,30 @@ async def async_setup_entry(
             if device_type == "chlorinator":
                 skip_ph_orp = DeviceIdentifier.has_feature(device, "skip_ph_orp_sensors")
 
+                # Get sensor components from device registry
+                sensors_config = DeviceIdentifier.get_feature(device, "sensors", {})
+
                 # pH, ORP, Free chlorine sensors (skip for CC24033907)
                 if not skip_ph_orp:
                     # pH sensor (component 172)
-                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "ph", 172))
+                    ph_component = sensors_config.get("ph", 172)
+                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "ph", ph_component))
                     # ORP sensor (component 177)
-                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "orp", 177))
+                    orp_component = sensors_config.get("orp", 177)
+                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "orp", orp_component))
                     # Free chlorine sensor (component 178)
-                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "free_chlorine", 178))
+                    free_chlorine_component = sensors_config.get("free_chlorine", 178)
+                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "free_chlorine", free_chlorine_component))
 
-                # Temperature sensor (component 183) - all chlorinators
-                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "temperature", 183))
+                # Temperature sensor - get from device registry (183 for generic, 21 for CC24033907)
+                temp_component = sensors_config.get("temperature", 183)
+                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "temperature", temp_component))
                 # Salinity sensor (component 185) - all chlorinators
-                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "salinity", 185))
+                salinity_component = sensors_config.get("salinity", 185)
+                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "salinity", salinity_component))
 
                 sensor_count = 2 if skip_ph_orp else 5
-                _LOGGER.info(f"✅ Adding {sensor_count} chlorinator sensors for {device_id}")
+                _LOGGER.info(f"✅ Adding {sensor_count} chlorinator sensors for {device_id} (temp component: {temp_component})")
 
         # Sensors spécifiques à la piscine (pas liés aux devices)
         entities.append(FluidraPoolWeatherSensor(coordinator, coordinator.api, pool["id"]))
@@ -1177,21 +1185,6 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
         components = self.device_data.get("components", {})
         component_data = components.get(str(self._component_id), {})
         raw_value = component_data.get("reportedValue")
-
-        # DEBUG: Log tous les composants du chlorinateur (seulement pour température)
-        if self._sensor_type == "temperature" and "CC24033907" in self._device_id:
-            _LOGGER.warning(f"🔍 DEBUG TEMPERATURE CHLORINATOR {self._device_id}")
-            _LOGGER.warning(f"   Looking for component {self._component_id}, raw_value={raw_value}")
-            _LOGGER.warning(f"   Scanning ALL components for potential temperature values (50-400 range):")
-            for comp_id, comp_data in components.items():
-                if isinstance(comp_data, dict):
-                    reported = comp_data.get("reportedValue")
-                    if reported is not None and reported != 0:
-                        if isinstance(reported, (int, float)) and 50 <= reported <= 400:
-                            temp_c = reported / 10.0
-                            _LOGGER.warning(f"      🌡️  Component {comp_id}: {reported} (÷10 = {temp_c}°C)")
-                        elif isinstance(reported, (int, float)):
-                            _LOGGER.warning(f"       Component {comp_id}: {reported}")
 
         if raw_value is None:
             return None
