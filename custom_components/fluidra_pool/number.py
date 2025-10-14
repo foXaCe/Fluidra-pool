@@ -12,6 +12,7 @@ from homeassistant.const import PERCENTAGE
 
 from .const import DOMAIN, DEVICE_TYPE_PUMP
 from .coordinator import FluidraDataUpdateCoordinator
+from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -343,22 +344,40 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        """Return the current chlorination level from component 4."""
+        """Return the current chlorination level from dynamic component."""
+        # Get component config dynamically
+        chlorination_config = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", {"write": 4, "read": 164})
+
+        # Handle both formats: int (simple) or dict (separate read/write)
+        if isinstance(chlorination_config, dict):
+            read_component = chlorination_config.get("read", chlorination_config.get("write", 4))
+        else:
+            read_component = chlorination_config
+
         components = self.device_data.get("components", {})
-        component_4_data = components.get("4", {})
-        current_value = component_4_data.get("reportedValue", 0)
+        component_data = components.get(str(read_component), {})
+        current_value = component_data.get("reportedValue", 0)
 
         return current_value
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the chlorination level via component 4."""
+        """Set the chlorination level via dynamic component."""
         int_value = int(value)
 
-        _LOGGER.info(f"Setting chlorinator {self._device_id} chlorination level to {int_value}%")
+        # Get component config dynamically
+        chlorination_config = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", {"write": 4, "read": 164})
+
+        # Handle both formats: int (simple) or dict (separate read/write)
+        if isinstance(chlorination_config, dict):
+            write_component = chlorination_config.get("write", 4)
+        else:
+            write_component = chlorination_config
+
+        _LOGGER.info(f"Setting chlorinator {self._device_id} chlorination level to {int_value}% (component {write_component})")
 
         try:
-            # Write to component 4
-            success = await self._api.control_device_component(self._device_id, 4, int_value)
+            # Write to dynamic component
+            success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if success:
                 _LOGGER.info(f"✅ Chlorination level set to {int_value}%")
@@ -390,10 +409,21 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         """Return additional state attributes."""
         current_level = self.native_value or 0
 
+        # Get component config dynamically
+        chlorination_config = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", {"write": 4, "read": 164})
+
+        # Handle both formats: int (simple) or dict (separate read/write)
+        if isinstance(chlorination_config, dict):
+            read_component = chlorination_config.get("read", chlorination_config.get("write", 4))
+            write_component = chlorination_config.get("write", 4)
+        else:
+            read_component = chlorination_config
+            write_component = chlorination_config
+
         return {
             "chlorination_range": "0-100%",
-            "read_component": 164,
-            "write_component": 4,
+            "read_component": read_component,
+            "write_component": write_component,
             "current_level": current_level,
             "device_id": self._device_id,
         }
@@ -462,11 +492,20 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        """Return the current pH setpoint from component 8."""
+        """Return the current pH setpoint from dynamic component."""
+        # Get component config dynamically
+        ph_config = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint", {"write": 8, "read": 172})
+
+        # Handle both formats: int (simple) or dict (separate read/write)
+        if isinstance(ph_config, dict):
+            read_component = ph_config.get("read", ph_config.get("write", 8))
+        else:
+            read_component = ph_config
+
         components = self.device_data.get("components", {})
-        component_8_data = components.get("8", {})
+        component_data = components.get(str(read_component), {})
         # Component value is pH * 100 (e.g., 720 = 7.20)
-        raw_value = component_8_data.get("reportedValue")
+        raw_value = component_data.get("reportedValue")
 
         if raw_value is None:
             return 7.2  # Default value
@@ -477,15 +516,24 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
             return 7.2
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the pH setpoint via component 8."""
+        """Set the pH setpoint via dynamic component."""
         # Convert pH value to API format (multiply by 100)
         int_value = int(value * 100)
 
-        _LOGGER.info(f"Setting chlorinator {self._device_id} pH setpoint to {value} (API value: {int_value})")
+        # Get component config dynamically
+        ph_config = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint", {"write": 8, "read": 172})
+
+        # Handle both formats: int (simple) or dict (separate read/write)
+        if isinstance(ph_config, dict):
+            write_component = ph_config.get("write", 8)
+        else:
+            write_component = ph_config
+
+        _LOGGER.info(f"Setting chlorinator {self._device_id} pH setpoint to {value} (API value: {int_value}, component {write_component})")
 
         try:
-            # Write to component 8
-            success = await self._api.control_device_component(self._device_id, 8, int_value)
+            # Write to dynamic component
+            success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if success:
                 _LOGGER.info(f"✅ pH setpoint set to {value}")
@@ -507,10 +555,21 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return additional state attributes."""
-        # Get current pH reading from component 172
+        # Get component config dynamically
+        ph_config = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint", {"write": 8, "read": 172})
+
+        # Handle both formats: int (simple) or dict (separate read/write)
+        if isinstance(ph_config, dict):
+            read_component = ph_config.get("read", ph_config.get("write", 8))
+            write_component = ph_config.get("write", 8)
+        else:
+            read_component = ph_config
+            write_component = ph_config
+
+        # Get current pH reading
         components = self.device_data.get("components", {})
-        component_172_data = components.get("172", {})
-        raw_reading = component_172_data.get("reportedValue")
+        component_data = components.get(str(read_component), {})
+        raw_reading = component_data.get("reportedValue")
 
         current_ph = None
         if raw_reading is not None:
@@ -521,8 +580,8 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
 
         return {
             "ph_range": "6.8-7.6",
-            "read_component": 172,
-            "write_component": 8,
+            "read_component": read_component,
+            "write_component": write_component,
             "current_ph_reading": current_ph,
             "device_id": self._device_id,
         }
@@ -591,11 +650,20 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        """Return the current ORP setpoint from component 11."""
+        """Return the current ORP setpoint from dynamic component."""
+        # Get component config dynamically
+        orp_config = DeviceIdentifier.get_feature(self.device_data, "orp_setpoint", {"write": 11, "read": 177})
+
+        # Handle both formats: int (simple) or dict (separate read/write)
+        if isinstance(orp_config, dict):
+            read_component = orp_config.get("read", orp_config.get("write", 11))
+        else:
+            read_component = orp_config
+
         components = self.device_data.get("components", {})
-        component_11_data = components.get("11", {})
+        component_data = components.get(str(read_component), {})
         # Component value is in mV directly
-        raw_value = component_11_data.get("reportedValue")
+        raw_value = component_data.get("reportedValue")
 
         if raw_value is None:
             return 700  # Default value
@@ -603,14 +671,23 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         return raw_value
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the ORP setpoint via component 11."""
+        """Set the ORP setpoint via dynamic component."""
         int_value = int(value)
 
-        _LOGGER.info(f"Setting chlorinator {self._device_id} ORP setpoint to {int_value} mV")
+        # Get component config dynamically
+        orp_config = DeviceIdentifier.get_feature(self.device_data, "orp_setpoint", {"write": 11, "read": 177})
+
+        # Handle both formats: int (simple) or dict (separate read/write)
+        if isinstance(orp_config, dict):
+            write_component = orp_config.get("write", 11)
+        else:
+            write_component = orp_config
+
+        _LOGGER.info(f"Setting chlorinator {self._device_id} ORP setpoint to {int_value} mV (component {write_component})")
 
         try:
-            # Write to component 11
-            success = await self._api.control_device_component(self._device_id, 11, int_value)
+            # Write to dynamic component
+            success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if success:
                 _LOGGER.info(f"✅ ORP setpoint set to {int_value} mV")
@@ -632,15 +709,26 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return additional state attributes."""
-        # Get current ORP reading from component 177
+        # Get component config dynamically
+        orp_config = DeviceIdentifier.get_feature(self.device_data, "orp_setpoint", {"write": 11, "read": 177})
+
+        # Handle both formats: int (simple) or dict (separate read/write)
+        if isinstance(orp_config, dict):
+            read_component = orp_config.get("read", orp_config.get("write", 11))
+            write_component = orp_config.get("write", 11)
+        else:
+            read_component = orp_config
+            write_component = orp_config
+
+        # Get current ORP reading
         components = self.device_data.get("components", {})
-        component_177_data = components.get("177", {})
-        current_orp = component_177_data.get("reportedValue")
+        component_data = components.get(str(read_component), {})
+        current_orp = component_data.get("reportedValue")
 
         return {
             "orp_range": "650-750 mV",
-            "read_component": 177,
-            "write_component": 11,
+            "read_component": read_component,
+            "write_component": write_component,
             "current_orp_reading": current_orp,
             "device_id": self._device_id,
         }

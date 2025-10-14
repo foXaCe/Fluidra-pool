@@ -1022,17 +1022,23 @@ class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if boost mode is on."""
+        # Get component number dynamically from device config
+        boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
+
         components = self.device_data.get("components", {})
-        component_245 = components.get("245", {})
-        boost_value = component_245.get("reportedValue", False)
+        component_data = components.get(str(boost_component), {})
+        boost_value = component_data.get("reportedValue", False)
         return bool(boost_value)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn boost mode on."""
-        _LOGGER.info(f"Turning ON boost mode for chlorinator {self._device_id}")
+        # Get component number dynamically from device config
+        boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
+
+        _LOGGER.info(f"Turning ON boost mode for chlorinator {self._device_id} (component {boost_component})")
 
         try:
-            success = await self._api.control_device_component(self._device_id, 245, True)
+            success = await self._api.control_device_component(self._device_id, boost_component, True)
 
             if success:
                 _LOGGER.info(f"✅ Boost mode enabled for chlorinator {self._device_id}")
@@ -1048,10 +1054,13 @@ class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn boost mode off."""
-        _LOGGER.info(f"Turning OFF boost mode for chlorinator {self._device_id}")
+        # Get component number dynamically from device config
+        boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
+
+        _LOGGER.info(f"Turning OFF boost mode for chlorinator {self._device_id} (component {boost_component})")
 
         try:
-            success = await self._api.control_device_component(self._device_id, 245, False)
+            success = await self._api.control_device_component(self._device_id, boost_component, False)
 
             if success:
                 _LOGGER.info(f"✅ Boost mode disabled for chlorinator {self._device_id}")
@@ -1068,7 +1077,10 @@ class FluidraChlorinatorBoostSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return additional state attributes."""
+        # Get component number dynamically from device config
+        boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
+
         return {
-            "component": 245,
+            "component": boost_component,
             "device_id": self._device_id,
         }

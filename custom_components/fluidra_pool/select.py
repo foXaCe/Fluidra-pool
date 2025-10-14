@@ -35,10 +35,12 @@ async def async_setup_entry(
             if not device_id:
                 continue
 
-            # Chlorinator mode select (OFF/ON/AUTO)
+            # Chlorinator mode select (OFF/ON/AUTO) - skip for CC24033907
             if device_type == "chlorinator":
-                entities.append(FluidraChlorinatorModeSelect(coordinator, coordinator.api, pool["id"], device_id))
-                _LOGGER.info(f"✅ Adding chlorinator mode select for {device_id}")
+                skip_mode = DeviceIdentifier.has_feature(device, "skip_mode_select")
+                if not skip_mode:
+                    entities.append(FluidraChlorinatorModeSelect(coordinator, coordinator.api, pool["id"], device_id))
+                    _LOGGER.info(f"✅ Adding chlorinator mode select for {device_id}")
 
             # Skip heat pumps - they don't have speed or schedule controls
             if DeviceIdentifier.has_feature(device, "skip_schedules"):
