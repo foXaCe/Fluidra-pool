@@ -247,7 +247,11 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
+        device_name = self.device_data.get("name")
+        if not device_name:
+            # Use model or generic pump name
+            model = self.device_data.get("model", "Pump")
+            device_name = f"{model} {self._device_id}"
         return f"{device_name} Speed"
 
     @property
@@ -363,7 +367,11 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
+        device_name = self.device_data.get("name")
+        if not device_name:
+            # Use model or generic pump name
+            model = self.device_data.get("model", "Pump")
+            device_name = f"{model} {self._device_id}"
         return f"{device_name} Schedules"
 
     @property
@@ -532,7 +540,11 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
+        device_name = self.device_data.get("name")
+        if not device_name:
+            # Get device type for proper fallback name
+            device_type = self.device_data.get("type", "device")
+            device_name = f"{device_type.replace('_', ' ').title()} {self._device_id}"
         return f"{device_name} Information"
 
     @property
@@ -659,10 +671,10 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
                 attrs["timezone_info"] = info_data["timezone"]
 
             # Informations statiques du device
-            attrs["device_name"] = self.device_data.get("name", "E30iQ")
-            attrs["device_type"] = self.device_data.get("type", "pump")
+            attrs["device_name"] = self.device_data.get("name", "Unknown")
+            attrs["device_type"] = self.device_data.get("type", "unknown")
             attrs["manufacturer"] = self.device_data.get("manufacturer", "Fluidra")
-            attrs["model"] = self.device_data.get("model", "E30iQ")
+            attrs["model"] = self.device_data.get("model", "Unknown")
             attrs["online"] = self.device_data.get("online", False)
 
         except Exception as e:

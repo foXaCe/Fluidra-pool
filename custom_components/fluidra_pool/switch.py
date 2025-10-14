@@ -706,7 +706,10 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
 
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
+        device_name = self.device_data.get("name")
+        if not device_name:
+            model = self.device_data.get("model", "Pump")
+            device_name = f"{model} {self._device_id}"
         self._attr_translation_key = "schedule_enable"
         self._attr_translation_placeholders = {"schedule_id": schedule_id}
         self._attr_unique_id = f"fluidra_{self._device_id}_schedule_{schedule_id}_enabled"
