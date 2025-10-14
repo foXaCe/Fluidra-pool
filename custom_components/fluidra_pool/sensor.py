@@ -367,6 +367,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         """Translate schedule state based on HA language."""
         # Détection de langue basique
         language = getattr(self.hass.config, 'language', 'en')
+        _LOGGER.debug(f"[SCHEDULE] Detected language: {language}, translating key: {state_key}")
 
         translations = {
             'en': {
@@ -561,6 +562,7 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
     def _translate_device_info(self, key: str) -> str:
         """Translate device info text based on HA language."""
         language = getattr(self.hass.config, 'language', 'en')
+        _LOGGER.debug(f"[DEVICE INFO] Detected language: {language}, translating key: {key}")
 
         translations = {
             'en': {
