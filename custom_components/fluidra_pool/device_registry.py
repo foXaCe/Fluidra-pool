@@ -100,6 +100,28 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         priority=80,  # Haute priorité pour éviter confusion avec pumps
     ),
 
+    "cc24033907_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["CC24033907*"],  # Specific CC24033907 model
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": True,  # Component 10 (0-100%)
+            "ph_setpoint": True,  # Component 16 (÷100)
+            "orp_setpoint": True,  # Component 20 (mV)
+            "boost_mode": True,  # Component 103 (boolean)
+            "sensors": {
+                "temperature": 183,  # Pool temperature (°C * 10)
+                "salinity": 185,  # Salinity (g/L * 100)
+            },
+            # Specific components for CC24033907
+            "specific_components": [10, 16, 20, 103, 183, 185],
+        },
+        priority=85,  # Higher than generic chlorinator
+    ),
+
     "e30iq_pump": DeviceConfig(
         device_type="pump",
         identifier_patterns=["E30*", "PUMP*"],
