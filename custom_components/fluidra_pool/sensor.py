@@ -365,9 +365,15 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
 
     def _translate_schedule_state(self, state_key: str) -> str:
         """Translate schedule state based on HA language."""
-        # Détection de langue basique
-        language = getattr(self.hass.config, 'language', 'en')
-        _LOGGER.debug(f"[SCHEDULE] Detected language: {language}, translating key: {state_key}")
+        # Try multiple methods to detect language
+        language = 'en'  # Default
+
+        # Method 1: Direct attribute
+        if hasattr(self.hass.config, 'language'):
+            language = self.hass.config.language
+            _LOGGER.warning(f"[SCHEDULE] Language from config.language: {language}")
+
+        _LOGGER.warning(f"[SCHEDULE] Final language used: {language}, translating key: {state_key}")
 
         translations = {
             'en': {
@@ -561,8 +567,22 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
 
     def _translate_device_info(self, key: str) -> str:
         """Translate device info text based on HA language."""
-        language = getattr(self.hass.config, 'language', 'en')
-        _LOGGER.debug(f"[DEVICE INFO] Detected language: {language}, translating key: {key}")
+        # Try multiple methods to detect language
+        language = 'en'  # Default
+
+        # Method 1: Direct attribute
+        if hasattr(self.hass.config, 'language'):
+            language = self.hass.config.language
+            _LOGGER.warning(f"[DEVICE INFO] Language from config.language: {language}")
+
+        # Method 2: Safe get with getattr
+        lang_getattr = getattr(self.hass.config, 'language', None)
+        if lang_getattr:
+            _LOGGER.warning(f"[DEVICE INFO] Language from getattr: {lang_getattr}")
+
+        # Log complete config for debugging
+        _LOGGER.warning(f"[DEVICE INFO] HA Config attributes: {dir(self.hass.config)}")
+        _LOGGER.warning(f"[DEVICE INFO] Final language used: {language}, translating key: {key}")
 
         translations = {
             'en': {
