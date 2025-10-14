@@ -84,25 +84,26 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
 
         self._attr_name = f"{device_name} Speed Level"
         self._attr_unique_id = f"fluidra_{self._device_id}_speed_level"
+        self._attr_translation_key = "pump_speed"
 
-        # Options comme dans l'app Fluidra
-        self._attr_options = ["Pas en marche", "Faible", "Moyenne", "Élevée"]
+        # Options using internal keys (will be translated)
+        self._attr_options = ["stopped", "low", "medium", "high"]
 
         # Mapping options → API values
-        # "Pas en marche" = pompe ON mais sans débit spécifique (état naturel)
+        # "stopped" = pump ON but no specific flow (natural state)
         self._speed_mapping = {
-            "Pas en marche": {"component": 9, "value": 1, "percent": 0, "keep_pump_on": True},
-            "Faible": {"component": 11, "value": 0, "percent": 45},
-            "Moyenne": {"component": 11, "value": 1, "percent": 65},
-            "Élevée": {"component": 11, "value": 2, "percent": 100}
+            "stopped": {"component": 9, "value": 1, "percent": 0, "keep_pump_on": True},
+            "low": {"component": 11, "value": 0, "percent": 45},
+            "medium": {"component": 11, "value": 1, "percent": 65},
+            "high": {"component": 11, "value": 2, "percent": 100}
         }
 
-        # Mapping inverse pour l'affichage
+        # Inverse mapping for display
         self._percent_to_option = {
-            0: "Pas en marche",
-            45: "Faible",
-            65: "Moyenne",
-            100: "Élevée"
+            0: "stopped",
+            45: "low",
+            65: "medium",
+            100: "high"
         }
 
     @property
@@ -167,23 +168,23 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         is_running = self.device_data.get("is_running", False)
 
         if not is_running:
-            # Pompe complètement OFF (ne devrait pas arriver avec la nouvelle logique)
-            return "Pas en marche"
+            # Pump completely OFF (should not happen with new logic)
+            return "stopped"
 
-        # Si en marche, vérifier d'abord le level direct du Component 11
+        # If running, check Component 11 level first
         speed_level = self.device_data.get("speed_level_reported")
         if speed_level is not None:
-            level_to_option = {0: "Faible", 1: "Moyenne", 2: "Élevée"}
-            return level_to_option.get(speed_level, "Faible")
+            level_to_option = {0: "low", 1: "medium", 2: "high"}
+            return level_to_option.get(speed_level, "low")
 
-        # Fallback sur le pourcentage pour compatibilité
+        # Fallback to percentage for compatibility
         current_percent = self.device_data.get("speed_percent", 0)
 
-        # Si pompe ON mais 0% ou speed_percent vide, c'est "Pas en marche"
+        # If pump ON but 0% or empty speed_percent, it's "stopped"
         if current_percent == 0:
-            return "Pas en marche"
+            return "stopped"
 
-        return self._percent_to_option.get(current_percent, "Faible")
+        return self._percent_to_option.get(current_percent, "low")
 
     async def async_select_option(self, option: str) -> None:
         """Select new speed option."""
@@ -207,27 +208,27 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
             import asyncio
             await asyncio.sleep(0.1)
 
-            # Pour "Pas en marche", s'assurer que la pompe est ON mais sans vitesse active
-            if option == "Pas en marche":
+            # For "stopped", ensure pump is ON but no active speed
+            if option == "stopped":
                 # 1. S'assurer que la pompe est ON (component 9 = 1)
                 success = await self._api.control_device_component(self._device_id, 9, 1)
                 if success:
                     _LOGGER.info(f"✅ Pump {self._device_id} set to ON")
-                    # 2. CRUCIAL : Désactiver explicitement la vitesse en envoyant une valeur spéciale
-                    # Essayer d'envoyer -1 ou une valeur qui signifie "pas de vitesse active"
+                    # 2. CRUCIAL: Explicitly disable speed by sending special value
+                    # Try sending -1 or a value meaning "no active speed"
                     try:
                         await self._api.control_device_component(self._device_id, 11, -1)
-                        _LOGGER.info(f"✅ Speed component disabled for 'Pas en marche' mode")
+                        _LOGGER.info(f"✅ Speed component disabled for 'stopped' mode")
                     except Exception as e:
                         _LOGGER.warning(f"⚠️ Could not disable speed component: {e}")
-                        # Fallback : marquer manuellement dans les données du device
+                        # Fallback: manually mark in device data
                         device = self._api.get_device_by_id(self._device_id)
                         if device:
                             device["speed_percent"] = 0
                             device["speed_level_reported"] = None
-                            _LOGGER.info(f"✅ Manually set speed to 0% for 'Pas en marche'")
+                            _LOGGER.info(f"✅ Manually set speed to 0% for 'stopped'")
                 else:
-                    _LOGGER.error(f"❌ Failed to set pump to ON for 'Pas en marche' mode")
+                    _LOGGER.error(f"❌ Failed to set pump to ON for 'stopped' mode")
                     return
             else:
                 # Pour les autres modes, d'abord s'assurer que la pompe est ON puis définir la vitesse
@@ -296,8 +297,8 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
     @property
     def icon(self) -> str:
         """Return the icon for the entity."""
-        # Si le mode auto est activé, afficher une icône différente
-        # Utiliser auto_reported en priorité (real-time API)
+        # If auto mode is enabled, show different icon
+        # Use auto_reported in priority (real-time API)
         auto_reported = self.device_data.get("auto_reported")
         if auto_reported is not None:
             auto_mode_enabled = bool(auto_reported)
@@ -305,16 +306,16 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
             auto_mode_enabled = self.device_data.get("auto_mode_enabled", False)
 
         if auto_mode_enabled:
-            return "mdi:autorenew"  # Icône pour indiquer le contrôle automatique
+            return "mdi:autorenew"  # Icon to indicate automatic control
 
         current_option = self.current_option
-        if current_option == "Pas en marche":
-            return "mdi:pump"  # Pompe ON mais pas en marche
-        elif current_option == "Faible":
+        if current_option == "stopped":
+            return "mdi:pump"  # Pump ON but not running
+        elif current_option == "low":
             return "mdi:pump"
-        elif current_option == "Moyenne":
+        elif current_option == "medium":
             return "mdi:pump"
-        else:  # Élevée
+        else:  # high
             return "mdi:pump"
 
     @property
@@ -376,8 +377,8 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         self._attr_unique_id = f"fluidra_{self._device_id}_schedule_{schedule_id}_mode"
         self._attr_entity_category = EntityCategory.CONFIG
 
-        # Options de vitesse pour les programmations
-        self._attr_options = ["Faible", "Moyenne", "Élevée"]
+        # Speed options for schedules (using translation keys from schedule_mode.state)
+        self._attr_options = ["0", "1", "2"]
 
     @property
     def device_data(self) -> dict:
@@ -433,32 +434,14 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         result = self._get_schedule_data() is not None
         return result
 
-    def _operation_to_mode(self, operation: str) -> str:
-        """Convert API operation to mode name."""
-        operation_map = {
-            "0": "Faible",
-            "1": "Moyenne",
-            "2": "Élevée"
-        }
-        return operation_map.get(str(operation), "Faible")
-
-    def _mode_to_operation(self, mode: str) -> str:
-        """Convert mode name to API operation."""
-        mode_map = {
-            "Faible": "0",
-            "Moyenne": "1",
-            "Élevée": "2"
-        }
-        return mode_map.get(mode, "0")
-
     @property
     def current_option(self) -> Optional[str]:
         """Return the current mode option."""
         schedule = self._get_schedule_data()
         if schedule:
             operation = schedule.get("startActions", {}).get("operationName", "0")
-            return self._operation_to_mode(operation)
-        return "Faible"
+            return str(operation)
+        return "0"
 
     async def async_select_option(self, option: str) -> None:
         """Select new mode option using exact mobile app format."""
@@ -486,7 +469,7 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
                 end_time = self._convert_cron_days(sched.get("endTime", ""))
 
                 # If this is the schedule we're updating, use the new mode
-                operation_name = self._mode_to_operation(option) if str(sched.get("id")) == str(self._schedule_id) else str(sched.get("startActions", {}).get("operationName", "0"))
+                operation_name = option if str(sched.get("id")) == str(self._schedule_id) else str(sched.get("startActions", {}).get("operationName", "0"))
 
                 scheduler = {
                     "id": sched.get("id"),
@@ -554,9 +537,9 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
     def icon(self) -> str:
         """Return the icon for the entity."""
         icons = {
-            "Faible": "mdi:speedometer-slow",
-            "Moyenne": "mdi:speedometer-medium",
-            "Élevée": "mdi:speedometer"
+            "0": "mdi:speedometer-slow",
+            "1": "mdi:speedometer-medium",
+            "2": "mdi:speedometer"
         }
         return icons.get(self.current_option, "mdi:speedometer")
 
@@ -662,7 +645,7 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
 
         # Get current mode from component 20
         mode_value = self.device_data.get("mode_reported", 0)
-        return self._value_to_mode.get(mode_value, "Arrêt")
+        return self._value_to_mode.get(mode_value, "off")
 
     async def async_select_option(self, option: str) -> None:
         """Select new mode option."""
@@ -705,11 +688,11 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
     def icon(self) -> str:
         """Return the icon for the entity."""
         current = self.current_option
-        if current == "Arrêt":
+        if current == "off":
             return "mdi:water-off"
-        elif current == "Marche":
+        elif current == "on":
             return "mdi:water"
-        else:  # Auto
+        else:  # auto
             return "mdi:water-sync"
 
     @property
