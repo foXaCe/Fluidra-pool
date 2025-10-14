@@ -120,11 +120,10 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
         components = self.device_data.get("components", {})
         component_data = components.get(str(self._component_id), {})
 
-        # Debug logging
+        # Use desiredValue preferentially to show immediate UI feedback
+        value = component_data.get("desiredValue", component_data.get("reportedValue", 0))
 
-        reported_value = component_data.get("reportedValue", 0)
-
-        return reported_value
+        return float(value)
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the component value."""
@@ -231,9 +230,10 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
         """Return the current speed value from component 15."""
         components = self.device_data.get("components", {})
         component_15_data = components.get("15", {})
-        current_value = component_15_data.get("reportedValue", 50)
+        # Use desiredValue preferentially to show immediate UI feedback
+        current_value = component_15_data.get("desiredValue", component_15_data.get("reportedValue", 50))
 
-        return current_value
+        return float(current_value)
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the speed percentage directly to component 15."""
@@ -303,12 +303,9 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         self._attr_name = f"{device_name} Chlorination Level"
         self._attr_unique_id = f"fluidra_{self._device_id}_chlorination_level"
         self._attr_mode = "slider"
-
-        # Get custom range from device config if available
-        range_config = DeviceIdentifier.get_feature(self.device_data, "chlorination_level_range", {"min": 0, "max": 100, "step": 1})
-        self._attr_native_min_value = range_config.get("min", 0)
-        self._attr_native_max_value = range_config.get("max", 100)
-        self._attr_native_step = range_config.get("step", 1)
+        self._attr_native_min_value = 0
+        self._attr_native_max_value = 100
+        self._attr_native_step = 1
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_device_class = NumberDeviceClass.POWER_FACTOR
 
@@ -346,90 +343,38 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        """Return the current chlorination level."""
-        # Get component config dynamically
-        chlorination_config = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", {"write": 4, "read": 164})
-
-        # Handle both formats: int (simple) or dict (separate read/write)
-        if isinstance(chlorination_config, dict):
-            read_component = chlorination_config.get("read", chlorination_config.get("write", 4))
-        else:
-            read_component = chlorination_config
-
+        """Return the current chlorination level from component 10."""
         components = self.device_data.get("components", {})
-        component_data = components.get(str(read_component), {})
-
-        # For single-component chlorinators (CC24033907), read desiredValue
-        # For dual-component chlorinators, read reportedValue from read component
-        if isinstance(chlorination_config, int):
-            current_value = component_data.get("desiredValue", 0)
-        else:
-            current_value = component_data.get("reportedValue", 0)
-
-        return float(current_value)
+        component_10 = components.get("10", {})
+        value = component_10.get("desiredValue", component_10.get("reportedValue", 0))
+        return float(value)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the chlorination level."""
+        """Set chlorination level to component 10."""
         int_value = int(value)
-
-        # Get component config dynamically
-        chlorination_config = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", {"write": 4, "read": 164})
-
-        # Handle both formats: int (simple) or dict (separate read/write)
-        if isinstance(chlorination_config, dict):
-            write_component = chlorination_config.get("write", 4)
-        else:
-            write_component = chlorination_config
-
-        _LOGGER.info(f"Setting chlorinator {self._device_id} chlorination level to {int_value}% (component {write_component})")
+        _LOGGER.info(f"Setting chlorinator {self._device_id} to {int_value}%")
 
         try:
-            success = await self._api.control_device_component(self._device_id, write_component, int_value)
-
+            success = await self._api.control_device_component(self._device_id, 10, int_value)
             if success:
-                _LOGGER.info(f"✅ Chlorination level set to {int_value}%")
+                _LOGGER.info(f"✅ Set to {int_value}%")
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"❌ Failed to set chlorination level to {int_value}%")
-
+                _LOGGER.error(f"❌ Failed to set to {int_value}%")
         except Exception as err:
-            _LOGGER.error(f"Error setting chlorination level: {err}")
+            _LOGGER.error(f"Error: {err}")
             raise
 
     @property
     def icon(self) -> str:
-        """Return the icon for the entity."""
-        current_level = self.native_value or 0
-        if current_level == 0:
-            return "mdi:water-percent-alert"
-        elif current_level < 30:
-            return "mdi:water-percent"
-        elif current_level < 70:
-            return "mdi:water-percent"
-        else:
-            return "mdi:water-percent"
+        """Return the icon."""
+        return "mdi:water-percent"
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
-        """Return additional state attributes."""
-        current_level = self.native_value or 0
-
-        # Get component config dynamically
-        chlorination_config = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", {"write": 4, "read": 164})
-
-        # Handle both formats: int (simple) or dict (separate read/write)
-        if isinstance(chlorination_config, dict):
-            read_component = chlorination_config.get("read", chlorination_config.get("write", 4))
-            write_component = chlorination_config.get("write", 4)
-        else:
-            read_component = chlorination_config
-            write_component = chlorination_config
-
+        """Return state attributes."""
         return {
-            "chlorination_range": "0-100%",
-            "read_component": read_component,
-            "write_component": write_component,
-            "current_level": current_level,
+            "component": 10,
             "device_id": self._device_id,
         }
 
@@ -510,7 +455,8 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         components = self.device_data.get("components", {})
         component_data = components.get(str(read_component), {})
         # Component value is pH * 100 (e.g., 720 = 7.20)
-        raw_value = component_data.get("reportedValue")
+        # Use desiredValue preferentially to show immediate UI feedback
+        raw_value = component_data.get("desiredValue", component_data.get("reportedValue"))
 
         if raw_value is None:
             return 7.2  # Default value
@@ -664,7 +610,8 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
 
         components = self.device_data.get("components", {})
         component_data = components.get(str(read_component), {})
-        raw_value = component_data.get("reportedValue")
+        # Use desiredValue preferentially to show immediate UI feedback
+        raw_value = component_data.get("desiredValue", component_data.get("reportedValue"))
 
         return float(raw_value) if raw_value is not None else 700.0
 
