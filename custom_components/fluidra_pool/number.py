@@ -355,7 +355,7 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         int_value = round(value / 10) * 10
         _LOGGER.info(f"Setting chlorinator {self._device_id} to {int_value}% (rounded from {value})")
 
-        # Optimistic update: Update local state immediately for responsive UI
+        # Optimistic update: Update UI immediately for instant feedback
         if self.coordinator.data:
             pool = self.coordinator.data.get(self._pool_id)
             if pool:
@@ -366,14 +366,13 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
                         if "10" not in device["components"]:
                             device["components"]["10"] = {}
                         device["components"]["10"]["desiredValue"] = int_value
-                        self.async_write_ha_state()  # Force UI update
+                        self.async_write_ha_state()
                         break
 
         try:
             success = await self._api.control_device_component(self._device_id, 10, int_value)
             if success:
                 _LOGGER.info(f"✅ Set to {int_value}%")
-                await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to set to {int_value}%")
         except Exception as err:
@@ -492,17 +491,32 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         # Handle both formats: int (simple) or dict (separate read/write)
         if isinstance(ph_config, dict):
             write_component = ph_config.get("write", 8)
+            read_component = ph_config.get("read", ph_config.get("write", 8))
         else:
             write_component = ph_config
+            read_component = ph_config
 
         _LOGGER.info(f"Setting chlorinator {self._device_id} pH setpoint to {value} (API value: {int_value}, component {write_component})")
+
+        # Optimistic update: Update UI immediately for instant feedback
+        if self.coordinator.data:
+            pool = self.coordinator.data.get(self._pool_id)
+            if pool:
+                for device in pool.get("devices", []):
+                    if device.get("device_id") == self._device_id:
+                        if "components" not in device:
+                            device["components"] = {}
+                        if str(read_component) not in device["components"]:
+                            device["components"][str(read_component)] = {}
+                        device["components"][str(read_component)]["desiredValue"] = int_value
+                        self.async_write_ha_state()
+                        break
 
         try:
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if success:
                 _LOGGER.info(f"✅ pH setpoint set to {value}")
-                await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to set pH setpoint to {value}")
 
@@ -640,17 +654,32 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         # Handle both formats: int (simple) or dict (separate read/write)
         if isinstance(orp_config, dict):
             write_component = orp_config.get("write", 11)
+            read_component = orp_config.get("read", orp_config.get("write", 11))
         else:
             write_component = orp_config
+            read_component = orp_config
 
         _LOGGER.info(f"Setting chlorinator {self._device_id} ORP setpoint to {int_value} mV (component {write_component})")
+
+        # Optimistic update: Update UI immediately for instant feedback
+        if self.coordinator.data:
+            pool = self.coordinator.data.get(self._pool_id)
+            if pool:
+                for device in pool.get("devices", []):
+                    if device.get("device_id") == self._device_id:
+                        if "components" not in device:
+                            device["components"] = {}
+                        if str(read_component) not in device["components"]:
+                            device["components"][str(read_component)] = {}
+                        device["components"][str(read_component)]["desiredValue"] = int_value
+                        self.async_write_ha_state()
+                        break
 
         try:
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if success:
                 _LOGGER.info(f"✅ ORP setpoint set to {int_value} mV")
-                await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to set ORP setpoint to {int_value} mV")
 
