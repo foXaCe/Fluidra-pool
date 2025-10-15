@@ -355,19 +355,12 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         int_value = round(value / 10) * 10
         _LOGGER.info(f"Setting chlorinator {self._device_id} to {int_value}% (rounded from {value})")
 
-        # Optimistic update: Update UI immediately for instant feedback
-        if self.coordinator.data:
-            pool = self.coordinator.data.get(self._pool_id)
-            if pool:
-                for device in pool.get("devices", []):
-                    if device.get("device_id") == self._device_id:
-                        if "components" not in device:
-                            device["components"] = {}
-                        if "10" not in device["components"]:
-                            device["components"]["10"] = {}
-                        device["components"]["10"]["desiredValue"] = int_value
-                        self.async_write_ha_state()
-                        break
+        # Optimistic update: Update coordinator data immediately for instant UI feedback
+        components = self.device_data.get("components", {})
+        if "10" not in components:
+            components["10"] = {}
+        components["10"]["desiredValue"] = int_value
+        self.async_write_ha_state()
 
         try:
             success = await self._api.control_device_component(self._device_id, 10, int_value)
@@ -498,19 +491,12 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
 
         _LOGGER.info(f"Setting chlorinator {self._device_id} pH setpoint to {value} (API value: {int_value}, component {write_component})")
 
-        # Optimistic update: Update UI immediately for instant feedback
-        if self.coordinator.data:
-            pool = self.coordinator.data.get(self._pool_id)
-            if pool:
-                for device in pool.get("devices", []):
-                    if device.get("device_id") == self._device_id:
-                        if "components" not in device:
-                            device["components"] = {}
-                        if str(read_component) not in device["components"]:
-                            device["components"][str(read_component)] = {}
-                        device["components"][str(read_component)]["desiredValue"] = int_value
-                        self.async_write_ha_state()
-                        break
+        # Optimistic update: Update coordinator data immediately for instant UI feedback
+        components = self.device_data.get("components", {})
+        if str(read_component) not in components:
+            components[str(read_component)] = {}
+        components[str(read_component)]["desiredValue"] = int_value
+        self.async_write_ha_state()
 
         try:
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
@@ -661,19 +647,12 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
 
         _LOGGER.info(f"Setting chlorinator {self._device_id} ORP setpoint to {int_value} mV (component {write_component})")
 
-        # Optimistic update: Update UI immediately for instant feedback
-        if self.coordinator.data:
-            pool = self.coordinator.data.get(self._pool_id)
-            if pool:
-                for device in pool.get("devices", []):
-                    if device.get("device_id") == self._device_id:
-                        if "components" not in device:
-                            device["components"] = {}
-                        if str(read_component) not in device["components"]:
-                            device["components"][str(read_component)] = {}
-                        device["components"][str(read_component)]["desiredValue"] = int_value
-                        self.async_write_ha_state()
-                        break
+        # Optimistic update: Update coordinator data immediately for instant UI feedback
+        components = self.device_data.get("components", {})
+        if str(read_component) not in components:
+            components[str(read_component)] = {}
+        components[str(read_component)]["desiredValue"] = int_value
+        self.async_write_ha_state()
 
         try:
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
