@@ -106,20 +106,22 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],  # No select, no pH/ORP/Cl sensors
+        entities=["switch", "number", "sensor_info"],  # No select for mode, but sensors enabled
         features={
             "chlorination_level": 10,  # Component 10 (0-100%, values rounded to multiples of 10)
             "ph_setpoint": 16,  # Component 16 (÷100)
             "orp_setpoint": 20,  # Component 20 (mV)
             "boost_mode": 103,  # Component 103 (boolean)
-            "skip_ph_orp_sensors": True,  # No pH/ORP/Cl sensors available
             "skip_mode_select": True,  # No mode select available
             "sensors": {
+                "ph": 172,  # pH reading (÷100) - e.g., 710 = 7.10
+                "orp": 177,  # ORP/Redox (mV) - e.g., 779 mV
+                "free_chlorine": 178,  # Free chlorine (mg/L ÷100)
                 "temperature": 21,  # Pool temperature (°C * 10) - Component 21 for CC24033907
                 "salinity": 185,  # Salinity (g/L * 100)
             },
             # Specific components for CC24033907
-            "specific_components": [10, 16, 20, 21, 103, 185],
+            "specific_components": [10, 16, 20, 21, 103, 172, 177, 178, 185],
         },
         priority=85,  # Higher than generic chlorinator
     ),
