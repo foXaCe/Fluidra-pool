@@ -114,14 +114,14 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
             "boost_mode": 103,  # Component 103 (boolean)
             "skip_mode_select": True,  # No mode select available
             "sensors": {
-                "ph": 172,  # pH reading (÷100) - e.g., 710 = 7.10
-                "orp": 177,  # ORP/Redox (mV) - e.g., 779 mV
+                "ph": 16,  # pH reading (÷100) - Component 16 serves both read/write
+                "orp": 20,  # ORP/Redox (mV) - Component 20 serves both read/write
                 "free_chlorine": 178,  # Free chlorine (mg/L ÷100)
                 "temperature": 21,  # Pool temperature (°C * 10) - Component 21 for CC24033907
                 "salinity": 185,  # Salinity (g/L * 100)
             },
             # Specific components for CC24033907
-            "specific_components": [10, 16, 20, 21, 103, 172, 177, 178, 185],
+            "specific_components": [10, 16, 20, 21, 103, 178, 185],
         },
         priority=85,  # Higher than generic chlorinator
     ),
