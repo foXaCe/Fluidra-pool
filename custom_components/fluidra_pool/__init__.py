@@ -166,9 +166,9 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
                 # Refresh coordinator data
                 await coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"❌ Failed to set schedule for {device_id}")
+                _LOGGER.error(f"Failed to set schedule for {device_id}")
         except Exception as e:
-            _LOGGER.error(f"❌ Error setting schedule for {device_id}: {e}")
+            _LOGGER.error(f"Error setting schedule for {device_id}: {e}")
 
     async def _handle_clear_schedule(call: ServiceCall) -> None:
         """Handle clear_schedule service call."""
@@ -180,9 +180,9 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
             if success:
                 await coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"❌ Failed to clear schedule for {device_id}")
+                _LOGGER.error(f"Failed to clear schedule for {device_id}")
         except Exception as e:
-            _LOGGER.error(f"❌ Error clearing schedule for {device_id}: {e}")
+            _LOGGER.error(f"Error clearing schedule for {device_id}: {e}")
 
     async def _handle_set_preset_schedule(call: ServiceCall) -> None:
         """Handle set_preset_schedule service call."""

@@ -225,7 +225,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                             device["speed_percent"] = 0
                             device["speed_level_reported"] = None
                 else:
-                    _LOGGER.error(f"❌ Failed to set pump to ON for 'stopped' mode")
+                    _LOGGER.error(f"Failed to set pump to ON for 'stopped' mode")
                     return
             else:
                 # Pour les autres modes, d'abord s'assurer que la pompe est ON puis définir la vitesse
@@ -242,7 +242,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"❌ Failed to set pump to {option}")
+                _LOGGER.error(f"Failed to set pump to {option}")
 
         except Exception as err:
             _LOGGER.error(f"Error setting pump speed to {option}: {err}")
@@ -284,7 +284,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                         device["speed_level_reported"] = None
 
         except Exception as e:
-            _LOGGER.error(f"❌ Error refreshing device state: {e}")
+            _LOGGER.error(f"Error refreshing device state: {e}")
 
     @property
     def icon(self) -> str:
@@ -491,10 +491,10 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
             if success:
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"❌ Failed to update mode for schedule {self._schedule_id}")
+                _LOGGER.error(f"Failed to update mode for schedule {self._schedule_id}")
 
         except Exception as e:
-            _LOGGER.error(f"❌ Error updating mode for schedule {self._schedule_id}: {e}")
+            _LOGGER.error(f"Error updating mode for schedule {self._schedule_id}: {e}")
 
     def _convert_cron_days(self, cron_time: str) -> str:
         """Convert cron time from HA format (0,1,2,3,4,5,6) to mobile format (1,2,3,4,5,6,7)."""
@@ -662,7 +662,7 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"❌ Failed to set chlorinator mode to {option}")
+                _LOGGER.error(f"Failed to set chlorinator mode to {option}")
 
         except Exception as err:
             _LOGGER.error(f"Error setting chlorinator mode to {option}: {err}")

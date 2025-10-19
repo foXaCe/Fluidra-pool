@@ -273,7 +273,7 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                     # Validate no overlap with other schedules
                     is_valid, error_msg = self._validate_schedule_overlap(value, current_end_time, self._schedule_id)
                     if not is_valid:
-                        _LOGGER.error(f"❌ {error_msg}")
+                        _LOGGER.error(f"{error_msg}")
                         raise ValueError(error_msg)
 
             # Create complete schedule list with EXACT format from mobile app
@@ -335,10 +335,10 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             if success:
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"❌ Failed to update start time for schedule {self._schedule_id}")
+                _LOGGER.error(f"Failed to update start time for schedule {self._schedule_id}")
 
         except Exception as e:
-            _LOGGER.error(f"❌ Error setting start time for schedule {self._schedule_id}: {e}")
+            _LOGGER.error(f"Error setting start time for schedule {self._schedule_id}: {e}")
 
 
 class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
@@ -389,7 +389,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                     # Validate no overlap with other schedules
                     is_valid, error_msg = self._validate_schedule_overlap(current_start_time, value, self._schedule_id)
                     if not is_valid:
-                        _LOGGER.error(f"❌ {error_msg}")
+                        _LOGGER.error(f"{error_msg}")
                         raise ValueError(error_msg)
 
             # Create complete schedule list with EXACT format from mobile app
@@ -451,7 +451,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             if success:
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"❌ Failed to update end time for schedule {self._schedule_id}")
+                _LOGGER.error(f"Failed to update end time for schedule {self._schedule_id}")
 
         except Exception as e:
-            _LOGGER.error(f"❌ Error setting end time for schedule {self._schedule_id}: {e}")
+            _LOGGER.error(f"Error setting end time for schedule {self._schedule_id}: {e}")

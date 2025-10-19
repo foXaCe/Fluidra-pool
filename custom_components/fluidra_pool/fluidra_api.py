@@ -91,7 +91,7 @@ class FluidraPoolAPI:
             await self.async_update_data()
 
         except Exception as e:
-            _LOGGER.error(f"❌ Échec authentification: {e}")
+            _LOGGER.error(f"Échec authentification: {e}")
             raise FluidraAuthError(f"Authentication failed: {e}")
 
     async def _cognito_initial_auth(self):
@@ -118,7 +118,7 @@ class FluidraPoolAPI:
         ) as response:
             if response.status != 200:
                 error_text = await response.text()
-                _LOGGER.error(f"❌ Erreur Cognito: {response.status} - {error_text}")
+                _LOGGER.error(f"Erreur Cognito: {response.status} - {error_text}")
                 raise FluidraAuthError(f"Cognito auth failed: {response.status} - {error_text}")
 
             # AWS Cognito renvoie application/x-amz-json-1.1, il faut forcer le décodage
@@ -127,7 +127,7 @@ class FluidraPoolAPI:
             try:
                 auth_data = json.loads(response_text)
             except json.JSONDecodeError as e:
-                _LOGGER.error(f"❌ Erreur parsing JSON Cognito: {e}")
+                _LOGGER.error(f"Erreur parsing JSON Cognito: {e}")
                 raise FluidraAuthError(f"Invalid JSON response: {e}")
 
             auth_result = auth_data.get("AuthenticationResult", {})
@@ -142,7 +142,7 @@ class FluidraPoolAPI:
             self.token_expires_at = int(time.time()) + expires_in - 300  # Renouveler 5 min avant expiration
 
             if not self.access_token:
-                _LOGGER.error(f"❌ Access token manquant dans auth_result: {auth_result}")
+                _LOGGER.error(f"Access token manquant dans auth_result: {auth_result}")
                 raise FluidraAuthError("Access token non reçu")
 
     async def _get_user_profile(self):
@@ -369,7 +369,7 @@ class FluidraPoolAPI:
 
                 return True
             else:
-                _LOGGER.error(f"❌ Échec refresh token: {response.status}")
+                _LOGGER.error(f"Échec refresh token: {response.status}")
                 return False
 
     async def get_pools(self) -> List[Dict[str, Any]]:
@@ -600,7 +600,7 @@ class FluidraPoolAPI:
                     _LOGGER.warning(f"Failed to get component state: {response.status} - {response_text}")
                     return None
         except aiohttp.ClientError as e:
-            _LOGGER.error(f"❌ Connection error during get state: {e}")
+            _LOGGER.error(f"Connection error during get state: {e}")
             return None
 
     async def control_device_component(self, device_id: str, component_id: int, value: int) -> bool:
@@ -692,17 +692,17 @@ class FluidraPoolAPI:
                                 return True
                             else:
                                 retry_text = await retry_response.text()
-                                _LOGGER.error(f"❌ Control failed après refresh: {retry_response.status} - {retry_text}")
+                                _LOGGER.error(f"Control failed après refresh: {retry_response.status} - {retry_text}")
                                 return False
                     else:
-                        _LOGGER.error("❌ Impossible de renouveler le token")
+                        _LOGGER.error("Impossible de renouveler le token")
                         return False
                 else:
-                    _LOGGER.error(f"❌ Control failed: {response.status} - {response_text}")
+                    _LOGGER.error(f"Control failed: {response.status} - {response_text}")
                     return False
 
         except aiohttp.ClientError as e:
-            _LOGGER.error(f"❌ Connection error during control: {e}")
+            _LOGGER.error(f"Connection error during control: {e}")
             return False
 
     async def set_heat_pump_temperature(self, device_id: str, temperature: float) -> bool:
@@ -723,7 +723,7 @@ class FluidraPoolAPI:
                     device["target_temperature"] = temperature
                 return True
             else:
-                _LOGGER.error(f"❌ Failed to set heat pump temperature to {temperature}°C (tried component {component_id})")
+                _LOGGER.error(f"Failed to set heat pump temperature to {temperature}°C (tried component {component_id})")
 
                 # Fallback: essayer d'autres composants possibles
                 for fallback_component in [12, 13, 14, 16]:
@@ -737,7 +737,7 @@ class FluidraPoolAPI:
                 return False
 
         except Exception as e:
-            _LOGGER.error(f"❌ Error setting heat pump temperature: {e}")
+            _LOGGER.error(f"Error setting heat pump temperature: {e}")
             return False
 
     def _is_heat_pump(self, device_id: str) -> bool:
@@ -852,11 +852,11 @@ class FluidraPoolAPI:
                 if response.status == 200:
                     return True
                 else:
-                    _LOGGER.error(f"❌ Schedule update failed: {response.status} - {response_text}")
+                    _LOGGER.error(f"Schedule update failed: {response.status} - {response_text}")
                     return False
 
         except Exception as e:
-            _LOGGER.error(f"❌ Exception setting schedule: {e}")
+            _LOGGER.error(f"Exception setting schedule: {e}")
             return False
 
     async def get_default_schedule(self) -> List[Dict[str, Any]]:
@@ -904,11 +904,11 @@ class FluidraPoolAPI:
                 if response.status == 200:
                     return True
                 else:
-                    _LOGGER.error(f"❌ Component {component_id} update failed: {response.status} - {response_text}")
+                    _LOGGER.error(f"Component {component_id} update failed: {response.status} - {response_text}")
                     return False
 
         except Exception as e:
-            _LOGGER.error(f"❌ Exception setting component {component_id}: {e}")
+            _LOGGER.error(f"Exception setting component {component_id}: {e}")
             return False
 
     async def clear_schedule(self, device_id: str) -> bool:

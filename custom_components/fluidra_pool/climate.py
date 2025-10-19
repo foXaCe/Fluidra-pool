@@ -342,7 +342,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
                 self._last_hvac_action_time = None
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"❌ Failed to set HVAC mode to {hvac_mode}")
+                _LOGGER.error(f"Failed to set HVAC mode to {hvac_mode}")
                 # Clear optimistic state on failure
                 self._pending_hvac_mode = None
                 self._last_hvac_action_time = None
@@ -357,7 +357,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
                 await self.coordinator.async_request_refresh()
 
         except Exception as e:
-            _LOGGER.error(f"❌ Error setting HVAC mode {hvac_mode}: {e}")
+            _LOGGER.error(f"Error setting HVAC mode {hvac_mode}: {e}")
             # Clear optimistic state on error
             self._pending_hvac_mode = None
             self._last_hvac_action_time = None
@@ -391,13 +391,13 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
                 self._pending_temperature = None
                 self._last_action_time = None
             else:
-                _LOGGER.error(f"❌ Failed to set temperature to {temperature}°C")
+                _LOGGER.error(f"Failed to set temperature to {temperature}°C")
                 # Annuler la température optimiste en cas d'échec
                 self._pending_temperature = None
                 self._last_action_time = None
 
         except Exception as e:
-            _LOGGER.error(f"❌ Error setting temperature {temperature}°C: {e}")
+            _LOGGER.error(f"Error setting temperature {temperature}°C: {e}")
             # Annuler la température optimiste en cas d'erreur
             self._pending_temperature = None
             self._last_action_time = None
@@ -428,7 +428,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
                 # The property will clear it after 5 seconds automatically
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"❌ Failed to set preset mode to {preset_mode}")
+                _LOGGER.error(f"Failed to set preset mode to {preset_mode}")
                 # Clear optimistic state on failure
                 self._pending_preset_mode = None
                 self._last_preset_action_time = None
@@ -442,7 +442,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
                 await self.coordinator.async_request_refresh()
 
         except Exception as e:
-            _LOGGER.error(f"❌ Error setting preset mode {preset_mode}: {e}")
+            _LOGGER.error(f"Error setting preset mode {preset_mode}: {e}")
             # Clear optimistic state on error
             self._pending_preset_mode = None
             self._last_preset_action_time = None
