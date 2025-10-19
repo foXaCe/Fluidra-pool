@@ -125,6 +125,30 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         priority=85,  # Higher than generic chlorinator
     ),
 
+    "lc24008313_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["LC24008313*"],  # Blauswim chlorinator (I.D. Electroquimica/Fluidra)
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],  # Sensors enabled
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%)
+            "ph_setpoint": 16,  # Component 16 (÷100)
+            "orp_setpoint": 20,  # Component 20 (mV)
+            "skip_mode_select": True,  # No mode select available
+            "sensors": {
+                "ph": 165,  # pH measured value (÷100) - e.g., 731 = 7.31 pH
+                "orp": 170,  # ORP/Redox measured value (mV) - e.g., 684 mV
+                "temperature": 172,  # Pool temperature (°C * 10) - Component 172 = 201 → 20.1°C
+                "salinity": 185,  # Salinity (g/L * 100) - if supported
+            },
+            # Specific components for LC24008313
+            "specific_components": [10, 16, 20, 165, 170, 172, 185],
+        },
+        priority=86,  # Higher than CC24033907 for more specific match
+    ),
+
     "e30iq_pump": DeviceConfig(
         device_type="pump",
         identifier_patterns=["E30*", "PUMP*"],
