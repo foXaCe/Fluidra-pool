@@ -358,8 +358,7 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
 
         try:
             success = await self._api.control_device_component(self._device_id, 10, int_value)
-            if success:
-            else:
+            if not success:
                 _LOGGER.error(f"❌ Failed to set to {int_value}%")
         except Exception as err:
             _LOGGER.error(f"Error: {err}")
@@ -493,8 +492,7 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         try:
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
-            if success:
-            else:
+            if not success:
                 _LOGGER.error(f"❌ Failed to set pH setpoint to {value}")
 
         except Exception as err:
@@ -647,8 +645,7 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         try:
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
-            if success:
-            else:
+            if not success:
                 _LOGGER.error(f"❌ Failed to set ORP setpoint to {int_value} mV")
 
         except Exception as err:
