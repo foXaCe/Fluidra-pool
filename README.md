@@ -10,7 +10,7 @@ Une intégration pour Home Assistant permettant de contrôler les équipements d
 
 Si cette intégration vous est utile, vous pouvez soutenir son développement avec un don en Bitcoin :
 
-**₿ Adresse Bitcoin :** `bc1qhe4ge22x0anuyeg0fmts6rdmz3t735dnqwt3p7`
+**🪙 Adresse Bitcoin :** `bc1qhe4ge22x0anuyeg0fmts6rdmz3t735dnqwt3p7`
 
 Vos contributions m'aident à continuer d'améliorer ce projet et à ajouter de nouvelles fonctionnalités. Merci ! 🙏
 

@@ -10,7 +10,7 @@ A Home Assistant integration for Fluidra pool equipment control.
 
 If this integration is useful to you, you can support its development with a Bitcoin donation:
 
-**₿ Bitcoin Address:** `bc1qhe4ge22x0anuyeg0fmts6rdmz3t735dnqwt3p7`
+**🪙 Bitcoin Address:** `bc1qhe4ge22x0anuyeg0fmts6rdmz3t735dnqwt3p7`
 
 Your contributions help me continue improving this project and adding new features. Thank you! 🙏
 
