@@ -40,7 +40,6 @@ async def async_setup_entry(
                 skip_mode = DeviceIdentifier.has_feature(device, "skip_mode_select")
                 if not skip_mode:
                     entities.append(FluidraChlorinatorModeSelect(coordinator, coordinator.api, pool["id"], device_id))
-                    _LOGGER.info(f"✅ Adding chlorinator mode select for {device_id}")
 
             # Skip heat pumps - they don't have speed or schedule controls
             if DeviceIdentifier.has_feature(device, "skip_schedules"):
@@ -199,7 +198,6 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         value = speed_config["value"]
         percent = speed_config["percent"]
 
-        _LOGGER.info(f"Setting pump {self._device_id} to {option} ({percent}%) via component {component}")
 
         try:
             # Définir l'option optimiste immédiatement
@@ -215,12 +213,10 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                 # 1. S'assurer que la pompe est ON (component 9 = 1)
                 success = await self._api.control_device_component(self._device_id, 9, 1)
                 if success:
-                    _LOGGER.info(f"✅ Pump {self._device_id} set to ON")
                     # 2. CRUCIAL: Explicitly disable speed by sending special value
                     # Try sending -1 or a value meaning "no active speed"
                     try:
                         await self._api.control_device_component(self._device_id, 11, -1)
-                        _LOGGER.info(f"✅ Speed component disabled for 'stopped' mode")
                     except Exception as e:
                         _LOGGER.warning(f"⚠️ Could not disable speed component: {e}")
                         # Fallback: manually mark in device data
@@ -228,7 +224,6 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                         if device:
                             device["speed_percent"] = 0
                             device["speed_level_reported"] = None
-                            _LOGGER.info(f"✅ Manually set speed to 0% for 'stopped'")
                 else:
                     _LOGGER.error(f"❌ Failed to set pump to ON for 'stopped' mode")
                     return
@@ -240,7 +235,6 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                 success = await self._api.control_device_component(self._device_id, component, value)
 
             if success:
-                _LOGGER.info(f"✅ Command sent to set pump to {option} ({percent}%)")
                 # Attendre que l'API se synchronise
                 import asyncio
                 await asyncio.sleep(3)  # Augmenté à 3 secondes pour plus de stabilité
@@ -261,7 +255,6 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
     async def _refresh_device_state(self) -> None:
         """Refresh device state by polling real API components."""
         try:
-            _LOGGER.info(f"🔄 Refreshing real-time state for device {self._device_id}")
 
             # Rafraîchir les états des composants critiques
             # Component 9 (on/off)
@@ -271,7 +264,6 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                 device = self._api.get_device_by_id(self._device_id)
                 if device:
                     device["is_running"] = bool(reported_value)
-                    _LOGGER.info(f"✅ Updated device {self._device_id} is_running: {bool(reported_value)}")
 
             # Component 11 (speed level)
             speed_state = await self._api.get_device_component_state(self._device_id, 11)
@@ -286,12 +278,10 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                         # Calculer le pourcentage correspondant
                         speed_percent = self._api.speed_percentages.get(speed_level, 45)
                         device["speed_percent"] = speed_percent
-                        _LOGGER.info(f"✅ Updated device {self._device_id} speed level: {speed_level} ({speed_percent}%)")
                     else:
                         # Pompe OFF (ne devrait plus arriver avec la nouvelle logique)
                         device["speed_percent"] = 0
                         device["speed_level_reported"] = None
-                        _LOGGER.info(f"✅ Device {self._device_id} stopped, speed set to 0%")
 
         except Exception as e:
             _LOGGER.error(f"❌ Error refreshing device state: {e}")
@@ -339,7 +329,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
             "operation_mode": self.device_data.get("operation_mode", 0),
             "auto_mode": auto_mode_enabled,
             "online": self.device_data.get("online", False),
-            # État optimiste pour debug
+            # État optimiste
             "optimistic_option": self._optimistic_option,
             "using_optimistic": self._optimistic_option is not None
         }
@@ -419,7 +409,6 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
                     schedule_id = schedule.get("id")
                     # Compare both as string and int to handle type mismatch
                     if str(schedule_id) == str(self._schedule_id):
-                        _LOGGER.info(f"[SELECT {self._schedule_id}] ✅ Found matching schedule!")
                         return schedule
 
                 _LOGGER.warning(f"[SELECT {self._schedule_id}] ❌ Schedule not found in {len(schedules)} schedules")
@@ -500,7 +489,6 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules)
             if success:
-                _LOGGER.info(f"✅ Updated mode for schedule {self._schedule_id} to {option}")
                 await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to update mode for schedule {self._schedule_id}")
@@ -657,7 +645,6 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
 
         mode_value = self._mode_mapping[option]
 
-        _LOGGER.info(f"Setting chlorinator {self._device_id} to mode {option} (value={mode_value})")
 
         try:
             # Set optimistic option immediately
@@ -672,7 +659,6 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
             success = await self._api.control_device_component(self._device_id, 20, mode_value)
 
             if success:
-                _LOGGER.info(f"✅ Chlorinator mode set to {option}")
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
             else:

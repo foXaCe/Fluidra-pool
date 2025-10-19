@@ -131,7 +131,6 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         device_id = call.data["device_id"]
         schedules_data = call.data["schedules"]
 
-        _LOGGER.info(f"Setting schedule for device {device_id}: {len(schedules_data)} entries")
 
         # Convert HA format to Fluidra API format
         fluidra_schedules = []
@@ -164,7 +163,6 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         try:
             success = await coordinator.api.set_schedule(device_id, fluidra_schedules)
             if success:
-                _LOGGER.info(f"✅ Schedule set successfully for {device_id}")
                 # Refresh coordinator data
                 await coordinator.async_request_refresh()
             else:
@@ -176,12 +174,10 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         """Handle clear_schedule service call."""
         device_id = call.data["device_id"]
 
-        _LOGGER.info(f"Clearing schedule for device {device_id}")
 
         try:
             success = await coordinator.api.clear_schedule(device_id)
             if success:
-                _LOGGER.info(f"✅ Schedule cleared successfully for {device_id}")
                 await coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to clear schedule for {device_id}")
@@ -193,7 +189,6 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         device_id = call.data["device_id"]
         preset = call.data["preset"]
 
-        _LOGGER.info(f"Setting preset schedule '{preset}' for device {device_id}")
 
         # Define presets
         presets = {
@@ -237,7 +232,6 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         DOMAIN, SERVICE_SET_PRESET_SCHEDULE, _handle_set_preset_schedule, schema=SET_PRESET_SCHEDULE_SCHEMA
     )
 
-    _LOGGER.info("✅ Fluidra Pool services registered")
 
 
 # FluidraDataUpdateCoordinator is now in coordinator.py

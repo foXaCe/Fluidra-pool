@@ -38,7 +38,6 @@ async def async_setup_entry(
                 entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool["id"], device_id))
                 entities.append(FluidraChlorinatorPhSetpoint(coordinator, coordinator.api, pool["id"], device_id))
                 entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool["id"], device_id))
-                _LOGGER.info(f"✅ Adding chlorinator controls (level, pH, ORP) for {device_id}")
 
             if device_type == DEVICE_TYPE_PUMP:
                 # Groupe Réglages - Contrôles de vitesse temporairement désactivés
@@ -129,13 +128,11 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
         """Set the component value."""
         int_value = int(value)
 
-        _LOGGER.info(f"Setting component {self._component_id} on device {self._device_id} to {int_value}")
 
         try:
             success = await self._api.set_component_value(self._device_id, self._component_id, int_value)
 
             if success:
-                _LOGGER.info(f"✅ Component {self._component_id} set to {int_value}")
                 await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to set component {self._component_id} to {int_value}")
@@ -239,7 +236,6 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
         """Set the speed percentage directly to component 15."""
         int_value = int(value)
 
-        _LOGGER.info(f"Setting pump speed to {int_value}%")
 
         try:
             success = await self._api.set_component_value(self._device_id, 15, int_value)
@@ -247,7 +243,6 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
                 _LOGGER.error(f"Failed to set speed percentage to {int_value}")
                 return
 
-            _LOGGER.info(f"✅ Pump speed set to {int_value}%")
             await self.coordinator.async_request_refresh()
 
         except Exception as err:
@@ -353,7 +348,6 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         """Set chlorination level to component 10."""
         # Round to nearest multiple of 10 for CC24033907 compatibility
         int_value = round(value / 10) * 10
-        _LOGGER.info(f"Setting chlorinator {self._device_id} to {int_value}% (rounded from {value})")
 
         # Optimistic update: Update coordinator data immediately for instant UI feedback
         components = self.device_data.get("components", {})
@@ -365,7 +359,6 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         try:
             success = await self._api.control_device_component(self._device_id, 10, int_value)
             if success:
-                _LOGGER.info(f"✅ Set to {int_value}%")
             else:
                 _LOGGER.error(f"❌ Failed to set to {int_value}%")
         except Exception as err:
@@ -489,7 +482,6 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
             write_component = ph_config
             read_component = ph_config
 
-        _LOGGER.info(f"Setting chlorinator {self._device_id} pH setpoint to {value} (API value: {int_value}, component {write_component})")
 
         # Optimistic update: Update coordinator data immediately for instant UI feedback
         components = self.device_data.get("components", {})
@@ -502,7 +494,6 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if success:
-                _LOGGER.info(f"✅ pH setpoint set to {value}")
             else:
                 _LOGGER.error(f"❌ Failed to set pH setpoint to {value}")
 
@@ -645,7 +636,6 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
             write_component = orp_config
             read_component = orp_config
 
-        _LOGGER.info(f"Setting chlorinator {self._device_id} ORP setpoint to {int_value} mV (component {write_component})")
 
         # Optimistic update: Update coordinator data immediately for instant UI feedback
         components = self.device_data.get("components", {})
@@ -658,7 +648,6 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if success:
-                _LOGGER.info(f"✅ ORP setpoint set to {int_value} mV")
             else:
                 _LOGGER.error(f"❌ Failed to set ORP setpoint to {int_value} mV")
 

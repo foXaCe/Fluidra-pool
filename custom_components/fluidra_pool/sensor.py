@@ -96,7 +96,6 @@ async def async_setup_entry(
                     sensor_count += 2  # pH + ORP
                     if "free_chlorine" in sensors_config:
                         sensor_count += 1  # Free chlorine (optional)
-                _LOGGER.info(f"✅ Adding {sensor_count} chlorinator sensors for {device_id} (temp component: {temp_component})")
 
         # Sensors spécifiques à la piscine (pas liés aux devices)
         entities.append(FluidraPoolWeatherSensor(coordinator, coordinator.api, pool["id"]))
@@ -463,7 +462,6 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
 
         if "schedule_data" in device_data:
             schedules = device_data["schedule_data"]
-            _LOGGER.info(f"[SENSOR] ✅ Found {len(schedules)} schedules in schedule_data")
             return schedules
         else:
             _LOGGER.warning(f"[SENSOR] ❌ No 'schedule_data' key found in device data")

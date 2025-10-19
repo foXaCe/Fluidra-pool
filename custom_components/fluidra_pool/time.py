@@ -333,7 +333,6 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules)
             if success:
-                _LOGGER.info(f"✅ Updated start time for schedule {self._schedule_id}")
                 await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to update start time for schedule {self._schedule_id}")
@@ -450,7 +449,6 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules)
             if success:
-                _LOGGER.info(f"✅ Updated end time for schedule {self._schedule_id}")
                 await self.coordinator.async_request_refresh()
             else:
                 _LOGGER.error(f"❌ Failed to update end time for schedule {self._schedule_id}")

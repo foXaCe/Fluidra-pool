@@ -326,10 +326,8 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             self.async_write_ha_state()
 
             if hvac_mode == HVACMode.HEAT:
-                _LOGGER.info(f"🚀 Turning on heat pump {self._device_id}")
                 success = await self._api.start_pump(self._device_id)
             elif hvac_mode == HVACMode.OFF:
-                _LOGGER.info(f"🚀 Turning off heat pump {self._device_id}")
                 success = await self._api.stop_pump(self._device_id)
             else:
                 _LOGGER.warning(f"Unsupported HVAC mode: {hvac_mode}")
@@ -339,7 +337,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
                 return
 
             if success:
-                _LOGGER.info(f"✅ Successfully set HVAC mode to {hvac_mode}")
                 # Clear optimistic state on success
                 self._pending_hvac_mode = None
                 self._last_hvac_action_time = None
@@ -377,7 +374,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             return
 
         try:
-            _LOGGER.info(f"🚀 Setting heat pump {self._device_id} temperature to {temperature}°C")
 
             # Mise à jour optimiste immédiate
             import time
@@ -390,7 +386,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             success = await self._api.set_heat_pump_temperature(self._device_id, temperature)
 
             if success:
-                _LOGGER.info(f"✅ Successfully set temperature to {temperature}°C")
                 await self.coordinator.async_request_refresh()
                 # Effacer la température en attente après confirmation
                 self._pending_temperature = None
@@ -419,7 +414,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
         try:
             mode_value = LG_MODE_TO_VALUE[preset_mode]
-            _LOGGER.info(f"🚀 Setting heat pump {self._device_id} preset mode to {preset_mode} (value: {mode_value})")
 
             # Optimistic update - show immediately in UI
             import time
@@ -430,7 +424,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             success = await self._api.control_device_component(self._device_id, 14, mode_value)
 
             if success:
-                _LOGGER.info(f"✅ Successfully set preset mode to {preset_mode}")
                 # Keep optimistic state until coordinator refresh completes
                 # The property will clear it after 5 seconds automatically
                 await self.coordinator.async_request_refresh()
@@ -476,7 +469,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             # UI responsiveness indicators
             "pending_temperature": self._pending_temperature is not None,
             "is_updating": self._is_updating,
-            # State sources pour debugging
+            # State sources
             "heat_pump_reported": device_data.get("heat_pump_reported"),
             "is_heating": device_data.get("is_heating"),
             "is_running": device_data.get("is_running"),
@@ -494,7 +487,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         water_temp = device_data.get("water_temperature")
         if water_temp is not None:
             attrs["water_temperature"] = water_temp
-            _LOGGER.info(f"Water temperature added to climate: {water_temp}°C")
 
         # Informations d'erreur pour feedback utilisateur
         if device_data.get("permission_error"):

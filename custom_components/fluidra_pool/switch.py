@@ -69,7 +69,6 @@ async def async_setup_entry(
             # Create boost mode switch for chlorinator
             if DeviceIdentifier.has_feature(device, "boost_mode"):
                 entities.append(FluidraChlorinatorBoostSwitch(coordinator, coordinator.api, pool["id"], device_id))
-                _LOGGER.info(f"✅ Adding boost mode switch for chlorinator {device_id}")
 
     async_add_entities(entities)
 
@@ -150,7 +149,6 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
     async def _refresh_device_state(self) -> None:
         """Refresh device state by polling real API components."""
         try:
-            _LOGGER.info(f"🔄 Refreshing real-time state for device {self._device_id}")
 
             # Rafraîchir les états des composants critiques
             # Component 9 (on/off)
@@ -161,7 +159,6 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
                 if device:
                     device["is_running"] = bool(reported_value)
                     device["pump_reported"] = reported_value
-                    _LOGGER.info(f"✅ Updated device {self._device_id} is_running: {bool(reported_value)}")
 
             # Component 10 (auto mode) - AJOUTÉ
             auto_state = await self._api.get_device_component_state(self._device_id, 10)
@@ -171,7 +168,6 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
                 if device:
                     device["auto_mode_enabled"] = bool(auto_reported)
                     device["auto_reported"] = auto_reported
-                    _LOGGER.info(f"✅ Updated device {self._device_id} auto_mode: {bool(auto_reported)}")
 
             # Component 11 (speed level)
             speed_state = await self._api.get_device_component_state(self._device_id, 11)
@@ -183,10 +179,8 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
                     if device.get("is_running", False):
                         speed_percent = self._api.speed_percentages.get(speed_level, 45)
                         device["speed_percent"] = speed_percent
-                        _LOGGER.info(f"✅ Updated device {self._device_id} speed: {speed_percent}%")
                     else:
                         device["speed_percent"] = 0
-                        _LOGGER.info(f"✅ Device {self._device_id} stopped, speed set to 0%")
 
         except Exception as e:
             _LOGGER.error(f"❌ Error refreshing device state: {e}")
@@ -251,14 +245,12 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the pump on using discovered API with optimistic UI."""
         try:
-            _LOGGER.info(f"🚀 Starting pump {self._device_id}")
 
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(True)
 
             success = await self._api.start_pump(self._device_id)
             if success:
-                _LOGGER.info(f"✅ Successfully started pump {self._device_id}")
                 # Attendre que l'API se synchronise
                 import asyncio
                 await asyncio.sleep(2)
@@ -279,14 +271,12 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the pump off using discovered API with optimistic UI."""
         try:
-            _LOGGER.info(f"🚀 Stopping pump {self._device_id}")
 
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(False)
 
             success = await self._api.stop_pump(self._device_id)
             if success:
-                _LOGGER.info(f"✅ Successfully stopped pump {self._device_id}")
                 # Attendre que l'API se synchronise
                 import asyncio
                 await asyncio.sleep(2)
@@ -401,7 +391,6 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the heat pump on using discovered API with optimistic UI."""
         try:
-            _LOGGER.info(f"🚀 Starting heat pump {self._device_id}")
 
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(True)
@@ -409,7 +398,6 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
             # Tenter d'utiliser le component 9 pour les pompes à chaleur
             success = await self._api.start_pump(self._device_id)
             if success:
-                _LOGGER.info(f"✅ Successfully started heat pump {self._device_id}")
                 # Attendre que l'API se synchronise
                 import asyncio
                 await asyncio.sleep(2)
@@ -430,14 +418,12 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the heat pump off using discovered API with optimistic UI."""
         try:
-            _LOGGER.info(f"🚀 Stopping heat pump {self._device_id}")
 
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(False)
 
             success = await self._api.stop_pump(self._device_id)
             if success:
-                _LOGGER.info(f"✅ Successfully stopped heat pump {self._device_id}")
                 # Attendre que l'API se synchronise
                 import asyncio
                 await asyncio.sleep(2)
@@ -458,7 +444,6 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     async def _refresh_heat_pump_state(self) -> None:
         """Refresh heat pump state by polling real API components."""
         try:
-            _LOGGER.info(f"🔄 Refreshing real-time state for heat pump {self._device_id}")
 
             # Component 9 (on/off) - standard pour pompes et pompes à chaleur
             heat_pump_state = await self._api.get_device_component_state(self._device_id, 9)
@@ -468,7 +453,6 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
                 if device:
                     device["is_heating"] = bool(reported_value)
                     device["heat_pump_reported"] = reported_value
-                    _LOGGER.info(f"✅ Updated heat pump {self._device_id} is_heating: {bool(reported_value)}")
 
         except Exception as e:
             _LOGGER.error(f"❌ Error refreshing heat pump state: {e}")
@@ -627,14 +611,12 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn auto mode on using discovered Component 10 with optimistic UI."""
         try:
-            _LOGGER.info(f"🚀 Enabling auto mode for {self._device_id}")
 
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(True)
 
             success = await self._api.enable_auto_mode(self._device_id)
             if success:
-                _LOGGER.info(f"✅ Successfully enabled auto mode for {self._device_id}")
                 # Attendre que l'API se synchronise
                 import asyncio
                 await asyncio.sleep(2)
@@ -655,14 +637,12 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn auto mode off using discovered Component 10 with optimistic UI."""
         try:
-            _LOGGER.info(f"🚀 Disabling auto mode for {self._device_id}")
 
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(False)
 
             success = await self._api.disable_auto_mode(self._device_id)
             if success:
-                _LOGGER.info(f"✅ Successfully disabled auto mode for {self._device_id}")
                 # Attendre que l'API se synchronise
                 import asyncio
                 await asyncio.sleep(2)
@@ -786,7 +766,6 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Enable the schedule using exact mobile app format with optimistic UI."""
-        _LOGGER.info(f"[{self._schedule_id}] 🔄 Attempting to enable schedule...")
         try:
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(True)
@@ -832,12 +811,10 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                     "startActions": {"operationName": "0"}
                 })
 
-            _LOGGER.info(f"[{self._schedule_id}] Sending {len(updated_schedules)} schedules to API")
 
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules)
             if success:
-                _LOGGER.info(f"[{self._schedule_id}] ✅ Successfully enabled schedule")
                 await self.coordinator.async_request_refresh()
                 # Effacer l'état en attente après confirmation
                 self._clear_pending_state()
@@ -900,7 +877,6 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules)
             if success:
-                _LOGGER.info(f"✅ Disabled schedule {self._schedule_id}")
                 await self.coordinator.async_request_refresh()
                 # Effacer l'état en attente après confirmation
                 self._clear_pending_state()
@@ -1019,7 +995,6 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
         # Get component number dynamically from device config
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
 
-        _LOGGER.info(f"Turning ON boost mode for chlorinator {self._device_id} (component {boost_component})")
 
         try:
             # Mise à jour optimiste immédiate pour la réactivité
@@ -1028,7 +1003,6 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             success = await self._api.control_device_component(self._device_id, boost_component, True)
 
             if success:
-                _LOGGER.info(f"✅ Boost mode enabled for chlorinator {self._device_id}")
                 import asyncio
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
@@ -1047,7 +1021,6 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
         # Get component number dynamically from device config
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
 
-        _LOGGER.info(f"Turning OFF boost mode for chlorinator {self._device_id} (component {boost_component})")
 
         try:
             # Mise à jour optimiste immédiate pour la réactivité
@@ -1056,7 +1029,6 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             success = await self._api.control_device_component(self._device_id, boost_component, False)
 
             if success:
-                _LOGGER.info(f"✅ Boost mode disabled for chlorinator {self._device_id}")
                 import asyncio
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()

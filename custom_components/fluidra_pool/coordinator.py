@@ -76,7 +76,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
                 # If device_id not in current API data, remove it
                 if device_id not in current_device_ids:
-                    _LOGGER.info(f"🗑️ Removing device {device_id} ({device_entry.name}) - no longer in Fluidra account")
 
                     # First, remove all entities associated with this device
                     entities_to_remove = er.async_entries_for_device(
@@ -112,7 +111,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     if (entry.platform == "fluidra_pool" and
                         entry.unique_id == expected_unique_id):
 
-                        _LOGGER.info(f"Removing empty schedule sensor entity: {entity_id} (no schedules remaining)")
                         entity_registry.async_remove(entity_id)
                         break
 
@@ -213,7 +211,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
             # Premier démarrage : scan minimal pour démarrer vite
             if self._first_update:
-                _LOGGER.info("🚀 First update: minimal scan for fast startup")
                 self._first_update = False
                 # Le prochain refresh normal (30s) fera le scan complet
                 return {pool['id']: pool for pool in pools}
@@ -340,7 +337,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                             # Valider la plage de température (5-50°C pour l'eau, permettant le chauffage)
                                             if 5.0 <= water_temp_value <= 50.0:
                                                 device["water_temperature"] = water_temp_value
-                                                _LOGGER.info(f"Heat pump {device_id} water temperature from component 19: {water_temp_value}°C")
                                         except (ValueError, TypeError):
                                             pass
                                 elif component_id == 20:
@@ -365,7 +361,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                         # Check if we had schedulers before and now have fewer (indicating deletion)
                                         previous_count = self._previous_schedule_entities.get(device_key, 0)
                                         if previous_count > 0 and current_schedule_count < previous_count:
-                                            _LOGGER.info(f"Schedule count decreased for device {device_id}: {previous_count} → {current_schedule_count}")
                                             # Trigger entity registry cleanup for this device's schedule sensor
                                             await self._cleanup_schedule_sensor_if_empty(pool_id, device_id, schedule_data)
 
@@ -391,7 +386,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                                 # Utiliser seulement si pas déjà défini par component 19
                                                 if "water_temperature" not in device:
                                                     device["water_temperature"] = water_temp_value
-                                                    _LOGGER.info(f"Heat pump {device_id} water temperature from component {component_id}: {water_temp_value}°C")
                                         except (ValueError, TypeError):
                                             pass
                                     device[f"component_{component_id}_data"] = component_state
