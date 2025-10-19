@@ -150,6 +150,31 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         priority=86,  # Higher than CC24033907 for more specific match
     ),
 
+    "cc25113623_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["CC25113623*"],  # Specific CC25113623 model
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],  # No select for mode, but sensors enabled
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%, values rounded to multiples of 10)
+            "ph_setpoint": 16,  # Component 16 (÷100)
+            "orp_setpoint": 20,  # Component 20 (mV)
+            "boost_mode": 103,  # Component 103 (boolean)
+            "skip_mode_select": True,  # No mode select available
+            "sensors": {
+                "ph": 165,  # pH measured value (÷100) - e.g., 712 = 7.12 pH
+                "orp": 170,  # ORP/Redox measured value (mV) - e.g., 779 mV
+                "temperature": 21,  # Pool temperature (°C * 10) - Component 21 for CC25113623 (to be confirmed)
+                "salinity": 185,  # Salinity (g/L * 100)
+            },
+            # Specific components for CC25113623 (based on CC24033907, may need adjustment)
+            "specific_components": [10, 16, 20, 21, 103, 165, 170, 185],
+        },
+        priority=87,  # Higher than LC24008313 for more specific match
+    ),
+
     "e30iq_pump": DeviceConfig(
         device_type="pump",
         identifier_patterns=["E30*", "PUMP*"],
