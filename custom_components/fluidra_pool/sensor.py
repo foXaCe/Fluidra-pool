@@ -78,9 +78,10 @@ async def async_setup_entry(
                     # ORP sensor (component 177)
                     orp_component = sensors_config.get("orp", 177)
                     entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "orp", orp_component))
-                    # Free chlorine sensor (component 178)
-                    free_chlorine_component = sensors_config.get("free_chlorine", 178)
-                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "free_chlorine", free_chlorine_component))
+                    # Free chlorine sensor (component 178) - only if configured
+                    if "free_chlorine" in sensors_config:
+                        free_chlorine_component = sensors_config.get("free_chlorine")
+                        entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "free_chlorine", free_chlorine_component))
 
                 # Temperature sensor - get from device registry (183 for generic, 21 for CC24033907)
                 temp_component = sensors_config.get("temperature", 183)
@@ -89,7 +90,12 @@ async def async_setup_entry(
                 salinity_component = sensors_config.get("salinity", 185)
                 entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "salinity", salinity_component))
 
-                sensor_count = 2 if skip_ph_orp else 5
+                # Count sensors dynamically
+                sensor_count = 2  # Base: temperature + salinity
+                if not skip_ph_orp:
+                    sensor_count += 2  # pH + ORP
+                    if "free_chlorine" in sensors_config:
+                        sensor_count += 1  # Free chlorine (optional)
                 _LOGGER.info(f"✅ Adding {sensor_count} chlorinator sensors for {device_id} (temp component: {temp_component})")
 
         # Sensors spécifiques à la piscine (pas liés aux devices)

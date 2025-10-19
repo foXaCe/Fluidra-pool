@@ -140,12 +140,12 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
             "skip_mode_select": True,  # No mode select available
             "sensors": {
                 "ph": 165,  # pH measured value (÷100) - e.g., 731 = 7.31 pH
-                "orp": 170,  # ORP/Redox measured value (mV) - e.g., 684 mV
+                "orp": 170,  # ORP/Redox measured value (mV) - e.g., 688 mV
                 "temperature": 172,  # Pool temperature (°C * 10) - Component 172 = 201 → 20.1°C
-                "salinity": 185,  # Salinity (g/L * 100) - if supported
+                "salinity": 174,  # Salinity (g/L * 100) - Component 174 = 536 → 5.36 g/L
             },
             # Specific components for LC24008313
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 185],
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
         },
         priority=86,  # Higher than CC24033907 for more specific match
     ),
