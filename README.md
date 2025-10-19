@@ -4,6 +4,18 @@
 
 Une intégration pour Home Assistant permettant de contrôler les équipements de piscine Fluidra.
 
+---
+
+## 💰 Soutenir le Projet
+
+Si cette intégration vous est utile, vous pouvez soutenir son développement avec un don en Bitcoin :
+
+**₿ Adresse Bitcoin :** `bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh`
+
+Vos contributions m'aident à continuer d'améliorer ce projet et à ajouter de nouvelles fonctionnalités. Merci ! 🙏
+
+---
+
 **🔬 État des tests :**
 - ✅ **Pompe E30iQ** : Entièrement testée et fonctionnelle
 - ⚠️ **Autres équipements** (éclairage, chauffages, etc.) : Code implémenté mais **nécessite des tests utilisateurs**
