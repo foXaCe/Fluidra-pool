@@ -164,13 +164,13 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
             "boost_mode": 103,  # Component 103 (boolean)
             "skip_mode_select": True,  # No mode select available
             "sensors": {
-                "ph": 165,  # pH measured value (÷100) - e.g., 712 = 7.12 pH
-                "orp": 170,  # ORP/Redox measured value (mV) - e.g., 687 = 687 mV
-                "temperature": 172,  # Pool temperature (°C * 10) - Component 172 = 297 → 29.7°C
-                "salinity": 185,  # Salinity (g/L * 100)
+                "ph": 165,  # pH measured value (÷100) - e.g., 716 = 7.16 pH
+                "orp": 170,  # ORP/Redox measured value (mV) - e.g., 681 = 681 mV
+                "temperature": 172,  # Pool temperature (°C * 10) - Component 172 = 291 → 29.1°C
+                "salinity": 174,  # Salinity (g/L * 100) - Component 174 = 570 → 5.70 g/L
             },
             # Specific components for CC25113623
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 185],
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
         },
         priority=87,  # Higher than LC24008313 for more specific match
     ),
