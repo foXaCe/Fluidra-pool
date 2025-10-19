@@ -464,7 +464,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
             schedules = device_data["schedule_data"]
             return schedules
         else:
-            _LOGGER.warning(f"[SENSOR] ❌ No 'schedule_data' key found in device data")
+            _LOGGER.debug(f"[SENSOR] No 'schedule_data' key found in device data (normal for devices without schedules)")
             return []
 
     @property

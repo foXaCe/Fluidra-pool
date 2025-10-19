@@ -162,7 +162,7 @@ class FluidraPoolAPI:
                 return profile_data
             else:
                 error_text = await response.text()
-                _LOGGER.warning(f"⚠️ Impossible de récupérer le profil: {response.status} - {error_text}")
+                _LOGGER.warning(f"Impossible de récupérer le profil: {response.status} - {error_text}")
                 return {}
 
     async def async_update_data(self):
@@ -196,7 +196,7 @@ class FluidraPoolAPI:
                         await self._discover_devices_for_pool(pool_id, headers)
             else:
                 error_text = await response.text()
-                _LOGGER.warning(f"⚠️ Impossible de récupérer les piscines: {response.status} - {error_text}")
+                _LOGGER.warning(f"Impossible de récupérer les piscines: {response.status} - {error_text}")
 
     async def _discover_devices_for_pool(self, pool_id: str, headers: dict):
         """Découvrir les équipements pour une piscine donnée."""
@@ -310,7 +310,7 @@ class FluidraPoolAPI:
                     self.devices.append(device_info)
             else:
                 error_text = await response.text()
-                _LOGGER.warning(f"⚠️ Impossible de récupérer les équipements pour pool {pool_id}: {response.status} - {error_text}")
+                _LOGGER.warning(f"Impossible de récupérer les équipements pour pool {pool_id}: {response.status} - {error_text}")
 
     def is_token_expired(self) -> bool:
         """Vérifier si le token va expirer bientôt."""
@@ -597,7 +597,7 @@ class FluidraPoolAPI:
                     state_data = await response.json()
                     return state_data
                 else:
-                    _LOGGER.warning(f"⚠️ Failed to get component state: {response.status} - {response_text}")
+                    _LOGGER.warning(f"Failed to get component state: {response.status} - {response_text}")
                     return None
         except aiohttp.ClientError as e:
             _LOGGER.error(f"❌ Connection error during get state: {e}")

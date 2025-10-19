@@ -218,7 +218,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                     try:
                         await self._api.control_device_component(self._device_id, 11, -1)
                     except Exception as e:
-                        _LOGGER.warning(f"⚠️ Could not disable speed component: {e}")
+                        _LOGGER.warning(f"Could not disable speed component: {e}")
                         # Fallback: manually mark in device data
                         device = self._api.get_device_by_id(self._device_id)
                         if device:
@@ -411,9 +411,9 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
 
-                _LOGGER.warning(f"[SELECT {self._schedule_id}] ❌ Schedule not found in {len(schedules)} schedules")
+                _LOGGER.debug(f"[SELECT {self._schedule_id}] Schedule not found in {len(schedules)} schedules")
             else:
-                _LOGGER.warning(f"[SELECT {self._schedule_id}] ❌ No 'schedule_data' key in device data")
+                _LOGGER.debug(f"[SELECT {self._schedule_id}] No 'schedule_data' key in device data")
 
         except Exception as e:
             _LOGGER.error(f"[SELECT {self._schedule_id}] Error getting schedule data: {e}")

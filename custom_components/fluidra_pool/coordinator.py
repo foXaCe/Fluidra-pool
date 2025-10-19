@@ -325,7 +325,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                             if 10.0 <= temp_value <= 50.0:
                                                 device["target_temperature"] = temp_value
                                         except (ValueError, TypeError):
-                                            _LOGGER.warning(f"⚠️ Invalid temperature value in component 15: {reported_value}")
+                                            _LOGGER.warning(f"Invalid temperature value in component 15: {reported_value}")
                                     # Note: Component 15 n'est plus utilisé pour le mode manuel, remplacé par Component 13
                                 elif component_id == 19:  # Température de l'eau (pour pompes à chaleur)
                                     device["timezone_component"] = reported_value
