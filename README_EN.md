@@ -4,6 +4,18 @@
 
 A Home Assistant integration for Fluidra pool equipment control.
 
+---
+
+## 💰 Support the Project
+
+If this integration is useful to you, you can support its development with a Bitcoin donation:
+
+**₿ Bitcoin Address:** `bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh`
+
+Your contributions help me continue improving this project and adding new features. Thank you! 🙏
+
+---
+
 **🔬 Testing Status:**
 - ✅ **E30iQ Pump**: Fully tested and functional
 - ⚠️ **Other equipment** (lighting, heaters, etc.): Code implemented but **requires user testing**
