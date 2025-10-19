@@ -44,12 +44,19 @@ Une intégration pour Home Assistant permettant de contrôler les équipements d
   - Gestion de 8 créneaux horaires/jour
 
 #### **Électrolyseurs au Sel / Chlorinateurs**
-- **Chlorinateurs Fluidra** (via bridge)
-  - Contrôle niveau de chlorination (0-100%)
-  - **Contrôle pH** : Setpoint réglable (6.8-7.6)
-  - **Contrôle ORP/Redox** : Setpoint réglable (650-750 mV)
-  - Mode AUTO/ON/OFF
-  - Capteurs : pH, ORP, chlore libre, température, salinité
+- **Chlorinateurs Fluidra** (via bridge connecté)
+  - **Modèles spécifiques testés** :
+    - CC24021110 ✅
+    - CC25113623 ✅
+    - LC24008313 (Blauswim - I.D. Electroquimica/Fluidra) ✅
+    - CC24033907 ✅
+  - **Fonctionnalités** :
+    - Contrôle niveau de chlorination (0-100%)
+    - **Contrôle pH** : Setpoint réglable (6.8-7.6)
+    - **Contrôle ORP/Redox** : Setpoint réglable (650-750 mV)
+    - Mode Boost (marche/arrêt)
+    - Capteurs : pH, ORP, chlore libre, température eau, salinité
+  - **Note** : Autres modèles de chlorinateurs Fluidra probablement compatibles
 
 ### ⚠️ **Équipements Implémentés (Tests Utilisateurs Requis)**
 

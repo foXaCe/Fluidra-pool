@@ -44,12 +44,19 @@ A Home Assistant integration for Fluidra pool equipment control.
   - Management of 8 time slots/day
 
 #### **Salt Chlorinators / Electrolyzers**
-- **Fluidra Chlorinators** (via bridge)
-  - Chlorination level control (0-100%)
-  - **pH Control**: Adjustable setpoint (6.8-7.6)
-  - **ORP/Redox Control**: Adjustable setpoint (650-750 mV)
-  - AUTO/ON/OFF mode
-  - Sensors: pH, ORP, free chlorine, temperature, salinity
+- **Fluidra Chlorinators** (via connected bridge)
+  - **Specific tested models**:
+    - CC24021110 ✅
+    - CC25113623 ✅
+    - LC24008313 (Blauswim - I.D. Electroquimica/Fluidra) ✅
+    - CC24033907 ✅
+  - **Features**:
+    - Chlorination level control (0-100%)
+    - **pH Control**: Adjustable setpoint (6.8-7.6)
+    - **ORP/Redox Control**: Adjustable setpoint (650-750 mV)
+    - Boost mode (on/off)
+    - Sensors: pH, ORP, free chlorine, water temperature, salinity
+  - **Note**: Other Fluidra chlorinator models likely compatible
 
 ### ⚠️ **Implemented Equipment (User Testing Required)**
 
