@@ -136,6 +136,7 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
             "chlorination_level": 10,  # Component 10 (0-100%)
             "ph_setpoint": 16,  # Component 16 (÷100)
             "orp_setpoint": 20,  # Component 20 (mV)
+            "boost_mode": 103,  # Component 103 (boolean: true/false)
             "skip_mode_select": True,  # No mode select available
             "sensors": {
                 "ph": 165,  # pH measured value (÷100) - e.g., 731 = 7.31 pH
@@ -144,7 +145,7 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
                 "salinity": 185,  # Salinity (g/L * 100) - if supported
             },
             # Specific components for LC24008313
-            "specific_components": [10, 16, 20, 165, 170, 172, 185],
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 185],
         },
         priority=86,  # Higher than CC24033907 for more specific match
     ),
