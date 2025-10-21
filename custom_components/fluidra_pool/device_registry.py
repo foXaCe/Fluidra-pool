@@ -116,11 +116,11 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
             "sensors": {
                 "ph": 165,  # pH measured value (÷100) - e.g., 712 = 7.12 pH
                 "orp": 170,  # ORP/Redox measured value (mV) - e.g., 779 mV
-                "temperature": 21,  # Pool temperature (°C * 10) - Component 21 for CC24033907
-                "salinity": 185,  # Salinity (g/L * 100)
+                "temperature": 172,  # Pool temperature (°C * 10) - Component 172 for CC24033907 (e.g., 136 = 13.6°C)
+                "salinity": 174,  # Salinity (g/L * 100) - Component 174 like LC24008313
             },
             # Specific components for CC24033907
-            "specific_components": [10, 16, 20, 21, 103, 165, 170, 185],
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
         },
         priority=85,  # Higher than generic chlorinator
     ),
