@@ -200,6 +200,32 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         priority=88,  # Higher than CC25113623 for more specific match
     ),
 
+    "cc25002928_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["CC25002928*"],  # Specific CC25002928 model (Energy Connect 21 Scalable)
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],  # No select for mode, but sensors enabled
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%) - e.g., 40 = 40%
+            "ph_setpoint": 16,  # Component 16 (÷100) - e.g., 720 = 7.20 pH
+            "orp_setpoint": 20,  # Component 20 (mV) - e.g., 720 = 720 mV
+            "boost_mode": 103,  # Component 103 (boolean: true/false)
+            "skip_mode_select": True,  # No mode select available
+            "sensors": {
+                "ph": 165,  # pH measured value (÷100) - e.g., 719 = 7.19 pH
+                "orp": 170,  # ORP/Redox measured value (mV) - e.g., 729 = 729 mV
+                "free_chlorine": 178,  # Free chlorine (mg/L) - may be 0 if no sensor
+                "temperature": 172,  # Pool temperature (°C × 10) - e.g., 195 = 19.5°C
+                "salinity": 174,  # Salinity (g/L × 100) - e.g., 566 = 5.66 g/L
+            },
+            # Specific components for CC25002928
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174, 178],
+        },
+        priority=89,  # Higher than CC24021110 for more specific match
+    ),
+
     "e30iq_pump": DeviceConfig(
         device_type="pump",
         identifier_patterns=["E30*", "PUMP*"],
