@@ -216,12 +216,11 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
             "sensors": {
                 "ph": 165,  # pH measured value (÷100) - e.g., 719 = 7.19 pH
                 "orp": 170,  # ORP/Redox measured value (mV) - e.g., 729 = 729 mV
-                "free_chlorine": 178,  # Free chlorine (mg/L) - may be 0 if no sensor
                 "temperature": 172,  # Pool temperature (°C × 10) - e.g., 195 = 19.5°C
                 "salinity": 174,  # Salinity (g/L × 100) - e.g., 566 = 5.66 g/L
             },
             # Specific components for CC25002928
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174, 178],
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
         },
         priority=89,  # Higher than CC24021110 for more specific match
     ),
