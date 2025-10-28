@@ -150,6 +150,32 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         priority=86,  # Higher than CC24033907 for more specific match
     ),
 
+    "cc24018202_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["CC24018202*"],  # Specific CC24018202 model
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],  # Sensors enabled
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%)
+            "ph_setpoint": 16,  # Component 16 (÷100)
+            "orp_setpoint": 20,  # Component 20 (mV)
+            "boost_mode": 103,  # Component 103 (boolean: true/false)
+            "skip_mode_select": True,  # No mode select available
+            "sensors": {
+                "ph": 165,  # pH measured value (÷100) - e.g., 727 = 7.27 pH
+                "orp": 170,  # ORP/Redox measured value (mV) - e.g., 768 mV
+                "temperature": 172,  # Pool temperature (°C * 10) - e.g., 255 = 25.5°C
+                "salinity": 174,  # Salinity (g/L * 100) - Component 174
+                "free_chlorine": 178,  # Free chlorine (mg/L) - Component 178
+            },
+            # Specific components for CC24018202
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174, 178],
+        },
+        priority=87,  # Higher than LC24008313 for more specific match
+    ),
+
     "cc25113623_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC25113623*"],  # Specific CC25113623 model
