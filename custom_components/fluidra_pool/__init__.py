@@ -77,10 +77,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pools = await api.get_pools()
 
         if not pools:
-            _LOGGER.warning("No pools found for account %s - continuing anyway", email)
             # Continue setup even without pools for now
 
-    except Exception as err:
+    except Exception:
+        pass
         _LOGGER.error("Unable to connect to Fluidra Pool API: %s", err)
         raise ConfigEntryNotReady from err
 
@@ -165,10 +165,8 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
             if success:
                 # Refresh coordinator data
                 await coordinator.async_request_refresh()
-            else:
-                _LOGGER.error(f"Failed to set schedule for {device_id}")
-        except Exception as e:
-            _LOGGER.error(f"Error setting schedule for {device_id}: {e}")
+        except Exception:
+            pass
 
     async def _handle_clear_schedule(call: ServiceCall) -> None:
         """Handle clear_schedule service call."""
@@ -179,10 +177,8 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
             success = await coordinator.api.clear_schedule(device_id)
             if success:
                 await coordinator.async_request_refresh()
-            else:
-                _LOGGER.error(f"Failed to clear schedule for {device_id}")
-        except Exception as e:
-            _LOGGER.error(f"Error clearing schedule for {device_id}: {e}")
+        except Exception:
+            pass
 
     async def _handle_set_preset_schedule(call: ServiceCall) -> None:
         """Handle set_preset_schedule service call."""
@@ -212,7 +208,6 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         }
 
         if preset not in presets:
-            _LOGGER.error(f"Unknown preset: {preset}")
             return
 
         # Use the set_schedule handler

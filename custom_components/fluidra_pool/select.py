@@ -190,7 +190,6 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Select new speed option."""
         if option not in self._speed_mapping:
-            _LOGGER.error(f"Invalid speed option: {option}")
             return
 
         speed_config = self._speed_mapping[option]
@@ -217,16 +216,12 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                     # Try sending -1 or a value meaning "no active speed"
                     try:
                         await self._api.control_device_component(self._device_id, 11, -1)
-                    except Exception as e:
-                        _LOGGER.warning(f"Could not disable speed component: {e}")
+                    except Exception:
                         # Fallback: manually mark in device data
                         device = self._api.get_device_by_id(self._device_id)
                         if device:
                             device["speed_percent"] = 0
                             device["speed_level_reported"] = None
-                else:
-                    _LOGGER.error(f"Failed to set pump to ON for 'stopped' mode")
-                    return
             else:
                 # Pour les autres modes, d'abord s'assurer que la pompe est ON puis définir la vitesse
                 # 1. S'assurer que la pompe est ON
@@ -241,11 +236,8 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
-            else:
-                _LOGGER.error(f"Failed to set pump to {option}")
 
         except Exception as err:
-            _LOGGER.error(f"Error setting pump speed to {option}: {err}")
             raise
         finally:
             # Toujours effacer l'option optimiste
@@ -283,8 +275,8 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                         device["speed_percent"] = 0
                         device["speed_level_reported"] = None
 
-        except Exception as e:
-            _LOGGER.error(f"Error refreshing device state: {e}")
+        except Exception:
+            pass
 
     @property
     def icon(self) -> str:
@@ -411,12 +403,8 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
 
-                _LOGGER.debug(f"[SELECT {self._schedule_id}] Schedule not found in {len(schedules)} schedules")
-            else:
-                _LOGGER.debug(f"[SELECT {self._schedule_id}] No 'schedule_data' key in device data")
-
-        except Exception as e:
-            _LOGGER.error(f"[SELECT {self._schedule_id}] Error getting schedule data: {e}")
+        except Exception:
+            pass
         return None
 
     @property
@@ -437,19 +425,16 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Select new mode option using exact mobile app format."""
         if option not in self._attr_options:
-            _LOGGER.error(f"Invalid schedule mode option: {option}")
             return
 
         try:
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
-                _LOGGER.error(f"No schedule data found for device {self._device_id}")
                 return
 
             current_schedules = device_data["schedule_data"]
             if not current_schedules:
-                _LOGGER.error(f"No schedules found for device {self._device_id}")
                 return
 
             # Create complete schedule list with EXACT format from mobile app
@@ -490,11 +475,9 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
             success = await self._api.set_schedule(self._device_id, updated_schedules)
             if success:
                 await self.coordinator.async_request_refresh()
-            else:
-                _LOGGER.error(f"Failed to update mode for schedule {self._schedule_id}")
 
-        except Exception as e:
-            _LOGGER.error(f"Error updating mode for schedule {self._schedule_id}: {e}")
+        except Exception:
+            pass
 
     def _convert_cron_days(self, cron_time: str) -> str:
         """Convert cron time from HA format (0,1,2,3,4,5,6) to mobile format (1,2,3,4,5,6,7)."""
@@ -640,7 +623,6 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Select new mode option."""
         if option not in self._mode_mapping:
-            _LOGGER.error(f"Invalid chlorinator mode option: {option}")
             return
 
         mode_value = self._mode_mapping[option]
@@ -661,11 +643,8 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
             if success:
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
-            else:
-                _LOGGER.error(f"Failed to set chlorinator mode to {option}")
 
         except Exception as err:
-            _LOGGER.error(f"Error setting chlorinator mode to {option}: {err}")
             raise
         finally:
             # Clear optimistic option

@@ -415,7 +415,8 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                 minute = int(parts[0])
                 hour = int(parts[1])
                 return time(hour, minute)
-        except (ValueError, IndexError):
+        except Exception:
+            pass
             pass
         return None
 
@@ -464,7 +465,6 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
             schedules = device_data["schedule_data"]
             return schedules
         else:
-            _LOGGER.debug(f"[SENSOR] No 'schedule_data' key found in device data (normal for devices without schedules)")
             return []
 
     @property
@@ -489,8 +489,8 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
             active_schedules_label = self._translate_schedule_state("active_schedules")
             return f"{enabled_count} {active_schedules_label}"
 
-        except Exception as e:
-            _LOGGER.error(f"Error getting schedule state: {e}")
+        except Exception:
+            pass
             return self._translate_schedule_state("error")
 
     @property
@@ -528,8 +528,8 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                         current_schedule.get("startActions", {}).get("operationName", "0")
                     )
 
-        except Exception as e:
-            _LOGGER.error(f"Error getting schedule attributes: {e}")
+        except Exception:
+            pass
             attrs["error"] = str(e)
 
         return attrs
@@ -629,8 +629,8 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
             else:
                 return f"{firmware_label} {firmware}"
 
-        except Exception as e:
-            _LOGGER.error(f"Error getting device info state: {e}")
+        except Exception:
+            pass
             return self._translate_device_info("error")
 
     @property
@@ -689,8 +689,8 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
             attrs["model"] = self.device_data.get("model", "Unknown")
             attrs["online"] = self.device_data.get("online", False)
 
-        except Exception as e:
-            _LOGGER.error(f"Error getting device info attributes: {e}")
+        except Exception:
+            pass
             attrs["error"] = str(e)
 
         return attrs
@@ -1196,7 +1196,8 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
         try:
             # Apply divisor to get actual value
             return float(raw_value) / self._divisor
-        except (ValueError, TypeError):
+        except Exception:
+            pass
             return None
 
     @property

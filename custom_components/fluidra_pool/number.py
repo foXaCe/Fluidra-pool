@@ -135,10 +135,9 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
             if success:
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"Failed to set component {self._component_id} to {int_value}")
 
-        except Exception as err:
-            _LOGGER.error(f"Error setting component {self._component_id}: {err}")
+        except Exception:
+            pass
             raise
 
     @property
@@ -240,13 +239,12 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
         try:
             success = await self._api.set_component_value(self._device_id, 15, int_value)
             if not success:
-                _LOGGER.error(f"Failed to set speed percentage to {int_value}")
                 return
 
             await self.coordinator.async_request_refresh()
 
-        except Exception as err:
-            _LOGGER.error(f"Error setting pump speed: {err}")
+        except Exception:
+            pass
             raise
 
     @property
@@ -359,9 +357,8 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         try:
             success = await self._api.control_device_component(self._device_id, 10, int_value)
             if not success:
-                _LOGGER.error(f"Failed to set to {int_value}%")
-        except Exception as err:
-            _LOGGER.error(f"Error: {err}")
+        except Exception:
+            pass
             raise
 
     @property
@@ -462,7 +459,8 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
 
         try:
             return float(raw_value) / 100
-        except (ValueError, TypeError):
+        except Exception:
+            pass
             return 7.2
 
     async def async_set_native_value(self, value: float) -> None:
@@ -493,10 +491,9 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if not success:
-                _LOGGER.error(f"Failed to set pH setpoint to {value}")
 
-        except Exception as err:
-            _LOGGER.error(f"Error setting pH setpoint: {err}")
+        except Exception:
+            pass
             raise
 
     @property
@@ -527,7 +524,8 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         if raw_reading is not None:
             try:
                 current_ph = float(raw_reading) / 100
-            except (ValueError, TypeError):
+            except Exception:
+                pass
                 pass
 
         return {
@@ -646,10 +644,9 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if not success:
-                _LOGGER.error(f"Failed to set ORP setpoint to {int_value} mV")
 
-        except Exception as err:
-            _LOGGER.error(f"Error setting ORP setpoint: {err}")
+        except Exception:
+            pass
             raise
 
     @property

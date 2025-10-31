@@ -119,8 +119,8 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
 
-        except Exception as e:
-            _LOGGER.error(f"[TIME {self._schedule_id}] Error getting schedule data: {e}")
+        except Exception:
+            pass
         return None
 
     @property
@@ -137,7 +137,8 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                 minute = int(parts[0])
                 hour = int(parts[1])
                 return time(hour, minute)
-        except (ValueError, IndexError):
+        except Exception:
+            pass
             pass
         return None
 
@@ -170,7 +171,8 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                 new_days_sorted = sorted([int(d) for d in new_days])
                 parts[4] = ','.join(map(str, new_days_sorted))
                 return ' '.join(parts)
-            except (ValueError, IndexError):
+            except Exception:
+                pass
                 pass
 
         return cron_time
@@ -203,8 +205,8 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                     return False, f"Conflit détecté avec {schedule_name} ({existing_start.strftime('%H:%M')} - {existing_end.strftime('%H:%M')})"
 
             return True, ""
-        except Exception as e:
-            _LOGGER.warning(f"Error validating schedule overlap: {e}")
+        except Exception:
+            pass
             return True, ""  # Allow if validation fails
 
     def _times_overlap(self, start1: time, end1: time, start2: time, end2: time) -> bool:
@@ -258,7 +260,6 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
-                _LOGGER.error(f"No schedule data found for device {self._device_id}")
                 return
 
             current_schedules = device_data["schedule_data"]
@@ -273,7 +274,6 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                     # Validate no overlap with other schedules
                     is_valid, error_msg = self._validate_schedule_overlap(value, current_end_time, self._schedule_id)
                     if not is_valid:
-                        _LOGGER.error(f"{error_msg}")
                         raise ValueError(error_msg)
 
             # Create complete schedule list with EXACT format from mobile app
@@ -301,7 +301,8 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                                     else:  # Monday-Saturday: 1-6 -> 1-6
                                         days.append(day)
                                 days = sorted(days)
-                            except (ValueError, TypeError, AttributeError):
+                            except Exception:
+                                pass
                                 pass
 
                     start_time = self._format_time_to_cron(value, days)
@@ -335,10 +336,9 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             if success:
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"Failed to update start time for schedule {self._schedule_id}")
 
-        except Exception as e:
-            _LOGGER.error(f"Error setting start time for schedule {self._schedule_id}: {e}")
+        except Exception:
+            pass
 
 
 class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
@@ -374,7 +374,6 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
-                _LOGGER.error(f"No schedule data found for device {self._device_id}")
                 return
 
             current_schedules = device_data["schedule_data"]
@@ -389,7 +388,6 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                     # Validate no overlap with other schedules
                     is_valid, error_msg = self._validate_schedule_overlap(current_start_time, value, self._schedule_id)
                     if not is_valid:
-                        _LOGGER.error(f"{error_msg}")
                         raise ValueError(error_msg)
 
             # Create complete schedule list with EXACT format from mobile app
@@ -417,7 +415,8 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                                     else:  # Monday-Saturday: 1-6 -> 1-6
                                         days.append(day)
                                 days = sorted(days)
-                            except (ValueError, TypeError, AttributeError):
+                            except Exception:
+                                pass
                                 pass
 
                     end_time = self._format_time_to_cron(value, days)
@@ -451,7 +450,6 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             if success:
                 await self.coordinator.async_request_refresh()
             else:
-                _LOGGER.error(f"Failed to update end time for schedule {self._schedule_id}")
 
-        except Exception as e:
-            _LOGGER.error(f"Error setting end time for schedule {self._schedule_id}: {e}")
+        except Exception:
+            pass

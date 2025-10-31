@@ -85,14 +85,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     )
 
                     for entity_entry in entities_to_remove:
-                        _LOGGER.debug(f"  Removing entity {entity_entry.entity_id}")
                         entity_registry.async_remove(entity_entry.entity_id)
 
                     # Then remove the device itself
                     device_registry.async_remove_device(device_entry.id)
 
-        except Exception as e:
-            _LOGGER.error(f"Error cleaning up removed devices: {e}")
+        except Exception:
+            pass
 
     async def _cleanup_schedule_sensor_if_empty(self, pool_id: str, device_id: str, schedule_data: list):
         """Clean up schedule sensor entity if no schedules remain."""
@@ -114,8 +113,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                         entity_registry.async_remove(entity_id)
                         break
 
-        except Exception as e:
-            _LOGGER.error(f"Error cleaning up schedule sensor for device {device_id}: {e}")
+        except Exception:
+            pass
 
     def _calculate_auto_speed_from_schedules(self, device: dict) -> int:
         """Calculate current speed based on active schedules in auto mode."""
@@ -188,8 +187,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
             return 0
 
-        except Exception as e:
-            _LOGGER.error(f"Error calculating auto speed from schedules: {e}")
+        except Exception:
             return 0
 
     async def _async_update_data(self):
@@ -325,7 +323,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                             if 10.0 <= temp_value <= 50.0:
                                                 device["target_temperature"] = temp_value
                                         except (ValueError, TypeError):
-                                            _LOGGER.warning(f"Invalid temperature value in component 15: {reported_value}")
+                                            pass
                                     # Note: Component 15 n'est plus utilisé pour le mode manuel, remplacé par Component 13
                                 elif component_id == 19:  # Température de l'eau (pour pompes à chaleur)
                                     device["timezone_component"] = reported_value
