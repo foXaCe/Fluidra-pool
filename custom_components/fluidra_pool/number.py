@@ -134,10 +134,8 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
 
             if success:
                 await self.coordinator.async_request_refresh()
-            else:
 
         except Exception:
-            pass
             raise
 
     @property
@@ -357,8 +355,8 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         try:
             success = await self._api.control_device_component(self._device_id, 10, int_value)
             if not success:
+                pass
         except Exception:
-            pass
             raise
 
     @property
@@ -491,9 +489,9 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if not success:
+                pass
 
         except Exception:
-            pass
             raise
 
     @property
@@ -644,9 +642,9 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
             if not success:
+                pass
 
         except Exception:
-            pass
             raise
 
     @property

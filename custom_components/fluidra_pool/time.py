@@ -335,7 +335,6 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             success = await self._api.set_schedule(self._device_id, updated_schedules)
             if success:
                 await self.coordinator.async_request_refresh()
-            else:
 
         except Exception:
             pass
@@ -449,7 +448,6 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             success = await self._api.set_schedule(self._device_id, updated_schedules)
             if success:
                 await self.coordinator.async_request_refresh()
-            else:
 
         except Exception:
             pass
