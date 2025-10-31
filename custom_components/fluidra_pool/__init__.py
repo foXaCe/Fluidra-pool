@@ -78,9 +78,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         if not pools:
             # Continue setup even without pools for now
+            pass
 
-    except Exception:
-        pass
+    except Exception as err:
         _LOGGER.error("Unable to connect to Fluidra Pool API: %s", err)
         raise ConfigEntryNotReady from err
 
