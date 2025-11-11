@@ -1,30 +1,3 @@
-# Sensitive data
-*.json
-!manifest.json
-!services.json
-
-# Credentials and tokens
-.env
-.env.*
-*token*
-*credential*
-*auth*
-
-# Capture files
-capture_*.py
-capture_*.json
-fullcapture_*
-cognito_tokens_*
-
-# Personal data
-foxace66@gmail.com
-chabrol
-stephane
-
-# Home Assistant
-*.log
-home-assistant*.log
-
 # Python
 __pycache__/
 *.py[cod]
@@ -43,21 +16,20 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
-# Virtual environments
+# Virtual Environment
+.venv/
 venv/
-venv_*/
-env/
 ENV/
-env.bak/
-venv.bak/
+env/
 
-# IDEs
+# Ruff
+.ruff_cache/
+
+# IDE
 .vscode/
 .idea/
 *.swp
@@ -66,20 +38,16 @@ venv.bak/
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Temporary files
-*.tmp
-*.temp
+# Backup files
 *.bak
-*.backup
-*.old
 
-# Test outputs
-test_output/
-test_results/
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temporary files
+*.log
+*.tmp
