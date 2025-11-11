@@ -1,16 +1,16 @@
 """Switch platform for Fluidra Pool integration."""
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.entity import EntityCategory
 
-from .const import DOMAIN, DEVICE_TYPE_PUMP, DEVICE_TYPE_HEAT_PUMP, DEVICE_TYPE_HEATER
+from .const import DOMAIN
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 
@@ -58,13 +58,9 @@ async def async_setup_entry(
             if DeviceIdentifier.has_feature(device, "schedules"):
                 schedule_count = DeviceIdentifier.get_feature(device, "schedule_count", 8)
                 for schedule_id in [str(i) for i in range(1, schedule_count + 1)]:
-                    entities.append(FluidraScheduleEnableSwitch(
-                        coordinator,
-                        coordinator.api,
-                        pool["id"],
-                        device_id,
-                        schedule_id
-                    ))
+                    entities.append(
+                        FluidraScheduleEnableSwitch(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                    )
 
             # Create boost mode switch for chlorinator
             if DeviceIdentifier.has_feature(device, "boost_mode"):
@@ -135,6 +131,7 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
     def _set_pending_state(self, state: bool) -> None:
         """Set pending state for optimistic UI updates."""
         import time
+
         self._pending_state = state
         self._last_action_time = time.time()
         self.async_write_ha_state()
@@ -145,11 +142,9 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
         self._last_action_time = None
         self.async_write_ha_state()
 
-
     async def _refresh_device_state(self) -> None:
         """Refresh device state by polling real API components."""
         try:
-
             # Rafraîchir les états des composants critiques
             # Component 9 (on/off)
             pump_state = await self._api.get_device_component_state(self._device_id, 9)
@@ -196,8 +191,8 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        pool_name = self.pool_data.get('name', 'Pool')
-        device_name = self.device_data.get('name', 'Pump')
+        pool_name = self.pool_data.get("name", "Pool")
+        device_name = self.device_data.get("name", "Pump")
         return f"{pool_name} {device_name}"
 
     @property
@@ -228,6 +223,7 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
             import time
+
             # Effacer l'état en attente après 10 secondes de sécurité
             if time.time() - self._last_action_time > 10:
                 self._clear_pending_state()
@@ -241,11 +237,9 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
         # Fallback sur is_running pour compatibilité
         return self.device_data.get("is_running", False)
 
-
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the pump on using discovered API with optimistic UI."""
         try:
-
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(True)
 
@@ -253,6 +247,7 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             if success:
                 # Attendre que l'API se synchronise
                 import asyncio
+
                 await asyncio.sleep(2)
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
@@ -270,7 +265,6 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the pump off using discovered API with optimistic UI."""
         try:
-
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(False)
 
@@ -278,6 +272,7 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             if success:
                 # Attendre que l'API se synchronise
                 import asyncio
+
                 await asyncio.sleep(2)
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
@@ -295,7 +290,7 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
     @property
     def extra_state_attributes(self) -> dict:
         """Return extra state attributes."""
-        attrs = {
+        return {
             "component_id": 9,
             "operation": "pump_control",
             "speed_percent": self.device_data.get("speed_percent", 0),
@@ -307,9 +302,8 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             "last_update": self.device_data.get("last_update"),
             # UI responsiveness indicators
             "pending_action": self._pending_state is not None,
-            "action_timestamp": self._last_action_time
+            "action_timestamp": self._last_action_time,
         }
-        return attrs
 
 
 class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
@@ -324,8 +318,8 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        pool_name = self.pool_data.get('name', 'Pool')
-        device_name = self.device_data.get('name', 'Heat Pump')
+        pool_name = self.pool_data.get("name", "Pool")
+        device_name = self.device_data.get("name", "Heat Pump")
 
         # Vérifier si c'est un Eco Elyo pour un nom plus spécifique
         device_config = DeviceIdentifier.identify_device(self.device_data)
@@ -362,6 +356,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
             import time
+
             # Effacer l'état en attente après 10 secondes de sécurité
             if time.time() - self._last_action_time > 10:
                 self._clear_pending_state()
@@ -389,7 +384,6 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the heat pump on using discovered API with optimistic UI."""
         try:
-
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(True)
 
@@ -398,6 +392,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
             if success:
                 # Attendre que l'API se synchronise
                 import asyncio
+
                 await asyncio.sleep(2)
                 # Récupérer l'état réel immédiatement
                 await self._refresh_heat_pump_state()
@@ -415,7 +410,6 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the heat pump off using discovered API with optimistic UI."""
         try:
-
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(False)
 
@@ -423,6 +417,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
             if success:
                 # Attendre que l'API se synchronise
                 import asyncio
+
                 await asyncio.sleep(2)
                 # Récupérer l'état réel immédiatement
                 await self._refresh_heat_pump_state()
@@ -440,7 +435,6 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     async def _refresh_heat_pump_state(self) -> None:
         """Refresh heat pump state by polling real API components."""
         try:
-
             # Component 9 (on/off) - standard pour pompes et pompes à chaleur
             heat_pump_state = await self._api.get_device_component_state(self._device_id, 9)
             if heat_pump_state:
@@ -467,7 +461,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
             "last_update": self.device_data.get("last_update"),
             # UI responsiveness indicators
             "pending_action": self._pending_state is not None,
-            "action_timestamp": self._last_action_time
+            "action_timestamp": self._last_action_time,
         }
 
         # Ajouter les données de température si disponibles
@@ -485,8 +479,8 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        device_name = self.device_data.get('name', f'Device {self._device_id}')
-        pool_name = self.pool_data.get('name', 'Pool')
+        device_name = self.device_data.get("name", f"Device {self._device_id}")
+        pool_name = self.pool_data.get("name", "Pool")
         return f"{pool_name} {device_name}"
 
     @property
@@ -541,9 +535,6 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
         return attrs
 
 
-
-
-
 class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     """Switch for controlling pump auto mode (ON/OFF)."""
 
@@ -554,8 +545,8 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     @property
     def name(self) -> str:
         """Return the name of the switch."""
-        pool_name = self.pool_data.get('name', 'Pool')
-        device_name = self.device_data.get('name', 'Pump')
+        pool_name = self.pool_data.get("name", "Pool")
+        device_name = self.device_data.get("name", "Pump")
         return f"{pool_name} {device_name} Auto Mode"
 
     @property
@@ -591,6 +582,7 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
             import time
+
             # Effacer l'état en attente après 10 secondes de sécurité
             if time.time() - self._last_action_time > 10:
                 self._clear_pending_state()
@@ -607,7 +599,6 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn auto mode on using discovered Component 10 with optimistic UI."""
         try:
-
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(True)
 
@@ -615,6 +606,7 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             if success:
                 # Attendre que l'API se synchronise
                 import asyncio
+
                 await asyncio.sleep(2)
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
@@ -632,7 +624,6 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn auto mode off using discovered Component 10 with optimistic UI."""
         try:
-
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(False)
 
@@ -640,6 +631,7 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             if success:
                 # Attendre que l'API se synchronise
                 import asyncio
+
                 await asyncio.sleep(2)
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
@@ -668,7 +660,7 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             "last_update": self.device_data.get("last_update"),
             # UI responsiveness indicators
             "pending_action": self._pending_state is not None,
-            "action_timestamp": self._last_action_time
+            "action_timestamp": self._last_action_time,
         }
 
 
@@ -688,7 +680,6 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         self._attr_translation_placeholders = {"schedule_id": schedule_id}
         self._attr_unique_id = f"fluidra_{self._device_id}_schedule_{schedule_id}_enabled"
         self._attr_entity_category = EntityCategory.CONFIG
-
 
     @property
     def unique_id(self) -> str:
@@ -712,7 +703,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         """Return device class for proper styling."""
         return "switch"
 
-    def _get_schedule_data(self) -> Optional[dict]:
+    def _get_schedule_data(self) -> dict | None:
         """Get schedule data from coordinator."""
         try:
             # Get schedules from device data like the sensor does
@@ -738,8 +729,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
     @property
     def available(self) -> bool:
         """Return True if the schedule exists."""
-        result = self._get_schedule_data() is not None
-        return result
+        return self._get_schedule_data() is not None
 
     @property
     def is_on(self) -> bool:
@@ -747,6 +737,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
             import time
+
             # Effacer l'état en attente après 10 secondes de sécurité
             if time.time() - self._last_action_time > 10:
                 self._clear_pending_state()
@@ -785,24 +776,23 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                     "enabled": True if str(sched.get("id")) == str(self._schedule_id) else sched.get("enabled", False),
                     "startTime": start_time,
                     "endTime": end_time,
-                    "startActions": {
-                        "operationName": str(sched.get("startActions", {}).get("operationName", "0"))
-                    }
+                    "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
                 }
                 updated_schedules.append(scheduler)
 
             # Ensure we have exactly 8 schedulers (add missing ones)
             while len(updated_schedules) < 8:
                 missing_id = len(updated_schedules) + 1
-                updated_schedules.append({
-                    "id": missing_id,
-                    "groupId": missing_id,
-                    "enabled": True if missing_id == int(self._schedule_id) else False,
-                    "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                    "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                    "startActions": {"operationName": "0"}
-                })
-
+                updated_schedules.append(
+                    {
+                        "id": missing_id,
+                        "groupId": missing_id,
+                        "enabled": missing_id == int(self._schedule_id),
+                        "startTime": "00 00 * * 1,2,3,4,5,6,7",
+                        "endTime": "00 01 * * 1,2,3,4,5,6,7",
+                        "startActions": {"operationName": "0"},
+                    }
+                )
 
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules)
@@ -846,23 +836,23 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                     "enabled": False if str(sched.get("id")) == str(self._schedule_id) else sched.get("enabled", False),
                     "startTime": start_time,
                     "endTime": end_time,
-                    "startActions": {
-                        "operationName": str(sched.get("startActions", {}).get("operationName", "0"))
-                    }
+                    "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
                 }
                 updated_schedules.append(scheduler)
 
             # Ensure we have exactly 8 schedulers (add missing ones)
             while len(updated_schedules) < 8:
                 missing_id = len(updated_schedules) + 1
-                updated_schedules.append({
-                    "id": missing_id,
-                    "groupId": missing_id,
-                    "enabled": False,
-                    "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                    "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                    "startActions": {"operationName": "0"}
-                })
+                updated_schedules.append(
+                    {
+                        "id": missing_id,
+                        "groupId": missing_id,
+                        "enabled": False,
+                        "startTime": "00 00 * * 1,2,3,4,5,6,7",
+                        "endTime": "00 01 * * 1,2,3,4,5,6,7",
+                        "startActions": {"operationName": "0"},
+                    }
+                )
 
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules)
@@ -888,7 +878,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         if len(parts) >= 5:
             try:
                 # Convert day numbers: 0->7, 1->1, 2->2, etc.
-                old_days = parts[4].split(',')
+                old_days = parts[4].split(",")
                 new_days = []
                 for day in old_days:
                     day_num = int(day.strip())
@@ -899,8 +889,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
 
                 # Sort days to match mobile app format
                 new_days_sorted = sorted([int(d) for d in new_days])
-                parts[4] = ','.join(map(str, new_days_sorted))
-                return ' '.join(parts)
+                parts[4] = ",".join(map(str, new_days_sorted))
+                return " ".join(parts)
             except Exception:
                 pass
                 pass
@@ -917,19 +907,18 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         }
 
         if schedule:
-            attrs.update({
-                "start_time": schedule.get("startTime", ""),
-                "end_time": schedule.get("endTime", ""),
-                "state": schedule.get("state", "IDLE"),
-                "start_action": schedule.get("startActions", {}),
-                "end_action": schedule.get("endActions", {}),
-            })
+            attrs.update(
+                {
+                    "start_time": schedule.get("startTime", ""),
+                    "end_time": schedule.get("endTime", ""),
+                    "state": schedule.get("state", "IDLE"),
+                    "start_action": schedule.get("startActions", {}),
+                    "end_action": schedule.get("endActions", {}),
+                }
+            )
 
         # UI responsiveness indicators
-        attrs.update({
-            "pending_action": self._pending_state is not None,
-            "action_timestamp": self._last_action_time
-        })
+        attrs.update({"pending_action": self._pending_state is not None, "action_timestamp": self._last_action_time})
 
         return attrs
 
@@ -967,16 +956,12 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
         # Si on a un état en attente
         if self._pending_state is not None:
             import time
+
             # Si le serveur confirme l'état attendu, clear le pending state
-            if actual_state == self._pending_state:
+            if actual_state == self._pending_state or time.time() - self._last_action_time > 10:
                 self._clear_pending_state()
                 return actual_state
-            # Effacer l'état en attente après 10 secondes de sécurité
-            elif time.time() - self._last_action_time > 10:
-                self._clear_pending_state()
-                return actual_state
-            else:
-                return self._pending_state
+            return self._pending_state
 
         return actual_state
 
@@ -984,7 +969,6 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
         """Turn boost mode on with optimistic UI."""
         # Get component number dynamically from device config
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
-
 
         try:
             # Mise à jour optimiste immédiate pour la réactivité
@@ -994,6 +978,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
 
             if success:
                 import asyncio
+
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
                 # Le pending state se clear automatiquement dans is_on() quand le serveur confirme
@@ -1010,7 +995,6 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
         # Get component number dynamically from device config
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
 
-
         try:
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(False)
@@ -1019,6 +1003,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
 
             if success:
                 import asyncio
+
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
                 # Le pending state se clear automatiquement dans is_on() quand le serveur confirme

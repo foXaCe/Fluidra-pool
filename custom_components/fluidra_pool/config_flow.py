@@ -1,14 +1,12 @@
 """Config flow for Fluidra Pool integration."""
 
 import logging
-from typing import Any, Dict, Optional
-
-import voluptuous as vol
+from typing import Any, Dict
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import voluptuous as vol
 
 from .const import DOMAIN
 from .fluidra_api import FluidraPoolAPI
@@ -28,9 +26,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: Optional[Dict[str, Any]] = None
-    ) -> FlowResult:
+    async def async_step_user(self, user_input: Dict[str, Any] | None = None) -> FlowResult:
         """Handle the initial step."""
         errors: Dict[str, str] = {}
 
@@ -47,7 +43,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             try:
                 await api.authenticate()
-                pools = await api.get_pools()
+                await api.get_pools()
 
                 await api.close()
 

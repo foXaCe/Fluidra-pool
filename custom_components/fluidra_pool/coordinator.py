@@ -1,14 +1,15 @@
 """Data update coordinator for Fluidra Pool integration."""
-import logging
+
 from datetime import timedelta
+import logging
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .fluidra_api import FluidraPoolAPI
-from .device_registry import DeviceIdentifier
 from .const import DOMAIN
+from .device_registry import DeviceIdentifier
+from .fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,10 +55,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             entity_registry = er.async_get(self.hass)
 
             # Get all devices for this integration
-            devices_to_check = dr.async_entries_for_config_entry(
-                device_registry,
-                self.config_entry.entry_id
-            )
+            devices_to_check = dr.async_entries_for_config_entry(device_registry, self.config_entry.entry_id)
 
             for device_entry in devices_to_check:
                 # Extract device_id from identifiers
@@ -76,12 +74,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
                 # If device_id not in current API data, remove it
                 if device_id not in current_device_ids:
-
                     # First, remove all entities associated with this device
                     entities_to_remove = er.async_entries_for_device(
-                        entity_registry,
-                        device_entry.id,
-                        include_disabled_entities=True
+                        entity_registry, device_entry.id, include_disabled_entities=True
                     )
 
                     for entity_entry in entities_to_remove:
@@ -107,9 +102,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
                 # Look for the schedule sensor entity
                 for entity_id, entry in entity_registry.entities.items():
-                    if (entry.platform == "fluidra_pool" and
-                        entry.unique_id == expected_unique_id):
-
+                    if entry.platform == "fluidra_pool" and entry.unique_id == expected_unique_id:
                         entity_registry.async_remove(entity_id)
                         break
 
@@ -131,9 +124,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
             # Mapping operationName to percentage (from mitmproxy capture)
             operation_to_percent = {
-                "0": 45,   # Faible
-                "1": 65,   # Moyenne
-                "2": 100   # Élevée
+                "0": 45,  # Faible
+                "1": 65,  # Moyenne
+                "2": 100,  # Élevée
             }
 
             def _parse_cron_time(cron_time: str):
@@ -157,7 +150,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                         if days_str == "*":
                             return list(range(7))  # All days
                         days = []
-                        for day in days_str.split(','):
+                        for day in days_str.split(","):
                             day_num = int(day.strip())
                             # Convert from cron format (0=Sunday) to Python format (0=Monday)
                             if day_num == 0:  # Sunday
@@ -182,8 +175,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     # Check if current time is within this schedule
                     if start_time_obj <= current_time <= end_time_obj:
                         operation = schedule.get("startActions", {}).get("operationName", "0")
-                        speed_percent = operation_to_percent.get(operation, 0)
-                        return speed_percent
+                        return operation_to_percent.get(operation, 0)
 
             return 0
 
@@ -196,7 +188,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             # Si des entités ont un état optimiste actif, réduire les mises à jour pour éviter les conflits
             if self.has_optimistic_entities():
                 # Retourner les données actuelles sans nouveau polling intensif
-                current_data = getattr(self, 'data', None)
+                current_data = getattr(self, "data", None)
                 if current_data:
                     return current_data
 
@@ -211,7 +203,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             if self._first_update:
                 self._first_update = False
                 # Le prochain refresh normal (30s) fera le scan complet
-                return {pool['id']: pool for pool in pools}
+                return {pool["id"]: pool for pool in pools}
 
             # Pour chaque pool, faire le polling temps réel des devices
             for pool in pools:
@@ -301,18 +293,19 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                             # MODE AUTO : Calculer à partir des schedules actifs
                                             current_speed = self._calculate_auto_speed_from_schedules(device)
                                             device["speed_percent"] = current_speed
+                                        # MODE MANUEL : Utiliser Component 11
+                                        elif reported_value == 0:
+                                            device["speed_percent"] = 45  # Faible
+                                        elif reported_value == 1:
+                                            device["speed_percent"] = 65  # Moyenne
+                                        elif reported_value == 2:
+                                            device["speed_percent"] = 100  # Élevée
                                         else:
-                                            # MODE MANUEL : Utiliser Component 11
-                                            if reported_value == 0:
-                                                device["speed_percent"] = 45  # Faible
-                                            elif reported_value == 1:
-                                                device["speed_percent"] = 65  # Moyenne
-                                            elif reported_value == 2:
-                                                device["speed_percent"] = 100 # Élevée
-                                            else:
-                                                device["speed_percent"] = 0   # Défaut
+                                            device["speed_percent"] = 0  # Défaut
                                 elif component_id == 15:  # Température de référence pour pompes à chaleur
-                                    device["component_15_speed"] = reported_value or component_state.get("desiredValue") or 0
+                                    device["component_15_speed"] = (
+                                        reported_value or component_state.get("desiredValue") or 0
+                                    )
 
                                     # Pour les pompes à chaleur, component 15 peut contenir la température × 10
                                     if device.get("type", "").lower() == "heat_pump" and reported_value:
@@ -360,7 +353,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                         previous_count = self._previous_schedule_entities.get(device_key, 0)
                                         if previous_count > 0 and current_schedule_count < previous_count:
                                             # Trigger entity registry cleanup for this device's schedule sensor
-                                            await self._cleanup_schedule_sensor_if_empty(pool_id, device_id, schedule_data)
+                                            await self._cleanup_schedule_sensor_if_empty(
+                                                pool_id, device_id, schedule_data
+                                            )
 
                                         # Update tracking count
                                         self._previous_schedule_entities[device_key] = current_schedule_count
@@ -404,7 +399,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             # Clean up devices that no longer exist in Fluidra API
             await self._cleanup_removed_devices(current_device_ids)
 
-            return {pool['id']: pool for pool in pools}
+            return {pool["id"]: pool for pool in pools}
 
         except Exception as err:
             _LOGGER.error(f"Error updating Fluidra Pool data: {err}")

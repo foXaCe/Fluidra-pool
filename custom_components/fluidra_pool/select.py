@@ -1,13 +1,14 @@
 """Select platform for Fluidra Pool integration."""
+
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN
 from .coordinator import FluidraDataUpdateCoordinator
@@ -53,13 +54,9 @@ async def async_setup_entry(
             if DeviceIdentifier.should_create_entity(device, "select") and device.get("schedule_data"):
                 # Create selects for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
-                    entities.append(FluidraScheduleModeSelect(
-                        coordinator,
-                        coordinator.api,
-                        pool["id"],
-                        device_id,
-                        schedule_id
-                    ))
+                    entities.append(
+                        FluidraScheduleModeSelect(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                    )
 
     async_add_entities(entities)
 
@@ -96,16 +93,11 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
             "stopped": {"component": 9, "value": 1, "percent": 0, "keep_pump_on": True},
             "low": {"component": 11, "value": 0, "percent": 45},
             "medium": {"component": 11, "value": 1, "percent": 65},
-            "high": {"component": 11, "value": 2, "percent": 100}
+            "high": {"component": 11, "value": 2, "percent": 100},
         }
 
         # Inverse mapping for display
-        self._percent_to_option = {
-            0: "stopped",
-            45: "low",
-            65: "medium",
-            100: "high"
-        }
+        self._percent_to_option = {0: "stopped", 45: "low", 65: "medium", 100: "high"}
 
     @property
     def device_data(self) -> dict:
@@ -153,13 +145,10 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         if auto_mode_enabled:
             return False
 
-        return (
-            self.coordinator.last_update_success
-            and self.device_data.get("online", False)
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
-    def current_option(self) -> Optional[str]:
+    def current_option(self) -> str | None:
         """Return the current speed option."""
         # Si on a une option optimiste en cours, l'utiliser en priorité
         if self._optimistic_option is not None:
@@ -195,8 +184,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         speed_config = self._speed_mapping[option]
         component = speed_config["component"]
         value = speed_config["value"]
-        percent = speed_config["percent"]
-
+        speed_config["percent"]
 
         try:
             # Définir l'option optimiste immédiatement
@@ -205,6 +193,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
 
             # Petit délai pour s'assurer que l'option optimiste est prise en compte
             import asyncio
+
             await asyncio.sleep(0.1)
 
             # For "stopped", ensure pump is ON but no active speed
@@ -232,12 +221,13 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
             if success:
                 # Attendre que l'API se synchronise
                 import asyncio
+
                 await asyncio.sleep(3)  # Augmenté à 3 secondes pour plus de stabilité
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
 
-        except Exception as err:
+        except Exception:
             raise
         finally:
             # Toujours effacer l'option optimiste
@@ -247,7 +237,6 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
     async def _refresh_device_state(self) -> None:
         """Refresh device state by polling real API components."""
         try:
-
             # Rafraîchir les états des composants critiques
             # Component 9 (on/off)
             pump_state = await self._api.get_device_component_state(self._device_id, 9)
@@ -295,12 +284,10 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         current_option = self.current_option
         if current_option == "stopped":
             return "mdi:pump"  # Pump ON but not running
-        elif current_option == "low":
+        if current_option in {"low", "medium"}:
             return "mdi:pump"
-        elif current_option == "medium":
-            return "mdi:pump"
-        else:  # high
-            return "mdi:pump"
+        # high
+        return "mdi:pump"
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -323,7 +310,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
             "online": self.device_data.get("online", False),
             # État optimiste
             "optimistic_option": self._optimistic_option,
-            "using_optimistic": self._optimistic_option is not None
+            "using_optimistic": self._optimistic_option is not None,
         }
 
         # Ajouter une indication si le contrôle est désactivé par le mode auto
@@ -355,7 +342,7 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         self._device_id = device_id
         self._schedule_id = schedule_id
 
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
+        self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         self._attr_translation_key = "schedule_mode"
         self._attr_translation_placeholders = {"schedule_id": schedule_id}
         self._attr_unique_id = f"fluidra_{self._device_id}_schedule_{schedule_id}_mode"
@@ -388,7 +375,7 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
             "via_device": (DOMAIN, self._pool_id),
         }
 
-    def _get_schedule_data(self) -> Optional[dict]:
+    def _get_schedule_data(self) -> dict | None:
         """Get schedule data from coordinator."""
         try:
             # Get schedules from device data like the sensor does
@@ -410,11 +397,10 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
     @property
     def available(self) -> bool:
         """Return True if the schedule exists."""
-        result = self._get_schedule_data() is not None
-        return result
+        return self._get_schedule_data() is not None
 
     @property
-    def current_option(self) -> Optional[str]:
+    def current_option(self) -> str | None:
         """Return the current mode option."""
         schedule = self._get_schedule_data()
         if schedule:
@@ -445,7 +431,11 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
                 end_time = self._convert_cron_days(sched.get("endTime", ""))
 
                 # If this is the schedule we're updating, use the new mode
-                operation_name = option if str(sched.get("id")) == str(self._schedule_id) else str(sched.get("startActions", {}).get("operationName", "0"))
+                operation_name = (
+                    option
+                    if str(sched.get("id")) == str(self._schedule_id)
+                    else str(sched.get("startActions", {}).get("operationName", "0"))
+                )
 
                 scheduler = {
                     "id": sched.get("id"),
@@ -453,23 +443,23 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
                     "enabled": sched.get("enabled", False),
                     "startTime": start_time,
                     "endTime": end_time,
-                    "startActions": {
-                        "operationName": operation_name
-                    }
+                    "startActions": {"operationName": operation_name},
                 }
                 updated_schedules.append(scheduler)
 
             # Ensure we have exactly 8 schedulers (add missing ones)
             while len(updated_schedules) < 8:
                 missing_id = len(updated_schedules) + 1
-                updated_schedules.append({
-                    "id": missing_id,
-                    "groupId": missing_id,
-                    "enabled": False,
-                    "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                    "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                    "startActions": {"operationName": "0"}
-                })
+                updated_schedules.append(
+                    {
+                        "id": missing_id,
+                        "groupId": missing_id,
+                        "enabled": False,
+                        "startTime": "00 00 * * 1,2,3,4,5,6,7",
+                        "endTime": "00 01 * * 1,2,3,4,5,6,7",
+                        "startActions": {"operationName": "0"},
+                    }
+                )
 
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules)
@@ -488,7 +478,7 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         if len(parts) >= 5:
             try:
                 # Convert day numbers: 0->7, 1->1, 2->2, etc.
-                old_days = parts[4].split(',')
+                old_days = parts[4].split(",")
                 new_days = []
                 for day in old_days:
                     day_num = int(day.strip())
@@ -499,8 +489,8 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
 
                 # Sort days to match mobile app format
                 new_days_sorted = sorted([int(d) for d in new_days])
-                parts[4] = ','.join(map(str, new_days_sorted))
-                return ' '.join(parts)
+                parts[4] = ",".join(map(str, new_days_sorted))
+                return " ".join(parts)
             except (ValueError, IndexError):
                 pass
 
@@ -509,11 +499,7 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
     @property
     def icon(self) -> str:
         """Return the icon for the entity."""
-        icons = {
-            "0": "mdi:speedometer-slow",
-            "1": "mdi:speedometer-medium",
-            "2": "mdi:speedometer"
-        }
+        icons = {"0": "mdi:speedometer-slow", "1": "mdi:speedometer-medium", "2": "mdi:speedometer"}
         return icons.get(self.current_option, "mdi:speedometer")
 
     @property
@@ -527,12 +513,14 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         }
 
         if schedule:
-            attrs.update({
-                "start_time": schedule.get("startTime", ""),
-                "end_time": schedule.get("endTime", ""),
-                "enabled": schedule.get("enabled", False),
-                "state": schedule.get("state", "IDLE"),
-            })
+            attrs.update(
+                {
+                    "start_time": schedule.get("startTime", ""),
+                    "end_time": schedule.get("endTime", ""),
+                    "enabled": schedule.get("enabled", False),
+                    "state": schedule.get("state", "IDLE"),
+                }
+            )
 
         return attrs
 
@@ -564,18 +552,10 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
         self._attr_options = ["off", "on", "auto"]
 
         # Mapping options → component 20 values
-        self._mode_mapping = {
-            "off": 0,
-            "on": 1,
-            "auto": 2
-        }
+        self._mode_mapping = {"off": 0, "on": 1, "auto": 2}
 
         # Inverse mapping for display
-        self._value_to_mode = {
-            0: "off",
-            1: "on",
-            2: "auto"
-        }
+        self._value_to_mode = {0: "off", 1: "on", 2: "auto"}
 
     @property
     def device_data(self) -> dict:
@@ -604,13 +584,10 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.device_data.get("online", False)
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
-    def current_option(self) -> Optional[str]:
+    def current_option(self) -> str | None:
         """Return the current mode option."""
         # Use optimistic option if set
         if self._optimistic_option is not None:
@@ -627,7 +604,6 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
 
         mode_value = self._mode_mapping[option]
 
-
         try:
             # Set optimistic option immediately
             self._optimistic_option = option
@@ -635,6 +611,7 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
 
             # Small delay for UI update
             import asyncio
+
             await asyncio.sleep(0.1)
 
             # Send command to API (component 20)
@@ -644,7 +621,7 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
 
-        except Exception as err:
+        except Exception:
             raise
         finally:
             # Clear optimistic option
@@ -657,10 +634,10 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
         current = self.current_option
         if current == "off":
             return "mdi:water-off"
-        elif current == "on":
+        if current == "on":
             return "mdi:water"
-        else:  # auto
-            return "mdi:water-sync"
+        # auto
+        return "mdi:water-sync"
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:

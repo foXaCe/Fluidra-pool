@@ -5,11 +5,11 @@ This module provides a simplified interface to the Fluidra Pool library
 optimized for Home Assistant usage with real AWS Cognito authentication.
 """
 
-import logging
-import aiohttp
-import asyncio
 import json
-from typing import Dict, List, Any, Optional
+import logging
+from typing import Any, Dict, List
+
+import aiohttp
 
 from .device_registry import DeviceIdentifier
 
@@ -40,13 +40,13 @@ class FluidraPoolAPI:
         """Initialize the API wrapper."""
         self.email = email
         self.password = password
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
         # AWS Cognito tokens
-        self.access_token: Optional[str] = None
-        self.refresh_token: Optional[str] = None
-        self.id_token: Optional[str] = None
-        self.token_expires_at: Optional[int] = None  # Timestamp d'expiration
+        self.access_token: str | None = None
+        self.refresh_token: str | None = None
+        self.id_token: str | None = None
+        self.token_expires_at: int | None = None  # Timestamp d'expiration
 
         # Account data
         self.user_pools: List[Dict[str, Any]] = []
@@ -55,24 +55,24 @@ class FluidraPoolAPI:
 
         # Component control mappings discovered via reverse engineering
         self.component_mappings = {
-            "pump_speed": 11, # ComponentToChange: 11 = VITESSE POMPE (3 niveaux)
-            "pump": 9,        # ComponentToChange: 9 = POMPE PRINCIPALE (on/off)
+            "pump_speed": 11,  # ComponentToChange: 11 = VITESSE POMPE (3 niveaux)
+            "pump": 9,  # ComponentToChange: 9 = POMPE PRINCIPALE (on/off)
             "auto_mode": 10,  # ComponentToChange: 10 = MODE AUTO/AUTRE ÉQUIPEMENT
-            "schedule": 20    # ComponentToChange: 20 = PROGRAMMATION HORAIRE
+            "schedule": 20,  # ComponentToChange: 20 = PROGRAMMATION HORAIRE
         }
 
         # Speed levels discovered (Component 11 pump speed control - corrected)
         self.pump_speed_levels = {
-            "low": 0,      # desiredValue: 0 = Faible (45%)
-            "medium": 1,   # desiredValue: 1 = Moyenne (65%)
-            "high": 2      # desiredValue: 2 = Élevée (100%)
+            "low": 0,  # desiredValue: 0 = Faible (45%)
+            "medium": 1,  # desiredValue: 1 = Moyenne (65%)
+            "high": 2,  # desiredValue: 2 = Élevée (100%)
         }
 
         # Speed percentage mapping for display (corrected based on real testing)
         self.speed_percentages = {
-            0: 45,   # Low speed (Faible)
-            1: 65,   # Medium speed (Moyenne)
-            2: 100   # High speed (Élevée)
+            0: 45,  # Low speed (Faible)
+            1: 65,  # Medium speed (Moyenne)
+            2: 100,  # High speed (Élevée)
         }
 
     async def authenticate(self) -> None:
@@ -98,23 +98,16 @@ class FluidraPoolAPI:
         auth_payload = {
             "AuthFlow": "USER_PASSWORD_AUTH",
             "ClientId": COGNITO_CLIENT_ID,
-            "AuthParameters": {
-                "USERNAME": self.email,
-                "PASSWORD": self.password
-            }
+            "AuthParameters": {"USERNAME": self.email, "PASSWORD": self.password},
         }
 
         headers = {
             "Content-Type": "application/x-amz-json-1.1; charset=utf-8",
             "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth",
-            "User-Agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)"
+            "User-Agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
         }
 
-        async with self._session.post(
-            COGNITO_ENDPOINT,
-            json=auth_payload,
-            headers=headers
-        ) as response:
+        async with self._session.post(COGNITO_ENDPOINT, json=auth_payload, headers=headers) as response:
             if response.status != 200:
                 error_text = await response.text()
                 raise FluidraAuthError(f"Cognito auth failed: {response.status} - {error_text}")
@@ -136,6 +129,7 @@ class FluidraPoolAPI:
             # Calculer l'expiration du token (AWS Cognito = 1 heure par défaut)
             expires_in = auth_result.get("ExpiresIn", 3600)  # 1 heure par défaut
             import time
+
             self.token_expires_at = int(time.time()) + expires_in - 300  # Renouveler 5 min avant expiration
 
             if not self.access_token:
@@ -146,32 +140,28 @@ class FluidraPoolAPI:
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
-            "User-Agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)"
+            "User-Agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
         }
 
         profile_url = f"{FLUIDRA_EMEA_BASE}/mobile/consumers/me"
 
-
         async with self._session.get(profile_url, headers=headers) as response:
             if response.status == 200:
-                profile_data = await response.json()
-                return profile_data
-            else:
-                return {}
+                return await response.json()
+            return {}
 
     async def async_update_data(self):
         """Discover pools and devices for the account and update their state."""
-        self.devices = [] # Clear devices before updating
+        self.devices = []  # Clear devices before updating
         headers = {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)"
+            "User-Agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
         }
 
         # Découvrir les piscines
         pools_url = f"{FLUIDRA_EMEA_BASE}/generic/users/me/pools"
-
 
         async with self._session.get(pools_url, headers=headers) as response:
             if response.status == 200:
@@ -194,7 +184,6 @@ class FluidraPoolAPI:
         devices_url = f"{FLUIDRA_EMEA_BASE}/generic/devices"
         params = {"poolId": pool_id, "format": "tree"}
 
-
         async with self._session.get(devices_url, headers=headers, params=params) as response:
             if response.status == 200:
                 devices_data = await response.json()
@@ -206,7 +195,6 @@ class FluidraPoolAPI:
                     pool_devices = devices_data.get("devices", [])
 
                 for device in pool_devices:
-
                     # Extract real device info from API structure
                     device_id = device.get("id")
                     info = device.get("info", {})
@@ -218,13 +206,18 @@ class FluidraPoolAPI:
                     family_lower = family.lower()
                     device_name_lower = device_name.lower()
 
-                    if "pump" in family_lower and ("heat" in family_lower or "eco" in family_lower or "elyo" in family_lower or "thermal" in family_lower):
+                    if "pump" in family_lower and (
+                        "heat" in family_lower
+                        or "eco" in family_lower
+                        or "elyo" in family_lower
+                        or "thermal" in family_lower
+                    ):
                         device_type = "heat_pump"
                     elif "pump" in family_lower:
                         device_type = "pump"
-                    elif any(keyword in family_lower for keyword in ["heat", "thermal", "eco elyo", "astralpool"]):
-                        device_type = "heat_pump"
-                    elif any(keyword in device_name_lower for keyword in ["heat", "thermal", "eco", "elyo"]):
+                    elif any(
+                        keyword in family_lower for keyword in ["heat", "thermal", "eco elyo", "astralpool"]
+                    ) or any(keyword in device_name_lower for keyword in ["heat", "thermal", "eco", "elyo"]):
                         device_type = "heat_pump"
                     elif "heater" in family_lower:
                         device_type = "heater"
@@ -296,7 +289,7 @@ class FluidraPoolAPI:
                         "operation_mode": operation_mode,
                         "speed_percent": speed_percent,
                         "variable_speed": True,
-                        "pump_type": "variable_speed"
+                        "pump_type": "variable_speed",
                     }
                     self.devices.append(device_info)
 
@@ -306,6 +299,7 @@ class FluidraPoolAPI:
             return True  # Pas d'info d'expiration, considérer comme expiré
 
         import time
+
         current_time = int(time.time())
         return current_time >= self.token_expires_at
 
@@ -323,21 +317,15 @@ class FluidraPoolAPI:
         refresh_payload = {
             "AuthFlow": "REFRESH_TOKEN_AUTH",
             "ClientId": COGNITO_CLIENT_ID,
-            "AuthParameters": {
-                "REFRESH_TOKEN": self.refresh_token
-            }
+            "AuthParameters": {"REFRESH_TOKEN": self.refresh_token},
         }
 
         headers = {
             "Content-Type": "application/x-amz-json-1.1; charset=utf-8",
-            "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth"
+            "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth",
         }
 
-        async with self._session.post(
-            COGNITO_ENDPOINT,
-            json=refresh_payload,
-            headers=headers
-        ) as response:
+        async with self._session.post(COGNITO_ENDPOINT, json=refresh_payload, headers=headers) as response:
             if response.status == 200:
                 # AWS Cognito renvoie application/x-amz-json-1.1, il faut forcer le décodage
                 response_text = await response.text()
@@ -352,11 +340,11 @@ class FluidraPoolAPI:
                 # Mettre à jour l'expiration
                 expires_in = auth_result.get("ExpiresIn", 3600)
                 import time
+
                 self.token_expires_at = int(time.time()) + expires_in - 300
 
                 return True
-            else:
-                return False
+            return False
 
     async def get_pools(self) -> List[Dict[str, Any]]:
         """Retourner les piscines découvertes lors de l'authentification."""
@@ -371,20 +359,12 @@ class FluidraPoolAPI:
                 pool_id = pool.get("id")
                 pool_devices = [device for device in self.devices if device.get("pool_id") == pool_id]
 
-                pool_data = {
-                    "id": pool_id,
-                    "name": pool.get("name", f"Pool {pool_id}"),
-                    "devices": pool_devices
-                }
+                pool_data = {"id": pool_id, "name": pool.get("name", f"Pool {pool_id}"), "devices": pool_devices}
                 pools.append(pool_data)
 
         elif self.devices:
             # Si pas de pools mais des devices, créer un pool par défaut
-            default_pool = {
-                "id": "default",
-                "name": "Fluidra Pool",
-                "devices": self.devices
-            }
+            default_pool = {"id": "default", "name": "Fluidra Pool", "devices": self.devices}
             pools.append(default_pool)
 
         if not pools:
@@ -392,34 +372,36 @@ class FluidraPoolAPI:
             test_pool = {
                 "id": "test_pool",
                 "name": "Test Pool",
-                "devices": [{
-                    "device_id": "test_device",
-                    "name": "E30iQ Pool Pump",
-                    "type": "pump",
-                    "model": "E30iQ",
-                    "manufacturer": "Fluidra",
-                    "online": True,
-                    "is_running": False,
-                    "auto_mode_enabled": False,
-                    "operation_mode": 0,
-                    "speed_percent": 50,
-                    "variable_speed": True,
-                    "pump_type": "variable_speed"
-                }]
+                "devices": [
+                    {
+                        "device_id": "test_device",
+                        "name": "E30iQ Pool Pump",
+                        "type": "pump",
+                        "model": "E30iQ",
+                        "manufacturer": "Fluidra",
+                        "online": True,
+                        "is_running": False,
+                        "auto_mode_enabled": False,
+                        "operation_mode": 0,
+                        "speed_percent": 50,
+                        "variable_speed": True,
+                        "pump_type": "variable_speed",
+                    }
+                ],
             }
             pools.append(test_pool)
 
         self._pools = pools
         return self._pools
 
-    def get_pool_by_id(self, pool_id: str) -> Optional[Dict[str, Any]]:
+    def get_pool_by_id(self, pool_id: str) -> Dict[str, Any] | None:
         """Get a specific pool by ID."""
         for pool in self._pools:
             if pool["id"] == pool_id:
                 return pool
         return None
 
-    def get_device_by_id(self, device_id: str) -> Optional[Dict[str, Any]]:
+    def get_device_by_id(self, device_id: str) -> Dict[str, Any] | None:
         """Get a specific device by ID across all pools."""
         for pool in self._pools:
             for device in pool["devices"]:
@@ -427,7 +409,7 @@ class FluidraPoolAPI:
                     return device
         return None
 
-    async def poll_device_status(self, pool_id: str, device_id: str) -> Optional[Dict[str, Any]]:
+    async def poll_device_status(self, pool_id: str, device_id: str) -> Dict[str, Any] | None:
         """
         Polling principal de l'état des équipements (découvert via reverse engineering).
         Pattern: GET /generic/devices?poolId=...&format=tree toutes les 30s
@@ -445,14 +427,11 @@ class FluidraPoolAPI:
             "authorization": f"Bearer {self.access_token}",
             "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
             "accept-encoding": "gzip, deflate",
-            "priority": "u=1, i"
+            "priority": "u=1, i",
         }
 
         url = f"{FLUIDRA_EMEA_BASE}/generic/devices"
-        params = {
-            "poolId": pool_id,
-            "format": "tree"
-        }
+        params = {"poolId": pool_id, "format": "tree"}
 
         try:
             async with self._session.get(url, headers=headers, params=params) as response:
@@ -461,29 +440,27 @@ class FluidraPoolAPI:
 
                     # Recherche du device dans la réponse (y compris les périphériques bridgés)
                     for device in devices:
-                        if device.get('id') == device_id:
+                        if device.get("id") == device_id:
                             return device
 
                         # Check bridged devices (e.g., chlorinator under bridge)
                         if "devices" in device and isinstance(device["devices"], list):
                             for child_device in device["devices"]:
-                                if child_device.get('id') == device_id:
+                                if child_device.get("id") == device_id:
                                     return child_device
 
                     return None
-                elif response.status == 403:
+                if response.status == 403:
                     # Token expiré, essayer de le rafraîchir
                     if await self.refresh_access_token():
                         return await self.poll_device_status(pool_id, device_id)
-                    else:
-                        raise FluidraAuthError("Token refresh failed")
-                else:
-                    return None
+                    raise FluidraAuthError("Token refresh failed")
+                return None
 
-        except Exception as e:
+        except Exception:
             return None
 
-    async def poll_water_quality(self, pool_id: str) -> Optional[Dict[str, Any]]:
+    async def poll_water_quality(self, pool_id: str) -> Dict[str, Any] | None:
         """
         Polling télémétrie qualité de l'eau.
         Pattern: GET /generic/pools/.../assistant/algorithms/telemetryWaterQuality/jobs
@@ -504,20 +481,17 @@ class FluidraPoolAPI:
         try:
             async with self._session.get(url, headers=headers, params=params) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    return data
-                elif response.status == 403:
+                    return await response.json()
+                if response.status == 403:
                     if await self.refresh_access_token():
                         return await self.poll_water_quality(pool_id)
-                    else:
-                        raise FluidraAuthError("Token refresh failed")
-                else:
-                    return None
+                    raise FluidraAuthError("Token refresh failed")
+                return None
 
-        except Exception as e:
+        except Exception:
             return None
 
-    async def get_component_state(self, device_id: str, component_id: int) -> Optional[Dict[str, Any]]:
+    async def get_component_state(self, device_id: str, component_id: int) -> Dict[str, Any] | None:
         """
         Récupère l'état d'un component spécifique (reportedValue/desiredValue).
         Cette méthode peut être appelée individuellement pour un component ou via PUT.
@@ -540,17 +514,15 @@ class FluidraPoolAPI:
             async with self._session.get(url, headers=headers, params=params) as response:
                 if response.status == 200:
                     return await response.json()
-                elif response.status == 403:
+                if response.status == 403:
                     if await self.refresh_access_token():
                         return await self.get_component_state(device_id, component_id)
-                    else:
-                        raise FluidraAuthError("Token refresh failed")
-                else:
-                    return None
-        except Exception as e:
+                    raise FluidraAuthError("Token refresh failed")
+                return None
+        except Exception:
             return None
 
-    async def get_device_component_state(self, device_id: str, component_id: int) -> Optional[Dict[str, Any]]:
+    async def get_device_component_state(self, device_id: str, component_id: int) -> Dict[str, Any] | None:
         """Get the state of a device component."""
         if not self.access_token:
             raise FluidraAuthError("Not authenticated")
@@ -561,23 +533,20 @@ class FluidraPoolAPI:
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)"
+            "User-Agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
         }
-
 
         if not self._session:
             self._session = aiohttp.ClientSession()
 
         try:
             async with self._session.get(url, headers=headers) as response:
-                response_text = await response.text()
+                await response.text()
 
                 if response.status == 200:
-                    state_data = await response.json()
-                    return state_data
-                else:
-                    return None
-        except aiohttp.ClientError as e:
+                    return await response.json()
+                return None
+        except aiohttp.ClientError:
             return None
 
     async def control_device_component(self, device_id: str, component_id: int, value: int) -> bool:
@@ -596,7 +565,7 @@ class FluidraPoolAPI:
             "content-type": "application/json; charset=utf-8",
             "accept": "application/json",
             "authorization": f"Bearer {self.access_token}",
-            "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)"
+            "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
         }
 
         # EXACT payload format captured: {"desiredValue": 1}
@@ -607,7 +576,7 @@ class FluidraPoolAPI:
 
         try:
             async with self._session.put(url, headers=headers, json=payload) as response:
-                response_text = await response.text()
+                await response.text()
 
                 if response.status == 200:
                     # Parse response for reportedValue/desiredValue (discovered structure)
@@ -657,22 +626,19 @@ class FluidraPoolAPI:
                             device["auto_mode_enabled"] = bool(value)
 
                     return True
-                elif response.status == 401:
+                if response.status == 401:
                     # Token expiré, essayer de le renouveler
                     if await self.refresh_access_token():
                         # Retry avec le nouveau token
                         headers["authorization"] = f"Bearer {self.access_token}"
                         async with self._session.put(url, headers=headers, json=payload) as retry_response:
-                            if retry_response.status == 200:
-                                return True
-                            else:
-                                return False
+                            return retry_response.status == 200
                     else:
                         return False
                 else:
                     return False
 
-        except aiohttp.ClientError as e:
+        except aiohttp.ClientError:
             return False
 
     async def set_heat_pump_temperature(self, device_id: str, temperature: float) -> bool:
@@ -692,19 +658,18 @@ class FluidraPoolAPI:
                 if device:
                     device["target_temperature"] = temperature
                 return True
-            else:
-                # Fallback: essayer d'autres composants possibles
-                for fallback_component in [12, 13, 14, 16]:
-                    success = await self.control_device_component(device_id, fallback_component, temperature_value)
-                    if success:
-                        device = self.get_device_by_id(device_id)
-                        if device:
-                            device["target_temperature"] = temperature
-                        return True
+            # Fallback: essayer d'autres composants possibles
+            for fallback_component in [12, 13, 14, 16]:
+                success = await self.control_device_component(device_id, fallback_component, temperature_value)
+                if success:
+                    device = self.get_device_by_id(device_id)
+                    if device:
+                        device["target_temperature"] = temperature
+                    return True
 
-                return False
+            return False
 
-        except Exception as e:
+        except Exception:
             return False
 
     def _is_heat_pump(self, device_id: str) -> bool:
@@ -728,6 +693,7 @@ class FluidraPoolAPI:
         if start_success:
             # Attendre un peu que la pompe démarre
             import asyncio
+
             await asyncio.sleep(1)
 
             # Définir vitesse par défaut (Faible = niveau 0)
@@ -760,7 +726,7 @@ class FluidraPoolAPI:
         if speed_percent == 0:
             # For stop, we might need to use component 9 or just return False
             return await self.control_device_component(device_id, 9, 0)  # Use component 9 for stop
-        elif speed_percent <= 45:
+        if speed_percent <= 45:
             speed_level = 0  # Low (45%)
         elif speed_percent <= 65:
             speed_level = 1  # Medium (65%)
@@ -785,7 +751,6 @@ class FluidraPoolAPI:
         """Disable auto mode using discovered component ID 10."""
         return await self.control_device_component(device_id, 10, 0)
 
-
     async def set_schedule(self, device_id: str, schedules: List[Dict[str, Any]]) -> bool:
         """Set pump schedule using exact format from mobile app."""
         if not self.access_token:
@@ -802,7 +767,7 @@ class FluidraPoolAPI:
             "content-type": "application/json; charset=utf-8",
             "accept": "application/json",
             "authorization": f"Bearer {self.access_token}",
-            "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)"
+            "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
         }
 
         # EXACT payload format from mobile app: {"desiredValue": [...]}
@@ -813,14 +778,11 @@ class FluidraPoolAPI:
 
         try:
             async with self._session.put(url, headers=headers, json=payload) as response:
-                response_text = await response.text()
+                await response.text()
 
-                if response.status == 200:
-                    return True
-                else:
-                    return False
+                return response.status == 200
 
-        except Exception as e:
+        except Exception:
             return False
 
     async def get_default_schedule(self) -> List[Dict[str, Any]]:
@@ -831,8 +793,8 @@ class FluidraPoolAPI:
                 "groupId": 1,
                 "enabled": True,
                 "startTime": "08 30 * * 1,2,3,4,5,6,7",  # 8h30 tous les jours
-                "endTime": "09 59 * * 1,2,3,4,5,6,7",   # 9h59 tous les jours
-                "startActions": {"operationName": 1}      # Run mode
+                "endTime": "09 59 * * 1,2,3,4,5,6,7",  # 9h59 tous les jours
+                "startActions": {"operationName": 1},  # Run mode
             },
         ]
 
@@ -852,7 +814,7 @@ class FluidraPoolAPI:
             "content-type": "application/json; charset=utf-8",
             "accept": "application/json",
             "authorization": f"Bearer {self.access_token}",
-            "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)"
+            "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
         }
 
         # EXACT payload format from mobile app: {"desiredValue": value}
@@ -863,21 +825,18 @@ class FluidraPoolAPI:
 
         try:
             async with self._session.put(url, headers=headers, json=payload) as response:
-                response_text = await response.text()
+                await response.text()
 
-                if response.status == 200:
-                    return True
-                else:
-                    return False
+                return response.status == 200
 
-        except Exception as e:
+        except Exception:
             return False
 
     async def clear_schedule(self, device_id: str) -> bool:
         """Clear all schedules for device."""
         return await self.set_schedule(device_id, [])
 
-    async def get_pool_details(self, pool_id: str) -> Optional[Dict[str, Any]]:
+    async def get_pool_details(self, pool_id: str) -> Dict[str, Any] | None:
         """
         Récupérer les détails spécifiques de la piscine.
         Pattern: GET /generic/pools/{poolId}
@@ -895,7 +854,7 @@ class FluidraPoolAPI:
             "authorization": f"Bearer {self.access_token}",
             "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
             "accept-encoding": "gzip, deflate",
-            "priority": "u=1, i"
+            "priority": "u=1, i",
         }
 
         pool_data = {}
@@ -910,8 +869,7 @@ class FluidraPoolAPI:
                 elif response.status == 403:
                     if await self.refresh_access_token():
                         return await self.get_pool_details(pool_id)
-                    else:
-                        raise FluidraAuthError("Token refresh failed")
+                    raise FluidraAuthError("Token refresh failed")
         except Exception:
             pass
 
@@ -927,7 +885,7 @@ class FluidraPoolAPI:
 
         return pool_data if pool_data else None
 
-    async def get_user_pools(self) -> Optional[List[Dict[str, Any]]]:
+    async def get_user_pools(self) -> List[Dict[str, Any]] | None:
         """
         Récupérer la liste des piscines de l'utilisateur.
         Pattern: GET /generic/users/me/pools?
@@ -945,7 +903,7 @@ class FluidraPoolAPI:
             "authorization": f"Bearer {self.access_token}",
             "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
             "accept-encoding": "gzip, deflate",
-            "priority": "u=1, i"
+            "priority": "u=1, i",
         }
 
         url = f"{FLUIDRA_EMEA_BASE}/generic/users/me/pools"
@@ -953,16 +911,13 @@ class FluidraPoolAPI:
         try:
             async with self._session.get(url, headers=headers) as response:
                 if response.status == 200:
-                    user_pools = await response.json()
-                    return user_pools
-                elif response.status == 403:
+                    return await response.json()
+                if response.status == 403:
                     # Token expiré, essayer de le rafraîchir
                     if await self.refresh_access_token():
                         return await self.get_user_pools()
-                    else:
-                        raise FluidraAuthError("Token refresh failed")
-                else:
-                    return None
+                    raise FluidraAuthError("Token refresh failed")
+                return None
 
         except Exception:
             return None

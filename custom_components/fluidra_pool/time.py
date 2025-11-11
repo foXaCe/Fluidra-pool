@@ -1,14 +1,14 @@
 """Time platform for Fluidra Pool integration."""
-import logging
+
 from datetime import time
-from typing import Optional, Dict, Any
+import logging
 
 from homeassistant.components.time import TimeEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN
 from .coordinator import FluidraDataUpdateCoordinator
@@ -44,22 +44,14 @@ async def async_setup_entry(
                 # Create time entities for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                     # Create start time entity
-                    entities.append(FluidraScheduleStartTimeEntity(
-                        coordinator,
-                        coordinator.api,
-                        pool["id"],
-                        device_id,
-                        schedule_id
-                    ))
+                    entities.append(
+                        FluidraScheduleStartTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                    )
 
                     # Create end time entity
-                    entities.append(FluidraScheduleEndTimeEntity(
-                        coordinator,
-                        coordinator.api,
-                        pool["id"],
-                        device_id,
-                        schedule_id
-                    ))
+                    entities.append(
+                        FluidraScheduleEndTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                    )
 
     async_add_entities(entities)
 
@@ -100,7 +92,7 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
             "via_device": (DOMAIN, self._pool_id),
         }
 
-    def _get_schedule_data(self) -> Optional[dict]:
+    def _get_schedule_data(self) -> dict | None:
         """Get schedule data from coordinator."""
         try:
             # Get schedules from device data like the sensor does
@@ -126,10 +118,9 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
     @property
     def available(self) -> bool:
         """Return True if the schedule exists."""
-        result = self._get_schedule_data() is not None
-        return result
+        return self._get_schedule_data() is not None
 
-    def _parse_cron_time(self, cron_time: str) -> Optional[time]:
+    def _parse_cron_time(self, cron_time: str) -> time | None:
         """Parse cron time format 'mm HH * * 0,1,2,3,4,5,6' to time object."""
         try:
             parts = cron_time.split()
@@ -146,7 +137,7 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
         """Format time object to cron format."""
         if days is None:
             days = [1, 2, 3, 4, 5, 6, 7]  # All days in mobile format
-        days_str = ','.join(map(str, days))
+        days_str = ",".join(map(str, days))
         return f"{time_obj.minute} {time_obj.hour} * * {days_str}"
 
     def _convert_cron_days(self, cron_time: str) -> str:
@@ -158,7 +149,7 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
         if len(parts) >= 5:
             try:
                 # Convert day numbers: 0->7, 1->1, 2->2, etc.
-                old_days = parts[4].split(',')
+                old_days = parts[4].split(",")
                 new_days = []
                 for day in old_days:
                     day_num = int(day.strip())
@@ -169,15 +160,17 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
 
                 # Sort days to match mobile app format
                 new_days_sorted = sorted([int(d) for d in new_days])
-                parts[4] = ','.join(map(str, new_days_sorted))
-                return ' '.join(parts)
+                parts[4] = ",".join(map(str, new_days_sorted))
+                return " ".join(parts)
             except Exception:
                 pass
                 pass
 
         return cron_time
 
-    def _validate_schedule_overlap(self, new_start_time: time, new_end_time: time, schedule_id_to_update: str) -> tuple[bool, str]:
+    def _validate_schedule_overlap(
+        self, new_start_time: time, new_end_time: time, schedule_id_to_update: str
+    ) -> tuple[bool, str]:
         """Validate that the new schedule doesn't overlap with existing enabled schedules."""
         try:
             device_data = self.device_data
@@ -188,8 +181,7 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
 
             for schedule in current_schedules:
                 # Skip the schedule we're updating and disabled schedules
-                if (str(schedule.get("id")) == str(schedule_id_to_update) or
-                    not schedule.get("enabled", False)):
+                if str(schedule.get("id")) == str(schedule_id_to_update) or not schedule.get("enabled", False):
                     continue
 
                 # Parse existing schedule times
@@ -202,7 +194,10 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                 # Check for overlap (simple time overlap check)
                 if self._times_overlap(new_start_time, new_end_time, existing_start, existing_end):
                     schedule_name = f"Programme {schedule.get('id')}"
-                    return False, f"Conflit détecté avec {schedule_name} ({existing_start.strftime('%H:%M')} - {existing_end.strftime('%H:%M')})"
+                    return (
+                        False,
+                        f"Conflit détecté avec {schedule_name} ({existing_start.strftime('%H:%M')} - {existing_end.strftime('%H:%M')})",
+                    )
 
             return True, ""
         except Exception:
@@ -234,7 +229,7 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
         """Initialize the start time entity."""
         super().__init__(coordinator, api, pool_id, device_id, schedule_id, "start")
 
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
+        self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         self._attr_translation_key = "schedule_start"
         self._attr_translation_placeholders = {"schedule_id": schedule_id}
         self._attr_unique_id = f"fluidra_{self._device_id}_{schedule_id}_start_time"
@@ -246,7 +241,7 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
         return "mdi:clock-start"
 
     @property
-    def native_value(self) -> Optional[time]:
+    def native_value(self) -> time | None:
         """Return the current start time."""
         schedule = self._get_schedule_data()
         if schedule:
@@ -293,7 +288,7 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                         if len(parts) >= 5:
                             try:
                                 # Convert existing days to mobile format
-                                old_days = [int(d) for d in parts[4].split(',')]
+                                old_days = [int(d) for d in parts[4].split(",")]
                                 days = []
                                 for day in old_days:
                                     if day == 0:  # Sunday: 0 -> 7
@@ -313,23 +308,23 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                     "enabled": sched.get("enabled", False),
                     "startTime": start_time,
                     "endTime": end_time,
-                    "startActions": {
-                        "operationName": str(sched.get("startActions", {}).get("operationName", "0"))
-                    }
+                    "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
                 }
                 updated_schedules.append(scheduler)
 
             # Ensure we have exactly 8 schedulers (add missing ones)
             while len(updated_schedules) < 8:
                 missing_id = len(updated_schedules) + 1
-                updated_schedules.append({
-                    "id": missing_id,
-                    "groupId": missing_id,
-                    "enabled": False,
-                    "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                    "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                    "startActions": {"operationName": "0"}
-                })
+                updated_schedules.append(
+                    {
+                        "id": missing_id,
+                        "groupId": missing_id,
+                        "enabled": False,
+                        "startTime": "00 00 * * 1,2,3,4,5,6,7",
+                        "endTime": "00 01 * * 1,2,3,4,5,6,7",
+                        "startActions": {"operationName": "0"},
+                    }
+                )
 
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules)
@@ -347,7 +342,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
         """Initialize the end time entity."""
         super().__init__(coordinator, api, pool_id, device_id, schedule_id, "end")
 
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
+        self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         self._attr_translation_key = "schedule_end"
         self._attr_translation_placeholders = {"schedule_id": schedule_id}
         self._attr_unique_id = f"fluidra_{self._device_id}_{schedule_id}_end_time"
@@ -359,7 +354,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
         return "mdi:clock-end"
 
     @property
-    def native_value(self) -> Optional[time]:
+    def native_value(self) -> time | None:
         """Return the current end time."""
         schedule = self._get_schedule_data()
         if schedule:
@@ -406,7 +401,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                         if len(parts) >= 5:
                             try:
                                 # Convert existing days to mobile format
-                                old_days = [int(d) for d in parts[4].split(',')]
+                                old_days = [int(d) for d in parts[4].split(",")]
                                 days = []
                                 for day in old_days:
                                     if day == 0:  # Sunday: 0 -> 7
@@ -426,23 +421,23 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                     "enabled": sched.get("enabled", False),
                     "startTime": start_time,
                     "endTime": end_time,
-                    "startActions": {
-                        "operationName": str(sched.get("startActions", {}).get("operationName", "0"))
-                    }
+                    "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
                 }
                 updated_schedules.append(scheduler)
 
             # Ensure we have exactly 8 schedulers (add missing ones)
             while len(updated_schedules) < 8:
                 missing_id = len(updated_schedules) + 1
-                updated_schedules.append({
-                    "id": missing_id,
-                    "groupId": missing_id,
-                    "enabled": False,
-                    "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                    "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                    "startActions": {"operationName": "0"}
-                })
+                updated_schedules.append(
+                    {
+                        "id": missing_id,
+                        "groupId": missing_id,
+                        "enabled": False,
+                        "startTime": "00 00 * * 1,2,3,4,5,6,7",
+                        "endTime": "00 01 * * 1,2,3,4,5,6,7",
+                        "startActions": {"operationName": "0"},
+                    }
+                )
 
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules)

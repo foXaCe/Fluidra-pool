@@ -4,8 +4,8 @@ This module centralizes device configurations to make adding new equipment easie
 and reduce the risk of breaking existing devices.
 """
 
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from typing import Any, Dict, List
 
 
 @dataclass
@@ -34,7 +34,6 @@ class DeviceConfig:
 
 # Configuration centralisée des équipements
 DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
-
     "lg_heat_pump": DeviceConfig(
         device_type="heat_pump",
         identifier_patterns=["LG*"],
@@ -54,7 +53,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=100,
     ),
-
     "z250iq_heat_pump": DeviceConfig(
         device_type="heat_pump",
         identifier_patterns=["LF*"],
@@ -73,7 +71,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=95,
     ),
-
     "chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["*.nn_*"],  # Bridged devices
@@ -99,7 +96,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=80,  # Haute priorité pour éviter confusion avec pumps
     ),
-
     "cc24033907_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24033907*"],  # Specific CC24033907 model
@@ -124,7 +120,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=85,  # Higher than generic chlorinator
     ),
-
     "lc24008313_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["LC24008313*"],  # Blauswim chlorinator (I.D. Electroquimica/Fluidra)
@@ -149,7 +144,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=86,  # Higher than CC24033907 for more specific match
     ),
-
     "cc24018202_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24018202*"],  # Specific CC24018202 model
@@ -175,7 +169,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=87,  # Higher than LC24008313 for more specific match
     ),
-
     "cc25113623_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC25113623*"],  # Specific CC25113623 model
@@ -200,7 +193,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=87,  # Higher than LC24008313 for more specific match
     ),
-
     "cc24021110_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24021110*"],  # Specific CC24021110 model
@@ -225,7 +217,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=88,  # Higher than CC25113623 for more specific match
     ),
-
     "cc25002928_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC25002928*"],  # Specific CC25002928 model (Energy Connect 21 Scalable)
@@ -250,13 +241,21 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=89,  # Higher than CC24021110 for more specific match
     ),
-
     "e30iq_pump": DeviceConfig(
         device_type="pump",
         identifier_patterns=["E30*", "PUMP*"],
         components_range=5,  # Minimal scan
         required_components=[0, 1, 2, 3],
-        entities=["switch", "switch_auto", "select", "number", "sensor_speed", "sensor_schedule", "sensor_info", "time"],
+        entities=[
+            "switch",
+            "switch_auto",
+            "select",
+            "number",
+            "sensor_speed",
+            "sensor_schedule",
+            "sensor_info",
+            "time",
+        ],
         features={
             "auto_mode": True,
             "speed_control": True,
@@ -266,7 +265,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=50,
     ),
-
     "generic_heat_pump": DeviceConfig(
         device_type="heat_pump",
         components_range=5,
@@ -279,7 +277,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=30,
     ),
-
     "generic_pump": DeviceConfig(
         device_type="pump",
         components_range=5,
@@ -291,7 +288,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=10,
     ),
-
     "generic_heater": DeviceConfig(
         device_type="heater",
         components_range=25,
@@ -299,7 +295,6 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         features={},
         priority=20,
     ),
-
     "generic_light": DeviceConfig(
         device_type="light",
         components_range=15,
@@ -320,14 +315,15 @@ class DeviceIdentifier:
             return False
 
         import re
+
         value_lower = value.lower()
         for pattern in patterns:
             pattern_lower = pattern.lower()
             if "*" in pattern_lower:
                 # Convert wildcard pattern to regex
                 # Escape special regex chars except *
-                regex_pattern = re.escape(pattern_lower).replace(r'\*', '.*')
-                regex_pattern = f'^{regex_pattern}$'
+                regex_pattern = re.escape(pattern_lower).replace(r"\*", ".*")
+                regex_pattern = f"^{regex_pattern}$"
                 if re.match(regex_pattern, value_lower):
                     return True
             elif pattern_lower in value_lower:
@@ -348,7 +344,7 @@ class DeviceIdentifier:
         return False
 
     @staticmethod
-    def identify_device(device: dict) -> Optional[DeviceConfig]:
+    def identify_device(device: dict) -> DeviceConfig | None:
         """Identify device type and return its configuration.
 
         Returns the best matching DeviceConfig based on priority and matching criteria.
@@ -367,11 +363,7 @@ class DeviceIdentifier:
             return None
 
         # Sort configs by priority (highest first)
-        sorted_configs = sorted(
-            DEVICE_CONFIGS.items(),
-            key=lambda x: x[1].priority,
-            reverse=True
-        )
+        sorted_configs = sorted(DEVICE_CONFIGS.items(), key=lambda x: x[1].priority, reverse=True)
 
         best_match = None
         best_score = 0
@@ -414,11 +406,11 @@ class DeviceIdentifier:
             # Use device type hint for fallback
             if "heat_pump" in device_type_hint or "heat" in device_type_hint:
                 return DEVICE_CONFIGS.get("generic_heat_pump")
-            elif "pump" in device_type_hint:
+            if "pump" in device_type_hint:
                 return DEVICE_CONFIGS.get("generic_pump")
-            elif "heater" in device_type_hint:
+            if "heater" in device_type_hint:
                 return DEVICE_CONFIGS.get("generic_heater")
-            elif "light" in device_type_hint:
+            if "light" in device_type_hint:
                 return DEVICE_CONFIGS.get("generic_light")
 
         return best_match

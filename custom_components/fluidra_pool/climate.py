@@ -1,15 +1,13 @@
 """Climate platform for Fluidra Pool integration."""
 
 import logging
-from typing import Any, Optional, List
+from typing import Any, List
 
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
-    HVACMode,
     HVACAction,
-    PRESET_BOOST,
-    PRESET_ECO,
+    HVACMode,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
@@ -17,20 +15,20 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, DEVICE_TYPE_HEAT_PUMP
+from .const import DOMAIN
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
 
 # LG Heat Pump preset modes (mapped to component 14 values)
-LG_PRESET_SMART_HEATING = "smart_heating"       # desiredValue: 0
-LG_PRESET_SMART_COOLING = "smart_cooling"       # desiredValue: 1
-LG_PRESET_SMART_HEAT_COOL = "smart_heat_cool"   # desiredValue: 2
-LG_PRESET_BOOST_HEATING = "boost_heating"       # desiredValue: 3
-LG_PRESET_SILENCE_HEATING = "silence_heating"   # desiredValue: 4
-LG_PRESET_BOOST_COOLING = "boost_cooling"       # desiredValue: 5
-LG_PRESET_SILENCE_COOLING = "silence_cooling"   # desiredValue: 6
+LG_PRESET_SMART_HEATING = "smart_heating"  # desiredValue: 0
+LG_PRESET_SMART_COOLING = "smart_cooling"  # desiredValue: 1
+LG_PRESET_SMART_HEAT_COOL = "smart_heat_cool"  # desiredValue: 2
+LG_PRESET_BOOST_HEATING = "boost_heating"  # desiredValue: 3
+LG_PRESET_SILENCE_HEATING = "silence_heating"  # desiredValue: 4
+LG_PRESET_BOOST_COOLING = "boost_cooling"  # desiredValue: 5
+LG_PRESET_SILENCE_COOLING = "silence_cooling"  # desiredValue: 6
 
 LG_PRESET_MODES = [
     LG_PRESET_SMART_HEATING,
@@ -119,8 +117,8 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     @property
     def name(self) -> str:
         """Return the name of the climate entity."""
-        pool_name = self.pool_data.get('name', 'Pool')
-        device_name = self.device_data.get('name', 'Heat Pump')
+        pool_name = self.pool_data.get("name", "Pool")
+        device_name = self.device_data.get("name", "Heat Pump")
         return f"{pool_name} {device_name}"
 
     @property
@@ -152,13 +150,13 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         return UnitOfTemperature.CELSIUS
 
     @property
-    def current_temperature(self) -> Optional[float]:
+    def current_temperature(self) -> float | None:
         """Return the current temperature (pool water temperature)."""
         # Afficher la température de l'eau de la piscine comme température actuelle
         return self.device_data.get("water_temperature")
 
     @property
-    def target_temperature(self) -> Optional[float]:
+    def target_temperature(self) -> float | None:
         """Return the target temperature."""
         actual_temp = self.device_data.get("target_temperature")
 
@@ -222,6 +220,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         # Check for pending optimistic preset mode first
         if self._pending_preset_mode is not None:
             import time
+
             # Clear pending mode after 5 seconds
             if time.time() - self._last_preset_action_time > 5:
                 self._pending_preset_mode = None
@@ -249,6 +248,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         # Check for pending optimistic HVAC mode first
         if self._pending_hvac_mode is not None:
             import time
+
             # Clear pending mode after 5 seconds
             if time.time() - self._last_hvac_action_time > 5:
                 self._pending_hvac_mode = None
@@ -288,8 +288,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         if heat_pump_reported is not None:
             if heat_pump_reported:
                 return HVACMode.HEAT
-            else:
-                return HVACMode.OFF
+            return HVACMode.OFF
 
         # 2. Fallback: is_heating (compatibility)
         if device_data.get("is_heating", False):
@@ -302,12 +301,11 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         return HVACMode.OFF
 
     @property
-    def hvac_action(self) -> Optional[HVACAction]:
+    def hvac_action(self) -> HVACAction | None:
         """Return the current hvac action."""
         if self.device_data.get("is_heating", False):
             return HVACAction.HEATING
         return HVACAction.OFF
-
 
     @property
     def icon(self) -> str:
@@ -321,6 +319,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         try:
             # Optimistic update - show immediately in UI
             import time
+
             self._pending_hvac_mode = hvac_mode
             self._last_hvac_action_time = time.time()
             self.async_write_ha_state()
@@ -354,8 +353,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
                 # Demander un refresh pour obtenir l'état réel depuis l'API
                 await self.coordinator.async_request_refresh()
 
-        except Exception:
-            pass
+        except Exception as e:
             # Clear optimistic state on error
             self._pending_hvac_mode = None
             self._last_hvac_action_time = None
@@ -372,9 +370,9 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             return
 
         try:
-
             # Mise à jour optimiste immédiate
             import time
+
             self._pending_temperature = temperature
             self._last_action_time = time.time()
             self.async_write_ha_state()
@@ -412,6 +410,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
             # Optimistic update - show immediately in UI
             import time
+
             self._pending_preset_mode = preset_mode
             self._last_preset_action_time = time.time()
             self.async_write_ha_state()
@@ -435,8 +434,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
                 # Demander un refresh pour obtenir l'état réel depuis l'API
                 await self.coordinator.async_request_refresh()
 
-        except Exception:
-            pass
+        except Exception as e:
             # Clear optimistic state on error
             self._pending_preset_mode = None
             self._last_preset_action_time = None
@@ -450,7 +448,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     def extra_state_attributes(self) -> dict:
         """Return extra state attributes."""
         device_data = self.device_data
-        pool_data = self.pool_data
         attrs = {
             "device_type": "heat_pump",
             "device_id": self._device_id,
@@ -473,7 +470,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
             "component_15_temperature": device_data.get("target_temperature"),
             # État de synchronisation
             "state_sync_working": device_data.get("heat_pump_reported") is not None,
-            "control_working": not device_data.get("permission_error", False)
+            "control_working": not device_data.get("permission_error", False),
         }
 
         # Ajouter la température de l'eau de la piscine si disponible

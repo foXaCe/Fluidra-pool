@@ -5,32 +5,31 @@ This integration provides support for Fluidra Pool systems.
 """
 
 import asyncio
-import logging
 from datetime import timedelta
+import logging
 from typing import Any, Dict, List
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 import voluptuous as vol
-from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN, CONF_EMAIL, CONF_PASSWORD
-from .fluidra_api import FluidraPoolAPI
+from .const import CONF_EMAIL, CONF_PASSWORD, DOMAIN
 from .coordinator import FluidraDataUpdateCoordinator
+from .fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [
     Platform.SWITCH,
     Platform.SENSOR,
-    Platform.SELECT,    # Pour modes d'opération pompe (OFF/ON/AUTO/TURBO)
-    Platform.NUMBER,    # Pour contrôle vitesse pompe E30iQ (0-100%)
-    Platform.TIME,      # Pour édition des heures de programmation
-    Platform.CLIMATE,   # Pour contrôle température pompes à chaleur
+    Platform.SELECT,  # Pour modes d'opération pompe (OFF/ON/AUTO/TURBO)
+    Platform.NUMBER,  # Pour contrôle vitesse pompe E30iQ (0-100%)
+    Platform.TIME,  # Pour édition des heures de programmation
+    Platform.CLIMATE,  # Pour contrôle température pompes à chaleur
 ]
 
 UPDATE_INTERVAL = timedelta(seconds=45)  # Reduced frequency for better performance
@@ -40,27 +39,35 @@ SERVICE_SET_SCHEDULE = "set_schedule"
 SERVICE_CLEAR_SCHEDULE = "clear_schedule"
 SERVICE_SET_PRESET_SCHEDULE = "set_preset_schedule"
 
-SCHEDULE_SCHEMA = vol.Schema({
-    vol.Required("enabled"): cv.boolean,
-    vol.Required("start_time"): cv.string,
-    vol.Required("end_time"): cv.string,
-    vol.Required("mode"): vol.In(["0", "1", "2"]),  # 0=Faible, 1=Moyenne, 2=Élevée
-    vol.Optional("days", default=[0,1,2,3,4,5,6]): [vol.Range(min=0, max=6)],  # 0=Lundi, 6=Dimanche
-})
+SCHEDULE_SCHEMA = vol.Schema(
+    {
+        vol.Required("enabled"): cv.boolean,
+        vol.Required("start_time"): cv.string,
+        vol.Required("end_time"): cv.string,
+        vol.Required("mode"): vol.In(["0", "1", "2"]),  # 0=Faible, 1=Moyenne, 2=Élevée
+        vol.Optional("days", default=[0, 1, 2, 3, 4, 5, 6]): [vol.Range(min=0, max=6)],  # 0=Lundi, 6=Dimanche
+    }
+)
 
-SET_SCHEDULE_SCHEMA = vol.Schema({
-    vol.Required("device_id"): cv.string,
-    vol.Required("schedules"): [SCHEDULE_SCHEMA],
-})
+SET_SCHEDULE_SCHEMA = vol.Schema(
+    {
+        vol.Required("device_id"): cv.string,
+        vol.Required("schedules"): [SCHEDULE_SCHEMA],
+    }
+)
 
-CLEAR_SCHEDULE_SCHEMA = vol.Schema({
-    vol.Required("device_id"): cv.string,
-})
+CLEAR_SCHEDULE_SCHEMA = vol.Schema(
+    {
+        vol.Required("device_id"): cv.string,
+    }
+)
 
-SET_PRESET_SCHEDULE_SCHEMA = vol.Schema({
-    vol.Required("device_id"): cv.string,
-    vol.Required("preset"): vol.In(["standard", "intensive", "eco", "summer", "winter"]),
-})
+SET_PRESET_SCHEDULE_SCHEMA = vol.Schema(
+    {
+        vol.Required("device_id"): cv.string,
+        vol.Required("preset"): vol.In(["standard", "intensive", "eco", "summer", "winter"]),
+    }
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -131,7 +138,6 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         device_id = call.data["device_id"]
         schedules_data = call.data["schedules"]
 
-
         # Convert HA format to Fluidra API format
         fluidra_schedules = []
         for i, schedule in enumerate(schedules_data):
@@ -143,19 +149,19 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
             end_cron = f"{end_parts[1]} {end_parts[0]} * * {','.join(map(str, schedule['days']))}"
 
             fluidra_schedule = {
-                "id": f"schedule_{i+1}",
+                "id": f"schedule_{i + 1}",
                 "enabled": schedule["enabled"],
                 "startTime": start_cron,
                 "endTime": end_cron,
                 "startActions": {
                     "componentToChange": 11,  # Speed component
-                    "operationName": schedule["mode"]
+                    "operationName": schedule["mode"],
                 },
                 "endActions": {
                     "componentToChange": 9,  # Pump component
-                    "operationName": "0"  # Turn off
+                    "operationName": "0",  # Turn off
                 },
-                "state": "IDLE"
+                "state": "IDLE",
             }
             fluidra_schedules.append(fluidra_schedule)
 
@@ -172,7 +178,6 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         """Handle clear_schedule service call."""
         device_id = call.data["device_id"]
 
-
         try:
             success = await coordinator.api.clear_schedule(device_id)
             if success:
@@ -185,48 +190,71 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         device_id = call.data["device_id"]
         preset = call.data["preset"]
 
-
         # Define presets
         presets = {
             "standard": [
-                {"enabled": True, "start_time": "08:00", "end_time": "12:00", "mode": "1", "days": [1,2,3,4,5]},
-                {"enabled": True, "start_time": "18:00", "end_time": "20:00", "mode": "1", "days": [1,2,3,4,5]}
+                {"enabled": True, "start_time": "08:00", "end_time": "12:00", "mode": "1", "days": [1, 2, 3, 4, 5]},
+                {"enabled": True, "start_time": "18:00", "end_time": "20:00", "mode": "1", "days": [1, 2, 3, 4, 5]},
             ],
             "intensive": [
-                {"enabled": True, "start_time": "08:00", "end_time": "18:00", "mode": "2", "days": [0,1,2,3,4,5,6]}
+                {
+                    "enabled": True,
+                    "start_time": "08:00",
+                    "end_time": "18:00",
+                    "mode": "2",
+                    "days": [0, 1, 2, 3, 4, 5, 6],
+                }
             ],
             "eco": [
-                {"enabled": True, "start_time": "10:00", "end_time": "14:00", "mode": "0", "days": [0,1,2,3,4,5,6]}
+                {
+                    "enabled": True,
+                    "start_time": "10:00",
+                    "end_time": "14:00",
+                    "mode": "0",
+                    "days": [0, 1, 2, 3, 4, 5, 6],
+                }
             ],
             "summer": [
-                {"enabled": True, "start_time": "06:00", "end_time": "10:00", "mode": "2", "days": [0,1,2,3,4,5,6]},
-                {"enabled": True, "start_time": "16:00", "end_time": "22:00", "mode": "2", "days": [0,1,2,3,4,5,6]}
+                {
+                    "enabled": True,
+                    "start_time": "06:00",
+                    "end_time": "10:00",
+                    "mode": "2",
+                    "days": [0, 1, 2, 3, 4, 5, 6],
+                },
+                {
+                    "enabled": True,
+                    "start_time": "16:00",
+                    "end_time": "22:00",
+                    "mode": "2",
+                    "days": [0, 1, 2, 3, 4, 5, 6],
+                },
             ],
             "winter": [
-                {"enabled": True, "start_time": "12:00", "end_time": "16:00", "mode": "0", "days": [0,1,2,3,4,5,6]}
-            ]
+                {
+                    "enabled": True,
+                    "start_time": "12:00",
+                    "end_time": "16:00",
+                    "mode": "0",
+                    "days": [0, 1, 2, 3, 4, 5, 6],
+                }
+            ],
         }
 
         if preset not in presets:
             return
 
         # Use the set_schedule handler
-        await _handle_set_schedule(ServiceCall(DOMAIN, SERVICE_SET_SCHEDULE, {
-            "device_id": device_id,
-            "schedules": presets[preset]
-        }))
+        await _handle_set_schedule(
+            ServiceCall(DOMAIN, SERVICE_SET_SCHEDULE, {"device_id": device_id, "schedules": presets[preset]})
+        )
 
     # Register services
-    hass.services.async_register(
-        DOMAIN, SERVICE_SET_SCHEDULE, _handle_set_schedule, schema=SET_SCHEDULE_SCHEMA
-    )
-    hass.services.async_register(
-        DOMAIN, SERVICE_CLEAR_SCHEDULE, _handle_clear_schedule, schema=CLEAR_SCHEDULE_SCHEMA
-    )
+    hass.services.async_register(DOMAIN, SERVICE_SET_SCHEDULE, _handle_set_schedule, schema=SET_SCHEDULE_SCHEMA)
+    hass.services.async_register(DOMAIN, SERVICE_CLEAR_SCHEDULE, _handle_clear_schedule, schema=CLEAR_SCHEDULE_SCHEMA)
     hass.services.async_register(
         DOMAIN, SERVICE_SET_PRESET_SCHEDULE, _handle_set_preset_schedule, schema=SET_PRESET_SCHEDULE_SCHEMA
     )
-
 
 
 # FluidraDataUpdateCoordinator is now in coordinator.py

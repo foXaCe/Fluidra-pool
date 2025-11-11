@@ -1,16 +1,17 @@
 """Number platform for Fluidra Pool integration."""
-import logging
-from typing import Any, Dict, Optional
 
-from homeassistant.components.number import NumberEntity, NumberDeviceClass
+import logging
+from typing import Any, Dict
+
+from homeassistant.components.number import NumberDeviceClass, NumberEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.entity import EntityCategory
-from homeassistant.const import PERCENTAGE
 
-from .const import DOMAIN, DEVICE_TYPE_PUMP
+from .const import DEVICE_TYPE_PUMP, DOMAIN
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 
@@ -108,13 +109,10 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.device_data.get("online", False)
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
-    def native_value(self) -> Optional[float]:
+    def native_value(self) -> float | None:
         """Return the current component value."""
         components = self.device_data.get("components", {})
         component_data = components.get(str(self._component_id), {})
@@ -127,7 +125,6 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the component value."""
         int_value = int(value)
-
 
         try:
             success = await self._api.set_component_value(self._device_id, self._component_id, int_value)
@@ -144,8 +141,7 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
         current_speed = self.native_value or 0
         if current_speed == 0:
             return "mdi:pump-off"
-        else:
-            return "mdi:pump"
+        return "mdi:pump"
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -214,13 +210,10 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.device_data.get("online", False)
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
-    def native_value(self) -> Optional[float]:
+    def native_value(self) -> float | None:
         """Return the current speed value from component 15."""
         components = self.device_data.get("components", {})
         component_15_data = components.get("15", {})
@@ -232,7 +225,6 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the speed percentage directly to component 15."""
         int_value = int(value)
-
 
         try:
             success = await self._api.set_component_value(self._device_id, 15, int_value)
@@ -251,12 +243,11 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
         current_speed = self.native_value or 0
         if current_speed >= 85:
             return "mdi:speedometer"
-        elif current_speed >= 65:
+        if current_speed >= 65:
             return "mdi:speedometer-medium"
-        elif current_speed >= 40:
+        if current_speed >= 40:
             return "mdi:speedometer-slow"
-        else:
-            return "mdi:pump-off"
+        return "mdi:pump-off"
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -327,13 +318,10 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.device_data.get("online", False)
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
-    def native_value(self) -> Optional[float]:
+    def native_value(self) -> float | None:
         """Return the current chlorination level from component 10."""
         components = self.device_data.get("components", {})
         component_10 = components.get("10", {})
@@ -429,13 +417,10 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.device_data.get("online", False)
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
-    def native_value(self) -> Optional[float]:
+    def native_value(self) -> float | None:
         """Return the current pH setpoint."""
         # Get component config dynamically
         ph_config = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint", {"write": 8, "read": 172})
@@ -476,7 +461,6 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         else:
             write_component = ph_config
             read_component = ph_config
-
 
         # Optimistic update: Update coordinator data immediately for instant UI feedback
         components = self.device_data.get("components", {})
@@ -591,13 +575,10 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.device_data.get("online", False)
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
-    def native_value(self) -> Optional[float]:
+    def native_value(self) -> float | None:
         """Return the current ORP setpoint."""
         # Get component config dynamically
         orp_config = DeviceIdentifier.get_feature(self.device_data, "orp_setpoint", {"write": 11, "read": 177})
@@ -629,7 +610,6 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         else:
             write_component = orp_config
             read_component = orp_config
-
 
         # Optimistic update: Update coordinator data immediately for instant UI feedback
         components = self.device_data.get("components", {})
@@ -678,5 +658,3 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
             "current_orp_reading": current_orp,
             "device_id": self._device_id,
         }
-
-

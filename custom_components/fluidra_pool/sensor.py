@@ -1,16 +1,16 @@
 """Sensor platform for Fluidra Pool integration."""
 
-import logging
 from datetime import datetime, time
-from typing import Optional, List, Dict, Any
+import logging
+from typing import Any, Dict, List
 
 from homeassistant.components.sensor import (
-    SensorEntity,
     SensorDeviceClass,
+    SensorEntity,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTemperature, PERCENTAGE
+from homeassistant.const import PERCENTAGE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -53,9 +53,13 @@ async def async_setup_entry(
             if DeviceIdentifier.should_create_entity(device, "sensor_temperature"):
                 # Temperature sensors for heaters
                 if "current_temperature" in device:
-                    entities.append(FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "current"))
+                    entities.append(
+                        FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "current")
+                    )
                 if "target_temperature" in device:
-                    entities.append(FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "target"))
+                    entities.append(
+                        FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "target")
+                    )
 
             if DeviceIdentifier.should_create_entity(device, "sensor_brightness"):
                 # Brightness sensor for lights
@@ -74,21 +78,46 @@ async def async_setup_entry(
                 if not skip_ph_orp:
                     # pH sensor (component 172)
                     ph_component = sensors_config.get("ph", 172)
-                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "ph", ph_component))
+                    entities.append(
+                        FluidraChlorinatorSensor(
+                            coordinator, coordinator.api, pool["id"], device_id, "ph", ph_component
+                        )
+                    )
                     # ORP sensor (component 177)
                     orp_component = sensors_config.get("orp", 177)
-                    entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "orp", orp_component))
+                    entities.append(
+                        FluidraChlorinatorSensor(
+                            coordinator, coordinator.api, pool["id"], device_id, "orp", orp_component
+                        )
+                    )
                     # Free chlorine sensor (component 178) - only if configured
                     if "free_chlorine" in sensors_config:
                         free_chlorine_component = sensors_config.get("free_chlorine")
-                        entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "free_chlorine", free_chlorine_component))
+                        entities.append(
+                            FluidraChlorinatorSensor(
+                                coordinator,
+                                coordinator.api,
+                                pool["id"],
+                                device_id,
+                                "free_chlorine",
+                                free_chlorine_component,
+                            )
+                        )
 
                 # Temperature sensor - get from device registry (183 for generic, 21 for CC24033907)
                 temp_component = sensors_config.get("temperature", 183)
-                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "temperature", temp_component))
+                entities.append(
+                    FluidraChlorinatorSensor(
+                        coordinator, coordinator.api, pool["id"], device_id, "temperature", temp_component
+                    )
+                )
                 # Salinity sensor (component 185) - all chlorinators
                 salinity_component = sensors_config.get("salinity", 185)
-                entities.append(FluidraChlorinatorSensor(coordinator, coordinator.api, pool["id"], device_id, "salinity", salinity_component))
+                entities.append(
+                    FluidraChlorinatorSensor(
+                        coordinator, coordinator.api, pool["id"], device_id, "salinity", salinity_component
+                    )
+                )
 
                 # Count sensors dynamically
                 sensor_count = 2  # Base: temperature + salinity
@@ -104,8 +133,6 @@ async def async_setup_entry(
         entities.append(FluidraPoolWaterQualitySensor(coordinator, coordinator.api, pool["id"]))
 
     async_add_entities(entities)
-
-
 
 
 class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
@@ -178,16 +205,16 @@ class FluidraTemperatureSensor(FluidraPoolSensorEntity):
     def name(self) -> str:
         """Return the name of the sensor."""
         temp_type = "Current" if self._sensor_type == "current" else "Target"
-        device_name = self.device_data.get('name', f'Device {self._device_id}')
-        pool_name = self.pool_data.get('name', 'Pool')
+        device_name = self.device_data.get("name", f"Device {self._device_id}")
+        pool_name = self.pool_data.get("name", "Pool")
         return f"{pool_name} {device_name} {temp_type} Temperature"
 
     @property
-    def native_value(self) -> Optional[float]:
+    def native_value(self) -> float | None:
         """Return the state of the sensor."""
         if self._sensor_type == "current":
             return self.device_data.get("current_temperature")
-        elif self._sensor_type == "target":
+        if self._sensor_type == "target":
             return self.device_data.get("target_temperature")
         return None
 
@@ -212,19 +239,18 @@ class FluidraTemperatureSensor(FluidraPoolSensorEntity):
         return "mdi:thermometer"
 
 
-
 class FluidraLightBrightnessSensor(FluidraPoolSensorEntity):
     """Brightness sensor for pool lights."""
 
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
-        device_name = self.device_data.get('name', f'Device {self._device_id}')
-        pool_name = self.pool_data.get('name', 'Pool')
+        device_name = self.device_data.get("name", f"Device {self._device_id}")
+        pool_name = self.pool_data.get("name", "Pool")
         return f"{pool_name} {device_name} Brightness"
 
     @property
-    def native_value(self) -> Optional[int]:
+    def native_value(self) -> int | None:
         """Return the state of the sensor."""
         return self.device_data.get("brightness")
 
@@ -274,17 +300,16 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         # Check for stopped states
         if speed_mode in ["stopped", "not_running"]:
             return "mdi:pump-off"
-        else:
-            return "mdi:pump"
+        return "mdi:pump"
 
     def _translate_speed_state(self, state_key: str) -> str:
         """Translate speed state to French."""
         translations = {
-            'stopped': 'Arrêtée',
-            'not_running': 'Pas en marche',
-            'low': 'Faible',
-            'medium': 'Moyenne',
-            'high': 'Élevée'
+            "stopped": "Arrêtée",
+            "not_running": "Pas en marche",
+            "low": "Faible",
+            "medium": "Moyenne",
+            "high": "Élevée",
         }
         return translations.get(state_key, state_key)
 
@@ -297,10 +322,10 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
             is_running = bool(pump_reported)
 
         # État du mode auto
-        auto_mode = self.device_data.get("auto_mode_enabled", False)
+        self.device_data.get("auto_mode_enabled", False)
         auto_reported = self.device_data.get("auto_reported")
         if auto_reported is not None:
-            auto_mode = bool(auto_reported)
+            bool(auto_reported)
 
         # Si pompe arrêtée - return state key
         if not is_running:
@@ -315,10 +340,9 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         # Mapper le pourcentage vers des états énumérés - return state keys
         if current_speed <= 50:
             return "low"
-        elif current_speed <= 70:
+        if current_speed <= 70:
             return "medium"
-        else:
-            return "high"
+        return "high"
 
     @property
     def native_value(self) -> str:
@@ -345,7 +369,7 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         current_speed = self.device_data.get("speed_percent", 0)
         speed_level = self.device_data.get("speed_level_reported")
 
-        attrs = {
+        return {
             "pump_running": is_running,
             "auto_mode": auto_mode,
             "speed_percent": current_speed,
@@ -356,11 +380,8 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
                 "is_running": self.device_data.get("is_running"),
                 "auto_mode_enabled": self.device_data.get("auto_mode_enabled"),
                 "speed_percent": self.device_data.get("speed_percent"),
-            }
+            },
         }
-
-
-        return attrs
 
 
 class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
@@ -397,17 +418,17 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         # Always return English for dynamic text
         # HA config.language returns system language, not user interface language
         translations = {
-            'no_schedule': 'No Schedule',
-            'active': 'Active',
-            'active_schedules': 'active schedules',
-            'error': 'Error',
-            'low': 'Low',
-            'medium': 'Medium',
-            'high': 'High'
+            "no_schedule": "No Schedule",
+            "active": "Active",
+            "active_schedules": "active schedules",
+            "error": "Error",
+            "low": "Low",
+            "medium": "Medium",
+            "high": "High",
         }
         return translations.get(state_key, state_key)
 
-    def _parse_cron_time(self, cron_time: str) -> Optional[time]:
+    def _parse_cron_time(self, cron_time: str) -> time | None:
         """Parse cron time format 'mm HH * * 0,1,2,3,4,5,6' to time object."""
         try:
             parts = cron_time.split()
@@ -431,16 +452,18 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
 
     def _get_operation_name(self, operation: str) -> str:
         """Convert operation name to readable format."""
-        speed_key = {
-            "0": "low",
-            "1": "medium",
-            "2": "high"
-        }.get(operation, "low")
+        speed_key = {"0": "low", "1": "medium", "2": "high"}.get(operation, "low")
 
         speed_name = self._translate_schedule_state(speed_key)
-        return f"{speed_name} (45%)" if operation == "0" else f"{speed_name} (65%)" if operation == "1" else f"{speed_name} (100%)"
+        return (
+            f"{speed_name} (45%)"
+            if operation == "0"
+            else f"{speed_name} (65%)"
+            if operation == "1"
+            else f"{speed_name} (100%)"
+        )
 
-    def _get_current_schedule(self, schedules: List[dict]) -> Optional[dict]:
+    def _get_current_schedule(self, schedules: List[dict]) -> dict | None:
         """Get currently active schedule based on current time."""
         now = datetime.now().time()
 
@@ -451,9 +474,8 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
             start_time = self._parse_cron_time(schedule.get("startTime", ""))
             end_time = self._parse_cron_time(schedule.get("endTime", ""))
 
-            if start_time and end_time:
-                if start_time <= now <= end_time:
-                    return schedule
+            if start_time and end_time and start_time <= now <= end_time:
+                return schedule
         return None
 
     def _get_schedules_data(self) -> List[dict]:
@@ -462,10 +484,8 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         device_data = self.device_data
 
         if "schedule_data" in device_data:
-            schedules = device_data["schedule_data"]
-            return schedules
-        else:
-            return []
+            return device_data["schedule_data"]
+        return []
 
     @property
     def native_value(self) -> str:
@@ -509,12 +529,14 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                         operation = schedule.get("startActions", {}).get("operationName", "0")
                         mode = self._get_operation_name(operation)
 
-                        formatted_schedules.append({
-                            "id": schedule.get("id"),
-                            "time": time_range,
-                            "mode": mode,
-                            "state": schedule.get("state", "IDLE")
-                        })
+                        formatted_schedules.append(
+                            {
+                                "id": schedule.get("id"),
+                                "time": time_range,
+                                "mode": mode,
+                                "state": schedule.get("state", "IDLE"),
+                            }
+                        )
 
                 attrs["schedules"] = formatted_schedules
                 attrs["total_schedules"] = len(schedules)
@@ -528,8 +550,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                         current_schedule.get("startActions", {}).get("operationName", "0")
                     )
 
-        except Exception:
-            pass
+        except Exception as e:
             attrs["error"] = str(e)
 
         return attrs
@@ -569,17 +590,17 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
         # Always return English for technical dynamic text
         # HA config.language returns system language, not user interface language
         translations = {
-            'unknown': 'Unknown',
-            'firmware': 'Firmware',
-            'signal': 'Signal',
-            'error': 'Error',
-            'excellent': 'Excellent',
-            'very_good': 'Very Good',
-            'good': 'Good',
-            'low': 'Low',
-            'very_low': 'Very Low',
-            'connected': 'Connected',
-            'disconnected': 'Disconnected'
+            "unknown": "Unknown",
+            "firmware": "Firmware",
+            "signal": "Signal",
+            "error": "Error",
+            "excellent": "Excellent",
+            "very_good": "Very Good",
+            "good": "Good",
+            "low": "Low",
+            "very_low": "Very Low",
+            "connected": "Connected",
+            "disconnected": "Disconnected",
         }
         return translations.get(key, key)
 
@@ -626,8 +647,7 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
 
             if signal and signal != 0:
                 return f"{firmware_label} {firmware} ({signal_label}: {signal} dBm)"
-            else:
-                return f"{firmware_label} {firmware}"
+            return f"{firmware_label} {firmware}"
 
         except Exception:
             pass
@@ -666,7 +686,11 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
 
             if "network_status" in info_data:
                 network_status = info_data["network_status"]
-                attrs["network_status"] = self._translate_device_info("connected") if network_status == 1 else self._translate_device_info("disconnected")
+                attrs["network_status"] = (
+                    self._translate_device_info("connected")
+                    if network_status == 1
+                    else self._translate_device_info("disconnected")
+                )
 
             # Informations système
             if "firmware_version" in info_data:
@@ -689,14 +713,14 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
             attrs["model"] = self.device_data.get("model", "Unknown")
             attrs["online"] = self.device_data.get("online", False)
 
-        except Exception:
-            pass
+        except Exception as e:
             attrs["error"] = str(e)
 
         return attrs
 
 
 # NOUVEAUX SENSORS SPÉCIFIQUES À LA PISCINE
+
 
 class FluidraPoolSensorBase(CoordinatorEntity, SensorEntity):
     """Base class for pool-specific sensor entities."""
@@ -754,7 +778,7 @@ class FluidraPoolWeatherSensor(FluidraPoolSensorBase):
         return f"{pool_name} Weather Temperature"
 
     @property
-    def native_value(self) -> Optional[float]:
+    def native_value(self) -> float | None:
         """Return the weather temperature."""
         pool_data = self.pool_data
 
@@ -817,18 +841,16 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
 
         if state == "using":
             return "using"
-        elif state == "maintenance":
+        if state == "maintenance":
             return "maintenance"
-        elif state == "offline":
+        if state == "offline":
             return "offline"
-        elif state == "winterized":
+        if state == "winterized":
             return "winterized"
-        else:
-            # État par défaut basé sur les données disponibles
-            if pool_data.get("name"):
-                return "connected"
-            else:
-                return "unknown_state"
+        # État par défaut basé sur les données disponibles
+        if pool_data.get("name"):
+            return "connected"
+        return "unknown_state"
 
     @property
     def icon(self) -> str:
@@ -838,14 +860,13 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
 
         if state == "using":
             return "mdi:pool"
-        elif state == "maintenance":
+        if state == "maintenance":
             return "mdi:tools"
-        elif state == "offline":
+        if state == "offline":
             return "mdi:pool-off"
-        elif state == "winterized":
+        if state == "winterized":
             return "mdi:snowflake"
-        else:
-            return "mdi:help-circle"
+        return "mdi:help-circle"
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -937,9 +958,9 @@ class FluidraPoolLocationSensor(FluidraPoolSensorBase):
 
             if locality and country_code:
                 return f"{locality}, {country_code}"
-            elif locality:
+            if locality:
                 return locality
-            elif country_code:
+            if country_code:
                 return country_code
 
         return "Localisation inconnue"
@@ -1003,8 +1024,7 @@ class FluidraPoolWaterQualitySensor(FluidraPoolSensorBase):
 
             if automatic:
                 return "auto"
-            else:
-                return "manual"
+            return "manual"
 
         return "not_configured"
 
@@ -1178,13 +1198,10 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (
-            self.coordinator.last_update_success
-            and self.device_data.get("online", False)
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
-    def native_value(self) -> Optional[float]:
+    def native_value(self) -> float | None:
         """Return the sensor value."""
         components = self.device_data.get("components", {})
         component_data = components.get(str(self._component_id), {})
