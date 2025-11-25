@@ -1,169 +1,172 @@
-# Intégration Fluidra Pool pour Home Assistant 🏊‍♂️
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Community Forum](https://img.shields.io/badge/Home_Assistant-Community-blue?logo=home-assistant)](https://community.home-assistant.io/t/custom-component-ajax-systems/948939/2)
+[![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/paypalme/foXaCe66)
 
-🇫🇷 Français | **[🇺🇸 English](README_EN.md)**
+# Fluidra Pool Integration for Home Assistant 🏊‍♂️
 
-Une intégration pour Home Assistant permettant de contrôler les équipements de piscine Fluidra.
-
----
-
-## 💰 Soutenir le Projet
-
-Si cette intégration vous est utile, vous pouvez soutenir son développement avec un don en Bitcoin :
-
-**🪙 Adresse Bitcoin :** `bc1qhe4ge22x0anuyeg0fmts6rdmz3t735dnqwt3p7`
-
-Vos contributions m'aident à continuer d'améliorer ce projet et à ajouter de nouvelles fonctionnalités. Merci ! 🙏
+A Home Assistant integration for Fluidra pool equipment control.
 
 ---
 
-**🔬 État des tests :**
-- ✅ **Pompe E30iQ** : Entièrement testée et fonctionnelle
-- ⚠️ **Autres équipements** (éclairage, chauffages, etc.) : Code implémenté mais **nécessite des tests utilisateurs**
+## 💰 Support the Project
 
-## ✨ Fonctionnalités
+If this integration is useful to you, you can support its development with a Bitcoin donation:
 
-### 🔄 **Contrôle Pompe E30iQ** ✅ **TESTÉ**
-- **Vitesses multiples** : Faible (45%), Moyenne (65%), Élevée (100%)
-- **Mode automatique** : Gestion intelligente basée sur les programmations
-- **Contrôle manuel** : Vitesse personnalisée et marche/arrêt
-- **Programmations avancées** : Jusqu'à 8 créneaux horaires par jour
+**🪙 Bitcoin Address:** `bc1qhe4ge22x0anuyeg0fmts6rdmz3t735dnqwt3p7`
 
-### 📊 **Capteurs Complets**
-- **Informations pompe** ✅ : Vitesse, mode, état de fonctionnement
-- **Programmations** ✅ : Affichage des créneaux actifs et planifiés
-- **Informations appareil** ✅ : Firmware, signal réseau, diagnostics
-- **Température** ⚠️ : Capteurs pour chauffages (actuel/cible) - **NON TESTÉ**
-- **Éclairage** ⚠️ : Luminosité des équipements LED - **NON TESTÉ**
-
-### ⚙️ **Entités Home Assistant**
-- `switch` : Marche/arrêt pompe et mode automatique
-- `select` : Sélection vitesse et mode de fonctionnement
-- `number` : Vitesse personnalisée (0-100%)
-- `time` : Configuration horaires de programmation
-- `sensor` : Surveillance complète des équipements
+Your contributions help me continue improving this project and adding new features. Thank you! 🙏
 
 ---
 
-## 🔌 Matériel Supporté
+**🔬 Testing Status:**
+- ✅ **E30iQ Pump**: Fully tested and functional
+- ⚠️ **Other equipment** (lighting, heaters, etc.): Code implemented but **requires user testing**
 
-### ✅ **Équipements Testés et Fonctionnels**
+## ✨ Features
 
-#### **Pompes à Vitesse Variable**
-- **E30iQ** - Pompe à vitesse variable
-  - Contrôle 3 vitesses (Faible 45%, Moyenne 65%, Élevée 100%)
-  - Mode automatique avec programmations
-  - Contrôle vitesse personnalisée (0-100%)
-  - Gestion de 8 créneaux horaires/jour
+### 🔄 **E30iQ Pump Control** ✅ **TESTED**
+- **Multiple speeds**: Low (45%), Medium (65%), High (100%)
+- **Automatic mode**: Smart management based on schedules
+- **Manual control**: Custom speed and on/off control
+- **Advanced scheduling**: Up to 8 time slots per day
 
-#### **Électrolyseurs au Sel / Chlorinateurs**
-- **Chlorinateurs Fluidra** (via bridge connecté)
-  - **Modèles spécifiques testés** :
+### 📊 **Complete Sensors**
+- **Pump information** ✅: Speed, mode, operating status
+- **Schedules** ✅: Display of active and planned time slots
+- **Device information** ✅: Firmware, network signal, diagnostics
+- **Temperature** ⚠️: Sensors for heaters (current/target) - **NOT TESTED**
+- **Lighting** ⚠️: Brightness of LED equipment - **NOT TESTED**
+
+### ⚙️ **Home Assistant Entities**
+- `switch`: Pump on/off and automatic mode
+- `select`: Speed and operating mode selection
+- `number`: Custom speed (0-100%)
+- `time`: Schedule time configuration
+- `sensor`: Complete equipment monitoring
+
+---
+
+## 🔌 Supported Hardware
+
+### ✅ **Tested and Functional Equipment**
+
+#### **Variable Speed Pumps**
+- **E30iQ** - Variable speed pump
+  - 3-speed control (Low 45%, Medium 65%, High 100%)
+  - Automatic mode with schedules
+  - Custom speed control (0-100%)
+  - Management of 8 time slots/day
+
+#### **Salt Chlorinators / Electrolyzers**
+- **Fluidra Chlorinators** (via connected bridge)
+  - **Specific tested models**:
     - CC24021110 ✅
     - CC25113623 ✅
     - LC24008313 (Blauswim - I.D. Electroquimica/Fluidra) ✅
     - CC24033907 ✅
-  - **Fonctionnalités** :
-    - Contrôle niveau de chlorination (0-100%)
-    - **Contrôle pH** : Setpoint réglable (6.8-7.6)
-    - **Contrôle ORP/Redox** : Setpoint réglable (650-750 mV)
-    - Mode Boost (marche/arrêt)
-    - Capteurs : pH, ORP, chlore libre, température eau, salinité
-  - **Note** : Autres modèles de chlorinateurs Fluidra probablement compatibles
+  - **Features**:
+    - Chlorination level control (0-100%)
+    - **pH Control**: Adjustable setpoint (6.8-7.6)
+    - **ORP/Redox Control**: Adjustable setpoint (650-750 mV)
+    - Boost mode (on/off)
+    - Sensors: pH, ORP, free chlorine, water temperature, salinity
+  - **Note**: Other Fluidra chlorinator models likely compatible
 
-### ⚠️ **Équipements Implémentés (Tests Utilisateurs Requis)**
+### ⚠️ **Implemented Equipment (User Testing Required)**
 
-#### **Pompes à Chaleur**
-- **LG Eco Elyo** - Pompe à chaleur réversible
-  - Modes : Smart Heating, Smart Cooling, Boost, Silence
-  - Contrôle température (10-40°C)
-  - Capteur température eau
+#### **Heat Pumps**
+- **LG Eco Elyo** - Reversible heat pump
+  - Modes: Smart Heating, Smart Cooling, Boost, Silence
+  - Temperature control (10-40°C)
+  - Water temperature sensor
 
-- **Z250iQ / Z25iQ** - Pompe à chaleur Fluidra
-  - Contrôle marche/arrêt
-  - Réglage température cible
-  - Capteur température actuelle
+- **Z250iQ / Z25iQ** - Fluidra heat pump
+  - On/off control
+  - Target temperature adjustment
+  - Current temperature sensor
 
-#### **Chauffages**
-- Support générique pour chauffages piscine
-  - Capteurs température (actuelle/cible)
-  - Contrôle marche/arrêt
+#### **Heaters**
+- Generic support for pool heaters
+  - Temperature sensors (current/target)
+  - On/off control
 
-#### **Éclairage**
-- Support générique pour éclairage LED piscine
-  - Contrôle marche/arrêt
-  - Réglage luminosité (0-100%)
+#### **Lighting**
+- Generic support for LED pool lighting
+  - On/off control
+  - Brightness adjustment (0-100%)
 
-### 🆕 **Ajouter un Nouvel Équipement**
+### 🆕 **Adding New Equipment**
 
-Votre équipement n'est pas listé ? Aidez-nous à l'ajouter !
+Your equipment is not listed? Help us add it!
 
-1. **Activez les logs debug** :
+1. **Enable debug logs**:
    ```yaml
    logger:
      logs:
        custom_components.fluidra_pool: debug
    ```
 
-2. **Créez une Issue** avec :
-   - Modèle de votre équipement
-   - Logs de détection (device discovery)
-   - Fonctionnalités disponibles dans l'app Fluidra
+2. **Create an Issue** with:
+   - Your equipment model
+   - Detection logs (device discovery)
+   - Features available in the Fluidra app
 
-3. **Testez et partagez** vos résultats
+3. **Test and share** your results
 
 ---
 
 ## 🚀 Installation
 
-### Méthode HACS (Recommandée)
+### HACS Method (Recommended)
 
-1. **Ajouter le dépôt**
+1. **Add the repository**
    ```
    https://github.com/foXaCe/Fluidra-pool
    ```
 
-2. **Installer l'intégration**
-   - HACS → Intégrations → Explorer et télécharger → "Fluidra Pool"
-   - Redémarrer Home Assistant
+2. **Install the integration**
+   - HACS → Integrations → Explore & Download → "Fluidra Pool"
+   - Restart Home Assistant
 
 3. **Configuration**
-   - Configuration → Intégrations → Ajouter → "Fluidra Pool"
-   - Entrer vos identifiants Fluidra Connect
+   - Configuration → Integrations → Add → "Fluidra Pool"
+   - Enter your Fluidra Connect credentials
 
-### Installation Manuelle
+### Manual Installation
 
-1. **Télécharger les fichiers**
+1. **Download files**
    ```bash
    git clone https://github.com/foXaCe/Fluidra-pool.git
    ```
 
-2. **Copier l'intégration**
+2. **Copy the integration**
    ```bash
    cp -r custom_components/fluidra_pool /config/custom_components/
    ```
 
-3. **Redémarrer Home Assistant**
+3. **Restart Home Assistant**
 
 ## ⚙️ Configuration
 
-### Identifiants Requis
-- **Email** : Votre email Fluidra Connect
-- **Mot de passe** : Votre mot de passe Fluidra Connect
+### Required Credentials
+- **Email**: Your Fluidra Connect email
+- **Password**: Your Fluidra Connect password
 
-### Options Avancées
-- **Intervalle de mise à jour** : 30 secondes (par défaut)
-- **Délai d'attente** : 10 secondes (par défaut)
+### Advanced Options
+- **Update interval**: 30 seconds (default)
+- **Timeout**: 10 seconds (default)
 
 ---
 
-## 🎛️ Utilisation
+## 🎛️ Usage
 
-### Contrôle de la Pompe
+### Pump Control
 
 ```yaml
-# Exemple d'automatisation
+# Automation example
 automation:
-  - alias: "Piscine - Mode Économie"
+  - alias: "Pool - Economy Mode"
     trigger:
       platform: time
       at: "22:00:00"
@@ -172,13 +175,13 @@ automation:
       target:
         entity_id: select.pool_e30iq_pump_speed
       data:
-        option: "Faible"
+        option: "Low"
 ```
 
-### Programmations Avancées
+### Advanced Scheduling
 
 ```yaml
-# Configuration de programmation via service
+# Schedule configuration via service
 service: fluidra_pool.set_schedule
 data:
   device_id: "LE24500883"
@@ -188,14 +191,14 @@ data:
       startTime: "30 08 * * 1,2,3,4,5,6,7"
       endTime: "59 09 * * 1,2,3,4,5,6,7"
       startActions:
-        operationName: "0"  # Faible
+        operationName: "0"  # Low
 ```
 
-### Tableau de Bord Lovelace
+### Lovelace Dashboard
 
 ```yaml
 type: entities
-title: Contrôle Piscine
+title: Pool Control
 entities:
   - entity: switch.pool_e30iq_pump
   - entity: select.pool_e30iq_pump_speed
@@ -203,70 +206,70 @@ entities:
   - entity: sensor.pool_e30iq_pump_information
 ```
 
-## 🔧 Dépannage
+## 🔧 Troubleshooting
 
-### Problèmes de Connexion
+### Connection Issues
 
-1. **Vérifier les identifiants**
-   - Email et mot de passe corrects
-   - Compte actif sur Fluidra Connect
+1. **Check credentials**
+   - Correct email and password
+   - Active account on Fluidra Connect
 
-2. **Journaux de diagnostic**
+2. **Diagnostic logs**
    ```yaml
    logger:
      logs:
        custom_components.fluidra_pool: debug
    ```
 
-3. **Reconnecter l'intégration**
-   - Supprimer l'intégration
-   - Redémarrer Home Assistant
-   - Reconfigurer avec de nouveaux identifiants
+3. **Reconnect integration**
+   - Remove integration
+   - Restart Home Assistant
+   - Reconfigure with new credentials
 
-### Erreurs Courantes
+### Common Errors
 
-| Erreur | Solution |
-|--------|----------|
-| `Authentication failed` | Vérifier email/mot de passe |
-| `No pools found` | Vérifier la configuration Fluidra Connect |
-| `Device not responding` | Vérifier la connectivité réseau de l'équipement |
-| `Token expired` | Redémarrer l'intégration |
+| Error | Solution |
+|-------|----------|
+| `Authentication failed` | Check email/password |
+| `No pools found` | Check Fluidra Connect configuration |
+| `Device not responding` | Check equipment network connectivity |
+| `Token expired` | Restart integration |
 
-## 🧪 Tests et Contribution
+## 🧪 Testing and Contributing
 
-### État Actuel des Tests
-Cette intégration a été développée par **reverse engineering** de l'API Fluidra Connect :
+### Current Testing Status
+This integration was developed through **reverse engineering** of the Fluidra Connect API:
 
-**✅ Équipements testés :**
-- **Pompe E30iQ** : Contrôle complet (vitesses, modes, programmations)
+**✅ Tested equipment:**
+- **E30iQ Pump**: Complete control (speeds, modes, scheduling)
 
-**⚠️ Équipements non testés (aide recherchée) :**
-- **Éclairage LED** : Code implémenté mais non testé
-- **Chauffages** : Capteurs température implémentés mais non testés
-- **Autres accessoires** : Support théorique seulement
+**⚠️ Untested equipment (help needed):**
+- **LED Lighting**: Code implemented but not tested
+- **Heaters**: Temperature sensors implemented but not tested
+- **Other accessories**: Theoretical support only
 
-### Besoin d'aide pour les tests
-Si vous possédez d'autres équipements Fluidra, vos tests seraient précieux !
-- Créer une [Issue](https://github.com/foXaCe/Fluidra-pool/issues) avec vos résultats
-- Partager les logs en mode debug
-- Proposer des améliorations
+### Help Needed for Testing
+If you own other Fluidra equipment, your testing would be valuable!
+- Create an [Issue](https://github.com/foXaCe/Fluidra-pool/issues) with your results
+- Share debug logs
+- Suggest improvements
 
-## 🤝 Contribution
+## 🤝 Contributing
 
-1. **Fork** le dépôt
-2. **Créer** une branche de fonctionnalité (`git checkout -b feature/NouvelleFonctionnalite`)
-3. **Commit** vos changements (`git commit -m 'Ajout NouvelleFonctionnalite'`)
-4. **Push** vers la branche (`git push origin feature/NouvelleFonctionnalite`)
-5. **Ouvrir** une Pull Request
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/AmazingFeature`)
+3. **Commit** your changes (`git commit -m 'Add AmazingFeature'`)
+4. **Push** to the branch (`git push origin feature/AmazingFeature`)
+5. **Open** a Pull Request
 
-### Développement Local
+### Local Development
 
 ```bash
-# Cloner le dépôt
+# Clone the repository
 git clone https://github.com/foXaCe/Fluidra-pool.git
 cd Fluidra-pool
 
-# Configuration environnement de test
+# Test environment setup
 cp custom_components/fluidra_pool /config/custom_components/
 
 # Tests
@@ -274,22 +277,22 @@ python -m pytest tests/
 ```
 
 
-## 📄 Licence
+## 📄 License
 
-Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## 🙏 Remerciements
+## 🙏 Acknowledgments
 
-- **Fluidra** pour leurs équipements innovants
-- **Home Assistant** pour la plateforme fantastique
-- **La communauté** pour les tests et retours
+- **Fluidra** for their innovative equipment
+- **Home Assistant** for the amazing platform
+- **The community** for testing and feedback
 
 ## 📞 Support
 
-- **Issues** : [GitHub Issues](https://github.com/foXaCe/Fluidra-pool/issues)
-- **Discussions** : [GitHub Discussions](https://github.com/foXaCe/Fluidra-pool/discussions)
-- **Discord** : [Home Assistant Discord](https://discord.gg/home-assistant)
+- **Issues**: [GitHub Issues](https://github.com/foXaCe/Fluidra-pool/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/foXaCe/Fluidra-pool/discussions)
+- **Discord**: [Home Assistant Discord](https://discord.gg/home-assistant)
 
 ---
 
-**⭐ Si cette intégration vous est utile, n'hésitez pas à laisser une étoile !**
+**⭐ If this integration is useful to you, feel free to leave a star!**

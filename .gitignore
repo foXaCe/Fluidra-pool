@@ -51,3 +51,13 @@ htmlcov/
 # Temporary files
 *.log
 *.tmp
+
+# Development/capture scripts (mitmproxy, reverse engineering)
+capture_*.py
+capture_*.sh
+CAPTURE_*.md
+analyze_*.py
+debug_*.py
+check_*_direct.py
+get_*_info.py
+pool_*.json
