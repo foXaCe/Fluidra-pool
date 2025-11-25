@@ -262,21 +262,6 @@ If you own other Fluidra equipment, your testing would be valuable!
 4. **Push** to the branch (`git push origin feature/AmazingFeature`)
 5. **Open** a Pull Request
 
-### Local Development
-
-```bash
-# Clone the repository
-git clone https://github.com/foXaCe/Fluidra-pool.git
-cd Fluidra-pool
-
-# Test environment setup
-cp custom_components/fluidra_pool /config/custom_components/
-
-# Tests
-python -m pytest tests/
-```
-
-
 ## 📄 License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

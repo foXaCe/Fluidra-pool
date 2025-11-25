@@ -61,3 +61,10 @@ debug_*.py
 check_*_direct.py
 get_*_info.py
 pool_*.json
+
+# Development documentation
+*_DEV.md
+*_SUPPORT.md
+*_IMPROVEMENTS.md
+*_COMPLETE.md
+*_report.md
