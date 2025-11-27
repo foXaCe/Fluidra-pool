@@ -21,7 +21,8 @@ Your contributions help me continue improving this project and adding new featur
 
 **🔬 Testing Status:**
 - ✅ **E30iQ Pump**: Fully tested and functional
-- ⚠️ **Other equipment** (lighting, heaters, etc.): Code implemented but **requires user testing**
+- ✅ **LumiPlus Connect**: RGBW lighting control tested
+- ⚠️ **Other equipment** (heaters, etc.): Code implemented but **requires user testing**
 
 ## ✨ Features
 
@@ -44,6 +45,7 @@ Your contributions help me continue improving this project and adding new featur
 - `number`: Custom speed (0-100%)
 - `time`: Schedule time configuration
 - `sensor`: Complete equipment monitoring
+- `light`: RGBW lighting control (LumiPlus Connect)
 
 ---
 
@@ -72,6 +74,13 @@ Your contributions help me continue improving this project and adding new featur
     - Boost mode (on/off)
     - Sensors: pH, ORP, free chlorine, water temperature, salinity
   - **Note**: Other Fluidra chlorinator models likely compatible
+
+#### **Pool Lighting**
+- **LumiPlus Connect** (76290_RGBW) ✅
+  - On/off control
+  - Brightness adjustment (0-100%)
+  - RGBW color control
+  - White channel support
 
 ### ⚠️ **Implemented Equipment (User Testing Required)**
 
@@ -242,9 +251,9 @@ This integration was developed through **reverse engineering** of the Fluidra Co
 
 **✅ Tested equipment:**
 - **E30iQ Pump**: Complete control (speeds, modes, scheduling)
+- **LumiPlus Connect**: RGBW lighting control (on/off, brightness, color)
 
 **⚠️ Untested equipment (help needed):**
-- **LED Lighting**: Code implemented but not tested
 - **Heaters**: Temperature sensors implemented but not tested
 - **Other accessories**: Theoretical support only
 

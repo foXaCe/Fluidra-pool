@@ -107,6 +107,11 @@
         "name": "Pompe à Chaleur"
       }
     },
+    "light": {
+      "pool_light": {
+        "name": "Éclairage Piscine"
+      }
+    },
     "number": {
       "speed_control": {
         "name": "Contrôle Vitesse"

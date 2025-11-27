@@ -107,6 +107,11 @@
         "name": "Heat Pump"
       }
     },
+    "light": {
+      "pool_light": {
+        "name": "Pool Light"
+      }
+    },
     "number": {
       "speed_control": {
         "name": "Speed Control"

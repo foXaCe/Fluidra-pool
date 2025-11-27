@@ -221,7 +221,7 @@ class FluidraPoolAPI:
                         device_type = "heat_pump"
                     elif "heater" in family_lower:
                         device_type = "heater"
-                    elif "light" in family_lower:
+                    elif "light" in family_lower or "lumiplus" in device_name_lower:
                         device_type = "light"
                     else:
                         device_type = "unknown"
@@ -829,6 +829,62 @@ class FluidraPoolAPI:
 
                 return response.status == 200
 
+        except Exception:
+            return False
+
+    async def set_component_string_value(self, device_id: str, component_id: int, value: str) -> bool:
+        """Set component value as string (for LumiPlus ON/OFF: "1"/"0")."""
+        if not self.access_token:
+            raise FluidraAuthError("Not authenticated")
+
+        if not await self.ensure_valid_token():
+            raise FluidraAuthError("Token refresh failed")
+
+        url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{device_id}/components/{component_id}?deviceType=connected"
+
+        headers = {
+            "content-type": "application/json; charset=utf-8",
+            "accept": "application/json",
+            "authorization": f"Bearer {self.access_token}",
+            "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
+        }
+
+        payload = {"desiredValue": value}
+
+        if not self._session:
+            self._session = aiohttp.ClientSession()
+
+        try:
+            async with self._session.put(url, headers=headers, json=payload) as response:
+                return response.status == 200
+        except Exception:
+            return False
+
+    async def set_component_json_value(self, device_id: str, component_id: int, value: dict) -> bool:
+        """Set component value as JSON object (for LumiPlus RGBW color)."""
+        if not self.access_token:
+            raise FluidraAuthError("Not authenticated")
+
+        if not await self.ensure_valid_token():
+            raise FluidraAuthError("Token refresh failed")
+
+        url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{device_id}/components/{component_id}?deviceType=connected"
+
+        headers = {
+            "content-type": "application/json; charset=utf-8",
+            "accept": "application/json",
+            "authorization": f"Bearer {self.access_token}",
+            "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
+        }
+
+        payload = {"desiredValue": value}
+
+        if not self._session:
+            self._session = aiohttp.ClientSession()
+
+        try:
+            async with self._session.put(url, headers=headers, json=payload) as response:
+                return response.status == 200
         except Exception:
             return False
 

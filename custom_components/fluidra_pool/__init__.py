@@ -30,6 +30,7 @@ PLATFORMS: list[Platform] = [
     Platform.NUMBER,  # Pour contrôle vitesse pompe E30iQ (0-100%)
     Platform.TIME,  # Pour édition des heures de programmation
     Platform.CLIMATE,  # Pour contrôle température pompes à chaleur
+    Platform.LIGHT,  # Pour LumiPlus Connect et autres éclairages
 ]
 
 UPDATE_INTERVAL = timedelta(seconds=45)  # Reduced frequency for better performance
