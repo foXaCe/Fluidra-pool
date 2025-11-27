@@ -751,8 +751,14 @@ class FluidraPoolAPI:
         """Disable auto mode using discovered component ID 10."""
         return await self.control_device_component(device_id, 10, 0)
 
-    async def set_schedule(self, device_id: str, schedules: List[Dict[str, Any]]) -> bool:
-        """Set pump schedule using exact format from mobile app."""
+    async def set_schedule(self, device_id: str, schedules: List[Dict[str, Any]], component_id: int = 20) -> bool:
+        """Set device schedule using exact format from mobile app.
+
+        Args:
+            device_id: The device ID
+            schedules: List of schedule dictionaries
+            component_id: Component ID for schedules (20 for pumps, 40 for lights)
+        """
         if not self.access_token:
             raise FluidraAuthError("Not authenticated")
 
@@ -761,7 +767,7 @@ class FluidraPoolAPI:
             raise FluidraAuthError("Token refresh failed")
 
         # EXACT URL format from captured traffic
-        url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{device_id}/components/20?deviceType=connected"
+        url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{device_id}/components/{component_id}?deviceType=connected"
 
         headers = {
             "content-type": "application/json; charset=utf-8",

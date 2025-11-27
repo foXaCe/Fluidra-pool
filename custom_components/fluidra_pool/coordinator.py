@@ -382,6 +382,26 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                         except (ValueError, TypeError):
                                             pass
                                     device[f"component_{component_id}_data"] = component_state
+                                elif component_id == 40:
+                                    # Component 40: Light schedules (LumiPlus Connect)
+                                    device_type = device.get("type", "")
+                                    if device_type == "light":
+                                        schedule_data = reported_value if isinstance(reported_value, list) else []
+                                        device["schedule_data"] = schedule_data
+
+                                        # Track current scheduler count for this device
+                                        current_schedule_count = len(schedule_data)
+                                        device_key = f"{pool_id}_{device_id}"
+
+                                        # Check if we had schedulers before and now have fewer
+                                        previous_count = self._previous_schedule_entities.get(device_key, 0)
+                                        if previous_count > 0 and current_schedule_count < previous_count:
+                                            await self._cleanup_schedule_sensor_if_empty(
+                                                pool_id, device_id, schedule_data
+                                            )
+
+                                        self._previous_schedule_entities[device_key] = current_schedule_count
+                                    device[f"component_{component_id}_data"] = component_state
                                 else:  # TOUS les autres components - exploration intensive
                                     device[f"component_{component_id}_data"] = component_state
 

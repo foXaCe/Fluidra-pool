@@ -126,6 +126,12 @@
       },
       "schedule_end": {
         "name": "Schedule {schedule_id} End"
+      },
+      "light_schedule_start": {
+        "name": "Light Schedule {schedule_id} Start"
+      },
+      "light_schedule_end": {
+        "name": "Light Schedule {schedule_id} End"
       }
     },
     "select": {

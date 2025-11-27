@@ -126,6 +126,12 @@
       },
       "schedule_end": {
         "name": "Planning {schedule_id} Fin"
+      },
+      "light_schedule_start": {
+        "name": "Planning Éclairage {schedule_id} Début"
+      },
+      "light_schedule_end": {
+        "name": "Planning Éclairage {schedule_id} Fin"
       }
     },
     "select": {
