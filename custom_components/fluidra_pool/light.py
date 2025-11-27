@@ -40,7 +40,7 @@ async def async_setup_entry(
         await coordinator.async_config_entry_first_refresh()
 
     if coordinator.data:
-        for pool in coordinator.data:
+        for pool_id, pool in coordinator.data.items():
             for device in pool.get("devices", []):
                 device_type = device.get("type", "")
                 family = device.get("family", "").lower()
@@ -120,8 +120,8 @@ class FluidraLight(CoordinatorEntity, LightEntity):
         if not self.coordinator.data:
             return
 
-        for pool in self.coordinator.data:
-            if pool.get("id") != self._pool_id:
+        for pool_id, pool in self.coordinator.data.items():
+            if pool_id != self._pool_id:
                 continue
 
             for device in pool.get("devices", []):
