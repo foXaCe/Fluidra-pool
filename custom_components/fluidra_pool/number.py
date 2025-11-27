@@ -44,6 +44,10 @@ async def async_setup_entry(
                 # Groupe Réglages - Contrôles de vitesse temporairement désactivés
                 pass
 
+            # LumiPlus Connect effect speed control
+            if device_type == "light":
+                entities.append(FluidraLightEffectSpeed(coordinator, coordinator.api, pool["id"], device_id))
+
     async_add_entities(entities)
 
 
@@ -657,4 +661,93 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
             "write_component": write_component,
             "current_orp_reading": current_orp,
             "device_id": self._device_id,
+        }
+
+
+class FluidraLightEffectSpeed(CoordinatorEntity, NumberEntity):
+    """Number entity for LumiPlus Connect effect speed (1-8)."""
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the effect speed control."""
+        super().__init__(coordinator)
+        self._api = api
+        self._pool_id = pool_id
+        self._device_id = device_id
+
+        device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
+
+        self._attr_name = f"{device_name} Effect Speed"
+        self._attr_unique_id = f"fluidra_{self._device_id}_effect_speed"
+        self._attr_mode = "slider"
+        self._attr_native_min_value = 1
+        self._attr_native_max_value = 8
+        self._attr_native_step = 1
+        self._attr_native_unit_of_measurement = None
+
+    @property
+    def device_data(self) -> dict:
+        """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
+        pool = self.coordinator.data.get(self._pool_id)
+        if pool:
+            for device in pool.get("devices", []):
+                if device.get("device_id") == self._device_id:
+                    return device
+        return {}
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
+        return {
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": device_name,
+            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
+            "model": self.device_data.get("model", "LumiPlus Connect"),
+            "via_device": (DOMAIN, self._pool_id),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current effect speed from component 20."""
+        components = self.device_data.get("components", {})
+        component_20 = components.get("20", {})
+        value = component_20.get("desiredValue", component_20.get("reportedValue", 1))
+        return float(value) if value else 1.0
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set effect speed to component 20."""
+        int_value = int(value)
+
+        try:
+            success = await self._api.set_component_value(self._device_id, 20, int_value)
+            if success:
+                await self.coordinator.async_request_refresh()
+        except Exception:
+            raise
+
+    @property
+    def icon(self) -> str:
+        """Return the icon."""
+        return "mdi:speedometer"
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return state attributes."""
+        return {
+            "component": 20,
+            "device_id": self._device_id,
+            "speed_range": "1-8",
         }
