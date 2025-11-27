@@ -40,15 +40,27 @@ async def async_setup_entry(
             if DeviceIdentifier.has_feature(device, "skip_schedules"):
                 continue
 
-            # LumiPlus Connect lights - 8 schedulers on component 40
+            # LumiPlus Connect lights - only create entities for existing schedules
             if device_type == "light":
-                for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
-                    entities.append(
-                        FluidraLightScheduleStartTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
-                    )
-                    entities.append(
-                        FluidraLightScheduleEndTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
-                    )
+                # Get existing schedules from coordinator data (after first poll)
+                schedule_data = []
+                if coordinator.data:
+                    pool_data = coordinator.data.get(pool["id"], {})
+                    for dev in pool_data.get("devices", []):
+                        if dev.get("device_id") == device_id:
+                            schedule_data = dev.get("schedule_data", [])
+                            break
+
+                if schedule_data:
+                    for schedule in schedule_data:
+                        schedule_id = str(schedule.get("id", ""))
+                        if schedule_id:
+                            entities.append(
+                                FluidraLightScheduleStartTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                            )
+                            entities.append(
+                                FluidraLightScheduleEndTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                            )
             # Pumps - 8 schedulers on component 20
             elif DeviceIdentifier.should_create_entity(device, "time"):
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
