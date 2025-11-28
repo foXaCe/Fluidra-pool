@@ -298,9 +298,10 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
     "generic_light": DeviceConfig(
         device_type="light",
         components_range=45,  # Include component 40 for light schedules
-        entities=["switch", "sensor_brightness", "time"],
+        entities=["switch", "sensor_brightness", "time", "select"],
         features={
-            "specific_components": [40, 45],  # Scheduler (40), RGBW color (45)
+            "specific_components": [18, 40, 45],  # Effect/Scene (18), Scheduler (40), RGBW color (45)
+            "effect_select": 18,  # Component 18 for effect/scene selection
         },
         priority=20,
     ),

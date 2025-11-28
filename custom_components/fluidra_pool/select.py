@@ -40,22 +40,50 @@ async def async_setup_entry(
             if device_type == "chlorinator":
                 skip_mode = DeviceIdentifier.has_feature(device, "skip_mode_select")
                 if not skip_mode:
-                    entities.append(FluidraChlorinatorModeSelect(coordinator, coordinator.api, pool["id"], device_id))
+                    entities.append(
+                        FluidraChlorinatorModeSelect(
+                            coordinator, coordinator.api, pool["id"], device_id
+                        )
+                    )
 
             # Skip heat pumps - they don't have speed or schedule controls
             if DeviceIdentifier.has_feature(device, "skip_schedules"):
                 continue
 
             # Speed select for variable speed pumps
-            if DeviceIdentifier.should_create_entity(device, "select") and device.get("variable_speed"):
-                entities.append(FluidraPumpSpeedSelect(coordinator, coordinator.api, pool["id"], device_id))
+            if DeviceIdentifier.should_create_entity(device, "select") and device.get(
+                "variable_speed"
+            ):
+                entities.append(
+                    FluidraPumpSpeedSelect(
+                        coordinator, coordinator.api, pool["id"], device_id
+                    )
+                )
 
             # Schedule mode selects for pumps with schedules
-            if DeviceIdentifier.should_create_entity(device, "select") and device.get("schedule_data"):
+            if DeviceIdentifier.should_create_entity(device, "select") and device.get(
+                "schedule_data"
+            ):
                 # Create selects for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                     entities.append(
-                        FluidraScheduleModeSelect(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                        FluidraScheduleModeSelect(
+                            coordinator,
+                            coordinator.api,
+                            pool["id"],
+                            device_id,
+                            schedule_id,
+                        )
+                    )
+
+            # Light effect/scene select for LumiPlus Connect
+            if device_type == "light":
+                effect_component = DeviceIdentifier.get_feature(device, "effect_select")
+                if effect_component:
+                    entities.append(
+                        FluidraLightEffectSelect(
+                            coordinator, coordinator.api, pool["id"], device_id
+                        )
                     )
 
     async_add_entities(entities)
@@ -76,7 +104,9 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         self._api = api
         self._pool_id = pool_id
         self._device_id = device_id
-        self._optimistic_option = None  # Option optimiste temporaire pendant les actions
+        self._optimistic_option = (
+            None  # Option optimiste temporaire pendant les actions
+        )
 
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
 
@@ -145,7 +175,9 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         if auto_mode_enabled:
             return False
 
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
+        return self.coordinator.last_update_success and self.device_data.get(
+            "online", False
+        )
 
     @property
     def current_option(self) -> str | None:
@@ -199,12 +231,16 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
             # For "stopped", ensure pump is ON but no active speed
             if option == "stopped":
                 # 1. S'assurer que la pompe est ON (component 9 = 1)
-                success = await self._api.control_device_component(self._device_id, 9, 1)
+                success = await self._api.control_device_component(
+                    self._device_id, 9, 1
+                )
                 if success:
                     # 2. CRUCIAL: Explicitly disable speed by sending special value
                     # Try sending -1 or a value meaning "no active speed"
                     try:
-                        await self._api.control_device_component(self._device_id, 11, -1)
+                        await self._api.control_device_component(
+                            self._device_id, 11, -1
+                        )
                     except Exception:
                         # Fallback: manually mark in device data
                         device = self._api.get_device_by_id(self._device_id)
@@ -216,7 +252,9 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                 # 1. S'assurer que la pompe est ON
                 await self._api.control_device_component(self._device_id, 9, 1)
                 # 2. Définir la vitesse
-                success = await self._api.control_device_component(self._device_id, component, value)
+                success = await self._api.control_device_component(
+                    self._device_id, component, value
+                )
 
             if success:
                 # Attendre que l'API se synchronise
@@ -247,7 +285,9 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                     device["is_running"] = bool(reported_value)
 
             # Component 11 (speed level)
-            speed_state = await self._api.get_device_component_state(self._device_id, 11)
+            speed_state = await self._api.get_device_component_state(
+                self._device_id, 11
+            )
             if speed_state:
                 speed_level = speed_state.get("reportedValue", 0)
                 device = self._api.get_device_by_id(self._device_id)
@@ -499,7 +539,11 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
     @property
     def icon(self) -> str:
         """Return the icon for the entity."""
-        icons = {"0": "mdi:speedometer-slow", "1": "mdi:speedometer-medium", "2": "mdi:speedometer"}
+        icons = {
+            "0": "mdi:speedometer-slow",
+            "1": "mdi:speedometer-medium",
+            "2": "mdi:speedometer",
+        }
         return icons.get(self.current_option, "mdi:speedometer")
 
     @property
@@ -584,7 +628,9 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
+        return self.coordinator.last_update_success and self.device_data.get(
+            "online", False
+        )
 
     @property
     def current_option(self) -> str | None:
@@ -615,7 +661,9 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
             await asyncio.sleep(0.1)
 
             # Send command to API (component 20)
-            success = await self._api.control_device_component(self._device_id, 20, mode_value)
+            success = await self._api.control_device_component(
+                self._device_id, 20, mode_value
+            )
 
             if success:
                 await asyncio.sleep(2)
@@ -645,5 +693,140 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
         return {
             "device_id": self._device_id,
             "mode_component": 20,
+            "optimistic_option": self._optimistic_option,
+        }
+
+
+class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
+    """Select entity for LumiPlus Connect light effect/scene selection."""
+
+    # Component 18 controls effect/scene selection
+    EFFECT_COMPONENT = 18
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the light effect select."""
+        super().__init__(coordinator)
+        self._api = api
+        self._pool_id = pool_id
+        self._device_id = device_id
+        self._optimistic_option = None
+
+        device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
+
+        self._attr_name = f"{device_name} Effect"
+        self._attr_unique_id = f"fluidra_{self._device_id}_effect"
+        self._attr_translation_key = "light_effect"
+
+        # Effect options (Scene 1 and Scene 2 as discovered via mitmproxy)
+        self._attr_options = ["scene_1", "scene_2"]
+
+        # Mapping options → component 18 values
+        self._effect_mapping = {"scene_1": 1, "scene_2": 2}
+
+        # Inverse mapping for display
+        self._value_to_effect = {1: "scene_1", 2: "scene_2"}
+
+    @property
+    def device_data(self) -> dict:
+        """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
+        pool = self.coordinator.data.get(self._pool_id)
+        if pool:
+            for device in pool.get("devices", []):
+                if device.get("device_id") == self._device_id:
+                    return device
+        return {}
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
+        return {
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": device_name,
+            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
+            "model": self.device_data.get("model", "LumiPlus Connect"),
+            "via_device": (DOMAIN, self._pool_id),
+        }
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self.coordinator.last_update_success and self.device_data.get(
+            "online", False
+        )
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current effect option."""
+        # Use optimistic option if set
+        if self._optimistic_option is not None:
+            return self._optimistic_option
+
+        # Get current effect from component 18
+        components = self.device_data.get("components", {})
+        component_data = components.get(str(self.EFFECT_COMPONENT), {})
+        effect_value = component_data.get(
+            "reportedValue", component_data.get("desiredValue", 1)
+        )
+
+        return self._value_to_effect.get(effect_value, "scene_1")
+
+    async def async_select_option(self, option: str) -> None:
+        """Select new effect option."""
+        if option not in self._effect_mapping:
+            return
+
+        effect_value = self._effect_mapping[option]
+
+        try:
+            # Set optimistic option immediately
+            self._optimistic_option = option
+            self.async_write_ha_state()
+
+            # Small delay for UI update
+            import asyncio
+
+            await asyncio.sleep(0.1)
+
+            # Send command to API (component 18)
+            success = await self._api.set_component_value(
+                self._device_id, self.EFFECT_COMPONENT, effect_value
+            )
+
+            if success:
+                await asyncio.sleep(2)
+                await self.coordinator.async_request_refresh()
+
+        except Exception:
+            raise
+        finally:
+            # Clear optimistic option
+            self._optimistic_option = None
+            self.async_write_ha_state()
+
+    @property
+    def icon(self) -> str:
+        """Return the icon for the entity."""
+        return "mdi:palette"
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional state attributes."""
+        components = self.device_data.get("components", {})
+        component_data = components.get(str(self.EFFECT_COMPONENT), {})
+
+        return {
+            "device_id": self._device_id,
+            "effect_component": self.EFFECT_COMPONENT,
+            "reported_value": component_data.get("reportedValue"),
+            "desired_value": component_data.get("desiredValue"),
             "optimistic_option": self._optimistic_option,
         }

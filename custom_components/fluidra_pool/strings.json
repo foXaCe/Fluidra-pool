@@ -148,6 +148,13 @@
           "on": "On",
           "auto": "Auto"
         }
+      },
+      "light_effect": {
+        "name": "Effect",
+        "state": {
+          "scene_1": "Scene 1",
+          "scene_2": "Scene 2"
+        }
       }
     }
   },

@@ -159,6 +159,13 @@
           "on": "Marche",
           "auto": "Auto"
         }
+      },
+      "light_effect": {
+        "name": "Effet",
+        "state": {
+          "scene_1": "Scène 1",
+          "scene_2": "Scène 2"
+        }
       }
     }
   },
