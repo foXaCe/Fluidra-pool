@@ -152,6 +152,7 @@
       "light_effect": {
         "name": "Effect",
         "state": {
+          "static_color": "Static Color",
           "scene_1": "Scene 1",
           "scene_2": "Scene 2"
         }

@@ -163,6 +163,7 @@
       "light_effect": {
         "name": "Effet",
         "state": {
+          "static_color": "Couleur fixe",
           "scene_1": "Scène 1",
           "scene_2": "Scène 2"
         }

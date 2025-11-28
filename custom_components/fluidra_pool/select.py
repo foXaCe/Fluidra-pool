@@ -727,14 +727,14 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
         self._attr_unique_id = f"fluidra_{self._device_id}_effect"
         self._attr_translation_key = "light_effect"
 
-        # Effect options (Scene 1 and Scene 2 as discovered via mitmproxy)
-        self._attr_options = ["scene_1", "scene_2"]
+        # Effect options (Static color + Scene 1 and Scene 2 as discovered via mitmproxy)
+        self._attr_options = ["static_color", "scene_1", "scene_2"]
 
         # Mapping options → component 18 values
-        self._effect_mapping = {"scene_1": 1, "scene_2": 2}
+        self._effect_mapping = {"static_color": 0, "scene_1": 1, "scene_2": 2}
 
         # Inverse mapping for display
-        self._value_to_effect = {1: "scene_1", 2: "scene_2"}
+        self._value_to_effect = {0: "static_color", 1: "scene_1", 2: "scene_2"}
 
     @property
     def device_data(self) -> dict:
@@ -778,10 +778,10 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
         components = self.device_data.get("components", {})
         component_data = components.get(str(self.EFFECT_COMPONENT), {})
         effect_value = component_data.get(
-            "reportedValue", component_data.get("desiredValue", 1)
+            "reportedValue", component_data.get("desiredValue", 0)
         )
 
-        return self._value_to_effect.get(effect_value, "scene_1")
+        return self._value_to_effect.get(effect_value, "static_color")
 
     async def async_select_option(self, option: str) -> None:
         """Select new effect option."""
