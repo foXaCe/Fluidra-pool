@@ -50,9 +50,11 @@ async def async_setup_entry(
             if DeviceIdentifier.has_feature(device, "skip_schedules"):
                 continue
 
-            # Speed select for variable speed pumps
-            if DeviceIdentifier.should_create_entity(device, "select") and device.get(
-                "variable_speed"
+            # Speed select for variable speed pumps (not for lights)
+            if (
+                device_type != "light"
+                and DeviceIdentifier.should_create_entity(device, "select")
+                and device.get("variable_speed")
             ):
                 entities.append(
                     FluidraPumpSpeedSelect(
@@ -60,9 +62,11 @@ async def async_setup_entry(
                     )
                 )
 
-            # Schedule mode selects for pumps with schedules
-            if DeviceIdentifier.should_create_entity(device, "select") and device.get(
-                "schedule_data"
+            # Schedule mode selects for pumps with schedules (not for lights)
+            if (
+                device_type != "light"
+                and DeviceIdentifier.should_create_entity(device, "select")
+                and device.get("schedule_data")
             ):
                 # Create selects for the actual 8 schedulers found
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
