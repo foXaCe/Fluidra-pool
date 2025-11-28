@@ -31,7 +31,9 @@ async def async_setup_entry(
     for pool in pools:
         for device in pool["devices"]:
             device_id = device.get("device_id")
-            device_type = device.get("type", "")
+            # Use device registry to get proper device type
+            config = DeviceIdentifier.identify_device(device)
+            device_type = config.device_type if config else device.get("type", "")
 
             if not device_id:
                 continue
@@ -727,14 +729,44 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
         self._attr_unique_id = f"fluidra_{self._device_id}_effect"
         self._attr_translation_key = "light_effect"
 
-        # Effect options (Static color + Scene 1 and Scene 2 as discovered via mitmproxy)
-        self._attr_options = ["static_color", "scene_1", "scene_2"]
+        # Effect options (Static color + 8 scenes as discovered via mitmproxy)
+        self._attr_options = [
+            "static_color",
+            "scene_1",
+            "scene_2",
+            "scene_3",
+            "scene_4",
+            "scene_5",
+            "scene_6",
+            "scene_7",
+            "scene_8",
+        ]
 
         # Mapping options → component 18 values
-        self._effect_mapping = {"static_color": 0, "scene_1": 1, "scene_2": 2}
+        self._effect_mapping = {
+            "static_color": 0,
+            "scene_1": 1,
+            "scene_2": 2,
+            "scene_3": 3,
+            "scene_4": 4,
+            "scene_5": 5,
+            "scene_6": 6,
+            "scene_7": 7,
+            "scene_8": 8,
+        }
 
         # Inverse mapping for display
-        self._value_to_effect = {0: "static_color", 1: "scene_1", 2: "scene_2"}
+        self._value_to_effect = {
+            0: "static_color",
+            1: "scene_1",
+            2: "scene_2",
+            3: "scene_3",
+            4: "scene_4",
+            5: "scene_5",
+            6: "scene_6",
+            7: "scene_7",
+            8: "scene_8",
+        }
 
     @property
     def device_data(self) -> dict:
@@ -800,16 +832,28 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
 
             await asyncio.sleep(0.1)
 
-            # Send command to API (component 18)
-            success = await self._api.set_component_value(
+            _LOGGER.debug(
+                "Setting light effect for %s: component %s = %s",
+                self._device_id,
+                self.EFFECT_COMPONENT,
+                effect_value,
+            )
+
+            # Send command to API (component 18) using control_device_component
+            # which properly updates local state
+            success = await self._api.control_device_component(
                 self._device_id, self.EFFECT_COMPONENT, effect_value
             )
 
+            _LOGGER.debug("Light effect API call result: %s", success)
+
             if success:
-                await asyncio.sleep(2)
+                # Wait for device to process the command
+                await asyncio.sleep(3)
                 await self.coordinator.async_request_refresh()
 
-        except Exception:
+        except Exception as err:
+            _LOGGER.error("Failed to set light effect: %s", err)
             raise
         finally:
             # Clear optimistic option

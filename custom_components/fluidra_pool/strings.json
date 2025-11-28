@@ -154,7 +154,13 @@
         "state": {
           "static_color": "Static Color",
           "scene_1": "Scene 1",
-          "scene_2": "Scene 2"
+          "scene_2": "Scene 2",
+          "scene_3": "Scene 3",
+          "scene_4": "Scene 4",
+          "scene_5": "Scene 5",
+          "scene_6": "Scene 6",
+          "scene_7": "Scene 7",
+          "scene_8": "Scene 8"
         }
       }
     }

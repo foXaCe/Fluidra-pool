@@ -90,6 +90,9 @@ class FluidraLight(CoordinatorEntity, LightEntity):
         self._brightness = 255
         self._rgbw_color = (255, 255, 255, 255)  # Default white
 
+        # Optimistic state to prevent coordinator from overwriting during command
+        self._optimistic_state = None  # None, True, or False
+
     @property
     def device_info(self) -> dict[str, Any]:
         """Return device info."""
@@ -103,6 +106,9 @@ class FluidraLight(CoordinatorEntity, LightEntity):
     @property
     def is_on(self) -> bool:
         """Return true if light is on."""
+        # Use optimistic state if set
+        if self._optimistic_state is not None:
+            return self._optimistic_state
         return self._is_on
 
     @property
@@ -158,6 +164,12 @@ class FluidraLight(CoordinatorEntity, LightEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the light."""
+        import asyncio
+
+        # Set optimistic state immediately
+        self._optimistic_state = True
+        self.async_write_ha_state()
+
         # Handle brightness
         if ATTR_BRIGHTNESS in kwargs:
             brightness_255 = kwargs[ATTR_BRIGHTNESS]
@@ -188,12 +200,25 @@ class FluidraLight(CoordinatorEntity, LightEntity):
         )
         self._is_on = True
 
+        # Wait for device to process, then clear optimistic state
+        await asyncio.sleep(5)
+        self._optimistic_state = None
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the light."""
+        import asyncio
+
+        # Set optimistic state immediately
+        self._optimistic_state = False
+        self.async_write_ha_state()
+
         await self.coordinator.api.set_component_string_value(
             self._device_id, COMPONENT_POWER, "0"
         )
         self._is_on = False
+
+        # Wait for device to process, then clear optimistic state
+        await asyncio.sleep(5)
+        self._optimistic_state = None
         self.async_write_ha_state()
