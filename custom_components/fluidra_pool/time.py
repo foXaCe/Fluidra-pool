@@ -31,7 +31,9 @@ async def async_setup_entry(
     for pool in pools:
         for device in pool["devices"]:
             device_id = device.get("device_id")
-            device_type = device.get("type", "")
+            # Use device registry to get proper device type
+            config = DeviceIdentifier.identify_device(device)
+            device_type = config.device_type if config else device.get("type", "")
 
             if not device_id:
                 continue
