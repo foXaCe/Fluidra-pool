@@ -384,7 +384,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                     device[f"component_{component_id}_data"] = component_state
                                 elif component_id == 40:
                                     # Component 40: Light schedules (LumiPlus Connect)
-                                    device_type = device.get("type", "")
+                                    # Use device registry to get proper device type
+                                    config = DeviceIdentifier.identify_device(device)
+                                    device_type = config.device_type if config else device.get("type", "")
                                     if device_type == "light":
                                         schedule_data = reported_value if isinstance(reported_value, list) else []
                                         device["schedule_data"] = schedule_data
