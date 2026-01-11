@@ -69,7 +69,7 @@ async def async_setup_entry(
             # Chlorinator sensors
             device_type = device.get("type", "")
             if device_type == "chlorinator":
-                skip_ph_orp = DeviceIdentifier.has_feature(device, "skip_ph_orp_sensors")
+                skip_ph_orp = DeviceIdentifier.has_feature(device, "skip_ph_orp")
 
                 # Get sensor components from device registry
                 sensors_config = DeviceIdentifier.get_feature(device, "sensors", {})
@@ -118,6 +118,15 @@ async def async_setup_entry(
                         coordinator, coordinator.api, pool["id"], device_id, "salinity", salinity_component
                     )
                 )
+
+                # Chlorination actual sensor (optional - only for models that have it)
+                if "chlorination_actual" in sensors_config:
+                    chlorination_actual_component = sensors_config.get("chlorination_actual")
+                    entities.append(
+                        FluidraChlorinatorSensor(
+                            coordinator, coordinator.api, pool["id"], device_id, "chlorination_actual", chlorination_actual_component
+                        )
+                    )
 
                 # Count sensors dynamically
                 sensor_count = 2  # Base: temperature + salinity
@@ -637,17 +646,13 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
         """Return the state of the sensor."""
         try:
             info_data = self._get_device_info_data()
-
-            # Afficher le firmware en état principal
-            firmware = info_data.get("firmware_version", self._translate_device_info("unknown"))
             signal = info_data.get("signal_strength", 0)
-
-            firmware_label = self._translate_device_info("firmware")
             signal_label = self._translate_device_info("signal")
 
+            # Only show signal (firmware not reliable across devices)
             if signal and signal != 0:
-                return f"{firmware_label} {firmware} ({signal_label}: {signal} dBm)"
-            return f"{firmware_label} {firmware}"
+                return f"{signal_label}: {signal} dBm"
+            return self._translate_device_info("online")
 
         except Exception:
             pass
@@ -1159,6 +1164,14 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
                 "state_class": SensorStateClass.MEASUREMENT,
                 "icon": "mdi:water-opacity",
                 "divisor": 100,  # Component value is g/L * 100
+            },
+            "chlorination_actual": {
+                "name": f"{device_name} Chlorination Actual",
+                "unit": PERCENTAGE,
+                "device_class": None,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "icon": "mdi:percent",
+                "divisor": 1,  # Component value is already percentage
             },
         }
 

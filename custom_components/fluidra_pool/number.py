@@ -37,8 +37,11 @@ async def async_setup_entry(
             # Chlorinator chlorination level
             if device_type == "chlorinator":
                 entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool["id"], device_id))
-                entities.append(FluidraChlorinatorPhSetpoint(coordinator, coordinator.api, pool["id"], device_id))
-                entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool["id"], device_id))
+                # Only add pH/ORP setpoints if not skipped (some models don't have pH/ORP)
+                skip_ph_orp = DeviceIdentifier.has_feature(device, "skip_ph_orp")
+                if not skip_ph_orp:
+                    entities.append(FluidraChlorinatorPhSetpoint(coordinator, coordinator.api, pool["id"], device_id))
+                    entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool["id"], device_id))
 
             if device_type == DEVICE_TYPE_PUMP:
                 # Groupe Réglages - Contrôles de vitesse temporairement désactivés

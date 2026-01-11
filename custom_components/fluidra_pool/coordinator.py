@@ -266,7 +266,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                 elif component_id == 2:  # Signal Strength
                                     device["signal_strength_component"] = reported_value
                                 elif component_id == 3:  # Firmware Version
-                                    device["firmware_version_component"] = reported_value
+                                    if not DeviceIdentifier.has_feature(device, "skip_firmware"):
+                                        device["firmware_version_component"] = reported_value
                                 elif component_id == 4:  # Hardware Errors
                                     device["hardware_errors_component"] = reported_value
                                 elif component_id == 5:  # Communication Errors
