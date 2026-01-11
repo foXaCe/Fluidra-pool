@@ -288,6 +288,29 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         },
         priority=91,  # Higher than CC25013923 for more specific match
     ),
+    "dm24049704_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["DM24049704*"],  # Domotic S2 chlorinator (SheepPool)
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "select", "number", "sensor_info"],  # Full features
+        features={
+            "chlorination_level": 4,  # Component 4 (0-100%) - e.g., 100 = 100%
+            "mode_control": True,  # Component 20: 0=OFF, 1=ON, 2=AUTO
+            "ph_setpoint": 8,  # Component 8 (÷100) - e.g., 740 = 7.40 pH
+            "orp_setpoint": 11,  # Component 11 (mV) - e.g., 690 = 690 mV
+            "boost_mode": 245,  # Component 245 (boolean: true/false)
+            "sensors": {
+                "ph": 172,  # pH measured value (÷100) - e.g., 738 = 7.38 pH
+                "orp": 177,  # ORP/Redox measured value (mV) - e.g., 740 mV
+                "temperature": 183,  # Pool temperature (°C × 10) - e.g., 42 = 4.2°C
+            },
+            # Specific components for DM24049704 (Domotic S2)
+            "specific_components": [4, 8, 11, 20, 172, 177, 183, 245],
+        },
+        priority=92,  # Higher than CC25005502 for specific match
+    ),
     "e30iq_pump": DeviceConfig(
         device_type="pump",
         identifier_patterns=["E30*", "PUMP*"],
