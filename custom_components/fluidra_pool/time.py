@@ -64,8 +64,19 @@ async def async_setup_entry(
                                 FluidraLightScheduleEndTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
                             )
             # Pumps - 8 schedulers on component 20
-            elif DeviceIdentifier.should_create_entity(device, "time"):
+            elif device_type == "pump" and DeviceIdentifier.should_create_entity(device, "time"):
                 for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
+                    entities.append(
+                        FluidraScheduleStartTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                    )
+                    entities.append(
+                        FluidraScheduleEndTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                    )
+            # Chlorinators with schedules (e.g., DM24049704)
+            elif device_type == "chlorinator" and DeviceIdentifier.has_feature(device, "schedules"):
+                schedule_count = DeviceIdentifier.get_feature(device, "schedule_count", 3)
+                for i in range(schedule_count):
+                    schedule_id = str(i)
                     entities.append(
                         FluidraScheduleStartTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
                     )

@@ -6,7 +6,7 @@ from typing import Any, Dict
 from homeassistant.components.number import NumberDeviceClass, NumberEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -298,6 +298,11 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_device_class = NumberDeviceClass.POWER_FACTOR
 
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.async_write_ha_state()
+
     @property
     def device_data(self) -> dict:
         """Get device data from coordinator."""
@@ -329,26 +334,34 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Return the current chlorination level from component 10."""
+        """Return the current chlorination level."""
+        # Get chlorination level component from device config (default to 10 for CC* devices)
+        chlorination_component = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", 10)
+
         components = self.device_data.get("components", {})
-        component_10 = components.get("10", {})
-        value = component_10.get("desiredValue", component_10.get("reportedValue", 0))
+        component_data = components.get(str(chlorination_component), {})
+        value = component_data.get("desiredValue", component_data.get("reportedValue", 0))
+
         return float(value)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set chlorination level to component 10."""
+        """Set chlorination level."""
+        # Get chlorination level component from device config (default to 10 for CC* devices)
+        chlorination_component = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", 10)
+
         # Round to nearest multiple of 10 for CC24033907 compatibility
         int_value = round(value / 10) * 10
 
         # Optimistic update: Update coordinator data immediately for instant UI feedback
         components = self.device_data.get("components", {})
-        if "10" not in components:
-            components["10"] = {}
-        components["10"]["desiredValue"] = int_value
+        comp_key = str(chlorination_component)
+        if comp_key not in components:
+            components[comp_key] = {}
+        components[comp_key]["desiredValue"] = int_value
         self.async_write_ha_state()
 
         try:
-            success = await self._api.control_device_component(self._device_id, 10, int_value)
+            success = await self._api.control_device_component(self._device_id, chlorination_component, int_value)
             if not success:
                 pass
         except Exception:
@@ -362,8 +375,9 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return state attributes."""
+        chlorination_component = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", 10)
         return {
-            "component": 10,
+            "component": chlorination_component,
             "device_id": self._device_id,
         }
 

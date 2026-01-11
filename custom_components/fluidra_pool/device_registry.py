@@ -294,20 +294,26 @@ DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
-        entities=["switch", "select", "number", "sensor_info"],  # Full features
+        entities=["switch", "select", "number", "sensor_info", "time"],  # Full features + schedules
         features={
             "chlorination_level": 4,  # Component 4 (0-100%) - e.g., 100 = 100%
             "mode_control": True,  # Component 20: 0=OFF, 1=ON, 2=AUTO
             "ph_setpoint": 8,  # Component 8 (÷100) - e.g., 740 = 7.40 pH
             "orp_setpoint": 11,  # Component 11 (mV) - e.g., 690 = 690 mV
             "boost_mode": 245,  # Component 245 (boolean: true/false)
+            "skip_signal": True,  # Component 2 is not RSSI for this device
+            "skip_firmware": True,  # Component 3 is not firmware for this device
+            "schedules": True,  # Has schedule support
+            "schedule_component": 258,  # Component 258 for schedules
+            "schedule_count": 3,  # 3 schedule slots
             "sensors": {
                 "ph": 172,  # pH measured value (÷100) - e.g., 738 = 7.38 pH
                 "orp": 177,  # ORP/Redox measured value (mV) - e.g., 740 mV
                 "temperature": 183,  # Pool temperature (°C × 10) - e.g., 42 = 4.2°C
+                "salinity": 185,  # Salinity (g/L) - e.g., 0 = 0 g/L
             },
             # Specific components for DM24049704 (Domotic S2)
-            "specific_components": [4, 8, 11, 20, 172, 177, 183, 245],
+            "specific_components": [4, 8, 11, 20, 172, 177, 183, 185, 245, 258],
         },
         priority=92,  # Higher than CC25005502 for specific match
     ),

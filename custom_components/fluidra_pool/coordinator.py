@@ -13,7 +13,7 @@ from .fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
-UPDATE_INTERVAL = timedelta(seconds=30)
+UPDATE_INTERVAL = timedelta(seconds=15)
 
 
 class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
@@ -205,19 +205,35 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                 # Le prochain refresh normal (30s) fera le scan complet
                 return {pool["id"]: pool for pool in pools}
 
+            # Récupérer les données précédentes pour préserver les components
+            previous_data = self.data if isinstance(self.data, dict) else {}
+
             # Pour chaque pool, faire le polling temps réel des devices
             for pool in pools:
                 pool_id = pool["id"]
 
+                # Récupérer les devices précédents avec leurs components
+                prev_pool = previous_data.get(pool_id, {})
+                prev_devices_by_id = {d.get("device_id"): d for d in prev_pool.get("devices", []) if d.get("device_id")}
+
                 # Récupération des détails spécifiques de la piscine
                 pool_details = await self.api.get_pool_details(pool_id)
                 if pool_details:
-                    # Sauvegarder les devices existants avant la mise à jour
-                    existing_devices = pool.get("devices", [])
+                    # Sauvegarder les devices de l'API avant la mise à jour
+                    api_devices = pool.get("devices", [])
                     # Mise à jour des données piscine avec les détails de l'API
                     pool.update(pool_details)
-                    # Restaurer les devices pour ne pas les écraser
-                    pool["devices"] = existing_devices
+                    # Restaurer les devices
+                    pool["devices"] = api_devices
+
+                # Préserver les components des devices précédents
+                for device in pool.get("devices", []):
+                    device_id = device.get("device_id")
+                    if device_id and device_id in prev_devices_by_id:
+                        prev_device = prev_devices_by_id[device_id]
+                        # Copier les components du précédent refresh
+                        if "components" in prev_device:
+                            device["components"] = dict(prev_device["components"])
 
                 # Polling télémétrie qualité de l'eau
                 water_quality = await self.api.poll_water_quality(pool_id)
@@ -264,7 +280,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                 elif component_id == 1:  # Part Numbers
                                     device["part_numbers_component"] = reported_value
                                 elif component_id == 2:  # Signal Strength
-                                    device["signal_strength_component"] = reported_value
+                                    if not DeviceIdentifier.has_feature(device, "skip_signal"):
+                                        device["signal_strength_component"] = reported_value
                                 elif component_id == 3:  # Firmware Version
                                     if not DeviceIdentifier.has_feature(device, "skip_firmware"):
                                         device["firmware_version_component"] = reported_value
@@ -405,7 +422,25 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
                                         self._previous_schedule_entities[device_key] = current_schedule_count
                                     device[f"component_{component_id}_data"] = component_state
-                                else:  # TOUS les autres components - exploration intensive
+                                else:
+                                    # Check if this is a device-specific schedule component
+                                    schedule_comp = DeviceIdentifier.get_feature(device, "schedule_component")
+                                    if schedule_comp and component_id == schedule_comp:
+                                        # Device-specific schedule component (e.g., 258 for DM24049704)
+                                        schedule_data = reported_value if isinstance(reported_value, list) else []
+                                        device["schedule_data"] = schedule_data
+
+                                        current_schedule_count = len(schedule_data)
+                                        device_key = f"{pool_id}_{device_id}"
+
+                                        previous_count = self._previous_schedule_entities.get(device_key, 0)
+                                        if previous_count > 0 and current_schedule_count < previous_count:
+                                            await self._cleanup_schedule_sensor_if_empty(
+                                                pool_id, device_id, schedule_data
+                                            )
+
+                                        self._previous_schedule_entities[device_key] = current_schedule_count
+                                    # Store all other components for exploration
                                     device[f"component_{component_id}_data"] = component_state
 
             # Collect all current device IDs from API
