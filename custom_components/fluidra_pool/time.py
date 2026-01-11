@@ -5,7 +5,7 @@ import logging
 
 from homeassistant.components.time import TimeEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -15,6 +15,55 @@ from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def parse_schedule_time(time_value) -> time | None:
+    """Parse schedule time - handles both numeric (minutes) and CRON format.
+
+    Formats supported:
+    - Numeric minutes from midnight: 540 -> 09:00
+    - CRON format: "0 5 * * 1,2,3,4,5,6,7" -> 05:00
+    """
+    if time_value is None:
+        return None
+
+    # If it's already a time object, return it
+    if isinstance(time_value, time):
+        return time_value
+
+    # If it's a number (minutes from midnight)
+    if isinstance(time_value, (int, float)):
+        minutes = int(time_value)
+        hours = minutes // 60
+        mins = minutes % 60
+        return time(hours % 24, mins)
+
+    # If it's a string
+    if isinstance(time_value, str):
+        time_value = time_value.strip()
+
+        # Try CRON format: "mm HH * * days"
+        parts = time_value.split()
+        if len(parts) >= 2:
+            try:
+                minute = int(parts[0])
+                hour = int(parts[1])
+                if 0 <= hour <= 23 and 0 <= minute <= 59:
+                    return time(hour, minute)
+            except (ValueError, TypeError):
+                pass
+
+        # Try numeric string (minutes from midnight)
+        try:
+            minutes = int(time_value)
+            hours = minutes // 60
+            mins = minutes % 60
+            if 0 <= hours <= 23:
+                return time(hours, mins)
+        except (ValueError, TypeError):
+            pass
+
+    return None
 
 
 async def async_setup_entry(
@@ -151,18 +200,14 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
         """Return True if the schedule exists."""
         return self._get_schedule_data() is not None
 
-    def _parse_cron_time(self, cron_time: str) -> time | None:
-        """Parse cron time format 'mm HH * * 0,1,2,3,4,5,6' to time object."""
-        try:
-            parts = cron_time.split()
-            if len(parts) >= 2:
-                minute = int(parts[0])
-                hour = int(parts[1])
-                return time(hour, minute)
-        except Exception:
-            pass
-            pass
-        return None
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.async_write_ha_state()
+
+    def _parse_cron_time(self, cron_time) -> time | None:
+        """Parse cron time format or numeric minutes to time object."""
+        return parse_schedule_time(cron_time)
 
     def _format_time_to_cron(self, time_obj: time, days: list = None) -> str:
         """Format time object to cron format."""
@@ -426,17 +471,14 @@ class FluidraLightScheduleTimeEntity(CoordinatorEntity, TimeEntity):
         """Return True if the schedule exists."""
         return self._get_schedule_data() is not None
 
-    def _parse_cron_time(self, cron_time: str) -> time | None:
-        """Parse cron time format 'mm HH * * days' to time object."""
-        try:
-            parts = cron_time.split()
-            if len(parts) >= 2:
-                minute = int(parts[0])
-                hour = int(parts[1])
-                return time(hour, minute)
-        except Exception:
-            pass
-        return None
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.async_write_ha_state()
+
+    def _parse_cron_time(self, cron_time) -> time | None:
+        """Parse cron time format or numeric minutes to time object."""
+        return parse_schedule_time(cron_time)
 
     def _format_time_to_cron(self, time_obj: time, days: list = None) -> str:
         """Format time object to cron format."""
