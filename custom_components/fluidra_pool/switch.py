@@ -1,7 +1,7 @@
 """Switch platform for Fluidra Pool integration."""
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
@@ -1016,7 +1016,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             raise
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         # Get component number dynamically from device config
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)

@@ -107,10 +107,14 @@ async def async_setup_entry(
                         schedule_id = str(schedule.get("id", ""))
                         if schedule_id:
                             entities.append(
-                                FluidraLightScheduleStartTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                                FluidraLightScheduleStartTimeEntity(
+                                    coordinator, coordinator.api, pool["id"], device_id, schedule_id
+                                )
                             )
                             entities.append(
-                                FluidraLightScheduleEndTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
+                                FluidraLightScheduleEndTimeEntity(
+                                    coordinator, coordinator.api, pool["id"], device_id, schedule_id
+                                )
                             )
             # Pumps - 8 schedulers on component 20
             elif device_type == "pump" and DeviceIdentifier.should_create_entity(device, "time"):
@@ -750,4 +754,3 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
 
         except Exception:
             pass
-

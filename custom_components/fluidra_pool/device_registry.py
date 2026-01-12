@@ -5,7 +5,7 @@ and reduce the risk of breaking existing devices.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any
 
 
 @dataclass
@@ -13,27 +13,27 @@ class DeviceConfig:
     """Configuration for a specific device type."""
 
     device_type: str  # Type général: pump, heat_pump, heater, light
-    identifier_patterns: List[str] = field(default_factory=list)  # Patterns d'identification (ex: ["LG*"])
-    name_patterns: List[str] = field(default_factory=list)  # Patterns dans le nom
-    family_patterns: List[str] = field(default_factory=list)  # Patterns dans la famille
-    model_patterns: List[str] = field(default_factory=list)  # Patterns dans le modèle
+    identifier_patterns: list[str] = field(default_factory=list)  # Patterns d'identification (ex: ["LG*"])
+    name_patterns: list[str] = field(default_factory=list)  # Patterns dans le nom
+    family_patterns: list[str] = field(default_factory=list)  # Patterns dans la famille
+    model_patterns: list[str] = field(default_factory=list)  # Patterns dans le modèle
 
     # Composants à scanner
     components_range: int = 25  # Nombre de composants à scanner
-    required_components: List[int] = field(default_factory=list)  # Composants obligatoires
+    required_components: list[int] = field(default_factory=list)  # Composants obligatoires
 
     # Entités Home Assistant à créer
-    entities: List[str] = field(default_factory=list)  # Types d'entités: switch, sensor, climate, etc.
+    entities: list[str] = field(default_factory=list)  # Types d'entités: switch, sensor, climate, etc.
 
     # Features spécifiques
-    features: Dict[str, Any] = field(default_factory=dict)
+    features: dict[str, Any] = field(default_factory=dict)
 
     # Priorité de détection (plus haut = vérifié en premier)
     priority: int = 0
 
 
 # Configuration centralisée des équipements
-DEVICE_CONFIGS: Dict[str, DeviceConfig] = {
+DEVICE_CONFIGS: dict[str, DeviceConfig] = {
     "lg_heat_pump": DeviceConfig(
         device_type="heat_pump",
         identifier_patterns=["LG*"],
@@ -388,7 +388,7 @@ class DeviceIdentifier:
     """Helper to identify device type from device data."""
 
     @staticmethod
-    def _matches_pattern(value: str, patterns: List[str]) -> bool:
+    def _matches_pattern(value: str, patterns: list[str]) -> bool:
         """Check if value matches any pattern (supports * wildcard)."""
         if not value or not patterns:
             return False
@@ -410,7 +410,7 @@ class DeviceIdentifier:
         return False
 
     @staticmethod
-    def _check_component_signature(device: dict, component_id: int, value_patterns: List[str]) -> bool:
+    def _check_component_signature(device: dict, component_id: int, value_patterns: list[str]) -> bool:
         """Check if a specific component contains expected values."""
         try:
             components = device.get("components", {})

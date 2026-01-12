@@ -4,17 +4,15 @@ Fluidra Pool integration for Home Assistant.
 This integration provides support for Fluidra Pool systems.
 """
 
-import asyncio
 from datetime import timedelta
 import logging
-from typing import Any, Dict, List
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import config_validation as cv, device_registry as dr
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 import voluptuous as vol
 
 from .const import CONF_EMAIL, CONF_PASSWORD, DOMAIN

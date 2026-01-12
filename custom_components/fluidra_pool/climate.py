@@ -1,7 +1,7 @@
 """Climate platform for Fluidra Pool integration."""
 
 import logging
-from typing import Any, List
+from typing import Any
 
 from homeassistant.components.climate import (
     ClimateEntity,
@@ -200,12 +200,12 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         return features
 
     @property
-    def hvac_modes(self) -> List[HVACMode]:
+    def hvac_modes(self) -> list[HVACMode]:
         """Return the list of available hvac operation modes."""
         return [HVACMode.OFF, HVACMode.HEAT]
 
     @property
-    def preset_modes(self) -> List[str]:
+    def preset_modes(self) -> list[str]:
         """Return available preset modes for heat pumps with this feature."""
         if DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
             return LG_PRESET_MODES

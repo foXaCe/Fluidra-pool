@@ -2,7 +2,7 @@
 
 from datetime import datetime, time
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -124,7 +124,12 @@ async def async_setup_entry(
                     chlorination_actual_component = sensors_config.get("chlorination_actual")
                     entities.append(
                         FluidraChlorinatorSensor(
-                            coordinator, coordinator.api, pool["id"], device_id, "chlorination_actual", chlorination_actual_component
+                            coordinator,
+                            coordinator.api,
+                            pool["id"],
+                            device_id,
+                            "chlorination_actual",
+                            chlorination_actual_component,
                         )
                     )
 
@@ -472,7 +477,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
             else f"{speed_name} (100%)"
         )
 
-    def _get_current_schedule(self, schedules: List[dict]) -> dict | None:
+    def _get_current_schedule(self, schedules: list[dict]) -> dict | None:
         """Get currently active schedule based on current time."""
         now = datetime.now().time()
 
@@ -487,7 +492,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                 return schedule
         return None
 
-    def _get_schedules_data(self) -> List[dict]:
+    def _get_schedules_data(self) -> list[dict]:
         """Get schedules data from device data."""
         # Chercher dans les données du coordinateur d'abord
         device_data = self.device_data
@@ -523,7 +528,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
             return self._translate_schedule_state("error")
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         attrs = {}
 
@@ -613,7 +618,7 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
         }
         return translations.get(key, key)
 
-    def _get_device_info_data(self) -> Dict[str, Any]:
+    def _get_device_info_data(self) -> dict[str, Any]:
         """Get device information from coordinator data."""
         # Récupérer les informations du device depuis le coordinateur
         device_data = self.device_data
@@ -659,7 +664,7 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
             return self._translate_device_info("error")
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         attrs = {}
 
@@ -1197,7 +1202,7 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
         return {}
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
         return {
@@ -1231,7 +1236,7 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
             return None
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         components = self.device_data.get("components", {})
         component_data = components.get(str(self._component_id), {})

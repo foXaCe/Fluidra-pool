@@ -1,7 +1,7 @@
 """Number platform for Fluidra Pool integration."""
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from homeassistant.components.number import NumberDeviceClass, NumberEntity
 from homeassistant.config_entries import ConfigEntry
@@ -102,7 +102,7 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
         return self.coordinator.data.get(self._pool_id, {})
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         return {
@@ -151,7 +151,7 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
         return "mdi:pump"
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         components = self.device_data.get("components", {})
         component_data = components.get(str(self._component_id), {})
@@ -203,7 +203,7 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
         return {}
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         return {
@@ -257,7 +257,7 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
         return "mdi:pump-off"
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         current_speed = self.native_value or 0
         speed_level = "high" if current_speed >= 85 else "medium" if current_speed >= 65 else "low"
@@ -316,7 +316,7 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         return {}
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
         return {
@@ -373,7 +373,7 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         return "mdi:water-percent"
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return state attributes."""
         chlorination_component = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", 10)
         return {
@@ -424,7 +424,7 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         return {}
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
         return {
@@ -505,7 +505,7 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         return "mdi:ph"
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         # Get component config dynamically
         ph_config = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint", {"write": 8, "read": 172})
@@ -582,7 +582,7 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         return {}
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
         return {
@@ -654,7 +654,7 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         return "mdi:lightning-bolt"
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         # Get component config dynamically
         orp_config = DeviceIdentifier.get_feature(self.device_data, "orp_setpoint", {"write": 11, "read": 177})
@@ -720,7 +720,7 @@ class FluidraLightEffectSpeed(CoordinatorEntity, NumberEntity):
         return {}
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
         return {
@@ -761,7 +761,7 @@ class FluidraLightEffectSpeed(CoordinatorEntity, NumberEntity):
         return "mdi:speedometer"
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return state attributes."""
         return {
             "component": 20,

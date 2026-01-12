@@ -7,7 +7,7 @@ optimized for Home Assistant usage with real AWS Cognito authentication.
 
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 import aiohttp
 
@@ -49,9 +49,9 @@ class FluidraPoolAPI:
         self.token_expires_at: int | None = None  # Timestamp d'expiration
 
         # Account data
-        self.user_pools: List[Dict[str, Any]] = []
-        self.devices: List[Dict[str, Any]] = []
-        self._pools: List[Dict[str, Any]] = []
+        self.user_pools: list[dict[str, Any]] = []
+        self.devices: list[dict[str, Any]] = []
+        self._pools: list[dict[str, Any]] = []
 
         # Component control mappings discovered via reverse engineering
         self.component_mappings = {
@@ -91,7 +91,7 @@ class FluidraPoolAPI:
             await self.async_update_data()
 
         except Exception as e:
-            raise FluidraAuthError(f"Authentication failed: {e}")
+            raise FluidraAuthError(f"Authentication failed: {e}") from e
 
     async def _cognito_initial_auth(self):
         """Authentification initiale AWS Cognito."""
@@ -118,7 +118,7 @@ class FluidraPoolAPI:
             try:
                 auth_data = json.loads(response_text)
             except json.JSONDecodeError as e:
-                raise FluidraAuthError(f"Invalid JSON response: {e}")
+                raise FluidraAuthError(f"Invalid JSON response: {e}") from e
 
             auth_result = auth_data.get("AuthenticationResult", {})
 
@@ -346,7 +346,7 @@ class FluidraPoolAPI:
                 return True
             return False
 
-    async def get_pools(self) -> List[Dict[str, Any]]:
+    async def get_pools(self) -> list[dict[str, Any]]:
         """Retourner les piscines découvertes lors de l'authentification."""
         if not self.access_token:
             raise FluidraAuthError("Not authenticated")
@@ -394,14 +394,14 @@ class FluidraPoolAPI:
         self._pools = pools
         return self._pools
 
-    def get_pool_by_id(self, pool_id: str) -> Dict[str, Any] | None:
+    def get_pool_by_id(self, pool_id: str) -> dict[str, Any] | None:
         """Get a specific pool by ID."""
         for pool in self._pools:
             if pool["id"] == pool_id:
                 return pool
         return None
 
-    def get_device_by_id(self, device_id: str) -> Dict[str, Any] | None:
+    def get_device_by_id(self, device_id: str) -> dict[str, Any] | None:
         """Get a specific device by ID across all pools."""
         for pool in self._pools:
             for device in pool["devices"]:
@@ -409,7 +409,7 @@ class FluidraPoolAPI:
                     return device
         return None
 
-    async def poll_device_status(self, pool_id: str, device_id: str) -> Dict[str, Any] | None:
+    async def poll_device_status(self, pool_id: str, device_id: str) -> dict[str, Any] | None:
         """
         Polling principal de l'état des équipements (découvert via reverse engineering).
         Pattern: GET /generic/devices?poolId=...&format=tree toutes les 30s
@@ -460,7 +460,7 @@ class FluidraPoolAPI:
         except Exception:
             return None
 
-    async def poll_water_quality(self, pool_id: str) -> Dict[str, Any] | None:
+    async def poll_water_quality(self, pool_id: str) -> dict[str, Any] | None:
         """
         Polling télémétrie qualité de l'eau.
         Pattern: GET /generic/pools/.../assistant/algorithms/telemetryWaterQuality/jobs
@@ -491,7 +491,7 @@ class FluidraPoolAPI:
         except Exception:
             return None
 
-    async def get_component_state(self, device_id: str, component_id: int) -> Dict[str, Any] | None:
+    async def get_component_state(self, device_id: str, component_id: int) -> dict[str, Any] | None:
         """
         Récupère l'état d'un component spécifique (reportedValue/desiredValue).
         Cette méthode peut être appelée individuellement pour un component ou via PUT.
@@ -522,7 +522,7 @@ class FluidraPoolAPI:
         except Exception:
             return None
 
-    async def get_device_component_state(self, device_id: str, component_id: int) -> Dict[str, Any] | None:
+    async def get_device_component_state(self, device_id: str, component_id: int) -> dict[str, Any] | None:
         """Get the state of a device component."""
         if not self.access_token:
             raise FluidraAuthError("Not authenticated")
@@ -751,7 +751,7 @@ class FluidraPoolAPI:
         """Disable auto mode using discovered component ID 10."""
         return await self.control_device_component(device_id, 10, 0)
 
-    async def set_schedule(self, device_id: str, schedules: List[Dict[str, Any]], component_id: int = 20) -> bool:
+    async def set_schedule(self, device_id: str, schedules: list[dict[str, Any]], component_id: int = 20) -> bool:
         """Set device schedule using exact format from mobile app.
 
         Args:
@@ -791,7 +791,7 @@ class FluidraPoolAPI:
         except Exception:
             return False
 
-    async def get_default_schedule(self) -> List[Dict[str, Any]]:
+    async def get_default_schedule(self) -> list[dict[str, Any]]:
         """Get a default schedule template based on captured data."""
         return [
             {
@@ -898,7 +898,7 @@ class FluidraPoolAPI:
         """Clear all schedules for device."""
         return await self.set_schedule(device_id, [])
 
-    async def get_pool_details(self, pool_id: str) -> Dict[str, Any] | None:
+    async def get_pool_details(self, pool_id: str) -> dict[str, Any] | None:
         """
         Récupérer les détails spécifiques de la piscine.
         Pattern: GET /generic/pools/{poolId}
@@ -947,7 +947,7 @@ class FluidraPoolAPI:
 
         return pool_data if pool_data else None
 
-    async def get_user_pools(self) -> List[Dict[str, Any]] | None:
+    async def get_user_pools(self) -> list[dict[str, Any]] | None:
         """
         Récupérer la liste des piscines de l'utilisateur.
         Pattern: GET /generic/users/me/pools?

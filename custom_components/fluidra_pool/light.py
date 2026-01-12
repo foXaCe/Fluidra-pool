@@ -40,7 +40,7 @@ async def async_setup_entry(
         await coordinator.async_config_entry_first_refresh()
 
     if coordinator.data:
-        for pool_id, pool in coordinator.data.items():
+        for _pool_id, pool in coordinator.data.items():
             for device in pool.get("devices", []):
                 device_type = device.get("type", "")
                 family = device.get("family", "").lower()
@@ -174,9 +174,7 @@ class FluidraLight(CoordinatorEntity, LightEntity):
         if ATTR_BRIGHTNESS in kwargs:
             brightness_255 = kwargs[ATTR_BRIGHTNESS]
             brightness_100 = int(brightness_255 * 100 / 255)
-            await self.coordinator.api.set_component_value(
-                self._device_id, COMPONENT_BRIGHTNESS, brightness_100
-            )
+            await self.coordinator.api.set_component_value(self._device_id, COMPONENT_BRIGHTNESS, brightness_100)
             self._brightness = brightness_255
 
         # Handle RGBW color
@@ -189,15 +187,11 @@ class FluidraLight(CoordinatorEntity, LightEntity):
                 "k": 5000,  # Default color temperature
                 "extra": {"w": w},
             }
-            await self.coordinator.api.set_component_json_value(
-                self._device_id, COMPONENT_COLOR, color_value
-            )
+            await self.coordinator.api.set_component_json_value(self._device_id, COMPONENT_COLOR, color_value)
             self._rgbw_color = (r, g, b, w)
 
         # Turn on power
-        await self.coordinator.api.set_component_string_value(
-            self._device_id, COMPONENT_POWER, "1"
-        )
+        await self.coordinator.api.set_component_string_value(self._device_id, COMPONENT_POWER, "1")
         self._is_on = True
 
         # Wait for device to process, then clear optimistic state
@@ -213,9 +207,7 @@ class FluidraLight(CoordinatorEntity, LightEntity):
         self._optimistic_state = False
         self.async_write_ha_state()
 
-        await self.coordinator.api.set_component_string_value(
-            self._device_id, COMPONENT_POWER, "0"
-        )
+        await self.coordinator.api.set_component_string_value(self._device_id, COMPONENT_POWER, "0")
         self._is_on = False
 
         # Wait for device to process, then clear optimistic state

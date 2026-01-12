@@ -1,7 +1,7 @@
 """Select platform for Fluidra Pool integration."""
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
@@ -42,11 +42,7 @@ async def async_setup_entry(
             if device_type == "chlorinator":
                 skip_mode = DeviceIdentifier.has_feature(device, "skip_mode_select")
                 if not skip_mode:
-                    entities.append(
-                        FluidraChlorinatorModeSelect(
-                            coordinator, coordinator.api, pool["id"], device_id
-                        )
-                    )
+                    entities.append(FluidraChlorinatorModeSelect(coordinator, coordinator.api, pool["id"], device_id))
 
             # Skip heat pumps - they don't have speed or schedule controls
             if DeviceIdentifier.has_feature(device, "skip_schedules"):
@@ -58,11 +54,7 @@ async def async_setup_entry(
                 and DeviceIdentifier.should_create_entity(device, "select")
                 and device.get("variable_speed")
             ):
-                entities.append(
-                    FluidraPumpSpeedSelect(
-                        coordinator, coordinator.api, pool["id"], device_id
-                    )
-                )
+                entities.append(FluidraPumpSpeedSelect(coordinator, coordinator.api, pool["id"], device_id))
 
             # Schedule mode selects for pumps with schedules (not for lights)
             if (
@@ -86,11 +78,7 @@ async def async_setup_entry(
             if device_type == "light":
                 effect_component = DeviceIdentifier.get_feature(device, "effect_select")
                 if effect_component:
-                    entities.append(
-                        FluidraLightEffectSelect(
-                            coordinator, coordinator.api, pool["id"], device_id
-                        )
-                    )
+                    entities.append(FluidraLightEffectSelect(coordinator, coordinator.api, pool["id"], device_id))
 
             # Schedule speed selects for chlorinators with schedules (e.g., DM24049704)
             if device_type == "chlorinator" and DeviceIdentifier.has_feature(device, "schedules"):
@@ -125,9 +113,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         self._api = api
         self._pool_id = pool_id
         self._device_id = device_id
-        self._optimistic_option = (
-            None  # Option optimiste temporaire pendant les actions
-        )
+        self._optimistic_option = None  # Option optimiste temporaire pendant les actions
 
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
 
@@ -170,7 +156,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         return self.coordinator.data.get(self._pool_id, {})
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         return {
@@ -196,9 +182,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         if auto_mode_enabled:
             return False
 
-        return self.coordinator.last_update_success and self.device_data.get(
-            "online", False
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def current_option(self) -> str | None:
@@ -252,16 +236,12 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
             # For "stopped", ensure pump is ON but no active speed
             if option == "stopped":
                 # 1. S'assurer que la pompe est ON (component 9 = 1)
-                success = await self._api.control_device_component(
-                    self._device_id, 9, 1
-                )
+                success = await self._api.control_device_component(self._device_id, 9, 1)
                 if success:
                     # 2. CRUCIAL: Explicitly disable speed by sending special value
                     # Try sending -1 or a value meaning "no active speed"
                     try:
-                        await self._api.control_device_component(
-                            self._device_id, 11, -1
-                        )
+                        await self._api.control_device_component(self._device_id, 11, -1)
                     except Exception:
                         # Fallback: manually mark in device data
                         device = self._api.get_device_by_id(self._device_id)
@@ -273,9 +253,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                 # 1. S'assurer que la pompe est ON
                 await self._api.control_device_component(self._device_id, 9, 1)
                 # 2. Définir la vitesse
-                success = await self._api.control_device_component(
-                    self._device_id, component, value
-                )
+                success = await self._api.control_device_component(self._device_id, component, value)
 
             if success:
                 # Attendre que l'API se synchronise
@@ -306,9 +284,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                     device["is_running"] = bool(reported_value)
 
             # Component 11 (speed level)
-            speed_state = await self._api.get_device_component_state(
-                self._device_id, 11
-            )
+            speed_state = await self._api.get_device_component_state(self._device_id, 11)
             if speed_state:
                 speed_level = speed_state.get("reportedValue", 0)
                 device = self._api.get_device_by_id(self._device_id)
@@ -351,7 +327,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         return "mdi:pump"
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         current_percent = self.device_data.get("speed_percent", 0)
 
@@ -424,7 +400,7 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         return {}
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         return {
@@ -567,7 +543,7 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         return icons.get(self.current_option, "mdi:speedometer")
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         schedule = self._get_schedule_data()
         attrs = {
@@ -634,7 +610,7 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
         return {}
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
         return {
@@ -648,9 +624,7 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get(
-            "online", False
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def current_option(self) -> str | None:
@@ -681,9 +655,7 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
             await asyncio.sleep(0.1)
 
             # Send command to API (component 20)
-            success = await self._api.control_device_component(
-                self._device_id, 20, mode_value
-            )
+            success = await self._api.control_device_component(self._device_id, 20, mode_value)
 
             if success:
                 await asyncio.sleep(2)
@@ -708,7 +680,7 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
         return "mdi:water-sync"
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         return {
             "device_id": self._device_id,
@@ -795,7 +767,7 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
         return {}
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
         return {
@@ -809,9 +781,7 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get(
-            "online", False
-        )
+        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def current_option(self) -> str | None:
@@ -823,9 +793,7 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
         # Get current effect from component 18
         components = self.device_data.get("components", {})
         component_data = components.get(str(self.EFFECT_COMPONENT), {})
-        effect_value = component_data.get(
-            "reportedValue", component_data.get("desiredValue", 0)
-        )
+        effect_value = component_data.get("reportedValue", component_data.get("desiredValue", 0))
 
         return self._value_to_effect.get(effect_value, "static_color")
 
@@ -855,9 +823,7 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
 
             # Send command to API (component 18) using control_device_component
             # which properly updates local state
-            success = await self._api.control_device_component(
-                self._device_id, self.EFFECT_COMPONENT, effect_value
-            )
+            success = await self._api.control_device_component(self._device_id, self.EFFECT_COMPONENT, effect_value)
 
             _LOGGER.debug("Light effect API call result: %s", success)
 
@@ -880,7 +846,7 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
         return "mdi:palette"
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         components = self.device_data.get("components", {})
         component_data = components.get(str(self.EFFECT_COMPONENT), {})
@@ -938,7 +904,7 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
         return {}
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
         return {
@@ -991,6 +957,7 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
             self.async_write_ha_state()
 
             import asyncio
+
             await asyncio.sleep(0.1)
 
             # Get all current schedule data
@@ -1029,9 +996,7 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
                 updated_schedules.append(scheduler)
 
             # Send update to API with specific component
-            success = await self._api.set_schedule(
-                self._device_id, updated_schedules, component_id=schedule_component
-            )
+            success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
             if success:
                 await asyncio.sleep(2)
                 await self.coordinator.async_request_refresh()
@@ -1053,7 +1018,7 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
         return "mdi:speedometer"
 
     @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         schedule = self._get_schedule_data()
         attrs = {
@@ -1063,11 +1028,13 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
         }
 
         if schedule:
-            attrs.update({
-                "start_time": schedule.get("startTime", ""),
-                "end_time": schedule.get("endTime", ""),
-                "enabled": schedule.get("enabled", False),
-                "state": schedule.get("state", "UNKNOWN"),
-            })
+            attrs.update(
+                {
+                    "start_time": schedule.get("startTime", ""),
+                    "end_time": schedule.get("endTime", ""),
+                    "enabled": schedule.get("enabled", False),
+                    "state": schedule.get("state", "UNKNOWN"),
+                }
+            )
 
         return attrs
