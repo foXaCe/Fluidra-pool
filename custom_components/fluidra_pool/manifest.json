@@ -5,13 +5,8 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/foxace66/fluidra-pool",
-  "homekit": {},
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/foxace66/fluidra-pool/issues",
-  "loggers": ["fluidra_pool"],
   "requirements": ["aiohttp>=3.8.0", "PyJWT>=2.0.0"],
-  "ssdp": [],
-  "version": "2.9.6",
-  "zeroconf": [],
-  "icon": "https://github.com/home-assistant/brands/blob/master/custom_integrations/fluidra_pool/icon.png"
+  "version": "2.10.2"
 }
