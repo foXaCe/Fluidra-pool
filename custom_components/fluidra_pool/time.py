@@ -163,12 +163,23 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
     @property
     def device_info(self) -> dict:
         """Return device info."""
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
+        # Detect device type for appropriate naming
+        config = DeviceIdentifier.identify_device(self.device_data)
+        device_type = config.device_type if config else "pump"
+
+        if device_type == "chlorinator":
+            default_name = f"Chlorinator {self._device_id}"
+            default_model = "Chlorinator"
+        else:
+            default_name = f"E30iQ Pump {self._device_id}"
+            default_model = "E30iQ"
+
+        device_name = self.device_data.get("name") or default_name
         return {
             "identifiers": {(DOMAIN, self._device_id)},
             "name": device_name,
             "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "E30iQ"),
+            "model": self.device_data.get("model", default_model),
             "via_device": (DOMAIN, self._pool_id),
         }
 
@@ -305,7 +316,6 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
         """Initialize the start time entity."""
         super().__init__(coordinator, api, pool_id, device_id, schedule_id, "start")
 
-        self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         self._attr_translation_key = "schedule_start"
         self._attr_translation_placeholders = {"schedule_id": schedule_id}
         self._attr_unique_id = f"fluidra_{self._device_id}_{schedule_id}_start_time"
@@ -637,7 +647,6 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
         """Initialize the end time entity."""
         super().__init__(coordinator, api, pool_id, device_id, schedule_id, "end")
 
-        self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         self._attr_translation_key = "schedule_end"
         self._attr_translation_placeholders = {"schedule_id": schedule_id}
         self._attr_unique_id = f"fluidra_{self._device_id}_{schedule_id}_end_time"

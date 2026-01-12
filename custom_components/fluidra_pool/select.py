@@ -92,6 +92,21 @@ async def async_setup_entry(
                         )
                     )
 
+            # Schedule speed selects for chlorinators with schedules (e.g., DM24049704)
+            if device_type == "chlorinator" and DeviceIdentifier.has_feature(device, "schedules"):
+                schedule_count = DeviceIdentifier.get_feature(device, "schedule_count", 3)
+                for i in range(schedule_count):
+                    schedule_id = str(i)
+                    entities.append(
+                        FluidraChlorinatorScheduleSpeedSelect(
+                            coordinator,
+                            coordinator.api,
+                            pool["id"],
+                            device_id,
+                            schedule_id,
+                        )
+                    )
+
     async_add_entities(entities)
 
 
@@ -388,7 +403,6 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         self._device_id = device_id
         self._schedule_id = schedule_id
 
-        self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
         self._attr_translation_key = "schedule_mode"
         self._attr_translation_placeholders = {"schedule_id": schedule_id}
         self._attr_unique_id = f"fluidra_{self._device_id}_schedule_{schedule_id}_mode"
@@ -878,3 +892,182 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
             "desired_value": component_data.get("desiredValue"),
             "optimistic_option": self._optimistic_option,
         }
+
+
+class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
+    """Select entity for chlorinator schedule speed (S1/S2/S3)."""
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api,
+        pool_id: str,
+        device_id: str,
+        schedule_id: str,
+    ) -> None:
+        """Initialize the chlorinator schedule speed select."""
+        super().__init__(coordinator)
+        self._api = api
+        self._pool_id = pool_id
+        self._device_id = device_id
+        self._schedule_id = schedule_id
+        self._optimistic_option = None
+
+        self._attr_translation_key = "chlorinator_schedule_speed"
+        self._attr_translation_placeholders = {"schedule_id": schedule_id}
+        self._attr_unique_id = f"fluidra_{self._device_id}_schedule_{schedule_id}_speed"
+        self._attr_entity_category = EntityCategory.CONFIG
+
+        # Speed options: S1, S2, S3 (mapped to operationName 1, 2, 3)
+        self._attr_options = ["S1", "S2", "S3"]
+
+        # Mapping options → operationName values
+        self._speed_mapping = {"S1": "1", "S2": "2", "S3": "3"}
+        self._value_to_speed = {"1": "S1", "2": "S2", "3": "S3"}
+
+    @property
+    def device_data(self) -> dict:
+        """Get device data from coordinator."""
+        if self.coordinator.data is None:
+            return {}
+        pool = self.coordinator.data.get(self._pool_id)
+        if pool:
+            for device in pool.get("devices", []):
+                if device.get("device_id") == self._device_id:
+                    return device
+        return {}
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        return {
+            "identifiers": {(DOMAIN, self._device_id)},
+            "name": device_name,
+            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
+            "model": self.device_data.get("model", "Chlorinator"),
+            "via_device": (DOMAIN, self._pool_id),
+        }
+
+    def _get_schedule_data(self) -> dict | None:
+        """Get schedule data from coordinator."""
+        try:
+            device_data = self.device_data
+            if "schedule_data" in device_data:
+                schedules = device_data["schedule_data"]
+                for schedule in schedules:
+                    schedule_id = schedule.get("id")
+                    if str(schedule_id) == str(self._schedule_id):
+                        return schedule
+        except Exception:
+            pass
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Return True if the schedule exists."""
+        return self._get_schedule_data() is not None
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current speed option."""
+        if self._optimistic_option is not None:
+            return self._optimistic_option
+
+        schedule = self._get_schedule_data()
+        if schedule:
+            operation = schedule.get("startActions", {}).get("operationName", "1")
+            return self._value_to_speed.get(str(operation), "S1")
+        return "S1"
+
+    async def async_select_option(self, option: str) -> None:
+        """Select new speed option."""
+        if option not in self._speed_mapping:
+            return
+
+        try:
+            # Set optimistic option immediately
+            self._optimistic_option = option
+            self.async_write_ha_state()
+
+            import asyncio
+            await asyncio.sleep(0.1)
+
+            # Get all current schedule data
+            device_data = self.device_data
+            if "schedule_data" not in device_data:
+                return
+
+            current_schedules = device_data["schedule_data"]
+            if not current_schedules:
+                return
+
+            # Get schedule component for this device
+            schedule_component = DeviceIdentifier.get_feature(device_data, "schedule_component", 258)
+
+            # Create updated schedule list
+            updated_schedules = []
+            for sched in current_schedules:
+                start_time = sched.get("startTime", "0 0 * * 1,2,3,4,5,6,7")
+                end_time = sched.get("endTime", "0 1 * * 1,2,3,4,5,6,7")
+
+                # If this is the schedule we're updating, use the new speed
+                operation_name = (
+                    self._speed_mapping[option]
+                    if str(sched.get("id")) == str(self._schedule_id)
+                    else str(sched.get("startActions", {}).get("operationName", "1"))
+                )
+
+                scheduler = {
+                    "id": sched.get("id"),
+                    "groupId": sched.get("groupId", 1),
+                    "enabled": sched.get("enabled", False),
+                    "startTime": start_time,
+                    "endTime": end_time,
+                    "startActions": {"operationName": operation_name},
+                }
+                updated_schedules.append(scheduler)
+
+            # Send update to API with specific component
+            success = await self._api.set_schedule(
+                self._device_id, updated_schedules, component_id=schedule_component
+            )
+            if success:
+                await asyncio.sleep(2)
+                await self.coordinator.async_request_refresh()
+
+        except Exception as err:
+            _LOGGER.error("Failed to set schedule speed: %s", err)
+        finally:
+            self._optimistic_option = None
+            self.async_write_ha_state()
+
+    @property
+    def icon(self) -> str:
+        """Return the icon for the entity."""
+        current = self.current_option
+        if current == "S1":
+            return "mdi:speedometer-slow"
+        if current == "S2":
+            return "mdi:speedometer-medium"
+        return "mdi:speedometer"
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        """Return additional state attributes."""
+        schedule = self._get_schedule_data()
+        attrs = {
+            "schedule_id": self._schedule_id,
+            "device_id": self._device_id,
+            "available_speeds": self._attr_options,
+        }
+
+        if schedule:
+            attrs.update({
+                "start_time": schedule.get("startTime", ""),
+                "end_time": schedule.get("endTime", ""),
+                "enabled": schedule.get("enabled", False),
+                "state": schedule.get("state", "UNKNOWN"),
+            })
+
+        return attrs
