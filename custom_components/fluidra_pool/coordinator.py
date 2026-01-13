@@ -138,8 +138,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
             # Map day names to CRON day numbers (1=Monday, 7=Sunday)
             day_name_to_cron = {
-                "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4,
-                "friday": 5, "saturday": 6, "sunday": 7
+                "monday": 1,
+                "tuesday": 2,
+                "wednesday": 3,
+                "thursday": 4,
+                "friday": 5,
+                "saturday": 6,
+                "sunday": 7,
             }
 
             # Group days by program ID
@@ -187,14 +192,16 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     start_cron = f"{start_minute} {start_hour} * * {days_str}"
                     end_cron = f"{end_minute} {end_hour} * * {days_str}"
 
-                    result.append({
-                        "id": schedule_id,
-                        "groupId": schedule_id,  # groupId must match id for API
-                        "startTime": start_cron,
-                        "endTime": end_cron,
-                        "startActions": {"operationName": str(mode)},
-                        "enabled": True
-                    })
+                    result.append(
+                        {
+                            "id": schedule_id,
+                            "groupId": schedule_id,  # groupId must match id for API
+                            "startTime": start_cron,
+                            "endTime": end_cron,
+                            "startActions": {"operationName": str(mode)},
+                            "enabled": True,
+                        }
+                    )
                     schedule_id += 1
 
             _LOGGER.debug("Parsed DM24049704 schedule: %s -> %s", reported_value, result)

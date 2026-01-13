@@ -768,8 +768,13 @@ class FluidraPoolAPI:
         """
         # Map CRON day numbers to day names
         cron_day_to_name = {
-            1: "monday", 2: "tuesday", 3: "wednesday", 4: "thursday",
-            5: "friday", 6: "saturday", 7: "sunday"
+            1: "monday",
+            2: "tuesday",
+            3: "wednesday",
+            4: "thursday",
+            5: "friday",
+            6: "saturday",
+            7: "sunday",
         }
 
         # Collect all days that have schedules
@@ -803,12 +808,7 @@ class FluidraPoolAPI:
                     # Parse mode
                     mode = int(operation) if operation else 1
 
-                    slots.append({
-                        "id": slot_id,
-                        "start": start_encoded,
-                        "end": end_encoded,
-                        "mode": mode
-                    })
+                    slots.append({"id": slot_id, "start": start_encoded, "end": end_encoded, "mode": mode})
                     slot_id += 1
 
                     # Collect days
@@ -832,10 +832,7 @@ class FluidraPoolAPI:
             day_programs[day_name] = 1 if cron_day in all_scheduled_days else 0
 
         # Build the final format
-        result = {
-            "dayPrograms": day_programs,
-            "programs": [{"id": 1, "slots": slots}] if slots else []
-        }
+        result = {"dayPrograms": day_programs, "programs": [{"id": 1, "slots": slots}] if slots else []}
 
         _LOGGER.debug("Converted schedules to DM24049704 format: %s -> %s", schedules, result)
         return result
@@ -868,10 +865,7 @@ class FluidraPoolAPI:
         # All components accept CRON list format (API converts internally)
         payload = {"desiredValue": schedules}
 
-        _LOGGER.debug(
-            "set_schedule: device=%s component=%s payload=%s",
-            device_id, component_id, payload
-        )
+        _LOGGER.debug("set_schedule: device=%s component=%s payload=%s", device_id, component_id, payload)
 
         if not self._session:
             self._session = aiohttp.ClientSession()
@@ -881,7 +875,8 @@ class FluidraPoolAPI:
                 response_text = await response.text()
                 _LOGGER.debug(
                     "set_schedule response: status=%s body=%s",
-                    response.status, response_text[:500] if response_text else ""
+                    response.status,
+                    response_text[:500] if response_text else "",
                 )
                 return response.status == 200
 
