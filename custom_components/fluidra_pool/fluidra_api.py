@@ -751,13 +751,102 @@ class FluidraPoolAPI:
         """Disable auto mode using discovered component ID 10."""
         return await self.control_device_component(device_id, 10, 0)
 
+    def _convert_schedules_to_dm24049704_format(self, schedules: list[dict[str, Any]]) -> dict:
+        """Convert CRON-format schedules to DM24049704 programs/slots format.
+
+        Input format (CRON):
+        [{"id": 0, "startTime": "0 5 * * 1,2,3,4,5", "endTime": "0 6 * * 1,2,3,4,5",
+          "startActions": {"operationName": "3"}, "enabled": True}]
+
+        Output format (programs/slots):
+        {
+            "dayPrograms": {"monday": 1, "tuesday": 1, ..., "saturday": 0, "sunday": 0},
+            "programs": [{"id": 1, "slots": [{"id": 0, "start": 1280, "end": 1536, "mode": 3}]}]
+        }
+
+        Time encoding: hours * 256 + minutes
+        """
+        # Map CRON day numbers to day names
+        cron_day_to_name = {
+            1: "monday", 2: "tuesday", 3: "wednesday", 4: "thursday",
+            5: "friday", 6: "saturday", 7: "sunday"
+        }
+
+        # Collect all days that have schedules
+        all_scheduled_days = set()
+        slots = []
+        slot_id = 0
+
+        for sched in schedules:
+            if not sched.get("enabled", True):
+                continue
+
+            start_cron = sched.get("startTime", "")
+            end_cron = sched.get("endTime", "")
+            operation = sched.get("startActions", {}).get("operationName", "1")
+
+            # Parse CRON times
+            start_parts = start_cron.split() if start_cron else []
+            end_parts = end_cron.split() if end_cron else []
+
+            if len(start_parts) >= 5 and len(end_parts) >= 2:
+                try:
+                    start_minute = int(start_parts[0])
+                    start_hour = int(start_parts[1])
+                    end_minute = int(end_parts[0])
+                    end_hour = int(end_parts[1])
+
+                    # Encode times as hours * 256 + minutes
+                    start_encoded = start_hour * 256 + start_minute
+                    end_encoded = end_hour * 256 + end_minute
+
+                    # Parse mode
+                    mode = int(operation) if operation else 1
+
+                    slots.append({
+                        "id": slot_id,
+                        "start": start_encoded,
+                        "end": end_encoded,
+                        "mode": mode
+                    })
+                    slot_id += 1
+
+                    # Collect days
+                    days_str = start_parts[4]
+                    if days_str != "*":
+                        for day in days_str.split(","):
+                            try:
+                                all_scheduled_days.add(int(day.strip()))
+                            except ValueError:
+                                pass
+                    else:
+                        all_scheduled_days.update(range(1, 8))
+
+                except (ValueError, IndexError) as e:
+                    _LOGGER.warning("Failed to parse schedule: %s, error: %s", sched, e)
+                    continue
+
+        # Build dayPrograms: days with schedules -> program 1, others -> 0
+        day_programs = {}
+        for cron_day, day_name in cron_day_to_name.items():
+            day_programs[day_name] = 1 if cron_day in all_scheduled_days else 0
+
+        # Build the final format
+        result = {
+            "dayPrograms": day_programs,
+            "programs": [{"id": 1, "slots": slots}] if slots else []
+        }
+
+        _LOGGER.debug("Converted schedules to DM24049704 format: %s -> %s", schedules, result)
+        return result
+
     async def set_schedule(self, device_id: str, schedules: list[dict[str, Any]], component_id: int = 20) -> bool:
         """Set device schedule using exact format from mobile app.
 
         Args:
             device_id: The device ID
             schedules: List of schedule dictionaries
-            component_id: Component ID for schedules (20 for pumps, 40 for lights)
+            component_id: Component ID for schedules (20 for pumps, 40 for lights, 258 for DM24049704)
         """
         if not self.access_token:
             raise FluidraAuthError("Not authenticated")
@@ -776,19 +865,28 @@ class FluidraPoolAPI:
             "user-agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
         }
 
-        # EXACT payload format from mobile app: {"desiredValue": [...]}
+        # All components accept CRON list format (API converts internally)
         payload = {"desiredValue": schedules}
+
+        _LOGGER.debug(
+            "set_schedule: device=%s component=%s payload=%s",
+            device_id, component_id, payload
+        )
 
         if not self._session:
             self._session = aiohttp.ClientSession()
 
         try:
             async with self._session.put(url, headers=headers, json=payload) as response:
-                await response.text()
-
+                response_text = await response.text()
+                _LOGGER.debug(
+                    "set_schedule response: status=%s body=%s",
+                    response.status, response_text[:500] if response_text else ""
+                )
                 return response.status == 200
 
-        except Exception:
+        except Exception as e:
+            _LOGGER.error("set_schedule error: %s", e)
             return False
 
     async def get_default_schedule(self) -> list[dict[str, Any]]:

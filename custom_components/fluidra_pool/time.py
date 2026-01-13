@@ -152,6 +152,16 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
         self._schedule_id = schedule_id
         self._time_type = time_type  # "start" or "end"
 
+    def _get_schedule_component(self) -> int:
+        """Get the correct schedule component ID for this device."""
+        device_data = self.device_data
+        # Check if device has a specific schedule component (e.g., 258 for DM24049704 chlorinator)
+        schedule_comp = DeviceIdentifier.get_feature(device_data, "schedule_component")
+        if schedule_comp:
+            return schedule_comp
+        # Default to component 20 for pumps
+        return 20
+
     @property
     def device_data(self) -> dict:
         """Get device data from coordinator."""
@@ -392,37 +402,67 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
 
                     start_time = self._format_time_to_cron(value, days)
 
-                scheduler = {
-                    "id": sched.get("id"),
-                    "groupId": sched.get("id"),  # Mobile app always uses id as groupId
-                    "enabled": sched.get("enabled", False),
-                    "startTime": start_time,
-                    "endTime": end_time,
-                    "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
-                }
+                # Send update to API with correct component ID
+                component_id = self._get_schedule_component()
+
+                # DM24049704 chlorinator uses different format
+                if component_id == 258:
+                    scheduler = {
+                        "id": sched.get("id"),
+                        "groupId": 1,  # App always uses groupId=1
+                        "enabled": True,
+                        "startTime": self._format_cron_time_chlorinator(start_time),
+                        "endTime": self._format_cron_time_chlorinator(end_time),
+                        "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "1"))},
+                    }
+                else:
+                    scheduler = {
+                        "id": sched.get("id"),
+                        "groupId": sched.get("id"),
+                        "enabled": sched.get("enabled", False),
+                        "startTime": start_time,
+                        "endTime": end_time,
+                        "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
+                    }
                 updated_schedules.append(scheduler)
 
-            # Ensure we have exactly 8 schedulers (add missing ones)
-            while len(updated_schedules) < 8:
-                missing_id = len(updated_schedules) + 1
-                updated_schedules.append(
-                    {
-                        "id": missing_id,
-                        "groupId": missing_id,
-                        "enabled": False,
-                        "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                        "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                        "startActions": {"operationName": "0"},
-                    }
-                )
+            # Send update to API with correct component ID
+            component_id = self._get_schedule_component()
 
-            # Send update to API
-            success = await self._api.set_schedule(self._device_id, updated_schedules)
+            # Pad schedules based on component type (only for pumps)
+            if component_id == 20:
+                # Pumps need 8 schedulers
+                while len(updated_schedules) < 8:
+                    missing_id = len(updated_schedules) + 1
+                    updated_schedules.append(
+                        {
+                            "id": missing_id,
+                            "groupId": missing_id,
+                            "enabled": False,
+                            "startTime": "00 00 * * 1,2,3,4,5,6,7",
+                            "endTime": "00 01 * * 1,2,3,4,5,6,7",
+                            "startActions": {"operationName": "0"},
+                        }
+                    )
+
+            success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
             if success:
                 await self.coordinator.async_request_refresh()
 
         except Exception:
             pass
+
+    def _format_cron_time_chlorinator(self, cron_time: str) -> str:
+        """Format CRON time for DM24049704 chlorinator (00 05 * * 1,2,3,4,5,6,7)."""
+        if not cron_time:
+            return "00 00 * * 1,2,3,4,5,6,7"
+        parts = cron_time.split()
+        if len(parts) >= 5:
+            minute = parts[0].zfill(2)
+            hour = parts[1].zfill(2)
+            days = parts[4] if parts[4] != "*" else "1,2,3,4,5,6,7"
+            return f"{minute} {hour} * * {days}"
+        return cron_time
 
 
 class FluidraLightScheduleTimeEntity(CoordinatorEntity, TimeEntity):
@@ -723,32 +763,50 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
 
                     end_time = self._format_time_to_cron(value, days)
 
-                scheduler = {
-                    "id": sched.get("id"),
-                    "groupId": sched.get("id"),  # Mobile app always uses id as groupId
-                    "enabled": sched.get("enabled", False),
-                    "startTime": start_time,
-                    "endTime": end_time,
-                    "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
-                }
+                # Send update to API with correct component ID
+                component_id = self._get_schedule_component()
+
+                # DM24049704 chlorinator uses different format
+                if component_id == 258:
+                    scheduler = {
+                        "id": sched.get("id"),
+                        "groupId": 1,  # App always uses groupId=1
+                        "enabled": True,
+                        "startTime": self._format_cron_time_chlorinator(start_time),
+                        "endTime": self._format_cron_time_chlorinator(end_time),
+                        "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "1"))},
+                    }
+                else:
+                    scheduler = {
+                        "id": sched.get("id"),
+                        "groupId": sched.get("id"),
+                        "enabled": sched.get("enabled", False),
+                        "startTime": start_time,
+                        "endTime": end_time,
+                        "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
+                    }
                 updated_schedules.append(scheduler)
 
-            # Ensure we have exactly 8 schedulers (add missing ones)
-            while len(updated_schedules) < 8:
-                missing_id = len(updated_schedules) + 1
-                updated_schedules.append(
-                    {
-                        "id": missing_id,
-                        "groupId": missing_id,
-                        "enabled": False,
-                        "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                        "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                        "startActions": {"operationName": "0"},
-                    }
-                )
+            # Send update to API with correct component ID
+            component_id = self._get_schedule_component()
 
-            # Send update to API
-            success = await self._api.set_schedule(self._device_id, updated_schedules)
+            # Pad schedules based on component type (only for pumps)
+            if component_id == 20:
+                # Pumps need 8 schedulers
+                while len(updated_schedules) < 8:
+                    missing_id = len(updated_schedules) + 1
+                    updated_schedules.append(
+                        {
+                            "id": missing_id,
+                            "groupId": missing_id,
+                            "enabled": False,
+                            "startTime": "00 00 * * 1,2,3,4,5,6,7",
+                            "endTime": "00 01 * * 1,2,3,4,5,6,7",
+                            "startActions": {"operationName": "0"},
+                        }
+                    )
+
+            success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
             if success:
                 await self.coordinator.async_request_refresh()
 

@@ -975,8 +975,8 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
             # Create updated schedule list
             updated_schedules = []
             for sched in current_schedules:
-                start_time = sched.get("startTime", "0 0 * * 1,2,3,4,5,6,7")
-                end_time = sched.get("endTime", "0 1 * * 1,2,3,4,5,6,7")
+                start_time = sched.get("startTime", "00 00 * * 1,2,3,4,5,6,7")
+                end_time = sched.get("endTime", "00 01 * * 1,2,3,4,5,6,7")
 
                 # If this is the schedule we're updating, use the new speed
                 operation_name = (
@@ -985,14 +985,26 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
                     else str(sched.get("startActions", {}).get("operationName", "1"))
                 )
 
-                scheduler = {
-                    "id": sched.get("id"),
-                    "groupId": sched.get("groupId", 1),
-                    "enabled": sched.get("enabled", False),
-                    "startTime": start_time,
-                    "endTime": end_time,
-                    "startActions": {"operationName": operation_name},
-                }
+                # DM24049704 chlorinator uses different format
+                if schedule_component == 258:
+                    # Format: id starts at 1, groupId always 1, CRON with "00" padding
+                    scheduler = {
+                        "id": sched.get("id"),
+                        "groupId": 1,  # App always uses groupId=1 for all schedules
+                        "enabled": True,
+                        "startTime": self._format_cron_time(start_time),
+                        "endTime": self._format_cron_time(end_time),
+                        "startActions": {"operationName": operation_name},
+                    }
+                else:
+                    scheduler = {
+                        "id": sched.get("id"),
+                        "groupId": sched.get("id"),
+                        "enabled": sched.get("enabled", False),
+                        "startTime": start_time,
+                        "endTime": end_time,
+                        "startActions": {"operationName": operation_name},
+                    }
                 updated_schedules.append(scheduler)
 
             # Send update to API with specific component
@@ -1006,6 +1018,22 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
         finally:
             self._optimistic_option = None
             self.async_write_ha_state()
+
+    def _format_cron_time(self, cron_time: str) -> str:
+        """Format CRON time to match official app format (00 05 * * 1,2,3,4,5,6,7)."""
+        if not cron_time:
+            return "00 00 * * 1,2,3,4,5,6,7"
+
+        parts = cron_time.split()
+        if len(parts) >= 5:
+            # Pad minute and hour with leading zeros
+            minute = parts[0].zfill(2)
+            hour = parts[1].zfill(2)
+            # Keep days as 1,2,3,4,5,6,7 (not *)
+            days = parts[4] if parts[4] != "*" else "1,2,3,4,5,6,7"
+            return f"{minute} {hour} * * {days}"
+
+        return cron_time
 
     @property
     def icon(self) -> str:

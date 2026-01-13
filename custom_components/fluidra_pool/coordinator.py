@@ -110,6 +110,100 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception:
             pass
 
+    def _parse_dm24049704_schedule_format(self, reported_value: dict) -> list:
+        """Parse DM24049704 chlorinator schedule format (programs/slots) to standard format.
+
+        The API returns component 258 in this format:
+        {
+            "dayPrograms": {"monday": 1, "tuesday": 1, ...},
+            "programs": [{"id": 1, "slots": [{"id": 0, "start": 1280, "end": 1536, "mode": 3}]}]
+        }
+
+        Where time is encoded as: hours * 256 + minutes
+        Mode 1=S1, 2=S2, 3=S3
+
+        Returns standard schedule format:
+        [{"id": 0, "startTime": "0 5 * * 1,2,3,4,5", "endTime": "0 6 * * 1,2,3,4,5",
+          "startActions": {"operationName": "3"}, "enabled": True}]
+        """
+        try:
+            if not isinstance(reported_value, dict):
+                return []
+
+            day_programs = reported_value.get("dayPrograms", {})
+            programs = reported_value.get("programs", [])
+
+            if not programs:
+                return []
+
+            # Map day names to CRON day numbers (1=Monday, 7=Sunday)
+            day_name_to_cron = {
+                "monday": 1, "tuesday": 2, "wednesday": 3, "thursday": 4,
+                "friday": 5, "saturday": 6, "sunday": 7
+            }
+
+            # Group days by program ID
+            program_days = {}
+            for day_name, program_id in day_programs.items():
+                if program_id not in program_days:
+                    program_days[program_id] = []
+                cron_day = day_name_to_cron.get(day_name.lower())
+                if cron_day:
+                    program_days[program_id].append(cron_day)
+
+            # Sort days for consistent output
+            for days in program_days.values():
+                days.sort()
+
+            result = []
+            schedule_id = 1  # DM24049704 uses IDs starting at 1
+
+            for program in programs:
+                program_id = program.get("id")
+                slots = program.get("slots", [])
+                days = program_days.get(program_id, [])
+
+                if not days:
+                    continue
+
+                days_str = ",".join(str(d) for d in days)
+
+                for slot in slots:
+                    start_raw = slot.get("start", 0)
+                    end_raw = slot.get("end", 0)
+                    mode = slot.get("mode", 0)
+
+                    # Skip empty slots (mode=0 with no time set)
+                    if mode == 0 and start_raw == 0 and end_raw == 0:
+                        continue
+
+                    # Decode time: hours * 256 + minutes
+                    start_hour = start_raw // 256
+                    start_minute = start_raw % 256
+                    end_hour = end_raw // 256
+                    end_minute = end_raw % 256
+
+                    # Create CRON format: "minute hour * * days"
+                    start_cron = f"{start_minute} {start_hour} * * {days_str}"
+                    end_cron = f"{end_minute} {end_hour} * * {days_str}"
+
+                    result.append({
+                        "id": schedule_id,
+                        "groupId": schedule_id,  # groupId must match id for API
+                        "startTime": start_cron,
+                        "endTime": end_cron,
+                        "startActions": {"operationName": str(mode)},
+                        "enabled": True
+                    })
+                    schedule_id += 1
+
+            _LOGGER.debug("Parsed DM24049704 schedule: %s -> %s", reported_value, result)
+            return result
+
+        except Exception as e:
+            _LOGGER.warning("Failed to parse DM24049704 schedule format: %s", e)
+            return []
+
     def _calculate_auto_speed_from_schedules(self, device: dict) -> int:
         """Calculate current speed based on active schedules in auto mode."""
         try:
@@ -428,7 +522,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                     schedule_comp = DeviceIdentifier.get_feature(device, "schedule_component")
                                     if schedule_comp and component_id == schedule_comp:
                                         # Device-specific schedule component (e.g., 258 for DM24049704)
-                                        schedule_data = reported_value if isinstance(reported_value, list) else []
+                                        # DM24049704 uses programs/slots format instead of list
+                                        if isinstance(reported_value, dict) and "programs" in reported_value:
+                                            schedule_data = self._parse_dm24049704_schedule_format(reported_value)
+                                        elif isinstance(reported_value, list):
+                                            schedule_data = reported_value
+                                        else:
+                                            schedule_data = []
                                         device["schedule_data"] = schedule_data
 
                                         current_schedule_count = len(schedule_data)
