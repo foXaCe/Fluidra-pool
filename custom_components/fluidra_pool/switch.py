@@ -398,22 +398,16 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
                 success = await self._api.start_pump(self._device_id)
 
             if success:
-                # Attendre que l'API se synchronise
-                import asyncio
-
-                await asyncio.sleep(2)
-                # Récupérer l'état réel immédiatement
-                await self._refresh_heat_pump_state()
+                # Keep optimistic state - property will auto-clear after timeout
                 await self.coordinator.async_request_refresh()
-                # Effacer l'état en attente après confirmation
-                self._clear_pending_state()
             else:
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
-        except Exception:
-            pass
-            # Annuler l'état optimiste en cas d'erreur
+                self.async_write_ha_state()
+        except Exception as e:
+            _LOGGER.error("Error turning on heat pump %s: %s", self._device_id, e)
             self._clear_pending_state()
+            self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the heat pump off using discovered API with optimistic UI."""
@@ -432,22 +426,16 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
                 success = await self._api.stop_pump(self._device_id)
 
             if success:
-                # Attendre que l'API se synchronise
-                import asyncio
-
-                await asyncio.sleep(2)
-                # Récupérer l'état réel immédiatement
-                await self._refresh_heat_pump_state()
+                # Keep optimistic state - property will auto-clear after timeout
                 await self.coordinator.async_request_refresh()
-                # Effacer l'état en attente après confirmation
-                self._clear_pending_state()
             else:
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
-        except Exception:
-            pass
-            # Annuler l'état optimiste en cas d'erreur
+                self.async_write_ha_state()
+        except Exception as e:
+            _LOGGER.error("Error turning off heat pump %s: %s", self._device_id, e)
             self._clear_pending_state()
+            self.async_write_ha_state()
 
     async def _refresh_heat_pump_state(self) -> None:
         """Refresh heat pump state by polling real API components."""
