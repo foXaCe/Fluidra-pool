@@ -1010,12 +1010,19 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
             # Send update to API with specific component
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
             if success:
-                await asyncio.sleep(2)
+                # Keep optimistic value - it will be cleared when coordinator confirms
+                await asyncio.sleep(3)
                 await self.coordinator.async_request_refresh()
+                # Clear optimistic only after successful refresh
+                self._optimistic_option = None
+                self.async_write_ha_state()
+            else:
+                # API failed - clear optimistic and revert
+                self._optimistic_option = None
+                self.async_write_ha_state()
 
         except Exception as err:
             _LOGGER.error("Failed to set schedule speed: %s", err)
-        finally:
             self._optimistic_option = None
             self.async_write_ha_state()
 

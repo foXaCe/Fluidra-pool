@@ -151,6 +151,7 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
         self._device_id = device_id
         self._schedule_id = schedule_id
         self._time_type = time_type  # "start" or "end"
+        self._optimistic_value: time | None = None  # Optimistic value during updates
 
     def _get_schedule_component(self) -> int:
         """Get the correct schedule component ID for this device."""
@@ -343,6 +344,9 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
     @property
     def native_value(self) -> time | None:
         """Return the current start time."""
+        # Return optimistic value if set
+        if self._optimistic_value is not None:
+            return self._optimistic_value
         schedule = self._get_schedule_data()
         if schedule:
             start_time_str = schedule.get("startTime", "")
@@ -352,6 +356,9 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
     async def async_set_value(self, value: time) -> None:
         """Set the start time using exact mobile app format."""
         try:
+            # Set optimistic value immediately
+            self._optimistic_value = value
+            self.async_write_ha_state()
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
@@ -447,10 +454,21 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
 
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
             if success:
+                import asyncio
+
+                await asyncio.sleep(3)
                 await self.coordinator.async_request_refresh()
+                # Clear optimistic only after successful refresh
+                self._optimistic_value = None
+                self.async_write_ha_state()
+            else:
+                # API failed - clear optimistic and revert
+                self._optimistic_value = None
+                self.async_write_ha_state()
 
         except Exception:
-            pass
+            self._optimistic_value = None
+            self.async_write_ha_state()
 
     def _format_cron_time_chlorinator(self, cron_time: str) -> str:
         """Format CRON time for DM24049704 chlorinator (00 05 * * 1,2,3,4,5,6,7)."""
@@ -704,6 +722,9 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
     @property
     def native_value(self) -> time | None:
         """Return the current end time."""
+        # Return optimistic value if set
+        if self._optimistic_value is not None:
+            return self._optimistic_value
         schedule = self._get_schedule_data()
         if schedule:
             end_time_str = schedule.get("endTime", "")
@@ -713,6 +734,10 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
     async def async_set_value(self, value: time) -> None:
         """Set the end time using exact mobile app format."""
         try:
+            # Set optimistic value immediately
+            self._optimistic_value = value
+            self.async_write_ha_state()
+
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
@@ -808,7 +833,18 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
 
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
             if success:
+                import asyncio
+
+                await asyncio.sleep(3)
                 await self.coordinator.async_request_refresh()
+                # Clear optimistic only after successful refresh
+                self._optimistic_value = None
+                self.async_write_ha_state()
+            else:
+                # API failed - clear optimistic and revert
+                self._optimistic_value = None
+                self.async_write_ha_state()
 
         except Exception:
-            pass
+            self._optimistic_value = None
+            self.async_write_ha_state()
