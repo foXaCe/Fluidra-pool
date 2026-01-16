@@ -71,6 +71,40 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=95,
     ),
+    "z550iq_heat_pump": DeviceConfig(
+        device_type="heat_pump",
+        identifier_patterns=["LD*"],
+        name_patterns=["z550", "z55"],
+        family_patterns=["heat pump"],
+        components_range=5,  # Minimal scan, specific components below
+        required_components=[0, 1, 2, 3],
+        entities=["climate", "switch", "sensor_info", "sensor_temperature"],
+        features={
+            "temperature_control": True,
+            "preset_modes": True,  # Enable preset modes (silence, smart, boost)
+            "hvac_modes": ["off", "heat", "cool", "auto"],
+            "skip_auto_mode": True,
+            "skip_schedules": True,
+            "z550_mode": True,  # Flag for Z550iQ+ specific mode handling
+            # Component mappings for Z550iQ+:
+            # - 21: ON/OFF (0=OFF, 1=ON)
+            # - 15: Temperature setpoint (decidegrees, 290=29.0°C)
+            # - 16: Mode (0=heating, 1=cooling, 2=auto)
+            # - 17: Preset mode (0=silence, 1=smart, 2=boost) - to be confirmed
+            # - 37: Water temperature (decidegrees)
+            # - 40: Air temperature (decidegrees)
+            # - 61: State (0=idle, 2=heating, 3=cooling, 11=no flow)
+            "on_off_component": 21,
+            "setpoint_component": 15,
+            "mode_component": 16,
+            "preset_component": 17,  # Preset mode component - to be confirmed
+            "water_temp_component": 37,
+            "air_temp_component": 40,
+            "state_component": 61,
+            "specific_components": [15, 16, 17, 21, 37, 40, 61],
+        },
+        priority=96,  # Higher than z250iq
+    ),
     "chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["*.nn_*"],  # Bridged devices

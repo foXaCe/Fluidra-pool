@@ -386,9 +386,17 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
         try:
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(True)
+            self.async_write_ha_state()
 
-            # Tenter d'utiliser le component 9 pour les pompes à chaleur
-            success = await self._api.start_pump(self._device_id)
+            # Z550iQ+ uses component 21 for ON/OFF
+            if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
+                _LOGGER.debug("Z550iQ+ turn ON: using component 21 for device %s", self._device_id)
+                success = await self._api.control_device_component(self._device_id, 21, 1)
+                _LOGGER.debug("Z550iQ+ turn ON result: %s", success)
+            else:
+                # Standard heat pumps use component 9
+                success = await self._api.start_pump(self._device_id)
+
             if success:
                 # Attendre que l'API se synchronise
                 import asyncio
@@ -412,8 +420,17 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
         try:
             # Mise à jour optimiste immédiate pour la réactivité
             self._set_pending_state(False)
+            self.async_write_ha_state()
 
-            success = await self._api.stop_pump(self._device_id)
+            # Z550iQ+ uses component 21 for ON/OFF
+            if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
+                _LOGGER.debug("Z550iQ+ turn OFF: using component 21 for device %s", self._device_id)
+                success = await self._api.control_device_component(self._device_id, 21, 0)
+                _LOGGER.debug("Z550iQ+ turn OFF result: %s", success)
+            else:
+                # Standard heat pumps use component 9
+                success = await self._api.stop_pump(self._device_id)
+
             if success:
                 # Attendre que l'API se synchronise
                 import asyncio

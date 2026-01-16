@@ -60,6 +60,16 @@ async def async_setup_entry(
                     entities.append(
                         FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "target")
                     )
+                # Z550iQ+ heat pump specific temperature sensors
+                if DeviceIdentifier.has_feature(device, "z550_mode"):
+                    # Water temperature sensor
+                    entities.append(
+                        FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "water")
+                    )
+                    # Air temperature sensor
+                    entities.append(
+                        FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "air")
+                    )
 
             if DeviceIdentifier.should_create_entity(device, "sensor_brightness"):
                 # Brightness sensor for lights
@@ -205,20 +215,30 @@ class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
 
 
 class FluidraTemperatureSensor(FluidraPoolSensorEntity):
-    """Temperature sensor for pool heaters."""
+    """Temperature sensor for pool heaters and heat pumps."""
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str, sensor_type: str):
         """Initialize the temperature sensor."""
         super().__init__(coordinator, api, pool_id, device_id, sensor_type)
         if sensor_type == "current":
             self._attr_translation_key = "current_temperature"
+        elif sensor_type == "water":
+            self._attr_translation_key = "water_temperature"
+        elif sensor_type == "air":
+            self._attr_translation_key = "air_temperature"
         else:
             self._attr_translation_key = "target_temperature"
 
     @property
     def name(self) -> str:
         """Return the name of the sensor."""
-        temp_type = "Current" if self._sensor_type == "current" else "Target"
+        type_names = {
+            "current": "Current",
+            "target": "Target",
+            "water": "Water",
+            "air": "Air",
+        }
+        temp_type = type_names.get(self._sensor_type, "Temperature")
         device_name = self.device_data.get("name", f"Device {self._device_id}")
         pool_name = self.pool_data.get("name", "Pool")
         return f"{pool_name} {device_name} {temp_type} Temperature"
@@ -230,6 +250,10 @@ class FluidraTemperatureSensor(FluidraPoolSensorEntity):
             return self.device_data.get("current_temperature")
         if self._sensor_type == "target":
             return self.device_data.get("target_temperature")
+        if self._sensor_type == "water":
+            return self.device_data.get("water_temperature")
+        if self._sensor_type == "air":
+            return self.device_data.get("air_temperature")
         return None
 
     @property

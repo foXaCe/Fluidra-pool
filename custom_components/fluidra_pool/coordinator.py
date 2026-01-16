@@ -428,10 +428,12 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                     )
 
                                     # Pour les pompes à chaleur, component 15 peut contenir la température × 10
-                                    if device.get("type", "").lower() == "heat_pump" and reported_value:
+                                    # Use desiredValue if reportedValue is not available (Z550iQ+ uses desiredValue)
+                                    temp_raw = reported_value or component_state.get("desiredValue")
+                                    if device.get("type", "").lower() == "heat_pump" and temp_raw:
                                         try:
                                             # Convertir la valeur brute en température (diviser par 10)
-                                            temp_value = float(reported_value) / 10.0
+                                            temp_value = float(temp_raw) / 10.0
                                             # Valider la plage de température (10-50°C)
                                             if 10.0 <= temp_value <= 50.0:
                                                 device["target_temperature"] = temp_value
@@ -479,17 +481,83 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
                                         # Update tracking count
                                         self._previous_schedule_entities[device_key] = current_schedule_count
-                                elif component_id == 21:  # Network Status
+                                elif component_id == 21:
+                                    # Component 21: Network Status for pumps, ON/OFF for Z550iQ+ heat pumps
                                     device["network_status_component"] = reported_value
+                                    # Check if this is a Z550iQ+ heat pump (uses component 21 for ON/OFF)
+                                    if DeviceIdentifier.has_feature(device, "z550_mode"):
+                                        device["heat_pump_reported"] = reported_value
+                                        device["is_heating"] = bool(reported_value)
                                 elif component_id == 13:  # Component 13 - État pompe à chaleur
                                     device["component_13_data"] = component_state
 
-                                    # Pour les pompes à chaleur, component 13 indique l'état de chauffage
-                                    if device.get("type", "").lower() == "heat_pump":
+                                    # Pour les pompes à chaleur (sauf Z550iQ+ qui utilise component 21)
+                                    if device.get(
+                                        "type", ""
+                                    ).lower() == "heat_pump" and not DeviceIdentifier.has_feature(device, "z550_mode"):
                                         device["heat_pump_reported"] = reported_value
                                         device["is_heating"] = bool(reported_value)
                                 elif component_id == 14:  # Component 14 exploration
                                     device["component_14_data"] = component_state
+                                elif component_id == 16:  # Component 16 - Mode for Z550iQ+
+                                    device["component_16_data"] = component_state
+                                    if DeviceIdentifier.has_feature(device, "z550_mode"):
+                                        # Z550iQ+ mode: 0=heating, 1=cooling, 2=auto
+                                        device["z550_mode_reported"] = reported_value
+                                elif component_id == 17:  # Component 17 - Preset mode for Z550iQ+
+                                    device["component_17_data"] = component_state
+                                    if DeviceIdentifier.has_feature(device, "z550_mode"):
+                                        # Z550iQ+ preset: 0=silence, 1=smart, 2=boost
+                                        device["z550_preset_reported"] = reported_value
+                                elif component_id == 37:  # Component 37 - Water temp for Z550iQ+
+                                    device["component_37_data"] = component_state
+                                    if DeviceIdentifier.has_feature(device, "z550_mode") and reported_value:
+                                        try:
+                                            # Decidegrees: 290 = 29.0°C
+                                            water_temp = float(reported_value) / 10.0
+                                            if 0.0 <= water_temp <= 50.0:
+                                                device["water_temperature"] = water_temp
+                                        except (ValueError, TypeError):
+                                            pass
+                                elif component_id == 40:
+                                    # Component 40: Light schedules OR Air temp for Z550iQ+
+                                    device[f"component_{component_id}_data"] = component_state
+                                    if DeviceIdentifier.has_feature(device, "z550_mode") and reported_value:
+                                        try:
+                                            # Decidegrees: 140 = 14.0°C
+                                            air_temp = float(reported_value) / 10.0
+                                            if -20.0 <= air_temp <= 60.0:
+                                                device["air_temperature"] = air_temp
+                                        except (ValueError, TypeError):
+                                            pass
+                                    else:
+                                        # Light schedules handling
+                                        config = DeviceIdentifier.identify_device(device)
+                                        device_type = config.device_type if config else device.get("type", "")
+                                        if device_type == "light":
+                                            schedule_data = reported_value if isinstance(reported_value, list) else []
+                                            device["schedule_data"] = schedule_data
+                                            current_schedule_count = len(schedule_data)
+                                            device_key = f"{pool_id}_{device_id}"
+                                            previous_count = self._previous_schedule_entities.get(device_key, 0)
+                                            if previous_count > 0 and current_schedule_count < previous_count:
+                                                await self._cleanup_schedule_sensor_if_empty(
+                                                    pool_id, device_id, schedule_data
+                                                )
+                                            self._previous_schedule_entities[device_key] = current_schedule_count
+                                elif component_id == 61:  # Component 61 - State for Z550iQ+
+                                    device["component_61_data"] = component_state
+                                    if DeviceIdentifier.has_feature(device, "z550_mode"):
+                                        # Z550iQ+ state: 0=idle, 2=heating, 3=cooling, 11=no flow
+                                        device["z550_state_reported"] = reported_value
+                                        if reported_value == 2:
+                                            device["hvac_action"] = "heating"
+                                        elif reported_value == 3:
+                                            device["hvac_action"] = "cooling"
+                                        elif reported_value == 11:
+                                            device["hvac_action"] = "no_flow"
+                                        else:
+                                            device["hvac_action"] = "idle"
                                 elif component_id in [62, 65]:  # Température de l'eau alternative
                                     # Components 62 et 65 peuvent aussi contenir la température de l'eau × 10
                                     if device.get("type", "").lower() == "heat_pump" and reported_value:
@@ -501,28 +569,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                                                     device["water_temperature"] = water_temp_value
                                         except (ValueError, TypeError):
                                             pass
-                                    device[f"component_{component_id}_data"] = component_state
-                                elif component_id == 40:
-                                    # Component 40: Light schedules (LumiPlus Connect)
-                                    # Use device registry to get proper device type
-                                    config = DeviceIdentifier.identify_device(device)
-                                    device_type = config.device_type if config else device.get("type", "")
-                                    if device_type == "light":
-                                        schedule_data = reported_value if isinstance(reported_value, list) else []
-                                        device["schedule_data"] = schedule_data
-
-                                        # Track current scheduler count for this device
-                                        current_schedule_count = len(schedule_data)
-                                        device_key = f"{pool_id}_{device_id}"
-
-                                        # Check if we had schedulers before and now have fewer
-                                        previous_count = self._previous_schedule_entities.get(device_key, 0)
-                                        if previous_count > 0 and current_schedule_count < previous_count:
-                                            await self._cleanup_schedule_sensor_if_empty(
-                                                pool_id, device_id, schedule_data
-                                            )
-
-                                        self._previous_schedule_entities[device_key] = current_schedule_count
                                     device[f"component_{component_id}_data"] = component_state
                                 else:
                                     # Check if this is a device-specific schedule component
