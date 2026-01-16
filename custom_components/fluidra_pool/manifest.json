@@ -8,5 +8,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/foxace66/fluidra-pool/issues",
   "requirements": ["aiohttp>=3.8.0", "PyJWT>=2.0.0"],
-  "version": "2.10.4"
+  "version": "2.11.0"
 }
