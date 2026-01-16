@@ -12,10 +12,26 @@ from homeassistant.components.climate import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import (
+    DOMAIN,
+    Z550_MAX_TEMP,
+    Z550_MIN_TEMP,
+    Z550_MODE_AUTO,
+    Z550_MODE_COOLING,
+    Z550_MODE_HEATING,
+    Z550_PRESET_MODES,
+    Z550_PRESET_SMART,
+    Z550_PRESET_TO_VALUE,
+    Z550_STATE_COOLING,
+    Z550_STATE_HEATING,
+    Z550_STATE_IDLE,
+    Z550_TEMP_STEP,
+    Z550_VALUE_TO_PRESET,
+)
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 
@@ -51,32 +67,6 @@ LG_MODE_TO_VALUE = {
 }
 
 LG_VALUE_TO_MODE = {v: k for k, v in LG_MODE_TO_VALUE.items()}
-
-# Z550iQ+ heat pump modes (mapped to component 16 values)
-Z550_MODE_HEATING = 0
-Z550_MODE_COOLING = 1
-Z550_MODE_AUTO = 2
-
-# Z550iQ+ state values (component 61)
-Z550_STATE_IDLE = 0
-Z550_STATE_HEATING = 2
-Z550_STATE_COOLING = 3
-Z550_STATE_NO_FLOW = 11
-
-# Z550iQ+ preset modes (mapped to component 17 values) - to be confirmed
-Z550_PRESET_SILENCE = "silence"
-Z550_PRESET_SMART = "smart"
-Z550_PRESET_BOOST = "boost"
-
-Z550_PRESET_MODES = [Z550_PRESET_SILENCE, Z550_PRESET_SMART, Z550_PRESET_BOOST]
-
-Z550_PRESET_TO_VALUE = {
-    Z550_PRESET_SILENCE: 0,
-    Z550_PRESET_SMART: 1,
-    Z550_PRESET_BOOST: 2,
-}
-
-Z550_VALUE_TO_PRESET = {v: k for k, v in Z550_PRESET_TO_VALUE.items()}
 
 
 async def async_setup_entry(
@@ -199,16 +189,22 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     @property
     def min_temp(self) -> float:
         """Return the minimum temperature."""
+        if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
+            return Z550_MIN_TEMP
         return 10.0
 
     @property
     def max_temp(self) -> float:
         """Return the maximum temperature."""
+        if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
+            return Z550_MAX_TEMP
         return 40.0
 
     @property
     def target_temperature_step(self) -> float:
         """Return the supported step of target temperature."""
+        if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
+            return Z550_TEMP_STEP
         return 1.0
 
     @property
@@ -461,6 +457,21 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         if temperature is None:
             return
 
+        # Validate temperature is within bounds
+        min_t = self.min_temp
+        max_t = self.max_temp
+        if temperature < min_t or temperature > max_t:
+            raise ServiceValidationError(
+                f"Temperature {temperature}°C is out of range ({min_t}°C - {max_t}°C)",
+                translation_domain=DOMAIN,
+                translation_key="temperature_out_of_range",
+                translation_placeholders={
+                    "temperature": str(temperature),
+                    "min_temp": str(min_t),
+                    "max_temp": str(max_t),
+                },
+            )
+
         try:
             # Mise à jour optimiste immédiate
             import time
@@ -482,11 +493,13 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
                 self._last_action_time = None
                 self.async_write_ha_state()
 
-        except Exception:
+        except Exception as e:
+            _LOGGER.error("Error setting temperature for %s: %s", self._device_id, e)
             # Annuler la température optimiste en cas d'erreur
             self._pending_temperature = None
             self._last_action_time = None
             self.async_write_ha_state()
+            raise
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode for heat pumps with this feature."""

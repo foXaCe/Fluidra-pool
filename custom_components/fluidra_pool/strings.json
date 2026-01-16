@@ -104,7 +104,23 @@
     },
     "climate": {
       "heat_pump": {
-        "name": "Heat Pump"
+        "name": "Heat Pump",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "silence": "Silence",
+              "smart": "Smart",
+              "boost": "Boost",
+              "smart_heating": "Smart Heating",
+              "smart_cooling": "Smart Cooling",
+              "smart_heat_cool": "Smart Heat/Cool",
+              "boost_heating": "Boost Heating",
+              "silence_heating": "Silence Heating",
+              "boost_cooling": "Boost Cooling",
+              "silence_cooling": "Silence Cooling"
+            }
+          }
+        }
       }
     },
     "number": {
@@ -163,6 +179,11 @@
           "scene_8": "Scene 8"
         }
       }
+    }
+  },
+  "exceptions": {
+    "temperature_out_of_range": {
+      "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"
     }
   }
 }
