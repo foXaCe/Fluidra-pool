@@ -1,14 +1,7 @@
 {
   "config": {
-    "step": {
-      "user": {
-        "title": "Configuração Fluidra Pool",
-        "description": "Insira suas credenciais Fluidra Pool",
-        "data": {
-          "email": "E-mail",
-          "password": "Senha"
-        }
-      }
+    "abort": {
+      "already_configured": "Esta conta já está configurada"
     },
     "error": {
       "cannot_connect": "Não foi possível conectar à API Fluidra",
@@ -16,121 +9,47 @@
       "no_pools": "Nenhuma piscina encontrada. Certifique-se de que seus equipamentos estão configurados no app Fluidra Pool",
       "unknown": "Erro inesperado"
     },
-    "abort": {
-      "already_configured": "Esta conta já está configurada"
-    }
-  },
-  "options": {
     "step": {
-      "init": {
-        "title": "Opções Fluidra Pool",
-        "description": "Configure opções avançadas",
+      "user": {
         "data": {
-          "scan_interval": "Intervalo de atualização (segundos)"
-        }
+          "email": "E-mail",
+          "password": "Senha"
+        },
+        "description": "Insira suas credenciais Fluidra Pool",
+        "title": "Configuração Fluidra Pool"
       }
     }
   },
   "entity": {
-    "sensor": {
-      "speed_percent": {
-        "name": "Porcentagem de Velocidade"
-      },
-      "operation_mode": {
-        "name": "Modo de Operação"
-      },
-      "connectivity": {
-        "name": "Conectividade"
-      },
-      "signal_strength": {
-        "name": "Força do Sinal"
-      },
-      "firmware_version": {
-        "name": "Versão do Firmware"
-      },
-      "hardware_errors": {
-        "name": "Erros de Hardware"
-      },
-      "comm_errors": {
-        "name": "Erros de Comunicação"
-      },
-      "network_status": {
-        "name": "Estado da Rede"
-      },
-      "schedule_count": {
-        "name": "Programações Ativas"
-      },
-      "next_schedule": {
-        "name": "Próxima Programação"
-      },
-      "current_temperature": {
-        "name": "Temperatura Atual"
-      },
-      "target_temperature": {
-        "name": "Temperatura Alvo"
-      },
-      "weather_temperature": {
-        "name": "Temperatura Clima"
-      },
-      "device_info": {
-        "name": "Informações do Dispositivo"
-      },
-      "pool_status": {
-        "name": "Status da Piscina"
-      },
-      "pool_location": {
-        "name": "Localização da Piscina"
-      },
-      "water_quality": {
-        "name": "Qualidade da Água"
-      }
-    },
-    "switch": {
-      "pump": {
-        "name": "Bomba"
-      },
-      "auto_mode": {
-        "name": "Modo Automático"
-      },
-      "heat_pump": {
-        "name": "Bomba de Calor"
-      },
-      "heater": {
-        "name": "Aquecedor"
-      },
-      "schedule_enable": {
-        "name": "Programação {schedule_id}"
-      }
-    },
     "climate": {
       "heat_pump": {
         "name": "Bomba de Calor"
       }
     },
     "number": {
-      "speed_control": {
-        "name": "Controle de Velocidade"
-      },
       "pump_vitesse": {
         "name": "Configuração {device_name} Velocidade"
-      }
-    },
-    "time": {
-      "schedule_start": {
-        "name": "Programação {schedule_id} Início"
       },
-      "schedule_end": {
-        "name": "Programação {schedule_id} Fim"
+      "speed_control": {
+        "name": "Controle de Velocidade"
       }
     },
     "select": {
+      "chlorinator_mode": {
+        "name": "Modo",
+        "state": {
+          "auto": "Automático",
+          "off": "Desligado",
+          "on": "Ligado"
+        }
+      },
       "pump_speed": {
         "name": "Nível de Velocidade",
         "state": {
-          "stopped": "Não funcionando",
+          "high": "Alta",
           "low": "Baixa",
           "medium": "Média",
-          "high": "Alta"
+          "stopped": "Não funcionando"
         }
       },
       "schedule_mode": {
@@ -140,75 +59,95 @@
           "1": "Média",
           "2": "Alta"
         }
+      }
+    },
+    "sensor": {
+      "comm_errors": {
+        "name": "Erros de Comunicação"
       },
-      "chlorinator_mode": {
-        "name": "Modo",
-        "state": {
-          "off": "Desligado",
-          "on": "Ligado",
-          "auto": "Automático"
-        }
+      "connectivity": {
+        "name": "Conectividade"
+      },
+      "current_temperature": {
+        "name": "Temperatura Atual"
+      },
+      "device_info": {
+        "name": "Informações do Dispositivo"
+      },
+      "firmware_version": {
+        "name": "Versão do Firmware"
+      },
+      "hardware_errors": {
+        "name": "Erros de Hardware"
+      },
+      "network_status": {
+        "name": "Estado da Rede"
+      },
+      "next_schedule": {
+        "name": "Próxima Programação"
+      },
+      "operation_mode": {
+        "name": "Modo de Operação"
+      },
+      "pool_location": {
+        "name": "Localização da Piscina"
+      },
+      "pool_status": {
+        "name": "Status da Piscina"
+      },
+      "schedule_count": {
+        "name": "Programações Ativas"
+      },
+      "signal_strength": {
+        "name": "Força do Sinal"
+      },
+      "speed_percent": {
+        "name": "Porcentagem de Velocidade"
+      },
+      "target_temperature": {
+        "name": "Temperatura Alvo"
+      },
+      "water_quality": {
+        "name": "Qualidade da Água"
+      },
+      "weather_temperature": {
+        "name": "Temperatura Clima"
+      }
+    },
+    "switch": {
+      "auto_mode": {
+        "name": "Modo Automático"
+      },
+      "heat_pump": {
+        "name": "Bomba de Calor"
+      },
+      "heater": {
+        "name": "Aquecedor"
+      },
+      "pump": {
+        "name": "Bomba"
+      },
+      "schedule_enable": {
+        "name": "Programação {schedule_id}"
+      }
+    },
+    "time": {
+      "schedule_end": {
+        "name": "Programação {schedule_id} Fim"
+      },
+      "schedule_start": {
+        "name": "Programação {schedule_id} Início"
       }
     }
   },
-  "state": {
-    "sensor": {
-      "operation_mode": {
-        "auto": "Automático",
-        "manual": "Manual",
-        "off": "Desligado",
-        "unknown": "Desconhecido"
-      },
-      "connectivity": {
-        "online": "Online",
-        "offline": "Offline",
-        "unknown": "Desconhecido"
-      },
-      "network_status": {
-        "connected": "Conectado",
-        "disconnected": "Desconectado",
-        "unknown": "Desconhecido"
-      },
-      "pump_status": {
-        "stopped": "Parada",
-        "not_running": "Não funcionando",
-        "no_schedule": "Sem programação"
-      },
-      "pump_speed_status": {
-        "stopped": "Parada",
-        "not_running": "Não funcionando",
-        "low": "Baixa",
-        "medium": "Média",
-        "high": "Alta"
-      },
-      "pump_speed": {
-        "low": "Baixa",
-        "medium": "Média",
-        "high": "Alta",
-        "active": "Ativa"
-      },
-      "signal_quality": {
-        "low": "Baixa",
-        "very_low": "Muito baixa"
-      },
-      "pool_status": {
-        "using": "Em serviço",
-        "maintenance": "Em manutenção",
-        "offline": "Offline",
-        "winterized": "Hibernada",
-        "connected": "Conectada",
-        "unknown_state": "Estado desconhecido"
-      },
-      "schedule": {
-        "active_schedules": "programações ativas"
-      },
-      "schedule_count": {
-        "no_schedule": "Sem programação"
-      },
-      "water_quality": {
-        "auto": "Automático",
-        "manual": "Manual",
-        "not_configured": "Não configurado"
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Intervalo de atualização (segundos)"
+        },
+        "description": "Configure opções avançadas",
+        "title": "Opções Fluidra Pool"
       }
     }
   }
