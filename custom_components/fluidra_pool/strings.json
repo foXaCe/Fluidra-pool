@@ -123,6 +123,11 @@
         }
       }
     },
+    "light": {
+      "pool_light": {
+        "name": "Pool Light"
+      }
+    },
     "number": {
       "speed_control": {
         "name": "Speed Control"
@@ -137,6 +142,12 @@
       },
       "schedule_end": {
         "name": "Schedule {schedule_id} End"
+      },
+      "light_schedule_start": {
+        "name": "Light Schedule {schedule_id} Start"
+      },
+      "light_schedule_end": {
+        "name": "Light Schedule {schedule_id} End"
       }
     },
     "select": {
@@ -178,6 +189,67 @@
           "scene_7": "Scene 7",
           "scene_8": "Scene 8"
         }
+      }
+    }
+  },
+  "state": {
+    "sensor": {
+      "operation_mode": {
+        "auto": "Auto",
+        "manual": "Manual",
+        "off": "Off",
+        "unknown": "Unknown"
+      },
+      "connectivity": {
+        "online": "Online",
+        "offline": "Offline",
+        "unknown": "Unknown"
+      },
+      "network_status": {
+        "connected": "Connected",
+        "disconnected": "Disconnected",
+        "unknown": "Unknown"
+      },
+      "pump_status": {
+        "stopped": "Stopped",
+        "not_running": "Not Running",
+        "no_schedule": "No Schedule"
+      },
+      "pump_speed_status": {
+        "stopped": "Stopped",
+        "not_running": "Not Running",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      },
+      "pump_speed": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "active": "Active"
+      },
+      "signal_quality": {
+        "low": "Low",
+        "very_low": "Very Low"
+      },
+      "pool_status": {
+        "using": "In Use",
+        "maintenance": "Maintenance",
+        "offline": "Offline",
+        "winterized": "Winterized",
+        "connected": "Connected",
+        "unknown_state": "Unknown State"
+      },
+      "schedule": {
+        "active_schedules": "active schedules"
+      },
+      "schedule_count": {
+        "no_schedule": "No Schedule"
+      },
+      "water_quality": {
+        "auto": "Auto",
+        "manual": "Manual",
+        "not_configured": "Not Configured"
       }
     }
   },
