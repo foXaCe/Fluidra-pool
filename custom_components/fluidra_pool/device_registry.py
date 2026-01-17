@@ -353,7 +353,7 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
     ),
     "e30iq_pump": DeviceConfig(
         device_type="pump",
-        identifier_patterns=["E30*", "PUMP*"],
+        identifier_patterns=["E30*", "LE*", "PUMP*"],
         components_range=5,  # Minimal scan
         required_components=[0, 1, 2, 3],
         entities=[
