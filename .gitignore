@@ -1,6 +1,3 @@
-# macOS
-.DS_Store
-
 # Python
 __pycache__/
 *.py[cod]
@@ -28,9 +25,6 @@ wheels/
 venv/
 ENV/
 env/
-.env
-.env.local
-.env.*.local
 
 # Ruff
 .ruff_cache/
