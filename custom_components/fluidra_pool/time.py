@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
+from .utils import convert_cron_days
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -243,33 +244,6 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
         days_str = ",".join(map(str, days))
         return f"{time_obj.minute} {time_obj.hour} * * {days_str}"
 
-    def _convert_cron_days(self, cron_time: str) -> str:
-        """Convert cron time from HA format (0,1,2,3,4,5,6) to mobile format (1,2,3,4,5,6,7)."""
-        if not cron_time:
-            return "00 00 * * 1,2,3,4,5,6,7"
-
-        parts = cron_time.split()
-        if len(parts) >= 5:
-            try:
-                # Convert day numbers: 0->7, 1->1, 2->2, etc.
-                old_days = parts[4].split(",")
-                new_days = []
-                for day in old_days:
-                    day_num = int(day.strip())
-                    if day_num == 0:  # Sunday: 0 -> 7
-                        new_days.append("7")
-                    else:  # Monday-Saturday: 1-6 -> 1-6
-                        new_days.append(str(day_num))
-
-                # Sort days to match mobile app format
-                new_days_sorted = sorted([int(d) for d in new_days])
-                parts[4] = ",".join(map(str, new_days_sorted))
-                return " ".join(parts)
-            except Exception:
-                pass
-
-        return cron_time
-
     def _validate_schedule_overlap(
         self, new_start_time: time, new_end_time: time, schedule_id_to_update: str
     ) -> tuple[bool, str]:
@@ -382,8 +356,8 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             updated_schedules = []
             for sched in current_schedules:
                 # Convert cron format 0,1,2,3,4,5,6 to 1,2,3,4,5,6,7 for mobile app
-                start_time = self._convert_cron_days(sched.get("startTime", ""))
-                end_time = self._convert_cron_days(sched.get("endTime", ""))
+                start_time = convert_cron_days(sched.get("startTime", ""))
+                end_time = convert_cron_days(sched.get("endTime", ""))
 
                 # If this is the schedule we're updating, use the new time
                 if str(sched.get("id")) == str(self._schedule_id):
@@ -760,8 +734,8 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             updated_schedules = []
             for sched in current_schedules:
                 # Convert cron format 0,1,2,3,4,5,6 to 1,2,3,4,5,6,7 for mobile app
-                start_time = self._convert_cron_days(sched.get("startTime", ""))
-                end_time = self._convert_cron_days(sched.get("endTime", ""))
+                start_time = convert_cron_days(sched.get("startTime", ""))
+                end_time = convert_cron_days(sched.get("endTime", ""))
 
                 # If this is the schedule we're updating, use the new time
                 if str(sched.get("id")) == str(self._schedule_id):
