@@ -23,7 +23,28 @@
   "entity": {
     "climate": {
       "heat_pump": {
-        "name": "Bomba de Calor"
+        "name": "Bomba de Calor",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "boost": "Turbo",
+              "boost_cooling": "Refrigeração Turbo",
+              "boost_heating": "Aquecimento Turbo",
+              "silence": "Silêncio",
+              "silence_cooling": "Refrigeração Silenciosa",
+              "silence_heating": "Aquecimento Silencioso",
+              "smart": "Inteligente",
+              "smart_cooling": "Refrigeração Inteligente",
+              "smart_heat_cool": "Aquec./Refrig. Inteligente",
+              "smart_heating": "Aquecimento Inteligente"
+            }
+          }
+        }
+      }
+    },
+    "light": {
+      "pool_light": {
+        "name": "Luz da Piscina"
       }
     },
     "number": {
@@ -41,6 +62,20 @@
           "auto": "Automático",
           "off": "Desligado",
           "on": "Ligado"
+        }
+      },
+      "light_effect": {
+        "name": "Efeito",
+        "state": {
+          "scene_1": "Cena 1",
+          "scene_2": "Cena 2",
+          "scene_3": "Cena 3",
+          "scene_4": "Cena 4",
+          "scene_5": "Cena 5",
+          "scene_6": "Cena 6",
+          "scene_7": "Cena 7",
+          "scene_8": "Cena 8",
+          "static_color": "Cor Fixa"
         }
       },
       "pump_speed": {
@@ -132,12 +167,23 @@
       }
     },
     "time": {
+      "light_schedule_end": {
+        "name": "Programação Luz {schedule_id} Fim"
+      },
+      "light_schedule_start": {
+        "name": "Programação Luz {schedule_id} Início"
+      },
       "schedule_end": {
         "name": "Programação {schedule_id} Fim"
       },
       "schedule_start": {
         "name": "Programação {schedule_id} Início"
       }
+    }
+  },
+  "exceptions": {
+    "temperature_out_of_range": {
+      "message": "A temperatura {temperature}°C está fora do intervalo ({min_temp}°C - {max_temp}°C)"
     }
   },
   "options": {

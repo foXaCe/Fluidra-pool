@@ -23,7 +23,23 @@
   "entity": {
     "climate": {
       "heat_pump": {
-        "name": "Heat Pump"
+        "name": "Heat Pump",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "boost": "Boost",
+              "boost_cooling": "Boost Cooling",
+              "boost_heating": "Boost Heating",
+              "silence": "Silence",
+              "silence_cooling": "Silence Cooling",
+              "silence_heating": "Silence Heating",
+              "smart": "Smart",
+              "smart_cooling": "Smart Cooling",
+              "smart_heat_cool": "Smart Heat/Cool",
+              "smart_heating": "Smart Heating"
+            }
+          }
+        }
       }
     },
     "light": {
@@ -46,6 +62,20 @@
           "auto": "Auto",
           "off": "Off",
           "on": "On"
+        }
+      },
+      "light_effect": {
+        "name": "Effect",
+        "state": {
+          "scene_1": "Scene 1",
+          "scene_2": "Scene 2",
+          "scene_3": "Scene 3",
+          "scene_4": "Scene 4",
+          "scene_5": "Scene 5",
+          "scene_6": "Scene 6",
+          "scene_7": "Scene 7",
+          "scene_8": "Scene 8",
+          "static_color": "Static Color"
         }
       },
       "pump_speed": {
@@ -149,6 +179,11 @@
       "schedule_start": {
         "name": "Schedule {schedule_id} Start"
       }
+    }
+  },
+  "exceptions": {
+    "temperature_out_of_range": {
+      "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"
     }
   },
   "options": {

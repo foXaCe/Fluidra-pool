@@ -81,10 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Test connection and authentication
         await api.authenticate()
         pools = await api.get_pools()
-
-        if not pools:
-            # Continue setup even without pools for now
-            pass
+        # Continue setup even if no pools found - user may add equipment later
 
     except Exception as err:
         _LOGGER.error("Unable to connect to Fluidra Pool API: %s", err)

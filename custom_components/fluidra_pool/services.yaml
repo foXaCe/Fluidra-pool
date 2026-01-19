@@ -1,18 +1,18 @@
-# Services pour la gestion des programmations de pompe
+# Services for pump schedule management
 set_schedule:
-  name: Définir programmation pompe
-  description: Configure la programmation horaire d'une pompe
+  name: Set pump schedule
+  description: Configure the pump schedule
   fields:
     device_id:
-      name: ID du device
-      description: Identifiant du device (ex. LE24500883)
+      name: Device ID
+      description: Device identifier (e.g., LE24500883)
       example: "LE24500883"
       required: true
       selector:
         text:
     schedules:
-      name: Programmations
-      description: Liste des créneaux horaires
+      name: Schedules
+      description: List of time slots
       required: true
       example: |
         - enabled: true
@@ -29,43 +29,43 @@ set_schedule:
         object:
 
 clear_schedule:
-  name: Effacer programmation pompe
-  description: Supprime toutes les programmations d'une pompe
+  name: Clear pump schedule
+  description: Delete all pump schedules
   fields:
     device_id:
-      name: ID du device
-      description: Identifiant du device (ex. LE24500883)
+      name: Device ID
+      description: Device identifier (e.g., LE24500883)
       example: "LE24500883"
       required: true
       selector:
         text:
 
 set_preset_schedule:
-  name: Programmation prédéfinie
-  description: Applique une programmation prédéfinie
+  name: Preset schedule
+  description: Apply a preset schedule
   fields:
     device_id:
-      name: ID du device
-      description: Identifiant du device (ex. LE24500883)
+      name: Device ID
+      description: Device identifier (e.g., LE24500883)
       example: "LE24500883"
       required: true
       selector:
         text:
     preset:
       name: Preset
-      description: Type de programmation prédéfinie
+      description: Type of preset schedule
       required: true
       default: "standard"
       selector:
         select:
           options:
             - value: "standard"
-              label: "Standard (8h-12h + 18h-20h Moyenne)"
+              label: "Standard (8am-12pm + 6pm-8pm Medium)"
             - value: "intensive"
-              label: "Intensif (8h-18h Élevée)"
+              label: "Intensive (8am-6pm High)"
             - value: "eco"
-              label: "Économique (10h-14h Faible)"
+              label: "Eco (10am-2pm Low)"
             - value: "summer"
-              label: "Été (6h-10h + 16h-22h Élevée)"
+              label: "Summer (6am-10am + 4pm-10pm High)"
             - value: "winter"
-              label: "Hiver (12h-16h Faible)"
+              label: "Winter (12pm-4pm Low)"
