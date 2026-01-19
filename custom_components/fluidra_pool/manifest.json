@@ -5,7 +5,6 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/foxace66/fluidra-pool",
-  "homeassistant": "2024.1.0",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/foxace66/fluidra-pool/issues",
   "requirements": ["aiohttp>=3.8.0", "PyJWT>=2.0.0"],
