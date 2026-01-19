@@ -1,9 +1,19 @@
+# macOS
+.DS_Store
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.local
+.env.*.local
 build/
 develop-eggs/
 dist/
@@ -20,36 +30,44 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
-.venv/
-venv/
-ENV/
-env/
+# IDE / Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.code-workspace
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
 
 # Ruff
 .ruff_cache/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Logs
+*.log
+logging.conf
+
+# Home Assistant specific
+config/
+.HA_VERSION
+home-assistant.log
+home-assistant_v2.db
+
+# Claude Code (fichiers locaux, ne pas partager)
+CLAUDE.md
+AGENTS.md
 
 # OS
-.DS_Store
 Thumbs.db
 
 # Backup files
 *.bak
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
 # Temporary files
-*.log
 *.tmp
 
 # Development/capture scripts (mitmproxy, reverse engineering)
