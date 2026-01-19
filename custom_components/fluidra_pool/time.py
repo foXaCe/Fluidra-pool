@@ -267,7 +267,6 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                 return " ".join(parts)
             except Exception:
                 pass
-                pass
 
         return cron_time
 
@@ -405,7 +404,6 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                                         days.append(day)
                                 days = sorted(days)
                             except Exception:
-                                pass
                                 pass
 
                     start_time = self._format_time_to_cron(value, days)
@@ -784,7 +782,6 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                                         days.append(day)
                                 days = sorted(days)
                             except Exception:
-                                pass
                                 pass
 
                     end_time = self._format_time_to_cron(value, days)

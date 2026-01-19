@@ -530,7 +530,6 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
                 current_ph = float(raw_reading) / 100
             except Exception:
                 pass
-                pass
 
         return {
             "ph_range": "6.8-7.6",

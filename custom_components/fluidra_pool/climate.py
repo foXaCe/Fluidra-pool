@@ -107,6 +107,10 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         self._pending_preset_mode = None
         self._pending_hvac_mode = None
         self._is_updating = False  # Indicates an action is in progress
+        # Timestamps for optimistic state timeout (5 second timeout)
+        self._last_action_time: float | None = None
+        self._last_preset_action_time: float | None = None
+        self._last_hvac_action_time: float | None = None
 
     @property
     def device_data(self) -> dict:
@@ -246,7 +250,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         device_data = self.device_data
 
         # Check for pending optimistic preset mode first
-        if self._pending_preset_mode is not None:
+        if self._pending_preset_mode is not None and self._last_preset_action_time is not None:
             # Clear pending mode after 5 seconds
             if time.time() - self._last_preset_action_time > 5:
                 self._pending_preset_mode = None
@@ -286,7 +290,7 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         """Return current hvac operation mode."""
 
         # Check for pending optimistic HVAC mode first
-        if self._pending_hvac_mode is not None:
+        if self._pending_hvac_mode is not None and self._last_hvac_action_time is not None:
             # Clear pending mode after 5 seconds
             if time.time() - self._last_hvac_action_time > 5:
                 self._pending_hvac_mode = None

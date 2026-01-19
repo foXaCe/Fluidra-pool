@@ -79,7 +79,9 @@ class FluidraPoolAPI:
     async def authenticate(self) -> None:
         """Authentification réelle via AWS Cognito."""
         if self._session is None:
-            self._session = aiohttp.ClientSession()
+            # Default timeout of 30s for all requests to prevent hanging
+            timeout = aiohttp.ClientTimeout(total=30)
+            self._session = aiohttp.ClientSession(timeout=timeout)
 
         try:
             # Étape 1: Authentification initiale AWS Cognito

@@ -477,7 +477,6 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                 return time(hour, minute)
         except Exception:
             pass
-            pass
         return None
 
     def _format_schedule_time(self, schedule: dict) -> str:

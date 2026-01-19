@@ -891,7 +891,6 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 return " ".join(parts)
             except Exception:
                 pass
-                pass
 
         return cron_time
 
