@@ -7,6 +7,7 @@ optimized for Home Assistant usage with real AWS Cognito authentication.
 
 import json
 import logging
+import time
 from typing import Any
 
 import aiohttp
@@ -128,8 +129,6 @@ class FluidraPoolAPI:
 
             # Calculer l'expiration du token (AWS Cognito = 1 heure par défaut)
             expires_in = auth_result.get("ExpiresIn", 3600)  # 1 heure par défaut
-            import time
-
             self.token_expires_at = int(time.time()) + expires_in - 300  # Renouveler 5 min avant expiration
 
             if not self.access_token:
@@ -297,11 +296,7 @@ class FluidraPoolAPI:
         """Vérifier si le token va expirer bientôt."""
         if not self.token_expires_at:
             return True  # Pas d'info d'expiration, considérer comme expiré
-
-        import time
-
-        current_time = int(time.time())
-        return current_time >= self.token_expires_at
+        return int(time.time()) >= self.token_expires_at
 
     async def ensure_valid_token(self) -> bool:
         """S'assurer que le token est valide, le renouveler si nécessaire."""
@@ -339,8 +334,6 @@ class FluidraPoolAPI:
 
                 # Mettre à jour l'expiration
                 expires_in = auth_result.get("ExpiresIn", 3600)
-                import time
-
                 self.token_expires_at = int(time.time()) + expires_in - 300
 
                 return True

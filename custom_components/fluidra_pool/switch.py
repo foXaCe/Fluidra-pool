@@ -1,6 +1,7 @@
 """Switch platform for Fluidra Pool integration."""
 
 import logging
+import time
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
@@ -27,7 +28,8 @@ async def async_setup_entry(
 
     entities = []
 
-    pools = await coordinator.api.get_pools()
+    # Use cached pools data instead of API call for faster startup
+    pools = coordinator.api._pools or await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
             device_id = device.get("device_id")
@@ -130,7 +132,6 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
 
     def _set_pending_state(self, state: bool) -> None:
         """Set pending state for optimistic UI updates."""
-        import time
 
         self._pending_state = state
         self._last_action_time = time.time()
@@ -222,8 +223,6 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
         """Return true if the pump is on using optimistic UI or real-time reported value."""
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
-            import time
-
             # Effacer l'état en attente après 10 secondes de sécurité
             if time.time() - self._last_action_time > 10:
                 self._clear_pending_state()
@@ -355,8 +354,6 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
         """Return true if the heat pump is on using optimistic UI or real-time reported value."""
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
-            import time
-
             # Effacer l'état en attente après 10 secondes de sécurité
             if time.time() - self._last_action_time > 10:
                 self._clear_pending_state()
@@ -586,8 +583,6 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
         """Return true if auto mode is on using optimistic UI or real-time reported value."""
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
-            import time
-
             # Effacer l'état en attente après 10 secondes de sécurité
             if time.time() - self._last_action_time > 10:
                 self._clear_pending_state()
@@ -741,8 +736,6 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         """Return true if the schedule is enabled using optimistic UI."""
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
-            import time
-
             # Effacer l'état en attente après 10 secondes de sécurité
             if time.time() - self._last_action_time > 10:
                 self._clear_pending_state()
@@ -960,8 +953,6 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
 
         # Si on a un état en attente
         if self._pending_state is not None:
-            import time
-
             # Si le serveur confirme l'état attendu, clear le pending state
             if actual_state == self._pending_state or time.time() - self._last_action_time > 10:
                 self._clear_pending_state()

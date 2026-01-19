@@ -1,6 +1,7 @@
 """Climate platform for Fluidra Pool integration."""
 
 import logging
+import time
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -79,7 +80,8 @@ async def async_setup_entry(
 
     entities = []
 
-    pools = await coordinator.api.get_pools()
+    # Use cached pools data instead of API call for faster startup
+    pools = coordinator.api._pools or await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
             device_id = device.get("device_id")
@@ -245,8 +247,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
         # Check for pending optimistic preset mode first
         if self._pending_preset_mode is not None:
-            import time
-
             # Clear pending mode after 5 seconds
             if time.time() - self._last_preset_action_time > 5:
                 self._pending_preset_mode = None
@@ -287,8 +287,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
         # Check for pending optimistic HVAC mode first
         if self._pending_hvac_mode is not None:
-            import time
-
             # Clear pending mode after 5 seconds
             if time.time() - self._last_hvac_action_time > 5:
                 self._pending_hvac_mode = None
@@ -389,7 +387,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         """Set new target hvac mode."""
         try:
             # Optimistic update - show immediately in UI
-            import time
 
             self._pending_hvac_mode = hvac_mode
             self._last_hvac_action_time = time.time()
@@ -474,7 +471,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
 
         try:
             # Mise à jour optimiste immédiate
-            import time
 
             self._pending_temperature = temperature
             self._last_action_time = time.time()
@@ -505,7 +501,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         """Set new preset mode for heat pumps with this feature."""
         try:
             # Optimistic update - show immediately in UI
-            import time
 
             self._pending_preset_mode = preset_mode
             self._last_preset_action_time = time.time()

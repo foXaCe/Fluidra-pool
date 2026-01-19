@@ -1,5 +1,6 @@
 """Data update coordinator for Fluidra Pool integration."""
 
+import asyncio
 from datetime import timedelta
 import logging
 
@@ -14,7 +15,8 @@ from .fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
-UPDATE_INTERVAL = timedelta(seconds=15)
+# Optimized polling interval (30s minimum per HA guidelines)
+UPDATE_INTERVAL = timedelta(seconds=30)
 
 
 class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
@@ -45,6 +47,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     def has_optimistic_entities(self) -> bool:
         """Vérifier si des entités ont un état optimiste actif."""
         return len(self._optimistic_entities) > 0
+
+    def get_pools_from_data(self) -> list[dict]:
+        """Get pools list from coordinator data (no API call).
+
+        Use this in platform setup instead of api.get_pools() for faster startup.
+        """
+        if not self.data:
+            return []
+        return [{"id": pool_id, **pool_data} for pool_id, pool_data in self.data.items()]
 
     async def _cleanup_removed_devices(self, current_device_ids: set):
         """Remove devices and entities that no longer exist in Fluidra API."""
@@ -284,335 +295,293 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception:
             return 0
 
+    async def _fetch_components_parallel(self, device_id: str, components_to_scan: list[int]) -> dict[int, dict]:
+        """Fetch multiple component states in parallel for a device.
+
+        Returns a dict mapping component_id to component_state.
+        """
+        # Limit concurrent requests to avoid overwhelming the API
+        semaphore = asyncio.Semaphore(10)
+
+        async def fetch_one(component_id: int) -> tuple[int, dict | None]:
+            async with semaphore:
+                state = await self.api.get_component_state(device_id, component_id)
+                return (component_id, state)
+
+        tasks = [fetch_one(cid) for cid in components_to_scan]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        component_states = {}
+        for result in results:
+            if isinstance(result, tuple):
+                cid, state = result
+                if state and isinstance(state, dict):
+                    component_states[cid] = state
+        return component_states
+
+    def _process_component_state(self, device: dict, pool_id: str, component_id: int, component_state: dict) -> None:
+        """Process a single component state and update device data.
+
+        Extracted from _async_update_data to reduce code duplication.
+        """
+        reported_value = component_state.get("reportedValue")
+        device_id = device.get("device_id")
+
+        # Store ALL component data
+        device["components"][str(component_id)] = component_state
+
+        if component_id == 0:
+            device["device_id_component"] = reported_value
+        elif component_id == 1:
+            device["part_numbers_component"] = reported_value
+        elif component_id == 2:
+            if not DeviceIdentifier.has_feature(device, "skip_signal"):
+                device["signal_strength_component"] = reported_value
+        elif component_id == 3:
+            if not DeviceIdentifier.has_feature(device, "skip_firmware"):
+                device["firmware_version_component"] = reported_value
+        elif component_id == 4:
+            device["hardware_errors_component"] = reported_value
+        elif component_id == 5:
+            device["comm_errors_component"] = reported_value
+        elif component_id == 9:
+            device["pump_reported"] = reported_value
+            device["pump_desired"] = component_state.get("desiredValue")
+            device["is_running"] = bool(reported_value)
+        elif component_id == 10:
+            device["auto_reported"] = reported_value
+            device["auto_desired"] = component_state.get("desiredValue")
+            device["auto_mode_enabled"] = bool(reported_value)
+        elif component_id == 11:
+            device["speed_level_reported"] = reported_value
+            device["speed_level_desired"] = component_state.get("desiredValue")
+            if not device.get("is_running", False):
+                device["speed_percent"] = 0
+            else:
+                auto_mode = device.get("auto_mode_enabled", False)
+                if auto_mode:
+                    device["speed_percent"] = self._calculate_auto_speed_from_schedules(device)
+                elif reported_value == 0:
+                    device["speed_percent"] = 45
+                elif reported_value == 1:
+                    device["speed_percent"] = 65
+                elif reported_value == 2:
+                    device["speed_percent"] = 100
+                else:
+                    device["speed_percent"] = 0
+        elif component_id == 13:
+            device["component_13_data"] = component_state
+            if device.get("type", "").lower() == "heat_pump" and not DeviceIdentifier.has_feature(device, "z550_mode"):
+                device["heat_pump_reported"] = reported_value
+                device["is_heating"] = bool(reported_value)
+        elif component_id == 14:
+            device["component_14_data"] = component_state
+        elif component_id == 15:
+            device["component_15_speed"] = reported_value or component_state.get("desiredValue") or 0
+            temp_raw = reported_value or component_state.get("desiredValue")
+            if device.get("type", "").lower() == "heat_pump" and temp_raw:
+                try:
+                    temp_value = float(temp_raw) / 10.0
+                    if 10.0 <= temp_value <= 50.0:
+                        device["target_temperature"] = temp_value
+                except (ValueError, TypeError):
+                    pass
+        elif component_id == 16:
+            device["component_16_data"] = component_state
+            if DeviceIdentifier.has_feature(device, "z550_mode"):
+                device["z550_mode_reported"] = reported_value
+        elif component_id == 17:
+            device["component_17_data"] = component_state
+            if DeviceIdentifier.has_feature(device, "z550_mode"):
+                device["z550_preset_reported"] = reported_value
+        elif component_id == 19:
+            device["timezone_component"] = reported_value
+            if device.get("type", "").lower() == "heat_pump" and reported_value:
+                try:
+                    water_temp_value = float(reported_value) / 10.0
+                    if 5.0 <= water_temp_value <= 50.0:
+                        device["water_temperature"] = water_temp_value
+                except (ValueError, TypeError):
+                    pass
+        elif component_id == 20:
+            device_type = device.get("type", "")
+            if device_type == "chlorinator":
+                if isinstance(reported_value, int):
+                    device["mode_reported"] = reported_value
+            else:
+                schedule_data = reported_value if isinstance(reported_value, list) else []
+                device["schedule_data"] = schedule_data
+                self._track_schedule_count(pool_id, device_id, schedule_data)
+        elif component_id == 21:
+            device["network_status_component"] = reported_value
+            if DeviceIdentifier.has_feature(device, "z550_mode"):
+                device["heat_pump_reported"] = reported_value
+                device["is_heating"] = bool(reported_value)
+        elif component_id == 37:
+            device["component_37_data"] = component_state
+            if DeviceIdentifier.has_feature(device, "z550_mode") and reported_value:
+                try:
+                    water_temp = float(reported_value) / 10.0
+                    if 0.0 <= water_temp <= 50.0:
+                        device["water_temperature"] = water_temp
+                except (ValueError, TypeError):
+                    pass
+        elif component_id == 40:
+            device[f"component_{component_id}_data"] = component_state
+            if DeviceIdentifier.has_feature(device, "z550_mode") and reported_value:
+                try:
+                    air_temp = float(reported_value) / 10.0
+                    if -20.0 <= air_temp <= 60.0:
+                        device["air_temperature"] = air_temp
+                except (ValueError, TypeError):
+                    pass
+            else:
+                config = DeviceIdentifier.identify_device(device)
+                device_type = config.device_type if config else device.get("type", "")
+                if device_type == "light":
+                    schedule_data = reported_value if isinstance(reported_value, list) else []
+                    device["schedule_data"] = schedule_data
+                    self._track_schedule_count(pool_id, device_id, schedule_data)
+        elif component_id == 61:
+            device["component_61_data"] = component_state
+            if DeviceIdentifier.has_feature(device, "z550_mode"):
+                device["z550_state_reported"] = reported_value
+                if reported_value == 2:
+                    device["hvac_action"] = "heating"
+                elif reported_value == 3:
+                    device["hvac_action"] = "cooling"
+                elif reported_value == 11:
+                    device["hvac_action"] = "no_flow"
+                else:
+                    device["hvac_action"] = "idle"
+        elif component_id in [62, 65]:
+            if device.get("type", "").lower() == "heat_pump" and reported_value:
+                try:
+                    water_temp_value = float(reported_value) / 10.0
+                    if 5.0 <= water_temp_value <= 50.0 and "water_temperature" not in device:
+                        device["water_temperature"] = water_temp_value
+                except (ValueError, TypeError):
+                    pass
+            device[f"component_{component_id}_data"] = component_state
+        else:
+            schedule_comp = DeviceIdentifier.get_feature(device, "schedule_component")
+            if schedule_comp and component_id == schedule_comp:
+                if isinstance(reported_value, dict) and "programs" in reported_value:
+                    schedule_data = self._parse_dm24049704_schedule_format(reported_value)
+                elif isinstance(reported_value, list):
+                    schedule_data = reported_value
+                else:
+                    schedule_data = []
+                device["schedule_data"] = schedule_data
+                self._track_schedule_count(pool_id, device_id, schedule_data)
+            device[f"component_{component_id}_data"] = component_state
+
+    def _track_schedule_count(self, pool_id: str, device_id: str, schedule_data: list) -> None:
+        """Track schedule count changes for cleanup."""
+        device_key = f"{pool_id}_{device_id}"
+        # Note: cleanup is now done asynchronously in a separate task to avoid blocking
+        self._previous_schedule_entities[device_key] = len(schedule_data)
+
     async def _async_update_data(self):
-        """Update data via library using real-time polling."""
+        """Update data via library using optimized parallel polling."""
         try:
-            # Si des entités ont un état optimiste actif, réduire les mises à jour pour éviter les conflits
+            # Skip update if entities have optimistic state
             if self.has_optimistic_entities():
-                # Retourner les données actuelles sans nouveau polling intensif
                 current_data = getattr(self, "data", None)
                 if current_data:
                     return current_data
 
-            # Vérification proactive du token avant chaque polling
+            # Validate token before polling
             if not await self.api.ensure_valid_token():
                 raise UpdateFailed("Token refresh failed")
 
-            # D'abord, récupérer la structure des pools
+            # Get pool structure
             pools = await self.api.get_pools()
 
-            # Premier démarrage : scan minimal pour démarrer vite
+            # Fast startup: minimal data on first update
             if self._first_update:
                 self._first_update = False
-                # Le prochain refresh normal (30s) fera le scan complet
                 return {pool["id"]: pool for pool in pools}
 
-            # Récupérer les données précédentes pour préserver les components
             previous_data = self.data if isinstance(self.data, dict) else {}
 
-            # Pour chaque pool, faire le polling temps réel des devices
+            # Process each pool with parallel API calls
             for pool in pools:
                 pool_id = pool["id"]
-
-                # Récupérer les devices précédents avec leurs components
                 prev_pool = previous_data.get(pool_id, {})
                 prev_devices_by_id = {d.get("device_id"): d for d in prev_pool.get("devices", []) if d.get("device_id")}
 
-                # Récupération des détails spécifiques de la piscine
-                pool_details = await self.api.get_pool_details(pool_id)
-                if pool_details:
-                    # Sauvegarder les devices de l'API avant la mise à jour
+                # Parallel: pool details + water quality
+                pool_details_task = self.api.get_pool_details(pool_id)
+                water_quality_task = self.api.poll_water_quality(pool_id)
+                pool_details, water_quality = await asyncio.gather(
+                    pool_details_task, water_quality_task, return_exceptions=True
+                )
+
+                if pool_details and not isinstance(pool_details, Exception):
                     api_devices = pool.get("devices", [])
-                    # Mise à jour des données piscine avec les détails de l'API
                     pool.update(pool_details)
-                    # Restaurer les devices
                     pool["devices"] = api_devices
 
-                # Préserver les components des devices précédents
+                if water_quality and not isinstance(water_quality, Exception):
+                    pool["water_quality"] = water_quality
+
+                # Preserve previous component data
                 for device in pool.get("devices", []):
                     device_id = device.get("device_id")
                     if device_id and device_id in prev_devices_by_id:
                         prev_device = prev_devices_by_id[device_id]
-                        # Copier les components du précédent refresh
                         if "components" in prev_device:
                             device["components"] = dict(prev_device["components"])
 
-                # Polling télémétrie qualité de l'eau
-                water_quality = await self.api.poll_water_quality(pool_id)
-                if water_quality:
-                    pool["water_quality"] = water_quality
+                # Parallel: device status for all devices in pool
+                devices_with_ids = [(d, d.get("device_id")) for d in pool.get("devices", []) if d.get("device_id")]
+                if devices_with_ids:
+                    status_tasks = [self.api.poll_device_status(pool_id, did) for _, did in devices_with_ids]
+                    status_results = await asyncio.gather(*status_tasks, return_exceptions=True)
 
-                # Pour chaque device du pool, faire le polling temps réel
+                    for (device, _), status in zip(devices_with_ids, status_results, strict=False):
+                        if status and not isinstance(status, Exception):
+                            device["status"] = status
+                            device["connectivity"] = status.get("connectivity", {})
+
+                # Parallel: fetch all components for all devices
                 for device in pool.get("devices", []):
                     device_id = device.get("device_id")
-                    if device_id:
-                        # Polling de l'état du device
-                        device_status = await self.api.poll_device_status(pool_id, device_id)
-                        if device_status:
-                            device["status"] = device_status
-                            device["connectivity"] = device_status.get("connectivity", {})
+                    if not device_id:
+                        continue
 
-                        # Initialiser la structure components si elle n'existe pas
-                        if "components" not in device:
-                            device["components"] = {}
+                    if "components" not in device:
+                        device["components"] = {}
 
-                        # Polling des components
-                        # Utiliser le registry pour déterminer la plage de composants à scanner
-                        component_range = DeviceIdentifier.get_components_range(device)
+                    # Build list of components to scan
+                    component_range = DeviceIdentifier.get_components_range(device)
+                    specific_components = DeviceIdentifier.get_feature(device, "specific_components", [])
+                    components_to_scan = list(range(0, component_range))
+                    if specific_components:
+                        components_to_scan.extend([c for c in specific_components if c not in components_to_scan])
 
-                        # Check if device has specific components to scan (optimization for chlorinator)
-                        specific_components = DeviceIdentifier.get_feature(device, "specific_components", [])
+                    # Fetch all components in parallel
+                    component_states = await self._fetch_components_parallel(device_id, components_to_scan)
 
-                        # Build list of components to scan
-                        components_to_scan = list(range(0, component_range))
-                        if specific_components:
-                            # Add specific components, avoiding duplicates
-                            components_to_scan.extend([c for c in specific_components if c not in components_to_scan])
+                    # Process all component states
+                    for component_id, component_state in component_states.items():
+                        self._process_component_state(device, pool_id, component_id, component_state)
 
-                        for component_id in components_to_scan:
-                            component_state = await self.api.get_component_state(device_id, component_id)
-                            if component_state and isinstance(component_state, dict):
-                                reported_value = component_state.get("reportedValue")
-
-                                # Stocker TOUTES les données de component dans la structure components
-                                device["components"][str(component_id)] = component_state
-
-                                if component_id == 0:  # Device ID
-                                    device["device_id_component"] = reported_value
-                                elif component_id == 1:  # Part Numbers
-                                    device["part_numbers_component"] = reported_value
-                                elif component_id == 2:  # Signal Strength
-                                    if not DeviceIdentifier.has_feature(device, "skip_signal"):
-                                        device["signal_strength_component"] = reported_value
-                                elif component_id == 3:  # Firmware Version
-                                    if not DeviceIdentifier.has_feature(device, "skip_firmware"):
-                                        device["firmware_version_component"] = reported_value
-                                elif component_id == 4:  # Hardware Errors
-                                    device["hardware_errors_component"] = reported_value
-                                elif component_id == 5:  # Communication Errors
-                                    device["comm_errors_component"] = reported_value
-                                elif component_id == 9:  # Pompe
-                                    device["pump_reported"] = reported_value
-                                    device["pump_desired"] = component_state.get("desiredValue")
-                                    device["is_running"] = bool(reported_value)
-                                elif component_id == 10:  # Mode auto
-                                    device["auto_reported"] = reported_value
-                                    device["auto_desired"] = component_state.get("desiredValue")
-                                    device["auto_mode_enabled"] = bool(reported_value)
-                                elif component_id == 11:  # Vitesse levels (utilisé en auto ET manuel)
-                                    device["speed_level_reported"] = reported_value
-                                    device["speed_level_desired"] = component_state.get("desiredValue")
-
-                                    # Component 11 : Vitesse en mode MANUEL uniquement
-                                    if not device.get("is_running", False):
-                                        # Pompe arrêtée = toujours 0%
-                                        device["speed_percent"] = 0
-                                    else:
-                                        auto_mode = device.get("auto_mode_enabled", False)
-                                        if auto_mode:
-                                            # MODE AUTO : Calculer à partir des schedules actifs
-                                            current_speed = self._calculate_auto_speed_from_schedules(device)
-                                            device["speed_percent"] = current_speed
-                                        # MODE MANUEL : Utiliser Component 11
-                                        elif reported_value == 0:
-                                            device["speed_percent"] = 45  # Faible
-                                        elif reported_value == 1:
-                                            device["speed_percent"] = 65  # Moyenne
-                                        elif reported_value == 2:
-                                            device["speed_percent"] = 100  # Élevée
-                                        else:
-                                            device["speed_percent"] = 0  # Défaut
-                                elif component_id == 15:  # Température de référence pour pompes à chaleur
-                                    device["component_15_speed"] = (
-                                        reported_value or component_state.get("desiredValue") or 0
-                                    )
-
-                                    # Pour les pompes à chaleur, component 15 peut contenir la température × 10
-                                    # Use desiredValue if reportedValue is not available (Z550iQ+ uses desiredValue)
-                                    temp_raw = reported_value or component_state.get("desiredValue")
-                                    if device.get("type", "").lower() == "heat_pump" and temp_raw:
-                                        try:
-                                            # Convertir la valeur brute en température (diviser par 10)
-                                            temp_value = float(temp_raw) / 10.0
-                                            # Valider la plage de température (10-50°C)
-                                            if 10.0 <= temp_value <= 50.0:
-                                                device["target_temperature"] = temp_value
-                                        except (ValueError, TypeError):
-                                            pass
-                                    # Note: Component 15 n'est plus utilisé pour le mode manuel, remplacé par Component 13
-                                elif component_id == 19:  # Température de l'eau (pour pompes à chaleur)
-                                    device["timezone_component"] = reported_value
-                                    # Component 19 peut contenir la température de l'eau de la piscine × 10
-                                    if device.get("type", "").lower() == "heat_pump" and reported_value:
-                                        try:
-                                            # Convertir la valeur brute en température (diviser par 10)
-                                            water_temp_value = float(reported_value) / 10.0
-                                            # Valider la plage de température (5-50°C pour l'eau, permettant le chauffage)
-                                            if 5.0 <= water_temp_value <= 50.0:
-                                                device["water_temperature"] = water_temp_value
-                                        except (ValueError, TypeError):
-                                            pass
-                                elif component_id == 20:
-                                    # Component 20 has different meanings:
-                                    # - For pumps: schedules (list)
-                                    # - For chlorinators: mode (0=OFF, 1=ON, 2=AUTO)
-                                    device_type = device.get("type", "")
-
-                                    if device_type == "chlorinator":
-                                        # Chlorinator mode
-                                        if isinstance(reported_value, int):
-                                            device["mode_reported"] = reported_value
-                                    else:
-                                        # Pump schedules
-                                        schedule_data = reported_value if isinstance(reported_value, list) else []
-                                        device["schedule_data"] = schedule_data
-
-                                        # Track current scheduler count for this device
-                                        current_schedule_count = len(schedule_data)
-                                        device_key = f"{pool_id}_{device_id}"
-
-                                        # Check if we had schedulers before and now have fewer (indicating deletion)
-                                        previous_count = self._previous_schedule_entities.get(device_key, 0)
-                                        if previous_count > 0 and current_schedule_count < previous_count:
-                                            # Trigger entity registry cleanup for this device's schedule sensor
-                                            await self._cleanup_schedule_sensor_if_empty(
-                                                pool_id, device_id, schedule_data
-                                            )
-
-                                        # Update tracking count
-                                        self._previous_schedule_entities[device_key] = current_schedule_count
-                                elif component_id == 21:
-                                    # Component 21: Network Status for pumps, ON/OFF for Z550iQ+ heat pumps
-                                    device["network_status_component"] = reported_value
-                                    # Check if this is a Z550iQ+ heat pump (uses component 21 for ON/OFF)
-                                    if DeviceIdentifier.has_feature(device, "z550_mode"):
-                                        device["heat_pump_reported"] = reported_value
-                                        device["is_heating"] = bool(reported_value)
-                                elif component_id == 13:  # Component 13 - État pompe à chaleur
-                                    device["component_13_data"] = component_state
-
-                                    # Pour les pompes à chaleur (sauf Z550iQ+ qui utilise component 21)
-                                    if device.get(
-                                        "type", ""
-                                    ).lower() == "heat_pump" and not DeviceIdentifier.has_feature(device, "z550_mode"):
-                                        device["heat_pump_reported"] = reported_value
-                                        device["is_heating"] = bool(reported_value)
-                                elif component_id == 14:  # Component 14 exploration
-                                    device["component_14_data"] = component_state
-                                elif component_id == 16:  # Component 16 - Mode for Z550iQ+
-                                    device["component_16_data"] = component_state
-                                    if DeviceIdentifier.has_feature(device, "z550_mode"):
-                                        # Z550iQ+ mode: 0=heating, 1=cooling, 2=auto
-                                        device["z550_mode_reported"] = reported_value
-                                elif component_id == 17:  # Component 17 - Preset mode for Z550iQ+
-                                    device["component_17_data"] = component_state
-                                    if DeviceIdentifier.has_feature(device, "z550_mode"):
-                                        # Z550iQ+ preset: 0=silence, 1=smart, 2=boost
-                                        device["z550_preset_reported"] = reported_value
-                                elif component_id == 37:  # Component 37 - Water temp for Z550iQ+
-                                    device["component_37_data"] = component_state
-                                    if DeviceIdentifier.has_feature(device, "z550_mode") and reported_value:
-                                        try:
-                                            # Decidegrees: 290 = 29.0°C
-                                            water_temp = float(reported_value) / 10.0
-                                            if 0.0 <= water_temp <= 50.0:
-                                                device["water_temperature"] = water_temp
-                                        except (ValueError, TypeError):
-                                            pass
-                                elif component_id == 40:
-                                    # Component 40: Light schedules OR Air temp for Z550iQ+
-                                    device[f"component_{component_id}_data"] = component_state
-                                    if DeviceIdentifier.has_feature(device, "z550_mode") and reported_value:
-                                        try:
-                                            # Decidegrees: 140 = 14.0°C
-                                            air_temp = float(reported_value) / 10.0
-                                            if -20.0 <= air_temp <= 60.0:
-                                                device["air_temperature"] = air_temp
-                                        except (ValueError, TypeError):
-                                            pass
-                                    else:
-                                        # Light schedules handling
-                                        config = DeviceIdentifier.identify_device(device)
-                                        device_type = config.device_type if config else device.get("type", "")
-                                        if device_type == "light":
-                                            schedule_data = reported_value if isinstance(reported_value, list) else []
-                                            device["schedule_data"] = schedule_data
-                                            current_schedule_count = len(schedule_data)
-                                            device_key = f"{pool_id}_{device_id}"
-                                            previous_count = self._previous_schedule_entities.get(device_key, 0)
-                                            if previous_count > 0 and current_schedule_count < previous_count:
-                                                await self._cleanup_schedule_sensor_if_empty(
-                                                    pool_id, device_id, schedule_data
-                                                )
-                                            self._previous_schedule_entities[device_key] = current_schedule_count
-                                elif component_id == 61:  # Component 61 - State for Z550iQ+
-                                    device["component_61_data"] = component_state
-                                    if DeviceIdentifier.has_feature(device, "z550_mode"):
-                                        # Z550iQ+ state: 0=idle, 2=heating, 3=cooling, 11=no flow
-                                        device["z550_state_reported"] = reported_value
-                                        if reported_value == 2:
-                                            device["hvac_action"] = "heating"
-                                        elif reported_value == 3:
-                                            device["hvac_action"] = "cooling"
-                                        elif reported_value == 11:
-                                            device["hvac_action"] = "no_flow"
-                                        else:
-                                            device["hvac_action"] = "idle"
-                                elif component_id in [62, 65]:  # Température de l'eau alternative
-                                    # Components 62 et 65 peuvent aussi contenir la température de l'eau × 10
-                                    if device.get("type", "").lower() == "heat_pump" and reported_value:
-                                        try:
-                                            water_temp_value = float(reported_value) / 10.0
-                                            if 5.0 <= water_temp_value <= 50.0:
-                                                # Utiliser seulement si pas déjà défini par component 19
-                                                if "water_temperature" not in device:
-                                                    device["water_temperature"] = water_temp_value
-                                        except (ValueError, TypeError):
-                                            pass
-                                    device[f"component_{component_id}_data"] = component_state
-                                else:
-                                    # Check if this is a device-specific schedule component
-                                    schedule_comp = DeviceIdentifier.get_feature(device, "schedule_component")
-                                    if schedule_comp and component_id == schedule_comp:
-                                        # Device-specific schedule component (e.g., 258 for DM24049704)
-                                        # DM24049704 uses programs/slots format instead of list
-                                        if isinstance(reported_value, dict) and "programs" in reported_value:
-                                            schedule_data = self._parse_dm24049704_schedule_format(reported_value)
-                                        elif isinstance(reported_value, list):
-                                            schedule_data = reported_value
-                                        else:
-                                            schedule_data = []
-                                        device["schedule_data"] = schedule_data
-
-                                        current_schedule_count = len(schedule_data)
-                                        device_key = f"{pool_id}_{device_id}"
-
-                                        previous_count = self._previous_schedule_entities.get(device_key, 0)
-                                        if previous_count > 0 and current_schedule_count < previous_count:
-                                            await self._cleanup_schedule_sensor_if_empty(
-                                                pool_id, device_id, schedule_data
-                                            )
-
-                                        self._previous_schedule_entities[device_key] = current_schedule_count
-                                    # Store all other components for exploration
-                                    device[f"component_{component_id}_data"] = component_state
-
-            # Collect all current device IDs from API
+            # Collect current device IDs for cleanup
             current_device_ids = set()
             for pool in pools:
-                # Add pool ID itself
                 current_device_ids.add(pool["id"])
-                # Add all device IDs
                 for device in pool.get("devices", []):
                     device_id = device.get("device_id")
                     if device_id:
                         current_device_ids.add(device_id)
 
-            # Clean up devices that no longer exist in Fluidra API
+            # Cleanup removed devices
             await self._cleanup_removed_devices(current_device_ids)
 
             return {pool["id"]: pool for pool in pools}
 
         except Exception as err:
-            _LOGGER.error(f"Error updating Fluidra Pool data: {err}")
+            _LOGGER.error("Error updating Fluidra Pool data: %s", err)
             raise UpdateFailed(f"Error communicating with API: {err}") from err
