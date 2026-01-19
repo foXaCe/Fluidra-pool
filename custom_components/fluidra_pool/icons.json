@@ -4,32 +4,32 @@
       "heat_pump": {
         "default": "mdi:heat-pump-outline",
         "state": {
-          "heat": "mdi:heat-pump",
           "cool": "mdi:snowflake",
+          "heat": "mdi:heat-pump",
           "heat_cool": "mdi:sun-snowflake-variant"
         }
       }
     },
-    "switch": {
-      "pump": {
-        "default": "mdi:pump-off",
-        "state": {
-          "on": "mdi:pump"
-        }
+    "sensor": {
+      "air_temperature": {
+        "default": "mdi:thermometer"
       },
+      "water_temperature": {
+        "default": "mdi:thermometer-water"
+      }
+    },
+    "switch": {
       "heat_pump": {
         "default": "mdi:heat-pump-outline",
         "state": {
           "on": "mdi:heat-pump"
         }
-      }
-    },
-    "sensor": {
-      "water_temperature": {
-        "default": "mdi:thermometer-water"
       },
-      "air_temperature": {
-        "default": "mdi:thermometer"
+      "pump": {
+        "default": "mdi:pump-off",
+        "state": {
+          "on": "mdi:pump"
+        }
       }
     }
   }

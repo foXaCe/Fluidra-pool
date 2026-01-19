@@ -36,7 +36,7 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-        args: ["--skip", "*.json,*.yaml,*.yml"]
+        additional_dependencies: ["tomli"]
 
   - repo: local
     hooks:

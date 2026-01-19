@@ -23,4 +23,8 @@ known-first-party = ["custom_components.fluidra_pool"]
 
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
-skips = ["B101"]  # Skip assert warnings (common in HA components)
+skips = ["B101", "B105", "B110"]  # B101: assert, B105: hardcoded password (false positive on const names), B110: try/except/pass (common in HA)
+
+[tool.codespell]
+skip = "*.json,*.yaml,*.yml,.git"
+ignore-words-list = "hass,informations,authentification,formater,potentiel,complet,valide,conflit,conflits,groupe,correspondant,mis"

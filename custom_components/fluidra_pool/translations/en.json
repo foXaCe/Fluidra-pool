@@ -1,14 +1,7 @@
 {
   "config": {
-    "step": {
-      "user": {
-        "title": "Fluidra Pool Configuration",
-        "description": "Enter your Fluidra Pool credentials",
-        "data": {
-          "email": "Email",
-          "password": "Password"
-        }
-      }
+    "abort": {
+      "already_configured": "This account is already configured"
     },
     "error": {
       "cannot_connect": "Unable to connect to Fluidra API",
@@ -16,92 +9,18 @@
       "no_pools": "No pools found. Make sure your equipment is configured in the Fluidra Pool app",
       "unknown": "Unexpected error"
     },
-    "abort": {
-      "already_configured": "This account is already configured"
-    }
-  },
-  "options": {
     "step": {
-      "init": {
-        "title": "Fluidra Pool Options",
-        "description": "Configure advanced options",
+      "user": {
         "data": {
-          "scan_interval": "Update interval (seconds)"
-        }
+          "email": "Email",
+          "password": "Password"
+        },
+        "description": "Enter your Fluidra Pool credentials",
+        "title": "Fluidra Pool Configuration"
       }
     }
   },
   "entity": {
-    "sensor": {
-      "speed_percent": {
-        "name": "Speed Percentage"
-      },
-      "operation_mode": {
-        "name": "Operation Mode"
-      },
-      "connectivity": {
-        "name": "Connectivity"
-      },
-      "signal_strength": {
-        "name": "Signal Strength"
-      },
-      "firmware_version": {
-        "name": "Firmware Version"
-      },
-      "hardware_errors": {
-        "name": "Hardware Errors"
-      },
-      "comm_errors": {
-        "name": "Communication Errors"
-      },
-      "network_status": {
-        "name": "Network Status"
-      },
-      "schedule_count": {
-        "name": "Active Schedules"
-      },
-      "next_schedule": {
-        "name": "Next Schedule"
-      },
-      "current_temperature": {
-        "name": "Current Temperature"
-      },
-      "target_temperature": {
-        "name": "Target Temperature"
-      },
-      "weather_temperature": {
-        "name": "Weather Temperature"
-      },
-      "device_info": {
-        "name": "Device Information"
-      },
-      "pool_status": {
-        "name": "Pool Status"
-      },
-      "pool_location": {
-        "name": "Pool Location"
-      },
-      "water_quality": {
-        "name": "Water Quality"
-      }
-    },
-    "switch": {
-      "pump": {
-        "name": "Pump"
-      },
-      "auto_mode": {
-        "name": "Auto Mode"
-      },
-      "heat_pump": {
-        "name": "Heat Pump"
-      },
-      "heater": {
-        "name": "Heater"
-      },
-      "schedule_enable": {
-        "name": "Schedule {schedule_id}"
-      }
-    },
     "climate": {
       "heat_pump": {
         "name": "Heat Pump"
@@ -113,35 +32,29 @@
       }
     },
     "number": {
-      "speed_control": {
-        "name": "Speed Control"
-      },
       "pump_vitesse": {
         "name": "{device_name} Speed Setting"
-      }
-    },
-    "time": {
-      "schedule_start": {
-        "name": "Schedule {schedule_id} Start"
       },
-      "schedule_end": {
-        "name": "Schedule {schedule_id} End"
-      },
-      "light_schedule_start": {
-        "name": "Light Schedule {schedule_id} Start"
-      },
-      "light_schedule_end": {
-        "name": "Light Schedule {schedule_id} End"
+      "speed_control": {
+        "name": "Speed Control"
       }
     },
     "select": {
+      "chlorinator_mode": {
+        "name": "Mode",
+        "state": {
+          "auto": "Auto",
+          "off": "Off",
+          "on": "On"
+        }
+      },
       "pump_speed": {
         "name": "Speed Level",
         "state": {
-          "stopped": "Not Running",
+          "high": "High",
           "low": "Low",
           "medium": "Medium",
-          "high": "High"
+          "stopped": "Not Running"
         }
       },
       "schedule_mode": {
@@ -151,14 +64,101 @@
           "1": "Medium",
           "2": "High"
         }
+      }
+    },
+    "sensor": {
+      "comm_errors": {
+        "name": "Communication Errors"
       },
-      "chlorinator_mode": {
-        "name": "Mode",
-        "state": {
-          "off": "Off",
-          "on": "On",
-          "auto": "Auto"
-        }
+      "connectivity": {
+        "name": "Connectivity"
+      },
+      "current_temperature": {
+        "name": "Current Temperature"
+      },
+      "device_info": {
+        "name": "Device Information"
+      },
+      "firmware_version": {
+        "name": "Firmware Version"
+      },
+      "hardware_errors": {
+        "name": "Hardware Errors"
+      },
+      "network_status": {
+        "name": "Network Status"
+      },
+      "next_schedule": {
+        "name": "Next Schedule"
+      },
+      "operation_mode": {
+        "name": "Operation Mode"
+      },
+      "pool_location": {
+        "name": "Pool Location"
+      },
+      "pool_status": {
+        "name": "Pool Status"
+      },
+      "schedule_count": {
+        "name": "Active Schedules"
+      },
+      "signal_strength": {
+        "name": "Signal Strength"
+      },
+      "speed_percent": {
+        "name": "Speed Percentage"
+      },
+      "target_temperature": {
+        "name": "Target Temperature"
+      },
+      "water_quality": {
+        "name": "Water Quality"
+      },
+      "weather_temperature": {
+        "name": "Weather Temperature"
+      }
+    },
+    "switch": {
+      "auto_mode": {
+        "name": "Auto Mode"
+      },
+      "heat_pump": {
+        "name": "Heat Pump"
+      },
+      "heater": {
+        "name": "Heater"
+      },
+      "pump": {
+        "name": "Pump"
+      },
+      "schedule_enable": {
+        "name": "Schedule {schedule_id}"
+      }
+    },
+    "time": {
+      "light_schedule_end": {
+        "name": "Light Schedule {schedule_id} End"
+      },
+      "light_schedule_start": {
+        "name": "Light Schedule {schedule_id} Start"
+      },
+      "schedule_end": {
+        "name": "Schedule {schedule_id} End"
+      },
+      "schedule_start": {
+        "name": "Schedule {schedule_id} Start"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Update interval (seconds)"
+        },
+        "description": "Configure advanced options",
+        "title": "Fluidra Pool Options"
       }
     }
   }
