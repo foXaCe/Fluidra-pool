@@ -5,13 +5,12 @@ import time
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 from .utils import convert_cron_days
@@ -21,11 +20,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: FluidraPoolConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Fluidra Pool switch entities."""
-    coordinator: FluidraDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = config_entry.runtime_data.coordinator
 
     entities = []
 
@@ -74,6 +73,8 @@ async def async_setup_entry(
 
 class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
     """Base class for Fluidra Pool switch entities."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str):
         """Initialize the switch."""

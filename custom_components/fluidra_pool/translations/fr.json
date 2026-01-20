@@ -1,7 +1,8 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Cette compte est déjà configuré"
+      "already_configured": "Cette compte est déjà configuré",
+      "reauth_successful": "Ré-authentification réussie"
     },
     "error": {
       "cannot_connect": "Impossible de se connecter à l'API Fluidra",
@@ -10,6 +11,21 @@
       "unknown": "Erreur inattendue"
     },
     "step": {
+      "confirm": {
+        "description": "Nous avons trouvé un équipement Fluidra Pool. Voulez-vous l'ajouter ?",
+        "title": "Piscine Fluidra découverte"
+      },
+      "reauth_confirm": {
+        "data": {
+          "password": "Mot de passe"
+        },
+        "description": "Veuillez réentrer votre mot de passe pour Fluidra Pool",
+        "title": "Re-authentification"
+      },
+      "reconfigure": {
+        "description": "Mettre à jour vos paramètres Fluidra Pool",
+        "title": "Reconfigurer"
+      },
       "user": {
         "data": {
           "email": "Adresse e-mail",
@@ -182,8 +198,25 @@
     }
   },
   "exceptions": {
+    "auth_failed": {
+      "message": "Échec d'authentification, veuillez vous ré-authentifier"
+    },
     "temperature_out_of_range": {
       "message": "La température {temperature}°C est hors plage ({min_temp}°C - {max_temp}°C)"
+    }
+  },
+  "issues": {
+    "connection_error": {
+      "description": "Impossible de se connecter au service Fluidra Pool",
+      "title": "Erreur de connexion"
+    },
+    "firmware_update_available": {
+      "description": "L'équipement {device} a la version firmware {version} disponible",
+      "title": "Mise à jour firmware disponible"
+    },
+    "offline_device": {
+      "description": "L'équipement {device} est hors ligne",
+      "title": "Équipement hors ligne"
     }
   },
   "options": {
@@ -192,7 +225,7 @@
         "data": {
           "scan_interval": "Intervalle de mise à jour (secondes)"
         },
-        "description": "Configurez les options avancées",
+        "description": "Configurer les options avancées",
         "title": "Options Fluidra Pool"
       }
     }

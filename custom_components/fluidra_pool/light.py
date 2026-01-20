@@ -9,12 +9,11 @@ from homeassistant.components.light import (
     ColorMode,
     LightEntity,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,11 +26,11 @@ COMPONENT_COLOR = 45  # RGBW color: {r, g, b, k, extra: {w}}
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: FluidraPoolConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Fluidra Pool light entities."""
-    coordinator: FluidraDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data.coordinator
 
     entities = []
 

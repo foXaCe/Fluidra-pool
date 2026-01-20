@@ -4,14 +4,13 @@ import logging
 from typing import Any
 
 from homeassistant.components.number import NumberDeviceClass, NumberEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DEVICE_TYPE_PUMP, DOMAIN
+from .const import DEVICE_TYPE_PUMP, DOMAIN, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 
@@ -20,11 +19,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: FluidraPoolConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the Fluidra Pool number entities."""
-    coordinator: FluidraDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    """Set up Fluidra Pool number entities."""
+    coordinator = config_entry.runtime_data.coordinator
 
     entities = []
 
@@ -57,6 +56,8 @@ async def async_setup_entry(
 
 class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
     """Base class for Fluidra pump component controls."""
+
+    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(
         self,
@@ -170,6 +171,8 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
 class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
     """Unified speed control for pump component 15 (40-105%)."""
 
+    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
+
     def __init__(self, coordinator, api, pool_id: str, device_id: str) -> None:
         """Initialize the speed control."""
         super().__init__(coordinator)
@@ -274,6 +277,8 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
 
 class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
     """Number entity for chlorinator chlorination level (0-100%)."""
+
+    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(
         self,
@@ -385,6 +390,8 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
 
 class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
     """Number entity for chlorinator pH setpoint control."""
+
+    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(
         self,
@@ -543,6 +550,8 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
 class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
     """Number entity for chlorinator ORP/Redox setpoint control."""
 
+    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
+
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
@@ -683,6 +692,8 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
 
 class FluidraLightEffectSpeed(CoordinatorEntity, NumberEntity):
     """Number entity for LumiPlus Connect effect speed (1-8)."""
+
+    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(
         self,

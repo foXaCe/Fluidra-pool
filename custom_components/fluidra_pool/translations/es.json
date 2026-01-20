@@ -1,7 +1,8 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Esta cuenta ya está configurada"
+      "already_configured": "Esta cuenta ya está configurada",
+      "reauth_successful": "Re-autenticación exitosa"
     },
     "error": {
       "cannot_connect": "No se puede conectar a la API de Fluidra",
@@ -10,6 +11,21 @@
       "unknown": "Error inesperado"
     },
     "step": {
+      "confirm": {
+        "description": "Hemos encontrado un dispositivo Fluidra Pool. ¿Quieres añadirlo?",
+        "title": "Fluidra Pool descubierto"
+      },
+      "reauth_confirm": {
+        "data": {
+          "password": "Contraseña"
+        },
+        "description": "Por favor reintroduce tu contraseña para Fluidra Pool",
+        "title": "Re-autenticar"
+      },
+      "reconfigure": {
+        "description": "Actualizar tu configuración de Fluidra Pool",
+        "title": "Reconfigurar"
+      },
       "user": {
         "data": {
           "email": "Correo electrónico",
@@ -182,8 +198,25 @@
     }
   },
   "exceptions": {
+    "auth_failed": {
+      "message": "Error de autenticación, por favor re-autentícate"
+    },
     "temperature_out_of_range": {
       "message": "La temperatura {temperature}°C está fuera de rango ({min_temp}°C - {max_temp}°C)"
+    }
+  },
+  "issues": {
+    "connection_error": {
+      "description": "No se puede conectar al servicio Fluidra Pool",
+      "title": "Error de conexión"
+    },
+    "firmware_update_available": {
+      "description": "El dispositivo {device} tiene la versión de firmware {version} disponible",
+      "title": "Actualización de firmware disponible"
+    },
+    "offline_device": {
+      "description": "El dispositivo {device} está fuera de línea",
+      "title": "Dispositivo fuera de línea"
     }
   },
   "options": {

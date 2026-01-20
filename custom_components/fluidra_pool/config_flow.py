@@ -140,6 +140,45 @@ class FluidraPoolConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
         return self.async_show_form(step_id="confirm")
 
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Handle reconfigure flow."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            email = user_input[CONF_EMAIL]
+            password = user_input[CONF_PASSWORD]
+
+            # Test connection
+            api = FluidraPoolAPI(email, password)
+            try:
+                await api.authenticate()
+                await api.get_pools()
+                await api.close()
+
+                return self.async_update_reload_and_abort(
+                    self._get_reconfigure_entry(),
+                    data_updates={CONF_EMAIL: email, CONF_PASSWORD: password},
+                )
+            except Exception as err:
+                _LOGGER.error("Error testing Fluidra Pool connection: %s", err)
+                if "auth" in str(err).lower() or "login" in str(err).lower():
+                    errors["base"] = "invalid_auth"
+                else:
+                    errors["base"] = "cannot_connect"
+            finally:
+                await api.close()
+
+        # Pre-fill with current values
+        current_config = self._get_reconfigure_entry().data
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                STEP_USER_DATA_SCHEMA,
+                current_config,
+            ),
+            errors=errors,
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:

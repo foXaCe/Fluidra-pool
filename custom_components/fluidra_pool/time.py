@@ -4,14 +4,12 @@ from datetime import time
 import logging
 
 from homeassistant.components.time import TimeEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
-from .coordinator import FluidraDataUpdateCoordinator
+from .const import DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
 from .utils import convert_cron_days
 
@@ -69,11 +67,11 @@ def parse_schedule_time(time_value) -> time | None:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: FluidraPoolConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Fluidra Pool time entities."""
-    coordinator: FluidraDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = config_entry.runtime_data.coordinator
 
     entities = []
 
@@ -144,6 +142,8 @@ async def async_setup_entry(
 
 class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
     """Base class for Fluidra schedule time entities."""
+
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str, schedule_id: str, time_type: str):
         """Initialize the time entity."""
@@ -459,6 +459,7 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
 class FluidraLightScheduleTimeEntity(CoordinatorEntity, TimeEntity):
     """Base class for LumiPlus Connect light schedule time entities."""
 
+    _attr_has_entity_name = True
     SCHEDULE_COMPONENT = 40  # Light schedules use component 40
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str, schedule_id: str, time_type: str):

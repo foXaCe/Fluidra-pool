@@ -10,7 +10,6 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -32,8 +31,8 @@ from .const import (
     Z550_STATE_IDLE,
     Z550_TEMP_STEP,
     Z550_VALUE_TO_PRESET,
+    FluidraPoolConfigEntry,
 )
-from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
@@ -72,11 +71,11 @@ LG_VALUE_TO_MODE = {v: k for k, v in LG_MODE_TO_VALUE.items()}
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: FluidraPoolConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Fluidra Pool climate entities."""
-    coordinator: FluidraDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = config_entry.runtime_data.coordinator
 
     entities = []
 
@@ -95,6 +94,8 @@ async def async_setup_entry(
 
 class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     """Climate entity for Fluidra heat pumps."""
+
+    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str):
         """Initialize the climate entity."""
