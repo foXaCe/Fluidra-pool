@@ -7,7 +7,6 @@ This integration provides support for Fluidra Pool systems.
 from datetime import timedelta
 import logging
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -15,7 +14,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 import voluptuous as vol
 
-from .const import CONF_EMAIL, CONF_PASSWORD, DOMAIN
+from .const import CONF_EMAIL, CONF_PASSWORD, DOMAIN, FluidraPoolConfigEntry, FluidraPoolRuntimeData
 from .coordinator import FluidraDataUpdateCoordinator
 from .fluidra_api import FluidraPoolAPI
 
@@ -69,7 +68,7 @@ SET_PRESET_SCHEDULE_SCHEMA = vol.Schema(
 )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) -> bool:
     """Set up Fluidra Pool from a config entry."""
     email = entry.data[CONF_EMAIL]
     password = entry.data[CONF_PASSWORD]
@@ -103,8 +102,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create data update coordinator
     coordinator = FluidraDataUpdateCoordinator(hass, api, entry)
 
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    # 🏆 Utiliser runtime_data au lieu de hass.data (2024+)
+    entry.runtime_data = FluidraPoolRuntimeData(coordinator=coordinator)
 
     # Set up platforms immediately (non-blocking)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -118,12 +117,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
-
-    return unload_ok
+    # runtime_data est nettoyé automatiquement
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
 async def _async_register_services(hass: HomeAssistant, coordinator: FluidraDataUpdateCoordinator) -> None:

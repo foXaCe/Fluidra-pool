@@ -9,13 +9,12 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 
@@ -24,11 +23,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: FluidraPoolConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Fluidra Pool sensor entities."""
-    coordinator: FluidraDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = config_entry.runtime_data.coordinator
 
     entities = []
 
@@ -163,6 +162,8 @@ async def async_setup_entry(
 class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
     """Base class for Fluidra Pool sensor entities."""
 
+    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
+
     def __init__(self, coordinator, api, pool_id: str, device_id: str, sensor_type: str = ""):
         """Initialize the sensor."""
         super().__init__(coordinator)
@@ -219,30 +220,27 @@ class FluidraTemperatureSensor(FluidraPoolSensorEntity):
     """Temperature sensor for pool heaters and heat pumps."""
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str, sensor_type: str):
-        """Initialize the temperature sensor."""
+        """Initialize temperature sensor."""
         super().__init__(coordinator, api, pool_id, device_id, sensor_type)
-        if sensor_type == "current":
-            self._attr_translation_key = "current_temperature"
-        elif sensor_type == "water":
-            self._attr_translation_key = "water_temperature"
-        elif sensor_type == "air":
-            self._attr_translation_key = "air_temperature"
-        else:
-            self._attr_translation_key = "target_temperature"
+        # 🥉 Utiliser device_class au lieu de translation_key quand possible (Bronze)
+        self._attr_device_class = SensorDeviceClass.TEMPERATURE
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+        self._attr_suggested_display_precision = 1
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the name of the sensor."""
-        type_names = {
-            "current": "Current",
-            "target": "Target",
-            "water": "Water",
-            "air": "Air",
-        }
-        temp_type = type_names.get(self._sensor_type, "Temperature")
-        device_name = self.device_data.get("name", f"Device {self._device_id}")
-        pool_name = self.pool_data.get("name", "Pool")
-        return f"{pool_name} {device_name} {temp_type} Temperature"
+        # 🥉 Utiliser translation_key et device_class si possible (Bronze)
+        if self._sensor_type == "current":
+            return None  # HA utilisera "Current Temperature"
+        elif self._sensor_type == "target":
+            return None  # HA utilisera "Target Temperature"
+        elif self._sensor_type == "water":
+            return None  # HA utilisera "Water Temperature"
+        elif self._sensor_type == "air":
+            return None  # HA utilisera "Air Temperature"
+        return "Temperature"
 
     @property
     def native_value(self) -> float | None:

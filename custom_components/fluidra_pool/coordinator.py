@@ -5,6 +5,7 @@ from datetime import timedelta
 import logging
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -493,7 +494,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
             # Validate token before polling
             if not await self.api.ensure_valid_token():
-                raise UpdateFailed("Token refresh failed")
+                # 🥈 Déclencher le reauth flow (Silver)
+                raise ConfigEntryAuthFailed(
+                    translation_domain=DOMAIN,
+                    translation_key="auth_failed",
+                )
 
             # Get pool structure
             pools = await self.api.get_pools()

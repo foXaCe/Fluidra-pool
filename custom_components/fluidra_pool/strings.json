@@ -8,6 +8,18 @@
           "email": "Email",
           "password": "Password"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "Please re-enter your password for Fluidra Pool"
+      },
+      "reconfigure": {
+        "title": "Reconfigure",
+        "description": "Update your Fluidra Pool settings"
+      },
+      "confirm": {
+        "title": "Discovered Fluidra Pool",
+        "description": "We found a Fluidra Pool device. Would you like to add it?"
       }
     },
     "error": {
@@ -17,7 +29,8 @@
       "unknown": "Unexpected error"
     },
     "abort": {
-      "already_configured": "This account is already configured"
+      "already_configured": "This account is already configured",
+      "reauth_successful": "Re-authentication successful"
     }
   },
   "options": {
@@ -195,6 +208,23 @@
   "exceptions": {
     "temperature_out_of_range": {
       "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"
+    },
+    "auth_failed": {
+      "message": "Authentication failed, please re-authenticate"
+    }
+  },
+  "issues": {
+    "offline_device": {
+      "title": "Device offline",
+      "description": "Device {device} is offline"
+    },
+    "firmware_update_available": {
+      "title": "Firmware update available",
+      "description": "Device {device} has firmware version {version} available"
+    },
+    "connection_error": {
+      "title": "Connection error",
+      "description": "Unable to connect to Fluidra Pool service"
     }
   }
 }
