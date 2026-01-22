@@ -59,6 +59,9 @@ async def async_setup_entry(
 class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
     """Base class for Fluidra pump component controls."""
 
+    # 🏆 __slots__ for memory efficiency (Platinum)
+    __slots__ = ("_api", "_pool_id", "_device_id", "_component_id", "_control_type")
+
     _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(

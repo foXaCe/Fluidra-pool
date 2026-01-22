@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -15,7 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, FluidraPoolConfigEntry
+from .const import DOMAIN, OPTIMISTIC_STATE_CLEAR_DELAY, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,6 +64,17 @@ async def async_setup_entry(
 
 class FluidraLight(CoordinatorEntity, LightEntity):
     """Representation of a Fluidra LumiPlus Connect light."""
+
+    # 🏆 __slots__ for memory efficiency (Platinum)
+    __slots__ = (
+        "_pool_id",
+        "_device_id",
+        "_device_data",
+        "_is_on",
+        "_brightness",
+        "_rgbw_color",
+        "_optimistic_state",
+    )
 
     _attr_has_entity_name = True
 
@@ -165,8 +177,6 @@ class FluidraLight(CoordinatorEntity, LightEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the light."""
-        import asyncio
-
         # Set optimistic state immediately
         self._optimistic_state = True
         self.async_write_ha_state()
@@ -196,14 +206,12 @@ class FluidraLight(CoordinatorEntity, LightEntity):
         self._is_on = True
 
         # Wait for device to process, then clear optimistic state
-        await asyncio.sleep(5)
+        await asyncio.sleep(OPTIMISTIC_STATE_CLEAR_DELAY)
         self._optimistic_state = None
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the light."""
-        import asyncio
-
         # Set optimistic state immediately
         self._optimistic_state = False
         self.async_write_ha_state()
@@ -212,6 +220,6 @@ class FluidraLight(CoordinatorEntity, LightEntity):
         self._is_on = False
 
         # Wait for device to process, then clear optimistic state
-        await asyncio.sleep(5)
+        await asyncio.sleep(OPTIMISTIC_STATE_CLEAR_DELAY)
         self._optimistic_state = None
         self.async_write_ha_state()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -11,7 +12,13 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, FluidraPoolConfigEntry
+from .const import (
+    COMMAND_CONFIRMATION_DELAY,
+    DOMAIN,
+    SWITCH_CONFIRMATION_DELAY,
+    UI_UPDATE_DELAY,
+    FluidraPoolConfigEntry,
+)
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 from .utils import convert_cron_days
@@ -103,6 +110,16 @@ async def async_setup_entry(
 
 class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
     """Representation of a Fluidra pump speed select control."""
+
+    # 🏆 __slots__ for memory efficiency (Platinum)
+    __slots__ = (
+        "_api",
+        "_pool_id",
+        "_device_id",
+        "_optimistic_option",
+        "_speed_mapping",
+        "_percent_to_option",
+    )
 
     _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
@@ -234,9 +251,8 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
             self.async_write_ha_state()  # Mettre à jour l'interface immédiatement
 
             # Petit délai pour s'assurer que l'option optimiste est prise en compte
-            import asyncio
 
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(UI_UPDATE_DELAY)
 
             # For "stopped", ensure pump is ON but no active speed
             if option == "stopped":
@@ -262,9 +278,8 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
 
             if success:
                 # Attendre que l'API se synchronise
-                import asyncio
 
-                await asyncio.sleep(3)  # Augmenté à 3 secondes pour plus de stabilité
+                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)  # Augmenté à 3 secondes pour plus de stabilité
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
@@ -628,15 +643,14 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
             self.async_write_ha_state()
 
             # Small delay for UI update
-            import asyncio
 
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(UI_UPDATE_DELAY)
 
             # Send command to API (component 20)
             success = await self._api.control_device_component(self._device_id, 20, mode_value)
 
             if success:
-                await asyncio.sleep(2)
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
 
         except Exception:
@@ -788,9 +802,8 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
             self.async_write_ha_state()
 
             # Small delay for UI update
-            import asyncio
 
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(UI_UPDATE_DELAY)
 
             _LOGGER.debug(
                 "Setting light effect for %s: component %s = %s",
@@ -807,7 +820,7 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
 
             if success:
                 # Wait for device to process the command
-                await asyncio.sleep(3)
+                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
 
         except Exception as err:
@@ -934,9 +947,7 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
             self._optimistic_option = option
             self.async_write_ha_state()
 
-            import asyncio
-
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(UI_UPDATE_DELAY)
 
             # Get all current schedule data
             device_data = self.device_data
@@ -989,7 +1000,7 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
             if success:
                 # Keep optimistic value - it will be cleared when coordinator confirms
-                await asyncio.sleep(3)
+                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
                 # Clear optimistic only after successful refresh
                 self._optimistic_option = None

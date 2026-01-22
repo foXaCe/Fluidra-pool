@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import Any
@@ -12,7 +13,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, FluidraPoolConfigEntry
+from .const import DOMAIN, SWITCH_CONFIRMATION_DELAY, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 from .utils import convert_cron_days
@@ -75,6 +76,9 @@ async def async_setup_entry(
 
 class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
     """Base class for Fluidra Pool switch entities."""
+
+    # 🏆 __slots__ for memory efficiency (Platinum)
+    __slots__ = ("_api", "_pool_id", "_device_id", "_pending_state", "_last_action_time")
 
     _attr_has_entity_name = True
 
@@ -249,9 +253,8 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             success = await self._api.start_pump(self._device_id)
             if success:
                 # Attendre que l'API se synchronise
-                import asyncio
 
-                await asyncio.sleep(2)
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
@@ -274,9 +277,8 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             success = await self._api.stop_pump(self._device_id)
             if success:
                 # Attendre que l'API se synchronise
-                import asyncio
 
-                await asyncio.sleep(2)
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
@@ -609,9 +611,8 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             success = await self._api.enable_auto_mode(self._device_id)
             if success:
                 # Attendre que l'API se synchronise
-                import asyncio
 
-                await asyncio.sleep(2)
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
@@ -634,9 +635,8 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             success = await self._api.disable_auto_mode(self._device_id)
             if success:
                 # Attendre que l'API se synchronise
-                import asyncio
 
-                await asyncio.sleep(2)
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 # Récupérer l'état réel immédiatement
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
@@ -949,9 +949,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             success = await self._api.control_device_component(self._device_id, boost_component, True)
 
             if success:
-                import asyncio
-
-                await asyncio.sleep(2)
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
                 # Le pending state se clear automatiquement dans is_on() quand le serveur confirme
             else:
@@ -974,9 +972,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             success = await self._api.control_device_component(self._device_id, boost_component, False)
 
             if success:
-                import asyncio
-
-                await asyncio.sleep(2)
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
                 # Le pending state se clear automatiquement dans is_on() quand le serveur confirme
             else:

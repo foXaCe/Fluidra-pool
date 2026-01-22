@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import time
 import logging
 
@@ -11,7 +12,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, FluidraPoolConfigEntry
+from .const import COMMAND_CONFIRMATION_DELAY, DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
 from .utils import convert_cron_days
 
@@ -144,6 +145,9 @@ async def async_setup_entry(
 
 class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
     """Base class for Fluidra schedule time entities."""
+
+    # 🏆 __slots__ for memory efficiency (Platinum)
+    __slots__ = ("_api", "_pool_id", "_device_id", "_schedule_id", "_time_type", "_optimistic_value")
 
     _attr_has_entity_name = True
 
@@ -299,6 +303,18 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
         # Check for overlap
         return not (end1_min <= start2_min or start1_min >= end2_min)
 
+    def _format_cron_time_chlorinator(self, cron_time: str) -> str:
+        """Format CRON time for DM24049704 chlorinator (00 05 * * 1,2,3,4,5,6,7)."""
+        if not cron_time:
+            return "00 00 * * 1,2,3,4,5,6,7"
+        parts = cron_time.split()
+        if len(parts) >= 5:
+            minute = parts[0].zfill(2)
+            hour = parts[1].zfill(2)
+            days = parts[4] if parts[4] != "*" else "1,2,3,4,5,6,7"
+            return f"{minute} {hour} * * {days}"
+        return cron_time
+
 
 class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
     """Time entity for schedule start time."""
@@ -429,9 +445,7 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
 
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
             if success:
-                import asyncio
-
-                await asyncio.sleep(3)
+                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
                 # Clear optimistic only after successful refresh
                 self._optimistic_value = None
@@ -445,21 +459,12 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             self._optimistic_value = None
             self.async_write_ha_state()
 
-    def _format_cron_time_chlorinator(self, cron_time: str) -> str:
-        """Format CRON time for DM24049704 chlorinator (00 05 * * 1,2,3,4,5,6,7)."""
-        if not cron_time:
-            return "00 00 * * 1,2,3,4,5,6,7"
-        parts = cron_time.split()
-        if len(parts) >= 5:
-            minute = parts[0].zfill(2)
-            hour = parts[1].zfill(2)
-            days = parts[4] if parts[4] != "*" else "1,2,3,4,5,6,7"
-            return f"{minute} {hour} * * {days}"
-        return cron_time
-
 
 class FluidraLightScheduleTimeEntity(CoordinatorEntity, TimeEntity):
     """Base class for LumiPlus Connect light schedule time entities."""
+
+    # 🏆 __slots__ for memory efficiency (Platinum)
+    __slots__ = ("_api", "_pool_id", "_device_id", "_schedule_id", "_time_type")
 
     _attr_has_entity_name = True
     SCHEDULE_COMPONENT = 40  # Light schedules use component 40
@@ -808,9 +813,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
 
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
             if success:
-                import asyncio
-
-                await asyncio.sleep(3)
+                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
                 # Clear optimistic only after successful refresh
                 self._optimistic_value = None

@@ -10,6 +10,7 @@ from datetime import timedelta
 import logging
 from typing import TYPE_CHECKING, Final
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -140,6 +141,30 @@ async def async_unload_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry)
     """Unload a config entry."""
     # runtime_data est nettoyé automatiquement
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old config entry to new version.
+
+    🏆 Lifecycle: Migration idempotente pour compatibilité long terme.
+    """
+    _LOGGER.debug("Migrating config entry from version %s", entry.version)
+
+    # Version 1 -> 2: Reserved for future migrations
+    # Example:
+    # if entry.version == 1:
+    #     data = {**entry.data}
+    #     data["new_key"] = data.pop("old_key", "default")
+    #     hass.config_entries.async_update_entry(entry, data=data, version=2)
+    #     _LOGGER.info("Migrated config entry to version 2")
+
+    # Current version is 1, no migration needed yet
+    if entry.version > 1:
+        # Future-proof: if somehow version is higher than expected
+        _LOGGER.error("Cannot migrate config entry from version %s", entry.version)
+        return False
+
+    return True
 
 
 async def _async_register_services(hass: HomeAssistant, coordinator: FluidraDataUpdateCoordinator) -> None:

@@ -97,6 +97,20 @@ async def async_setup_entry(
 class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     """Climate entity for Fluidra heat pumps."""
 
+    # 🏆 __slots__ for memory efficiency (Platinum)
+    __slots__ = (
+        "_api",
+        "_pool_id",
+        "_device_id",
+        "_pending_temperature",
+        "_pending_preset_mode",
+        "_pending_hvac_mode",
+        "_is_updating",
+        "_last_action_time",
+        "_last_preset_action_time",
+        "_last_hvac_action_time",
+    )
+
     _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str):

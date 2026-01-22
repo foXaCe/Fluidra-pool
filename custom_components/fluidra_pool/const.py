@@ -53,6 +53,13 @@ SERVICE_SET_LIGHT_BRIGHTNESS = "set_light_brightness"
 DEFAULT_SCAN_INTERVAL = 30  # seconds
 DEFAULT_TIMEOUT = 10  # seconds
 
+# Timing constants for optimistic state management
+OPTIMISTIC_STATE_CLEAR_DELAY = 5  # seconds - delay before clearing optimistic state
+COMMAND_CONFIRMATION_DELAY = 3  # seconds - delay after command before refresh
+SWITCH_CONFIRMATION_DELAY = 2  # seconds - delay after switch toggle before refresh
+UI_UPDATE_DELAY = 0.1  # seconds - small delay for UI responsiveness
+PUMP_START_DELAY = 1  # seconds - delay after pump start before setting speed
+
 # Z550iQ+ Heat Pump Constants
 Z550_MIN_TEMP = 15.0
 Z550_MAX_TEMP = 40.0
