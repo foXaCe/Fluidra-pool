@@ -1,8 +1,10 @@
 """Sensor platform for Fluidra Pool integration."""
 
+from __future__ import annotations
+
 from datetime import datetime, time
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -10,13 +12,17 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import PERCENTAGE, UnitOfTemperature
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.core import callback
 
 from .const import DOMAIN, FluidraPoolConfigEntry
-from .coordinator import FluidraDataUpdateCoordinator
-from .device_registry import DeviceIdentifier
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+    from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+    from .coordinator import FluidraDataUpdateCoordinator
+    from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -162,6 +168,9 @@ async def async_setup_entry(
 class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
     """Base class for Fluidra Pool sensor entities."""
 
+    # 🏆 __slots__ for memory efficiency (Platinum)
+    __slots__ = ("_api", "_pool_id", "_device_id", "_sensor_type", "_cached_device_data", "_cached_pool_data")
+
     _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str, sensor_type: str = ""):
@@ -171,25 +180,48 @@ class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
         self._pool_id = pool_id
         self._device_id = device_id
         self._sensor_type = sensor_type
+        # 🏆 Cache values for performance (Platinum)
+        self._cached_device_data: dict | None = None
+        self._cached_pool_data: dict | None = None
 
     @property
     def device_data(self) -> dict:
         """Get device data from coordinator."""
+        # 🏆 Use cached value for performance (Platinum)
+        if self._cached_device_data is not None:
+            return self._cached_device_data
+
         if self.coordinator.data is None:
             return {}
         pool = self.coordinator.data.get(self._pool_id)
         if pool:
             for device in pool.get("devices", []):
                 if device.get("device_id") == self._device_id:
+                    self._cached_device_data = device
                     return device
+        self._cached_device_data = {}
         return {}
 
     @property
     def pool_data(self) -> dict:
         """Get pool data from coordinator."""
+        # 🏆 Use cached value for performance (Platinum)
+        if self._cached_pool_data is not None:
+            return self._cached_pool_data
+
         if self.coordinator.data is None:
             return {}
-        return self.coordinator.data.get(self._pool_id, {})
+        pool_data = self.coordinator.data.get(self._pool_id, {})
+        self._cached_pool_data = pool_data
+        return pool_data
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle coordinator data update and clear cache."""
+        # 🏆 Clear cache when coordinator updates (Platinum)
+        self._cached_device_data = None
+        self._cached_pool_data = None
+        super()._handle_coordinator_update()
 
     @property
     def unique_id(self) -> str:

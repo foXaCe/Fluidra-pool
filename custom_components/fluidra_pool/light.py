@@ -1,5 +1,7 @@
 """Light platform for Fluidra Pool integration (LumiPlus Connect)."""
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 

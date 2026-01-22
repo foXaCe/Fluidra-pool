@@ -1,0 +1,94 @@
+name: Bug Report
+description: Report a bug with the integration
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and this is not a duplicate
+          required: true
+        - label: I am running the latest version
+          required: true
+        - label: I have checked the documentation
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Integration Version
+      placeholder: "2.13.0"
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant Version
+      placeholder: "2024.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device_type
+    attributes:
+      label: Device Type
+      description: Which Fluidra device is affected?
+      options:
+        - Pump (VS*, VT*, NCC*)
+        - Heat Pump (LG, Z550iQ+)
+        - Chlorinator (DM*)
+        - Light (LT*)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the bug
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happens?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Log Output
+      description: |
+        Copy paste relevant logs. Enable debug logging first:
+        ```yaml
+        logger:
+          logs:
+            custom_components.fluidra_pool: debug
+        ```
+      render: shell
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste output from Settings > Devices > Fluidra Pool > Download Diagnostics
+      render: json

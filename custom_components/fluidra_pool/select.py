@@ -1,5 +1,7 @@
 """Select platform for Fluidra Pool integration."""
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 

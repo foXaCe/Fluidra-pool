@@ -4,6 +4,8 @@ This module centralizes device configurations to make adding new equipment easie
 and reduce the risk of breaking existing devices.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Any
 

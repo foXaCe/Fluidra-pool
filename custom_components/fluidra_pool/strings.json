@@ -11,11 +11,19 @@
       },
       "reauth_confirm": {
         "title": "Re-authenticate",
-        "description": "Please re-enter your password for Fluidra Pool"
+        "description": "Session expired for {email}. Please re-enter your credentials.",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
       },
       "reconfigure": {
-        "title": "Reconfigure",
-        "description": "Update your Fluidra Pool settings"
+        "title": "Reconfigure Fluidra Pool",
+        "description": "Update credentials for {email}",
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        }
       },
       "confirm": {
         "title": "Discovered Fluidra Pool",
@@ -30,7 +38,8 @@
     },
     "abort": {
       "already_configured": "This account is already configured",
-      "reauth_successful": "Re-authentication successful"
+      "reauth_successful": "Re-authentication successful",
+      "reconfigure_successful": "Configuration updated successfully"
     }
   },
   "options": {

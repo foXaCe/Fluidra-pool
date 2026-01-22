@@ -1,40 +1,60 @@
 """Data update coordinator for Fluidra Pool integration."""
 
+from __future__ import annotations
+
 import asyncio
 from datetime import timedelta
 import logging
+from typing import Final
 
+from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
 from .fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
 # Optimized polling interval (30s minimum per HA guidelines)
-UPDATE_INTERVAL = timedelta(seconds=30)
+UPDATE_INTERVAL: Final = timedelta(seconds=30)
 
 
 class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from the Fluidra Pool API."""
 
-    def __init__(self, hass: HomeAssistant, api: FluidraPoolAPI, config_entry=None) -> None:
+    def __init__(
+        self, hass: HomeAssistant, api: FluidraPoolAPI, config_entry: FluidraPoolConfigEntry | None = None
+    ) -> None:
         """Initialize."""
         self.api = api
         self.config_entry = config_entry  # Store config entry for device cleanup
         self._optimistic_entities = set()  # Entités avec état optimiste actif
         self._previous_schedule_entities = {}  # Track scheduler entities per device for cleanup
         self._first_update = True  # Skip heavy polling on first update for faster startup
+
+        # 🥇 Gold: Utiliser l'intervalle configuré dans les options
+        scan_interval = DEFAULT_SCAN_INTERVAL
+        if config_entry and config_entry.options:
+            scan_interval = config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+
         super().__init__(
             hass,
             _LOGGER,
             name="fluidra_pool",
-            update_interval=UPDATE_INTERVAL,
+            update_interval=timedelta(seconds=scan_interval),
+            # 🏆 Platinum: Debouncer pour éviter les appels API trop fréquents
+            request_refresh_debouncer=Debouncer(
+                hass,
+                _LOGGER,
+                cooldown=1.5,  # 1.5 secondes entre les requêtes
+                immediate=False,
+            ),
         )
 
     def register_optimistic_entity(self, entity_id: str):

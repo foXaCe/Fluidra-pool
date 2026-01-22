@@ -11,5 +11,5 @@
   "ssdp": [{"st": "urn:schemas-fluidra-com:device:pool:1"}],
   "issue_tracker": "https://github.com/foxace66/fluidra-pool/issues",
   "requirements": ["aiohttp>=3.8.0", "PyJWT>=2.0.0"],
-  "version": "2.13.0"
+  "version": "2.14.0-platinum"
 }

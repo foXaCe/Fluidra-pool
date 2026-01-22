@@ -1,0 +1,40 @@
+name: Feature Request
+description: Suggest a new feature
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Clear description of the feature
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device_type
+    attributes:
+      label: Related Device Type
+      description: Which Fluidra device is this for?
+      options:
+        - All devices
+        - Pump (VS*, VT*, NCC*)
+        - Heat Pump (LG, Z550iQ+)
+        - Chlorinator (DM*)
+        - Light (LT*)
+        - New device type
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use Case
+      description: Why do you need this feature?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Any workarounds you've tried?

@@ -5,19 +5,24 @@ This module provides a simplified interface to the Fluidra Pool library
 optimized for Home Assistant usage with real AWS Cognito authentication.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any, Final
 
 import aiohttp
 
 from .device_registry import DeviceIdentifier
 
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+
 # API endpoints discovered through reverse engineering
-FLUIDRA_EMEA_BASE = "https://api.fluidra-emea.com"
-COGNITO_ENDPOINT = "https://cognito-idp.eu-west-1.amazonaws.com/"
-COGNITO_CLIENT_ID = "g3njunelkcbtefosqm9bdhhq1"
+FLUIDRA_EMEA_BASE: Final = "https://api.fluidra-emea.com"
+COGNITO_ENDPOINT: Final = "https://cognito-idp.eu-west-1.amazonaws.com/"
+COGNITO_CLIENT_ID: Final = "g3njunelkcbtefosqm9bdhhq1"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,12 +40,13 @@ class FluidraConnectionError(FluidraError):
 
 
 class FluidraPoolAPI:
-    """Wrapper for Fluidra Pool API for Home Assistant."""
+    """Wrapper for Fluidra Pool API for Home Assistant (Platinum - fully typed)."""
 
-    def __init__(self, email: str, password: str):
+    def __init__(self, email: str, password: str, hass: HomeAssistant | None = None) -> None:
         """Initialize the API wrapper."""
-        self.email = email
-        self.password = password
+        self.email: str = email
+        self.password: str = password
+        self._hass: HomeAssistant | None = hass
         self._session: aiohttp.ClientSession | None = None
 
         # AWS Cognito tokens
@@ -55,7 +61,7 @@ class FluidraPoolAPI:
         self._pools: list[dict[str, Any]] = []
 
         # Component control mappings discovered via reverse engineering
-        self.component_mappings = {
+        self.component_mappings: Final[dict[str, int]] = {
             "pump_speed": 11,  # ComponentToChange: 11 = VITESSE POMPE (3 niveaux)
             "pump": 9,  # ComponentToChange: 9 = POMPE PRINCIPALE (on/off)
             "auto_mode": 10,  # ComponentToChange: 10 = MODE AUTO/AUTRE ÉQUIPEMENT
@@ -63,14 +69,14 @@ class FluidraPoolAPI:
         }
 
         # Speed levels discovered (Component 11 pump speed control - corrected)
-        self.pump_speed_levels = {
+        self.pump_speed_levels: Final[dict[str, int]] = {
             "low": 0,  # desiredValue: 0 = Faible (45%)
             "medium": 1,  # desiredValue: 1 = Moyenne (65%)
             "high": 2,  # desiredValue: 2 = Élevée (100%)
         }
 
         # Speed percentage mapping for display (corrected based on real testing)
-        self.speed_percentages = {
+        self.speed_percentages: Final[dict[int, int]] = {
             0: 45,  # Low speed (Faible)
             1: 65,  # Medium speed (Moyenne)
             2: 100,  # High speed (Élevée)
@@ -79,9 +85,15 @@ class FluidraPoolAPI:
     async def authenticate(self) -> None:
         """Authentification réelle via AWS Cognito."""
         if self._session is None:
-            # Default timeout of 30s for all requests to prevent hanging
-            timeout = aiohttp.ClientTimeout(total=30)
-            self._session = aiohttp.ClientSession(timeout=timeout)
+            # 🏆 Use HA's session for better performance (Platinum)
+            if self._hass:
+                from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+                self._session = async_get_clientsession(self._hass)
+            else:
+                # Fallback for testing
+                timeout = aiohttp.ClientTimeout(total=30)
+                self._session = aiohttp.ClientSession(timeout=timeout)
 
         try:
             # Étape 1: Authentification initiale AWS Cognito

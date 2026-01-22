@@ -4,23 +4,27 @@ Fluidra Pool integration for Home Assistant.
 This integration provides support for Fluidra Pool systems.
 """
 
+from __future__ import annotations
+
 from datetime import timedelta
 import logging
+from typing import TYPE_CHECKING, Final
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 import voluptuous as vol
 
 from .const import CONF_EMAIL, CONF_PASSWORD, DOMAIN, FluidraPoolConfigEntry, FluidraPoolRuntimeData
-from .coordinator import FluidraDataUpdateCoordinator
-from .fluidra_api import FluidraPoolAPI
+
+if TYPE_CHECKING:
+    from .coordinator import FluidraDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [
+PLATFORMS: Final = [
     Platform.SWITCH,
     Platform.SENSOR,
     Platform.SELECT,  # Pour modes d'opération pompe (OFF/ON/AUTO/TURBO)
@@ -30,7 +34,7 @@ PLATFORMS: list[Platform] = [
     Platform.LIGHT,  # Pour LumiPlus Connect et autres éclairages
 ]
 
-UPDATE_INTERVAL = timedelta(seconds=45)  # Reduced frequency for better performance
+UPDATE_INTERVAL: Final = timedelta(seconds=45)  # Reduced frequency for better performance
 
 # Service schemas
 SERVICE_SET_SCHEDULE = "set_schedule"
@@ -74,7 +78,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     password = entry.data[CONF_PASSWORD]
 
     # Initialize API client
-    api = FluidraPoolAPI(email, password)
+    from .fluidra_api import FluidraPoolAPI
+
+    api = FluidraPoolAPI(email, password, hass)
 
     try:
         # Test connection and authentication
@@ -100,6 +106,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
         )
 
     # Create data update coordinator
+    from .coordinator import FluidraDataUpdateCoordinator
+
     coordinator = FluidraDataUpdateCoordinator(hass, api, entry)
 
     # 🏆 Utiliser runtime_data au lieu de hass.data (2024+)
@@ -114,7 +122,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     # Register services
     await _async_register_services(hass, coordinator)
 
+    # 🥇 Gold: Recharger l'intégration quand les options changent
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: FluidraPoolConfigEntry) -> None:
+    """Handle options update - reload the integration.
+
+    🥇 Gold: Recharger l'intégration pour appliquer les nouvelles options.
+    """
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) -> bool:
@@ -124,10 +143,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry)
 
 
 async def _async_register_services(hass: HomeAssistant, coordinator: FluidraDataUpdateCoordinator) -> None:
-    """Register services for Fluidra Pool."""
+    """Register services for Fluidra Pool.
 
-    async def _handle_set_schedule(call: ServiceCall) -> None:
-        """Handle set_schedule service call."""
+    🏆 Platinum: Services avec supports_response pour retourner des données.
+    """
+
+    async def _handle_set_schedule(call: ServiceCall) -> ServiceResponse:
+        """Handle set_schedule service call.
+
+        🏆 Platinum: Retourne le résultat de l'opération.
+        """
         device_id = call.data["device_id"]
         schedules_data = call.data["schedules"]
 
@@ -162,29 +187,42 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         try:
             success = await coordinator.api.set_schedule(device_id, fluidra_schedules)
             if success:
-                # Refresh coordinator data
                 await coordinator.async_request_refresh()
-        except Exception:
-            pass
+                return {
+                    "success": True,
+                    "device_id": device_id,
+                    "schedules_count": len(fluidra_schedules),
+                }
+            return {"success": False, "device_id": device_id, "error": "API call failed"}
+        except Exception as err:
+            return {"success": False, "device_id": device_id, "error": str(err)}
 
-    async def _handle_clear_schedule(call: ServiceCall) -> None:
-        """Handle clear_schedule service call."""
+    async def _handle_clear_schedule(call: ServiceCall) -> ServiceResponse:
+        """Handle clear_schedule service call.
+
+        🏆 Platinum: Retourne le résultat de l'opération.
+        """
         device_id = call.data["device_id"]
 
         try:
             success = await coordinator.api.clear_schedule(device_id)
             if success:
                 await coordinator.async_request_refresh()
-        except Exception:
-            pass
+                return {"success": True, "device_id": device_id}
+            return {"success": False, "device_id": device_id, "error": "API call failed"}
+        except Exception as err:
+            return {"success": False, "device_id": device_id, "error": str(err)}
 
-    async def _handle_set_preset_schedule(call: ServiceCall) -> None:
-        """Handle set_preset_schedule service call."""
+    async def _handle_set_preset_schedule(call: ServiceCall) -> ServiceResponse:
+        """Handle set_preset_schedule service call.
+
+        🏆 Platinum: Retourne le résultat de l'opération.
+        """
         device_id = call.data["device_id"]
         preset = call.data["preset"]
 
         # Define presets
-        presets = {
+        presets: dict[str, list[dict]] = {
             "standard": [
                 {"enabled": True, "start_time": "08:00", "end_time": "12:00", "mode": "1", "days": [1, 2, 3, 4, 5]},
                 {"enabled": True, "start_time": "18:00", "end_time": "20:00", "mode": "1", "days": [1, 2, 3, 4, 5]},
@@ -235,18 +273,63 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         }
 
         if preset not in presets:
-            return
+            return {"success": False, "device_id": device_id, "error": f"Unknown preset: {preset}"}
 
-        # Use the set_schedule handler
-        await _handle_set_schedule(
-            ServiceCall(DOMAIN, SERVICE_SET_SCHEDULE, {"device_id": device_id, "schedules": presets[preset]})
-        )
+        # Build schedules in Fluidra format
+        fluidra_schedules = []
+        for i, schedule in enumerate(presets[preset]):
+            start_parts = schedule["start_time"].split(":")
+            end_parts = schedule["end_time"].split(":")
+            start_cron = f"{start_parts[1]} {start_parts[0]} * * {','.join(map(str, schedule['days']))}"
+            end_cron = f"{end_parts[1]} {end_parts[0]} * * {','.join(map(str, schedule['days']))}"
 
-    # Register services
-    hass.services.async_register(DOMAIN, SERVICE_SET_SCHEDULE, _handle_set_schedule, schema=SET_SCHEDULE_SCHEMA)
-    hass.services.async_register(DOMAIN, SERVICE_CLEAR_SCHEDULE, _handle_clear_schedule, schema=CLEAR_SCHEDULE_SCHEMA)
+            fluidra_schedules.append(
+                {
+                    "id": f"schedule_{i + 1}",
+                    "enabled": schedule["enabled"],
+                    "startTime": start_cron,
+                    "endTime": end_cron,
+                    "startActions": {"componentToChange": 11, "operationName": schedule["mode"]},
+                    "endActions": {"componentToChange": 9, "operationName": "0"},
+                    "state": "IDLE",
+                }
+            )
+
+        try:
+            success = await coordinator.api.set_schedule(device_id, fluidra_schedules)
+            if success:
+                await coordinator.async_request_refresh()
+                return {
+                    "success": True,
+                    "device_id": device_id,
+                    "preset": preset,
+                    "schedules_count": len(fluidra_schedules),
+                }
+            return {"success": False, "device_id": device_id, "error": "API call failed"}
+        except Exception as err:
+            return {"success": False, "device_id": device_id, "error": str(err)}
+
+    # 🏆 Platinum: Register services with supports_response
     hass.services.async_register(
-        DOMAIN, SERVICE_SET_PRESET_SCHEDULE, _handle_set_preset_schedule, schema=SET_PRESET_SCHEDULE_SCHEMA
+        DOMAIN,
+        SERVICE_SET_SCHEDULE,
+        _handle_set_schedule,
+        schema=SET_SCHEDULE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CLEAR_SCHEDULE,
+        _handle_clear_schedule,
+        schema=CLEAR_SCHEDULE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_PRESET_SCHEDULE,
+        _handle_set_preset_schedule,
+        schema=SET_PRESET_SCHEDULE_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
     )
 
 

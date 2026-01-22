@@ -6,22 +6,37 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ruff:
-    name: Ruff
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v1
+
+      - name: Ruff check
+        uses: astral-sh/ruff-action@v1
         with:
           args: "check --output-format=github"
-      - uses: astral-sh/ruff-action@v1
+
+      - name: Ruff format check
+        uses: astral-sh/ruff-action@v1
         with:
           args: "format --check"
 
-  hassfest:
-    name: Hassfest
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: home-assistant/actions/hassfest@master
+
+      - name: HACS Validation
+        uses: hacs/action@main
+        with:
+          category: integration
+
+      - name: Hassfest
+        uses: home-assistant/actions/hassfest@master
