@@ -18,12 +18,12 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Ruff check
-        uses: astral-sh/ruff-action@v1
+        uses: astral-sh/ruff-action@v3
         with:
           args: "check --output-format=github"
 
       - name: Ruff format check
-        uses: astral-sh/ruff-action@v1
+        uses: astral-sh/ruff-action@v3
         with:
           args: "format --check"
 
