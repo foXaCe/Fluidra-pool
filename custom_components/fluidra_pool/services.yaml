@@ -2,6 +2,7 @@
 set_schedule:
   name: Set pump schedule
   description: Configure the pump schedule
+  target:
   fields:
     device_id:
       name: Device ID
@@ -27,16 +28,11 @@ set_schedule:
           days: [6,0]
       selector:
         object:
-  response:
-    description: Result of the schedule operation
-    example: |
-      success: true
-      device_id: "LE24500883"
-      schedules_count: 2
 
 clear_schedule:
   name: Clear pump schedule
   description: Delete all pump schedules
+  target:
   fields:
     device_id:
       name: Device ID
@@ -45,15 +41,11 @@ clear_schedule:
       required: true
       selector:
         text:
-  response:
-    description: Result of the clear operation
-    example: |
-      success: true
-      device_id: "LE24500883"
 
 set_preset_schedule:
   name: Preset schedule
   description: Apply a preset schedule
+  target:
   fields:
     device_id:
       name: Device ID
@@ -80,10 +72,3 @@ set_preset_schedule:
               label: "Summer (6am-10am + 4pm-10pm High)"
             - value: "winter"
               label: "Winter (12pm-4pm Low)"
-  response:
-    description: Result of the preset operation
-    example: |
-      success: true
-      device_id: "LE24500883"
-      preset: "standard"
-      schedules_count: 2
