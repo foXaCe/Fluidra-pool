@@ -5,6 +5,18 @@ All notable changes to Fluidra Pool Integration will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.1] - 2025-01-23
+
+### Fixed
+- Duplicate URL parameter in API component control request
+- API session not closed after credential test in config flow
+- Python 3.11+ compatibility (TypeAlias instead of `type` keyword)
+- Private attribute access (`api._pools` → `api.cached_pools`)
+- Dead code in exception handlers (added debug logging)
+- Missing `CoordinatorEntity` import at runtime
+- Unused variables in sensor and select platforms
+- Service response key alignment with schema
+
 ## [2.14.0] - 2025-01-22
 
 ### Added
