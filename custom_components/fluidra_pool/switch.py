@@ -32,7 +32,7 @@ async def async_setup_entry(
     entities = []
 
     # Use cached pools data instead of API call for faster startup
-    pools = coordinator.api._pools or await coordinator.api.get_pools()
+    pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
             device_id = device.get("device_id")
@@ -263,8 +263,8 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             else:
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to turn on pump: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
 
@@ -287,8 +287,8 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             else:
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to turn off pump: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
 
@@ -621,8 +621,8 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             else:
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to enable auto mode: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
 
@@ -645,8 +645,8 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             else:
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to disable auto mode: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
 
@@ -806,8 +806,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
 
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to enable schedule: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
 
@@ -866,8 +866,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
 
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to disable schedule: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
 
@@ -955,8 +955,8 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             else:
                 self._clear_pending_state()
 
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to enable boost mode: %s", err)
             self._clear_pending_state()
             raise
 
@@ -978,8 +978,8 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             else:
                 self._clear_pending_state()
 
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to disable boost mode: %s", err)
             self._clear_pending_state()
             raise
 

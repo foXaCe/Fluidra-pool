@@ -79,7 +79,7 @@ async def async_setup_entry(
     entities = []
 
     # Use cached pools data instead of API call for faster startup
-    pools = coordinator.api._pools or await coordinator.api.get_pools()
+    pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
             device_id = device.get("device_id")

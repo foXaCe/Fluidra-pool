@@ -676,6 +676,11 @@ class FluidraPoolAPI:
         self._pools = pools
         return self._pools
 
+    @property
+    def cached_pools(self) -> list[dict[str, Any]]:
+        """Get cached pools without API call (public accessor for _pools)."""
+        return self._pools
+
     def get_pool_by_id(self, pool_id: str) -> dict[str, Any] | None:
         """Get a specific pool by ID."""
         for pool in self._pools:
@@ -836,7 +841,7 @@ class FluidraPoolAPI:
         try:
             response = await self._request(
                 "PUT",
-                f"{url}?deviceType=connected",
+                url,
                 headers=headers,
                 json_data=payload,
             )

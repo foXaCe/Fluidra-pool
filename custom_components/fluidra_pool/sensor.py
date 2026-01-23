@@ -13,16 +13,16 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import PERCENTAGE, UnitOfTemperature
 from homeassistant.core import callback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, FluidraPoolConfigEntry
+from .device_registry import DeviceIdentifier
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
-    from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
     from .coordinator import FluidraDataUpdateCoordinator
-    from .device_registry import DeviceIdentifier
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ async def async_setup_entry(
     entities = []
 
     # Use cached pools data instead of API call for faster startup
-    pools = coordinator.api._pools or await coordinator.api.get_pools()
+    pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
             device_id = device.get("device_id")
@@ -389,12 +389,6 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         pump_reported = self.device_data.get("pump_reported")
         if pump_reported is not None:
             is_running = bool(pump_reported)
-
-        # État du mode auto
-        self.device_data.get("auto_mode_enabled", False)
-        auto_reported = self.device_data.get("auto_reported")
-        if auto_reported is not None:
-            bool(auto_reported)
 
         # Si pompe arrêtée - return state key
         if not is_running:

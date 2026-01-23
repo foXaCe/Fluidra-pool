@@ -197,6 +197,8 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
             if "timeout" in str(err).lower() or "connect" in str(err).lower():
                 return "cannot_connect"
             return "unknown"
+        finally:
+            await api.close()
 
 
 class FluidraPoolOptionsFlowHandler(OptionsFlow):

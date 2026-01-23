@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, TypeAlias
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 
 DOMAIN: Final = "fluidra_pool"
 
-# 🏆 Type alias for ConfigEntry (Platinum)
-type FluidraPoolConfigEntry = ConfigEntry[FluidraPoolRuntimeData]
+# 🏆 Type alias for ConfigEntry (Platinum) - Compatible Python 3.11+
+FluidraPoolConfigEntry: TypeAlias = "ConfigEntry[FluidraPoolRuntimeData]"  # noqa: UP040
 
 
 @dataclass(frozen=True, slots=True)

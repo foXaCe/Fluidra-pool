@@ -118,8 +118,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     # Then remove the device itself
                     device_registry.async_remove_device(device_entry.id)
 
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to cleanup removed devices: %s", err)
 
     async def _cleanup_schedule_sensor_if_empty(self, pool_id: str, device_id: str, schedule_data: list):
         """Clean up schedule sensor entity if no schedules remain."""
@@ -139,8 +139,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                         entity_registry.async_remove(entity_id)
                         break
 
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to cleanup schedule sensor: %s", err)
 
     def _parse_dm24049704_schedule_format(self, reported_value: dict) -> list:
         """Parse DM24049704 chlorinator schedule format (programs/slots) to standard format.
