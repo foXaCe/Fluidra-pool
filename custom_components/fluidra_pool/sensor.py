@@ -499,7 +499,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                 minute = int(parts[0])
                 hour = int(parts[1])
                 return time(hour, minute)
-        except Exception:
+        except (ValueError, TypeError):
             pass
         return None
 
@@ -572,7 +572,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
             return f"{enabled_count} {active_schedules_label}"
 
         except Exception:
-            pass
+            _LOGGER.debug("Failed to get schedule state for %s", self._device_id)
             return self._translate_schedule_state("error")
 
     @property
@@ -708,7 +708,7 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
             return self._translate_device_info("online")
 
         except Exception:
-            pass
+            _LOGGER.debug("Failed to get device info state for %s", self._device_id)
             return self._translate_device_info("error")
 
     @property
@@ -1279,8 +1279,8 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
         try:
             # Apply divisor to get actual value
             return float(raw_value) / self._divisor
-        except Exception:
-            pass
+        except (ValueError, TypeError):
+            _LOGGER.debug("Failed to parse sensor value %s for component %s", raw_value, self._component_id)
             return None
 
     @property

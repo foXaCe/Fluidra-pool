@@ -21,6 +21,9 @@ ignore = [
 force-sort-within-sections = true
 known-first-party = ["custom_components.fluidra_pool"]
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
 skips = ["B101", "B105", "B110"]  # B101: assert, B105: hardcoded password (false positive on const names), B110: try/except/pass (common in HA)

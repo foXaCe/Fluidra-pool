@@ -11,11 +11,11 @@ from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SWITCH_CONFIRMATION_DELAY, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
+from .entity import FluidraPoolControlEntity
 from .utils import convert_cron_days
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,64 +74,21 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
+class FluidraPoolSwitchEntity(FluidraPoolControlEntity, SwitchEntity):
     """Base class for Fluidra Pool switch entities."""
 
-    # 🏆 __slots__ for memory efficiency (Platinum)
-    __slots__ = ("_api", "_pool_id", "_device_id", "_pending_state", "_last_action_time")
-
-    _attr_has_entity_name = True
+    __slots__ = ("_pending_state", "_last_action_time")
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str):
         """Initialize the switch."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
         self._pending_state = None
         self._last_action_time = None
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def pool_data(self) -> dict:
-        """Get pool data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        return self.coordinator.data.get(self._pool_id, {})
 
     @property
     def unique_id(self) -> str:
         """Return unique ID."""
         return f"{DOMAIN}_{self._pool_id}_{self._device_id}"
-
-    @property
-    def device_info(self) -> dict:
-        """Return device info."""
-        device_data = self.device_data
-        device_name = device_data.get("name", f"Device {self._device_id}")
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": device_data.get("manufacturer", "Fluidra"),
-            "model": device_data.get("model", "Pool Equipment"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def assumed_state(self) -> bool:
@@ -187,7 +144,7 @@ class FluidraPoolSwitchEntity(CoordinatorEntity, SwitchEntity):
                         device["speed_percent"] = 0
 
         except Exception:
-            pass
+            _LOGGER.debug("Failed to refresh device state for %s", self._device_id)
 
 
 class FluidraPumpSwitch(FluidraPoolSwitchEntity):
@@ -453,7 +410,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
                     device["heat_pump_reported"] = reported_value
 
         except Exception:
-            pass
+            _LOGGER.debug("Failed to refresh heat pump state for %s", self._device_id)
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -727,7 +684,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                         return schedule
 
         except Exception:
-            pass
+            _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
     @property

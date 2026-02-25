@@ -10,17 +10,16 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     COMMAND_CONFIRMATION_DELAY,
-    DOMAIN,
     SWITCH_CONFIRMATION_DELAY,
     UI_UPDATE_DELAY,
     FluidraPoolConfigEntry,
 )
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
+from .entity import FluidraPoolControlEntity
 from .utils import convert_cron_days
 
 _LOGGER = logging.getLogger(__name__)
@@ -108,20 +107,14 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
+class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
     """Representation of a Fluidra pump speed select control."""
 
-    # 🏆 __slots__ for memory efficiency (Platinum)
     __slots__ = (
-        "_api",
-        "_pool_id",
-        "_device_id",
         "_optimistic_option",
         "_speed_mapping",
         "_percent_to_option",
     )
-
-    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(
         self,
@@ -131,10 +124,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         device_id: str,
     ) -> None:
         """Initialize the pump speed select."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
         self._optimistic_option = None  # Option optimiste temporaire pendant les actions
 
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
@@ -157,37 +147,6 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
 
         # Inverse mapping for display
         self._percent_to_option = {0: "stopped", 45: "low", 65: "medium", 100: "high"}
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def pool_data(self) -> dict:
-        """Get pool data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        return self.coordinator.data.get(self._pool_id, {})
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "E30iQ"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
 
     @property
     def available(self) -> bool:
@@ -263,6 +222,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                     try:
                         await self._api.control_device_component(self._device_id, 11, -1)
                     except Exception:
+                        _LOGGER.debug("Failed to disable speed for %s, using fallback", self._device_id)
                         # Fallback: manually mark in device data
                         device = self._api.get_device_by_id(self._device_id)
                         if device:
@@ -283,8 +243,6 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                 await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
 
-        except Exception:
-            raise
         finally:
             # Toujours effacer l'option optimiste
             self._optimistic_option = None
@@ -321,7 +279,7 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
                         device["speed_level_reported"] = None
 
         except Exception:
-            pass
+            _LOGGER.debug("Failed to refresh device state for %s", self._device_id)
 
     @property
     def icon(self) -> str:
@@ -380,8 +338,10 @@ class FluidraPumpSpeedSelect(CoordinatorEntity, SelectEntity):
         return attrs
 
 
-class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
+class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
     """Select entity for choosing schedule mode (speed level) for existing schedules."""
+
+    __slots__ = ("_schedule_id",)
 
     def __init__(
         self,
@@ -392,10 +352,7 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         schedule_id: str,
     ) -> None:
         """Initialize the schedule mode select."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
 
         self._attr_translation_key = "schedule_mode"
@@ -405,30 +362,6 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
 
         # Speed options for schedules (using translation keys from schedule_mode.state)
         self._attr_options = ["0", "1", "2"]
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "E30iQ"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
 
     def _get_schedule_data(self) -> dict | None:
         """Get schedule data from coordinator."""
@@ -446,7 +379,7 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
                         return schedule
 
         except Exception:
-            pass
+            _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
     @property
@@ -522,7 +455,7 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
                 await self.coordinator.async_request_refresh()
 
         except Exception:
-            pass
+            _LOGGER.debug("Failed to update schedule mode for %s", self._device_id)
 
     @property
     def icon(self) -> str:
@@ -557,8 +490,10 @@ class FluidraScheduleModeSelect(CoordinatorEntity, SelectEntity):
         return attrs
 
 
-class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
+class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
     """Select entity for chlorinator mode (OFF/ON/AUTO)."""
+
+    __slots__ = ("_optimistic_option", "_mode_mapping", "_value_to_mode")
 
     def __init__(
         self,
@@ -568,10 +503,7 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
         device_id: str,
     ) -> None:
         """Initialize the chlorinator mode select."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
         self._optimistic_option = None
 
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
@@ -588,35 +520,6 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
 
         # Inverse mapping for display
         self._value_to_mode = {0: "off", 1: "on", 2: "auto"}
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "Chlorinator"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def current_option(self) -> str | None:
@@ -652,8 +555,6 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
 
-        except Exception:
-            raise
         finally:
             # Clear optimistic option
             self._optimistic_option = None
@@ -680,11 +581,12 @@ class FluidraChlorinatorModeSelect(CoordinatorEntity, SelectEntity):
         }
 
 
-class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
+class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
     """Select entity for LumiPlus Connect light effect/scene selection."""
 
-    # Component 18 controls effect/scene selection
     EFFECT_COMPONENT = 18
+
+    __slots__ = ("_optimistic_option", "_effect_mapping", "_value_to_effect")
 
     def __init__(
         self,
@@ -694,10 +596,7 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
         device_id: str,
     ) -> None:
         """Initialize the light effect select."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
         self._optimistic_option = None
 
         device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
@@ -744,35 +643,6 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
             7: "scene_7",
             8: "scene_8",
         }
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "LumiPlus Connect"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def current_option(self) -> str | None:
@@ -850,8 +720,10 @@ class FluidraLightEffectSelect(CoordinatorEntity, SelectEntity):
         }
 
 
-class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
+class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEntity):
     """Select entity for chlorinator schedule speed (S1/S2/S3)."""
+
+    __slots__ = ("_schedule_id", "_optimistic_option", "_speed_mapping", "_value_to_speed")
 
     def __init__(
         self,
@@ -862,10 +734,7 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
         schedule_id: str,
     ) -> None:
         """Initialize the chlorinator schedule speed select."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
         self._optimistic_option = None
 
@@ -881,30 +750,6 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
         self._speed_mapping = {"S1": "1", "S2": "2", "S3": "3"}
         self._value_to_speed = {"1": "S1", "2": "S2", "3": "S3"}
 
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "Chlorinator"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
     def _get_schedule_data(self) -> dict | None:
         """Get schedule data from coordinator."""
         try:
@@ -916,7 +761,7 @@ class FluidraChlorinatorScheduleSpeedSelect(CoordinatorEntity, SelectEntity):
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
         except Exception:
-            pass
+            _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
     @property

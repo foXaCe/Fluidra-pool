@@ -10,10 +10,10 @@ from homeassistant.components.time import TimeEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import COMMAND_CONFIRMATION_DELAY, DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
+from .entity import FluidraPoolControlEntity
 from .utils import convert_cron_days
 
 _LOGGER = logging.getLogger(__name__)
@@ -143,20 +143,14 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
+class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
     """Base class for Fluidra schedule time entities."""
 
-    # 🏆 __slots__ for memory efficiency (Platinum)
-    __slots__ = ("_api", "_pool_id", "_device_id", "_schedule_id", "_time_type", "_optimistic_value")
-
-    _attr_has_entity_name = True
+    __slots__ = ("_schedule_id", "_time_type", "_optimistic_value")
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str, schedule_id: str, time_type: str):
         """Initialize the time entity."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
         self._time_type = time_type  # "start" or "end"
         self._optimistic_value: time | None = None  # Optimistic value during updates
@@ -170,18 +164,6 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
             return schedule_comp
         # Default to component 20 for pumps
         return 20
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
 
     @property
     def device_info(self) -> dict:
@@ -226,7 +208,7 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                         return schedule
 
         except Exception:
-            pass
+            _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
     @property
@@ -283,7 +265,7 @@ class FluidraScheduleTimeEntity(CoordinatorEntity, TimeEntity):
 
             return True, ""
         except Exception:
-            pass
+            _LOGGER.debug("Failed to validate schedule overlap for %s", self._device_id)
             return True, ""  # Allow if validation fails
 
     def _times_overlap(self, start1: time, end1: time, start2: time, end2: time) -> bool:
@@ -395,7 +377,7 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                                     else:  # Monday-Saturday: 1-6 -> 1-6
                                         days.append(day)
                                 days = sorted(days)
-                            except Exception:
+                            except (ValueError, TypeError):
                                 pass
 
                     start_time = self._format_time_to_cron(value, days)
@@ -455,40 +437,24 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                 self._optimistic_value = None
                 self.async_write_ha_state()
 
-        except Exception:
+        except Exception as err:
+            _LOGGER.debug("Failed to set schedule start time for %s: %s", self._device_id, err)
             self._optimistic_value = None
             self.async_write_ha_state()
 
 
-class FluidraLightScheduleTimeEntity(CoordinatorEntity, TimeEntity):
+class FluidraLightScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
     """Base class for LumiPlus Connect light schedule time entities."""
 
-    # 🏆 __slots__ for memory efficiency (Platinum)
-    __slots__ = ("_api", "_pool_id", "_device_id", "_schedule_id", "_time_type")
+    __slots__ = ("_schedule_id", "_time_type")
 
-    _attr_has_entity_name = True
     SCHEDULE_COMPONENT = 40  # Light schedules use component 40
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str, schedule_id: str, time_type: str):
         """Initialize the time entity."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
         self._time_type = time_type
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
 
     @property
     def device_info(self) -> dict:
@@ -516,7 +482,7 @@ class FluidraLightScheduleTimeEntity(CoordinatorEntity, TimeEntity):
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
         except Exception:
-            pass
+            _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
     @property
@@ -590,7 +556,7 @@ class FluidraLightScheduleStartTimeEntity(FluidraLightScheduleTimeEntity):
                         if len(parts) >= 5:
                             try:
                                 days = [int(d) for d in parts[4].split(",")]
-                            except Exception:
+                            except (ValueError, TypeError):
                                 pass
                     start_time = self._format_time_to_cron(value, days)
 
@@ -608,8 +574,8 @@ class FluidraLightScheduleStartTimeEntity(FluidraLightScheduleTimeEntity):
             if success:
                 await self.coordinator.async_request_refresh()
 
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to set light schedule start time for %s: %s", self._device_id, err)
 
 
 class FluidraLightScheduleEndTimeEntity(FluidraLightScheduleTimeEntity):
@@ -661,7 +627,7 @@ class FluidraLightScheduleEndTimeEntity(FluidraLightScheduleTimeEntity):
                         if len(parts) >= 5:
                             try:
                                 days = [int(d) for d in parts[4].split(",")]
-                            except Exception:
+                            except (ValueError, TypeError):
                                 pass
                     end_time = self._format_time_to_cron(value, days)
 
@@ -679,8 +645,8 @@ class FluidraLightScheduleEndTimeEntity(FluidraLightScheduleTimeEntity):
             if success:
                 await self.coordinator.async_request_refresh()
 
-        except Exception:
-            pass
+        except Exception as err:
+            _LOGGER.debug("Failed to set light schedule end time for %s: %s", self._device_id, err)
 
 
 class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
@@ -763,7 +729,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                                     else:  # Monday-Saturday: 1-6 -> 1-6
                                         days.append(day)
                                 days = sorted(days)
-                            except Exception:
+                            except (ValueError, TypeError):
                                 pass
 
                     end_time = self._format_time_to_cron(value, days)
@@ -823,6 +789,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                 self._optimistic_value = None
                 self.async_write_ha_state()
 
-        except Exception:
+        except Exception as err:
+            _LOGGER.debug("Failed to set schedule end time for %s: %s", self._device_id, err)
             self._optimistic_value = None
             self.async_write_ha_state()

@@ -16,15 +16,17 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, OPTIMISTIC_STATE_CLEAR_DELAY, FluidraPoolConfigEntry
+from .const import (
+    DOMAIN,
+    LUMIPLUS_COMPONENT_BRIGHTNESS,
+    LUMIPLUS_COMPONENT_COLOR,
+    LUMIPLUS_COMPONENT_POWER,
+    OPTIMISTIC_STATE_CLEAR_DELAY,
+    FluidraPoolConfigEntry,
+)
 from .coordinator import FluidraDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-
-# LumiPlus Connect component IDs (discovered via mitmproxy)
-COMPONENT_POWER = 11  # ON/OFF: "1" = ON, "0" = OFF
-COMPONENT_BRIGHTNESS = 17  # Brightness: 0-100
-COMPONENT_COLOR = 45  # RGBW color: {r, g, b, k, extra: {w}}
 
 
 async def async_setup_entry(
@@ -150,19 +152,19 @@ class FluidraLight(CoordinatorEntity, LightEntity):
                 components = device.get("components", {})
 
                 # Power state (component 11)
-                power_comp = components.get(str(COMPONENT_POWER), {})
+                power_comp = components.get(str(LUMIPLUS_COMPONENT_POWER), {})
                 reported_power = power_comp.get("reportedValue")
                 if reported_power is not None:
                     self._is_on = bool(int(reported_power))
 
                 # Brightness (component 17) - 0-100, convert to 0-255
-                brightness_comp = components.get(str(COMPONENT_BRIGHTNESS), {})
+                brightness_comp = components.get(str(LUMIPLUS_COMPONENT_BRIGHTNESS), {})
                 reported_brightness = brightness_comp.get("reportedValue")
                 if reported_brightness is not None:
                     self._brightness = int(reported_brightness * 255 / 100)
 
                 # Color (component 45)
-                color_comp = components.get(str(COMPONENT_COLOR), {})
+                color_comp = components.get(str(LUMIPLUS_COMPONENT_COLOR), {})
                 reported_color = color_comp.get("reportedValue")
                 if reported_color and isinstance(reported_color, dict):
                     r = reported_color.get("r", 0)
@@ -185,7 +187,9 @@ class FluidraLight(CoordinatorEntity, LightEntity):
         if ATTR_BRIGHTNESS in kwargs:
             brightness_255 = kwargs[ATTR_BRIGHTNESS]
             brightness_100 = int(brightness_255 * 100 / 255)
-            await self.coordinator.api.set_component_value(self._device_id, COMPONENT_BRIGHTNESS, brightness_100)
+            await self.coordinator.api.set_component_value(
+                self._device_id, LUMIPLUS_COMPONENT_BRIGHTNESS, brightness_100
+            )
             self._brightness = brightness_255
 
         # Handle RGBW color
@@ -198,11 +202,11 @@ class FluidraLight(CoordinatorEntity, LightEntity):
                 "k": 5000,  # Default color temperature
                 "extra": {"w": w},
             }
-            await self.coordinator.api.set_component_json_value(self._device_id, COMPONENT_COLOR, color_value)
+            await self.coordinator.api.set_component_json_value(self._device_id, LUMIPLUS_COMPONENT_COLOR, color_value)
             self._rgbw_color = (r, g, b, w)
 
         # Turn on power
-        await self.coordinator.api.set_component_string_value(self._device_id, COMPONENT_POWER, "1")
+        await self.coordinator.api.set_component_string_value(self._device_id, LUMIPLUS_COMPONENT_POWER, "1")
         self._is_on = True
 
         # Wait for device to process, then clear optimistic state
@@ -216,7 +220,7 @@ class FluidraLight(CoordinatorEntity, LightEntity):
         self._optimistic_state = False
         self.async_write_ha_state()
 
-        await self.coordinator.api.set_component_string_value(self._device_id, COMPONENT_POWER, "0")
+        await self.coordinator.api.set_component_string_value(self._device_id, LUMIPLUS_COMPONENT_POWER, "0")
         self._is_on = False
 
         # Wait for device to process, then clear optimistic state

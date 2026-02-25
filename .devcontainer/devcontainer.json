@@ -1,0 +1,26 @@
+{
+  "name": "Fluidra Pool Development",
+  "image": "ghcr.io/home-assistant/devcontainer:latest",
+  "forwardPorts": [8123],
+  "postCreateCommand": "pip install -r requirements_dev.txt || true",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "esbenp.prettier-vscode",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.analysis.typeCheckingMode": "basic",
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff"
+        }
+      }
+    }
+  },
+  "remoteUser": "vscode"
+}

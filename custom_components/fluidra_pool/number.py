@@ -10,11 +10,11 @@ from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DEVICE_TYPE_PUMP, DOMAIN, FluidraPoolConfigEntry
+from .const import DEVICE_TYPE_PUMP, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
+from .entity import FluidraPoolControlEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,13 +56,10 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
+class FluidraPumpComponentNumber(FluidraPoolControlEntity, NumberEntity):
     """Base class for Fluidra pump component controls."""
 
-    # 🏆 __slots__ for memory efficiency (Platinum)
-    __slots__ = ("_api", "_pool_id", "_device_id", "_component_id", "_control_type")
-
-    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
+    __slots__ = ("_component_id", "_control_type")
 
     def __init__(
         self,
@@ -74,10 +71,7 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
         control_type: str,
     ) -> None:
         """Initialize the pump component number."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
         self._component_id = component_id
         self._control_type = control_type
 
@@ -88,42 +82,6 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
         self._attr_unique_id = f"fluidra_{self._device_id}_component_{component_id}"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_mode = "slider"
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def pool_data(self) -> dict:
-        """Get pool data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        return self.coordinator.data.get(self._pool_id, {})
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "E30iQ"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def native_value(self) -> float | None:
@@ -140,14 +98,10 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
         """Set the component value."""
         int_value = int(value)
 
-        try:
-            success = await self._api.set_component_value(self._device_id, self._component_id, int_value)
+        success = await self._api.set_component_value(self._device_id, self._component_id, int_value)
 
-            if success:
-                await self.coordinator.async_request_refresh()
-
-        except Exception:
-            raise
+        if success:
+            await self.coordinator.async_request_refresh()
 
     @property
     def icon(self) -> str:
@@ -173,17 +127,12 @@ class FluidraPumpComponentNumber(CoordinatorEntity, NumberEntity):
         }
 
 
-class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
+class FluidraSpeedControl(FluidraPoolControlEntity, NumberEntity):
     """Unified speed control for pump component 15 (40-105%)."""
-
-    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str) -> None:
         """Initialize the speed control."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
 
         device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
 
@@ -200,35 +149,6 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
         self._attr_device_class = NumberDeviceClass.POWER_FACTOR
 
     @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"E30iQ Pump {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "E30iQ"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
-
-    @property
     def native_value(self) -> float | None:
         """Return the current speed value from component 15."""
         components = self.device_data.get("components", {})
@@ -242,16 +162,11 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
         """Set the speed percentage directly to component 15."""
         int_value = int(value)
 
-        try:
-            success = await self._api.set_component_value(self._device_id, 15, int_value)
-            if not success:
-                return
+        success = await self._api.set_component_value(self._device_id, 15, int_value)
+        if not success:
+            return
 
-            await self.coordinator.async_request_refresh()
-
-        except Exception:
-            pass
-            raise
+        await self.coordinator.async_request_refresh()
 
     @property
     def icon(self) -> str:
@@ -280,10 +195,8 @@ class FluidraSpeedControl(CoordinatorEntity, NumberEntity):
         }
 
 
-class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
+class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
     """Number entity for chlorinator chlorination level (0-100%)."""
-
-    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(
         self,
@@ -293,10 +206,7 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         device_id: str,
     ) -> None:
         """Initialize the chlorinator level control."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
 
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
 
@@ -313,35 +223,6 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
         self.async_write_ha_state()
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "Chlorinator"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def native_value(self) -> float | None:
@@ -371,12 +252,9 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         components[comp_key]["desiredValue"] = int_value
         self.async_write_ha_state()
 
-        try:
-            success = await self._api.control_device_component(self._device_id, chlorination_component, int_value)
-            if not success:
-                pass
-        except Exception:
-            raise
+        success = await self._api.control_device_component(self._device_id, chlorination_component, int_value)
+        if not success:
+            _LOGGER.debug("Failed to set chlorination level for %s", self._device_id)
 
     @property
     def icon(self) -> str:
@@ -393,10 +271,8 @@ class FluidraChlorinatorLevelNumber(CoordinatorEntity, NumberEntity):
         }
 
 
-class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
+class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
     """Number entity for chlorinator pH setpoint control."""
-
-    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(
         self,
@@ -406,10 +282,7 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         device_id: str,
     ) -> None:
         """Initialize the pH setpoint control."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
 
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
 
@@ -423,35 +296,6 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         self._attr_native_step = 0.1
         self._attr_native_unit_of_measurement = None
         self._attr_device_class = None
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "Chlorinator"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def native_value(self) -> float | None:
@@ -476,8 +320,7 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
 
         try:
             return float(raw_value) / 100
-        except Exception:
-            pass
+        except (ValueError, TypeError):
             return 7.2
 
     async def async_set_native_value(self, value: float) -> None:
@@ -503,14 +346,10 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         components[str(read_component)]["desiredValue"] = int_value
         self.async_write_ha_state()
 
-        try:
-            success = await self._api.control_device_component(self._device_id, write_component, int_value)
+        success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
-            if not success:
-                pass
-
-        except Exception:
-            raise
+        if not success:
+            _LOGGER.debug("Failed to set pH setpoint for %s", self._device_id)
 
     @property
     def icon(self) -> str:
@@ -540,8 +379,8 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         if raw_reading is not None:
             try:
                 current_ph = float(raw_reading) / 100
-            except Exception:
-                pass
+            except (ValueError, TypeError):
+                _LOGGER.debug("Failed to parse pH reading: %s", raw_reading)
 
         return {
             "ph_range": "6.8-7.6",
@@ -552,10 +391,8 @@ class FluidraChlorinatorPhSetpoint(CoordinatorEntity, NumberEntity):
         }
 
 
-class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
+class FluidraChlorinatorOrpSetpoint(FluidraPoolControlEntity, NumberEntity):
     """Number entity for chlorinator ORP/Redox setpoint control."""
-
-    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(
         self,
@@ -565,10 +402,7 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         device_id: str,
     ) -> None:
         """Initialize the ORP setpoint control."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
 
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
 
@@ -582,35 +416,6 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         self._attr_native_step = 10
         self._attr_native_unit_of_measurement = "mV"
         self._attr_device_class = NumberDeviceClass.VOLTAGE
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "Chlorinator"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def native_value(self) -> float | None:
@@ -653,14 +458,10 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         components[str(read_component)]["desiredValue"] = int_value
         self.async_write_ha_state()
 
-        try:
-            success = await self._api.control_device_component(self._device_id, write_component, int_value)
+        success = await self._api.control_device_component(self._device_id, write_component, int_value)
 
-            if not success:
-                pass
-
-        except Exception:
-            raise
+        if not success:
+            _LOGGER.debug("Failed to set ORP setpoint for %s", self._device_id)
 
     @property
     def icon(self) -> str:
@@ -695,10 +496,8 @@ class FluidraChlorinatorOrpSetpoint(CoordinatorEntity, NumberEntity):
         }
 
 
-class FluidraLightEffectSpeed(CoordinatorEntity, NumberEntity):
+class FluidraLightEffectSpeed(FluidraPoolControlEntity, NumberEntity):
     """Number entity for LumiPlus Connect effect speed (1-8)."""
-
-    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
 
     def __init__(
         self,
@@ -708,10 +507,7 @@ class FluidraLightEffectSpeed(CoordinatorEntity, NumberEntity):
         device_id: str,
     ) -> None:
         """Initialize the effect speed control."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
+        super().__init__(coordinator, api, pool_id, device_id)
 
         device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
 
@@ -722,35 +518,6 @@ class FluidraLightEffectSpeed(CoordinatorEntity, NumberEntity):
         self._attr_native_max_value = 8
         self._attr_native_step = 1
         self._attr_native_unit_of_measurement = None
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device information."""
-        device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "LumiPlus Connect"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def native_value(self) -> float | None:
@@ -764,12 +531,9 @@ class FluidraLightEffectSpeed(CoordinatorEntity, NumberEntity):
         """Set effect speed to component 20."""
         int_value = int(value)
 
-        try:
-            success = await self._api.set_component_value(self._device_id, 20, int_value)
-            if success:
-                await self.coordinator.async_request_refresh()
-        except Exception:
-            raise
+        success = await self._api.set_component_value(self._device_id, 20, int_value)
+        if success:
+            await self.coordinator.async_request_refresh()
 
     @property
     def icon(self) -> str:

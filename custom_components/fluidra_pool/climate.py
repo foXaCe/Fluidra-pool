@@ -16,10 +16,13 @@ from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
+    LG_MODE_TO_VALUE,
+    LG_PRESET_MODES,
+    LG_PRESET_SMART_HEATING,
+    LG_VALUE_TO_MODE,
     Z550_MAX_TEMP,
     Z550_MIN_TEMP,
     Z550_MODE_AUTO,
@@ -36,39 +39,9 @@ from .const import (
     FluidraPoolConfigEntry,
 )
 from .device_registry import DeviceIdentifier
+from .entity import FluidraPoolControlEntity
 
 _LOGGER = logging.getLogger(__name__)
-
-# LG Heat Pump preset modes (mapped to component 14 values)
-LG_PRESET_SMART_HEATING = "smart_heating"  # desiredValue: 0
-LG_PRESET_SMART_COOLING = "smart_cooling"  # desiredValue: 1
-LG_PRESET_SMART_HEAT_COOL = "smart_heat_cool"  # desiredValue: 2
-LG_PRESET_BOOST_HEATING = "boost_heating"  # desiredValue: 3
-LG_PRESET_SILENCE_HEATING = "silence_heating"  # desiredValue: 4
-LG_PRESET_BOOST_COOLING = "boost_cooling"  # desiredValue: 5
-LG_PRESET_SILENCE_COOLING = "silence_cooling"  # desiredValue: 6
-
-LG_PRESET_MODES = [
-    LG_PRESET_SMART_HEATING,
-    LG_PRESET_SMART_COOLING,
-    LG_PRESET_SMART_HEAT_COOL,
-    LG_PRESET_BOOST_HEATING,
-    LG_PRESET_SILENCE_HEATING,
-    LG_PRESET_BOOST_COOLING,
-    LG_PRESET_SILENCE_COOLING,
-]
-
-LG_MODE_TO_VALUE = {
-    LG_PRESET_SMART_HEATING: 0,
-    LG_PRESET_SMART_COOLING: 1,
-    LG_PRESET_SMART_HEAT_COOL: 2,
-    LG_PRESET_BOOST_HEATING: 3,
-    LG_PRESET_SILENCE_HEATING: 4,
-    LG_PRESET_BOOST_COOLING: 5,
-    LG_PRESET_SILENCE_COOLING: 6,
-}
-
-LG_VALUE_TO_MODE = {v: k for k, v in LG_MODE_TO_VALUE.items()}
 
 
 async def async_setup_entry(
@@ -94,14 +67,10 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
+class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
     """Climate entity for Fluidra heat pumps."""
 
-    # 🏆 __slots__ for memory efficiency (Platinum)
     __slots__ = (
-        "_api",
-        "_pool_id",
-        "_device_id",
         "_pending_temperature",
         "_pending_preset_mode",
         "_pending_hvac_mode",
@@ -111,42 +80,16 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
         "_last_hvac_action_time",
     )
 
-    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
-
     def __init__(self, coordinator, api, pool_id: str, device_id: str):
         """Initialize the climate entity."""
-        super().__init__(coordinator)
-        self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
-        # Optimistic state management
+        super().__init__(coordinator, api, pool_id, device_id)
         self._pending_temperature = None
         self._pending_preset_mode = None
         self._pending_hvac_mode = None
-        self._is_updating = False  # Indicates an action is in progress
-        # Timestamps for optimistic state timeout (5 second timeout)
+        self._is_updating = False
         self._last_action_time: float | None = None
         self._last_preset_action_time: float | None = None
         self._last_hvac_action_time: float | None = None
-
-    @property
-    def device_data(self) -> dict:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool = self.coordinator.data.get(self._pool_id)
-        if pool:
-            for device in pool.get("devices", []):
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
-    def pool_data(self) -> dict:
-        """Get pool data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        return self.coordinator.data.get(self._pool_id, {})
 
     @property
     def unique_id(self) -> str:
@@ -164,24 +107,6 @@ class FluidraHeatPumpClimate(CoordinatorEntity, ClimateEntity):
     def translation_key(self) -> str:
         """Return the translation key."""
         return "heat_pump"
-
-    @property
-    def device_info(self) -> dict:
-        """Return device info."""
-        device_data = self.device_data
-        device_name = device_data.get("name", f"Device {self._device_id}")
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": device_data.get("manufacturer", "Fluidra"),
-            "model": device_data.get("model", "Heat Pump"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
 
     @property
     def temperature_unit(self) -> str:

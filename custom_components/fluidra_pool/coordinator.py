@@ -313,7 +313,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
             return 0
 
-        except Exception:
+        except (ValueError, TypeError):
             return 0
 
     async def _fetch_components_parallel(self, device_id: str, components_to_scan: list[int]) -> dict[int, dict]:
@@ -607,6 +607,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
             return {pool["id"]: pool for pool in pools}
 
+        except ConfigEntryAuthFailed:
+            raise
         except Exception as err:
             _LOGGER.error("Error updating Fluidra Pool data: %s", err)
             raise UpdateFailed(f"Error communicating with API: {err}") from err
