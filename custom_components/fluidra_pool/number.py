@@ -214,8 +214,8 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
         self._attr_unique_id = f"fluidra_{self._device_id}_chlorination_level"
         self._attr_mode = "slider"
         self._attr_native_min_value = 0
-        self._attr_native_max_value = 100
-        self._attr_native_step = 1  # UI step (actual value rounded to 10 in async_set_native_value)
+        self._attr_native_max_value = DeviceIdentifier.get_feature(self.device_data, "chlorination_max", 100)
+        self._attr_native_step = DeviceIdentifier.get_feature(self.device_data, "chlorination_step", 1)
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_device_class = NumberDeviceClass.POWER_FACTOR
 
@@ -241,8 +241,12 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
         # Get chlorination level component from device config (default to 10 for CC* devices)
         chlorination_component = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", 10)
 
-        # Round to nearest multiple of 10 for CC24033907 compatibility
-        int_value = round(value / 10) * 10
+        # Round to nearest multiple of 10 for CC* chlorinators (0-100% range)
+        chlorination_max = DeviceIdentifier.get_feature(self.device_data, "chlorination_max", 100)
+        if chlorination_max == 100:
+            int_value = round(value / 10) * 10
+        else:
+            int_value = int(value)
 
         # Optimistic update: Update coordinator data immediately for instant UI feedback
         components = self.device_data.get("components", {})

@@ -377,6 +377,38 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=92,  # Higher than CC25005502 for specific match
     ),
+    "ns25_exo_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["NS*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info", "time"],
+        features={
+            "chlorination_level": 35,  # Component 35 (production level setpoint)
+            "chlorination_max": 10,  # EXO uses 0-10 range (not 0-100%)
+            "chlorination_step": 1,  # Step 1 (no rounding to 10)
+            "boost_mode": 14,  # Component 14 (boolean)
+            "skip_mode_select": True,  # No mode select for EXO
+            "skip_ph_orp": True,  # pH/ORP read via sensors, no setpoint controls
+            "schedules": True,
+            "schedule_count": 4,
+            "exo_mode": True,  # Flag for EXO-specific handling
+            "on_off_component": 9,  # Component 9 (0=OFF, 1=ON)
+            "sensor_divisors": {
+                "salinity": 1000,  # EXO reports salinity in mg/L (2750 = 2.75 g/L)
+            },
+            "sensors": {
+                "ph": 39,  # pH (÷100) - e.g., 730 = 7.30 pH
+                "orp": 63,  # ORP (mV) - e.g., 755 = 755 mV
+                "temperature": 40,  # Water temp (÷10) - e.g., 71 = 7.1°C
+                "salinity": 36,  # Salinity (÷1000 for g/L) - e.g., 2750 = 2.75 g/L
+            },
+            # Specific components for NS25 (Zodiac EXO iQ)
+            "specific_components": [9, 13, 14, 15, 17, 20, 35, 36, 39, 40, 63, 69, 90, 91, 92],
+        },
+        priority=85,
+    ),
     "e30iq_pump": DeviceConfig(
         device_type="pump",
         identifier_patterns=["E30*", "LE*", "PUMP*"],

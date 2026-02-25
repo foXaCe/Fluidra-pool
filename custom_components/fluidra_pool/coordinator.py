@@ -427,7 +427,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         elif component_id == 20:
             device_type = device.get("type", "")
             if device_type == "chlorinator":
-                if isinstance(reported_value, int):
+                # EXO chlorinators have schedule data (list) in component 20
+                if isinstance(reported_value, list):
+                    device["schedule_data"] = reported_value
+                    self._track_schedule_count(pool_id, device_id, reported_value)
+                elif isinstance(reported_value, int):
                     device["mode_reported"] = reported_value
             else:
                 schedule_data = reported_value if isinstance(reported_value, list) else []

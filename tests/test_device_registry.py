@@ -216,6 +216,28 @@ class TestIdentifyDevice:
         assert config is not None
         assert config.device_type == "light"
 
+    def test_identify_ns25_exo_chlorinator(self):
+        device = {
+            "device_id": "NS25003678",
+            "name": "Zodiac EXO iQ 35",
+            "family": "Chlorinators",
+            "model": "",
+            "type": "connected",
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is not None
+        assert config.device_type == "chlorinator"
+        assert config.features.get("exo_mode") is True
+        assert config.features.get("on_off_component") == 9
+        assert config.features.get("chlorination_level") == 35
+        assert config.features.get("boost_mode") == 14
+        assert config.features.get("schedules") is True
+        assert config.features.get("skip_ph_orp") is True
+        assert config.features["sensors"]["ph"] == 39
+        assert config.features["sensors"]["orp"] == 63
+        assert config.features["sensors"]["temperature"] == 40
+        assert config.features["sensors"]["salinity"] == 36
+
     def test_invalid_input_returns_none(self):
         assert DeviceIdentifier.identify_device(None) is None
         assert DeviceIdentifier.identify_device("not a dict") is None

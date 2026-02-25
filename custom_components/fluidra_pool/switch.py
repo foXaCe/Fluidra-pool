@@ -53,6 +53,8 @@ async def async_setup_entry(
                         entities.append(FluidraPumpSwitch(coordinator, coordinator.api, pool["id"], device_id))
                     elif device_type == "heater":
                         entities.append(FluidraHeaterSwitch(coordinator, pool, device))
+                    elif device_type == "chlorinator" and DeviceIdentifier.has_feature(device, "on_off_component"):
+                        entities.append(FluidraChlorinatorSwitch(coordinator, coordinator.api, pool["id"], device_id))
 
             # Create auto mode switch if device supports it
             if DeviceIdentifier.should_create_entity(device, "switch_auto"):
@@ -948,6 +950,96 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
 
         return {
             "component": boost_component,
+            "device_id": self._device_id,
+            "pending_action": self._pending_state is not None,
+            "action_timestamp": self._last_action_time,
+        }
+
+
+class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
+    """Switch for controlling chlorinator ON/OFF (e.g., Zodiac EXO iQ)."""
+
+    def __init__(self, coordinator, api, pool_id: str, device_id: str):
+        """Initialize the switch."""
+        super().__init__(coordinator, api, pool_id, device_id)
+
+    @property
+    def name(self) -> str:
+        """Return the name of the switch."""
+        pool_name = self.pool_data.get("name", "Pool")
+        device_name = self.device_data.get("name", "Chlorinator")
+        return f"{pool_name} {device_name}"
+
+    @property
+    def translation_key(self) -> str:
+        """Return the translation key."""
+        return "chlorinator"
+
+    @property
+    def icon(self) -> str:
+        """Return the icon of the switch."""
+        if self.is_on:
+            return "mdi:flask"
+        return "mdi:flask-outline"
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if the chlorinator is on."""
+        if self._pending_state is not None:
+            if time.time() - self._last_action_time > 10:
+                self._clear_pending_state()
+            else:
+                return self._pending_state
+
+        # Use pump_reported (set by coordinator from component 9)
+        pump_reported = self.device_data.get("pump_reported")
+        if pump_reported is not None:
+            return bool(pump_reported)
+        return self.device_data.get("is_running", False)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the chlorinator on."""
+        try:
+            self._set_pending_state(True)
+
+            on_off_component = DeviceIdentifier.get_feature(self.device_data, "on_off_component", 9)
+            success = await self._api.control_device_component(self._device_id, on_off_component, 1)
+
+            if success:
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
+                await self.coordinator.async_request_refresh()
+                self._clear_pending_state()
+            else:
+                self._clear_pending_state()
+        except Exception as err:
+            _LOGGER.debug("Failed to turn on chlorinator: %s", err)
+            self._clear_pending_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the chlorinator off."""
+        try:
+            self._set_pending_state(False)
+
+            on_off_component = DeviceIdentifier.get_feature(self.device_data, "on_off_component", 9)
+            success = await self._api.control_device_component(self._device_id, on_off_component, 0)
+
+            if success:
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
+                await self.coordinator.async_request_refresh()
+                self._clear_pending_state()
+            else:
+                self._clear_pending_state()
+        except Exception as err:
+            _LOGGER.debug("Failed to turn off chlorinator: %s", err)
+            self._clear_pending_state()
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return extra state attributes."""
+        on_off_component = DeviceIdentifier.get_feature(self.device_data, "on_off_component", 9)
+        return {
+            "component_id": on_off_component,
+            "operation": "chlorinator_control",
             "device_id": self._device_id,
             "pending_action": self._pending_state is not None,
             "action_timestamp": self._last_action_time,

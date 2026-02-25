@@ -1236,6 +1236,10 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
         self._attr_state_class = config.get("state_class")
         self._attr_icon = config.get("icon")
         self._divisor = config.get("divisor", 1)
+        # Override divisor from device registry if available
+        custom_divisors = DeviceIdentifier.get_feature(self.device_data, "sensor_divisors", {})
+        if sensor_type in custom_divisors:
+            self._divisor = custom_divisors[sensor_type]
 
     @property
     def device_data(self) -> dict:

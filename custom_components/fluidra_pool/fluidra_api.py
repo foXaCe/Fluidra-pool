@@ -368,6 +368,8 @@ class FluidraPoolAPI:
                 keyword in device_name_lower for keyword in ["heat", "thermal", "eco", "elyo"]
             ):
                 device_type = "heat_pump"
+            elif "chlorinator" in family_lower or "electrolyseur" in family_lower:
+                device_type = "chlorinator"
             elif "heater" in family_lower:
                 device_type = "heater"
             elif "light" in family_lower or "lumiplus" in device_name_lower:
