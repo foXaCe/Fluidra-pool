@@ -964,6 +964,11 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
         super().__init__(coordinator, api, pool_id, device_id)
 
     @property
+    def unique_id(self) -> str:
+        """Return unique ID."""
+        return f"{DOMAIN}_{self._pool_id}_{self._device_id}_chlorinator"
+
+    @property
     def name(self) -> str:
         """Return the name of the switch."""
         pool_name = self.pool_data.get("name", "Pool")
