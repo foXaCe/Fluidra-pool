@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.0] - 2026-02-26
+
+### Added
+- **EXO iQ35 schedule output select** — schedule selects now show hardware outputs (Pump/Aux 1/Aux 2) instead of speed levels for EXO chlorinators
+  - Detects `schedule_output_type` from device config to adapt options, read and write logic
+  - Supports both `componentActions` (EXO) and `operationName` (DM) API formats
+  - Translations in EN, FR, ES, PT
+
+### Changed
+- GitHub release workflow now uses CHANGELOG.md as release notes source
+
 ## [2.15.0] - 2026-02-26
 
 ### Added
@@ -225,6 +236,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release with pool device support
 
+[2.16.0]: https://github.com/foXaCe/Fluidra-pool/compare/v2.15.0...v2.16.0
 [2.15.0]: https://github.com/foXaCe/Fluidra-pool/compare/v2.14.2...v2.15.0
 [2.14.2]: https://github.com/foXaCe/Fluidra-pool/compare/v2.14.1...v2.14.2
 [2.14.1]: https://github.com/foXaCe/Fluidra-pool/compare/v2.14.0...v2.14.1
