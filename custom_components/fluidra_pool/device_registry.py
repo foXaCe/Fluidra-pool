@@ -397,6 +397,8 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
             "ph_setpoint_divisor": 10,  # EXO uses ÷10 (not ÷100 like CC chlorinators)
             "schedules": True,
             "schedule_count": 4,
+            "schedule_component": 20,
+            "schedule_output_type": "output",  # "output" = pump/aux1/aux2
             "exo_mode": True,  # Flag for EXO-specific handling
             # on_off_component: removed - mode select (AUTO/ON/OFF) replaces ON/OFF switch
             "sensor_divisors": {

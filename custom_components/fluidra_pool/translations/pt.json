@@ -98,6 +98,14 @@
           "on": "Ligado"
         }
       },
+      "chlorinator_schedule_output": {
+        "name": "Programação {schedule_id} Saída",
+        "state": {
+          "aux1": "Aux 1",
+          "aux2": "Aux 2",
+          "pump": "Bomba"
+        }
+      },
       "chlorinator_schedule_speed": {
         "name": "Programação {schedule_id} Velocidade",
         "state": {

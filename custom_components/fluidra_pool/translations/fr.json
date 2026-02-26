@@ -98,6 +98,14 @@
           "on": "Marche"
         }
       },
+      "chlorinator_schedule_output": {
+        "name": "Planning {schedule_id} Sortie",
+        "state": {
+          "aux1": "Aux 1",
+          "aux2": "Aux 2",
+          "pump": "Pompe"
+        }
+      },
       "chlorinator_schedule_speed": {
         "name": "Planning {schedule_id} Vitesse",
         "state": {

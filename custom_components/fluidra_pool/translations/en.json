@@ -98,6 +98,14 @@
           "on": "On"
         }
       },
+      "chlorinator_schedule_output": {
+        "name": "Schedule {schedule_id} Output",
+        "state": {
+          "aux1": "Aux 1",
+          "aux2": "Aux 2",
+          "pump": "Pump"
+        }
+      },
       "chlorinator_schedule_speed": {
         "name": "Schedule {schedule_id} Speed",
         "state": {

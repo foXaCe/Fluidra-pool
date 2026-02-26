@@ -283,6 +283,14 @@
           "s3": "Speed 3"
         }
       },
+      "chlorinator_schedule_output": {
+        "name": "Schedule {schedule_id} Output",
+        "state": {
+          "pump": "Pump",
+          "aux1": "Aux 1",
+          "aux2": "Aux 2"
+        }
+      },
       "light_effect": {
         "name": "Effect",
         "state": {

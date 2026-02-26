@@ -746,7 +746,7 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
 class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEntity):
     """Select entity for chlorinator schedule speed (S1/S2/S3)."""
 
-    __slots__ = ("_schedule_id", "_optimistic_option", "_speed_mapping", "_value_to_speed")
+    __slots__ = ("_schedule_id", "_optimistic_option", "_speed_mapping", "_value_to_speed", "_output_type")
 
     def __init__(
         self,
@@ -761,17 +761,26 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
         self._schedule_id = schedule_id
         self._optimistic_option = None
 
-        self._attr_translation_key = "chlorinator_schedule_speed"
+        # Detect output type from device config
+        device_data = self.device_data
+        self._output_type = DeviceIdentifier.get_feature(device_data, "schedule_output_type", "speed")
+
+        if self._output_type == "output":
+            # EXO iQ35: controls hardware outputs (pump/aux1/aux2)
+            self._attr_translation_key = "chlorinator_schedule_output"
+            self._attr_options = ["pump", "aux1", "aux2"]
+            self._speed_mapping = {"pump": "1", "aux1": "2", "aux2": "3"}
+            self._value_to_speed = {"1": "pump", "2": "aux1", "3": "aux2"}
+        else:
+            # DM24049704: controls speed levels (S1/S2/S3)
+            self._attr_translation_key = "chlorinator_schedule_speed"
+            self._attr_options = ["s1", "s2", "s3"]
+            self._speed_mapping = {"s1": "1", "s2": "2", "s3": "3"}
+            self._value_to_speed = {"1": "s1", "2": "s2", "3": "s3"}
+
         self._attr_translation_placeholders = {"schedule_id": schedule_id}
         self._attr_unique_id = f"fluidra_{self._device_id}_schedule_{schedule_id}_speed"
         self._attr_entity_category = EntityCategory.CONFIG
-
-        # Speed options: S1, S2, S3 (mapped to operationName 1, 2, 3)
-        self._attr_options = ["s1", "s2", "s3"]
-
-        # Mapping options → operationName values
-        self._speed_mapping = {"s1": "1", "s2": "2", "s3": "3"}
-        self._value_to_speed = {"1": "s1", "2": "s2", "3": "s3"}
 
     def _get_schedule_data(self) -> dict | None:
         """Get schedule data from coordinator."""
@@ -794,15 +803,23 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
 
     @property
     def current_option(self) -> str | None:
-        """Return the current speed option."""
+        """Return the current speed/output option."""
         if self._optimistic_option is not None:
             return self._optimistic_option
 
         schedule = self._get_schedule_data()
         if schedule:
-            operation = schedule.get("startActions", {}).get("operationName", "1")
-            return self._value_to_speed.get(str(operation), "s1")
-        return "s1"
+            start_actions = schedule.get("startActions", {})
+            component_actions = start_actions.get("componentActions", [])
+            if component_actions:
+                # EXO format: componentActions[0].reportedValue
+                value = str(component_actions[0].get("reportedValue", 1))
+            else:
+                # DM format: operationName
+                value = str(start_actions.get("operationName", "1"))
+            default = self._attr_options[0]
+            return self._value_to_speed.get(value, default)
+        return self._attr_options[0]
 
     async def async_select_option(self, option: str) -> None:
         """Select new speed option."""
@@ -834,16 +851,31 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
                 start_time = sched.get("startTime", "00 00 * * 1,2,3,4,5,6,7")
                 end_time = sched.get("endTime", "00 01 * * 1,2,3,4,5,6,7")
 
-                # If this is the schedule we're updating, use the new speed
-                operation_name = (
-                    self._speed_mapping[option]
-                    if str(sched.get("id")) == str(self._schedule_id)
-                    else str(sched.get("startActions", {}).get("operationName", "1"))
-                )
+                # If this is the schedule we're updating, use the new value
+                if str(sched.get("id")) == str(self._schedule_id):
+                    operation_name = self._speed_mapping[option]
+                else:
+                    # Read current value from existing schedule (both formats)
+                    start_actions = sched.get("startActions", {})
+                    component_actions = start_actions.get("componentActions", [])
+                    if component_actions:
+                        operation_name = str(component_actions[0].get("reportedValue", 1))
+                    else:
+                        operation_name = str(start_actions.get("operationName", "1"))
 
-                # DM24049704 chlorinator uses different format
-                if schedule_component == 258:
-                    # Format: id starts at 1, groupId always 1, CRON with "00" padding
+                if self._output_type == "output":
+                    # EXO format: componentActions with reportedValue
+                    scheduler = {
+                        "id": sched.get("id"),
+                        "groupId": sched.get("groupId", sched.get("id")),
+                        "state": sched.get("state", "IDLE"),
+                        "enabled": sched.get("enabled", True),
+                        "startTime": start_time,
+                        "endTime": end_time,
+                        "startActions": {"componentActions": [{"id": 0, "reportedValue": int(operation_name)}]},
+                    }
+                elif schedule_component == 258:
+                    # DM24049704 format: operationName with CRON padding
                     scheduler = {
                         "id": sched.get("id"),
                         "groupId": 1,  # App always uses groupId=1 for all schedules
