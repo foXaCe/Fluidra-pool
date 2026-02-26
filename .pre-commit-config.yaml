@@ -16,7 +16,9 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: captures/
       - id: end-of-file-fixer
+        exclude: captures/
       - id: check-json
         exclude: (.vscode|.devcontainer)
       - id: pretty-format-json
@@ -37,6 +39,7 @@ repos:
     hooks:
       - id: codespell
         additional_dependencies: ["tomli"]
+        exclude: captures/
 
   - repo: local
     hooks:

@@ -70,6 +70,9 @@ Thumbs.db
 # Temporary files
 *.tmp
 
+# Captures (mitmproxy flows, binary data)
+captures/
+
 # Development/capture scripts (mitmproxy, reverse engineering)
 capture_*.py
 capture_*.sh
