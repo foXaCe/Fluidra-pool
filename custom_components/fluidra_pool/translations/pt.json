@@ -1,7 +1,9 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Esta conta já está configurada"
+      "already_configured": "Esta conta já está configurada",
+      "reauth_successful": "Re-autenticação bem-sucedida",
+      "reconfigure_successful": "Configuração atualizada com sucesso"
     },
     "error": {
       "cannot_connect": "Não foi possível conectar à API Fluidra",
@@ -10,6 +12,26 @@
       "unknown": "Erro inesperado"
     },
     "step": {
+      "confirm": {
+        "description": "Encontramos um dispositivo Fluidra Pool. Deseja adicioná-lo?",
+        "title": "Fluidra Pool descoberto"
+      },
+      "reauth_confirm": {
+        "data": {
+          "email": "E-mail",
+          "password": "Senha"
+        },
+        "description": "Sessão expirada para {email}. Por favor reinsira suas credenciais.",
+        "title": "Re-autenticar"
+      },
+      "reconfigure": {
+        "data": {
+          "email": "E-mail",
+          "password": "Senha"
+        },
+        "description": "Atualizar credenciais para {email}",
+        "title": "Reconfigurar Fluidra Pool"
+      },
       "user": {
         "data": {
           "email": "E-mail",
@@ -48,6 +70,18 @@
       }
     },
     "number": {
+      "chlorination_level": {
+        "name": "Nível de Cloração"
+      },
+      "effect_speed": {
+        "name": "Velocidade de Efeito"
+      },
+      "orp_setpoint": {
+        "name": "Referência ORP"
+      },
+      "ph_setpoint": {
+        "name": "Referência pH"
+      },
       "pump_vitesse": {
         "name": "Configuração {device_name} Velocidade"
       },
@@ -62,6 +96,14 @@
           "auto": "Automático",
           "off": "Desligado",
           "on": "Ligado"
+        }
+      },
+      "chlorinator_schedule_speed": {
+        "name": "Programação {schedule_id} Velocidade",
+        "state": {
+          "S1": "Velocidade 1",
+          "S2": "Velocidade 2",
+          "S3": "Velocidade 3"
         }
       },
       "light_effect": {
@@ -84,7 +126,7 @@
           "high": "Alta",
           "low": "Baixa",
           "medium": "Média",
-          "stopped": "Não funcionando"
+          "stopped": "Parada"
         }
       },
       "schedule_mode": {
@@ -97,6 +139,30 @@
       }
     },
     "sensor": {
+      "air_temperature": {
+        "name": "Temperatura do Ar"
+      },
+      "brightness": {
+        "name": "Brilho"
+      },
+      "chlorinator_chlorination_actual": {
+        "name": "Cloração Real"
+      },
+      "chlorinator_free_chlorine": {
+        "name": "Cloro Livre"
+      },
+      "chlorinator_orp": {
+        "name": "ORP"
+      },
+      "chlorinator_ph": {
+        "name": "pH"
+      },
+      "chlorinator_salinity": {
+        "name": "Salinidade"
+      },
+      "chlorinator_water_temperature": {
+        "name": "Temperatura da Água"
+      },
       "comm_errors": {
         "name": "Erros de Comunicação"
       },
@@ -107,7 +173,16 @@
         "name": "Temperatura Atual"
       },
       "device_info": {
-        "name": "Informações do Dispositivo"
+        "name": "Informações do Dispositivo",
+        "state": {
+          "error": "Erro",
+          "online": "Online",
+          "signal_excellent": "Sinal Excelente",
+          "signal_good": "Sinal Bom",
+          "signal_low": "Sinal Fraco",
+          "signal_very_good": "Sinal Muito Bom",
+          "signal_very_low": "Sinal Muito Fraco"
+        }
       },
       "firmware_version": {
         "name": "Versão do Firmware"
@@ -128,13 +203,31 @@
         "name": "Localização da Piscina"
       },
       "pool_status": {
-        "name": "Status da Piscina"
+        "name": "Status da Piscina",
+        "state": {
+          "connected": "Conectada",
+          "maintenance": "Manutenção",
+          "offline": "Offline",
+          "unknown_state": "Desconhecido",
+          "using": "Ativa",
+          "winterized": "Hibernação"
+        }
       },
       "schedule_count": {
         "name": "Programações Ativas"
       },
       "signal_strength": {
         "name": "Força do Sinal"
+      },
+      "speed_mode": {
+        "name": "Velocidade",
+        "state": {
+          "high": "Alta",
+          "low": "Baixa",
+          "medium": "Média",
+          "not_running": "Sem funcionar",
+          "stopped": "Parada"
+        }
       },
       "speed_percent": {
         "name": "Porcentagem de Velocidade"
@@ -143,7 +236,15 @@
         "name": "Temperatura Alvo"
       },
       "water_quality": {
-        "name": "Qualidade da Água"
+        "name": "Qualidade da Água",
+        "state": {
+          "auto": "Automática",
+          "manual": "Manual",
+          "not_configured": "Não configurada"
+        }
+      },
+      "water_temperature": {
+        "name": "Temperatura da Água"
       },
       "weather_temperature": {
         "name": "Temperatura Clima"
@@ -152,6 +253,12 @@
     "switch": {
       "auto_mode": {
         "name": "Modo Automático"
+      },
+      "boost_mode": {
+        "name": "Modo Turbo"
+      },
+      "chlorinator": {
+        "name": "Clorador"
       },
       "heat_pump": {
         "name": "Bomba de Calor"
@@ -182,8 +289,25 @@
     }
   },
   "exceptions": {
+    "auth_failed": {
+      "message": "Falha na autenticação, por favor re-autentique-se"
+    },
     "temperature_out_of_range": {
       "message": "A temperatura {temperature}°C está fora do intervalo ({min_temp}°C - {max_temp}°C)"
+    }
+  },
+  "issues": {
+    "connection_error": {
+      "description": "Não foi possível conectar ao serviço Fluidra Pool",
+      "title": "Erro de conexão"
+    },
+    "firmware_update_available": {
+      "description": "O dispositivo {device} tem a versão de firmware {version} disponível",
+      "title": "Atualização de firmware disponível"
+    },
+    "offline_device": {
+      "description": "O dispositivo {device} está offline",
+      "title": "Dispositivo offline"
     }
   },
   "options": {
@@ -192,7 +316,7 @@
         "data": {
           "scan_interval": "Intervalo de atualização (segundos)"
         },
-        "description": "Configure opções avançadas",
+        "description": "Configurar opções avançadas",
         "title": "Opções Fluidra Pool"
       }
     }
