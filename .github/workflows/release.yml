@@ -21,63 +21,42 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Generate release notes from commits
+      - name: Extract changelog for this version
         id: notes
         run: |
-          # Get previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          VERSION="${GITHUB_REF#refs/tags/v}"
 
-          if [ -z "$PREV_TAG" ]; then
-            # First release - get all commits
-            COMMITS=$(git log --pretty=format:"- %s" --no-merges)
-          else
-            # Get commits since previous tag
-            COMMITS=$(git log --pretty=format:"- %s" --no-merges ${PREV_TAG}..HEAD)
-          fi
+          # Extract the section for this version from CHANGELOG.md
+          # Matches from "## [X.Y.Z]" until the next "## [" or end of file
+          NOTES=$(awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" CHANGELOG.md)
 
-          # Categorize commits
-          FEATURES=$(echo "$COMMITS" | grep -E "^- feat(\([^)]+\))?:" || true)
-          FIXES=$(echo "$COMMITS" | grep -E "^- fix(\([^)]+\))?:" || true)
-          DOCS=$(echo "$COMMITS" | grep -E "^- docs(\([^)]+\))?:" || true)
-          REFACTOR=$(echo "$COMMITS" | grep -E "^- refactor(\([^)]+\))?:" || true)
-          PERF=$(echo "$COMMITS" | grep -E "^- perf(\([^)]+\))?:" || true)
-          BUILD=$(echo "$COMMITS" | grep -E "^- (build|ci)(\([^)]+\))?:" || true)
-          CHORE=$(echo "$COMMITS" | grep -E "^- chore(\([^)]+\))?:" || true)
-          OTHER=$(echo "$COMMITS" | grep -v -E "^- (feat|fix|docs|refactor|perf|build|ci|chore)(\([^)]+\))?:" || true)
+          if [ -z "$NOTES" ]; then
+            # Fallback: generate from commits if CHANGELOG entry not found
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
 
-          # Build release notes
-          NOTES=""
+            if [ -z "$PREV_TAG" ]; then
+              COMMITS=$(git log --pretty=format:"- %s" --no-merges)
+            else
+              COMMITS=$(git log --pretty=format:"- %s" --no-merges ${PREV_TAG}..HEAD)
+            fi
 
-          if [ -n "$FEATURES" ]; then
-            NOTES="${NOTES}## 🚀 New Features\n\n${FEATURES}\n\n"
-          fi
+            # Filter out release/chore commits
+            COMMITS=$(echo "$COMMITS" | grep -v -E "^- (release|chore: bump version)" || true)
 
-          if [ -n "$FIXES" ]; then
-            NOTES="${NOTES}## 🐛 Bug Fixes\n\n${FIXES}\n\n"
-          fi
+            FEATURES=$(echo "$COMMITS" | grep -E "^- feat(\([^)]+\))?:" || true)
+            FIXES=$(echo "$COMMITS" | grep -E "^- fix(\([^)]+\))?:" || true)
+            REFACTOR=$(echo "$COMMITS" | grep -E "^- refactor(\([^)]+\))?:" || true)
+            PERF=$(echo "$COMMITS" | grep -E "^- perf(\([^)]+\))?:" || true)
+            BUILD=$(echo "$COMMITS" | grep -E "^- (build|ci)(\([^)]+\))?:" || true)
+            OTHER=$(echo "$COMMITS" | grep -v -E "^- (feat|fix|docs|refactor|perf|build|ci|chore)(\([^)]+\))?:" || true)
 
-          if [ -n "$PERF" ]; then
-            NOTES="${NOTES}## ⚡ Performance\n\n${PERF}\n\n"
-          fi
-
-          if [ -n "$REFACTOR" ]; then
-            NOTES="${NOTES}## 🔧 Refactoring\n\n${REFACTOR}\n\n"
-          fi
-
-          if [ -n "$DOCS" ]; then
-            NOTES="${NOTES}## 📚 Documentation\n\n${DOCS}\n\n"
-          fi
-
-          if [ -n "$BUILD" ]; then
-            NOTES="${NOTES}## 🏗️ Build & CI\n\n${BUILD}\n\n"
-          fi
-
-          if [ -n "$CHORE" ]; then
-            NOTES="${NOTES}## 🧹 Chores\n\n${CHORE}\n\n"
-          fi
-
-          if [ -n "$OTHER" ]; then
-            NOTES="${NOTES}## 📝 Other\n\n${OTHER}\n\n"
+            NOTES=""
+            [ -n "$FEATURES" ] && NOTES="${NOTES}### Added\n\n${FEATURES}\n\n"
+            [ -n "$FIXES" ] && NOTES="${NOTES}### Fixed\n\n${FIXES}\n\n"
+            [ -n "$REFACTOR" ] && NOTES="${NOTES}### Changed\n\n${REFACTOR}\n\n"
+            [ -n "$PERF" ] && NOTES="${NOTES}### Performance\n\n${PERF}\n\n"
+            [ -n "$BUILD" ] && NOTES="${NOTES}### Build\n\n${BUILD}\n\n"
+            [ -n "$OTHER" ] && NOTES="${NOTES}### Other\n\n${OTHER}\n\n"
           fi
 
           # Output
@@ -91,20 +70,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: v${{ steps.version.outputs.version }}
-          body: |
-            ${{ steps.notes.outputs.notes }}
-
-            ## Installation
-
-            ### HACS (Recommended)
-            1. Open HACS
-            2. Add custom repository: `https://github.com/${{ github.repository }}`
-            3. Search for "Fluidra Pool"
-            4. Install and restart Home Assistant
-
-            ### Manual
-            1. Download the `fluidra_pool` folder from this release
-            2. Copy to `custom_components/`
-            3. Restart Home Assistant
+          body: ${{ steps.notes.outputs.notes }}
           draft: false
           prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
