@@ -101,9 +101,9 @@
       "chlorinator_schedule_speed": {
         "name": "Schedule {schedule_id} Speed",
         "state": {
-          "S1": "Speed 1",
-          "S2": "Speed 2",
-          "S3": "Speed 3"
+          "s1": "Speed 1",
+          "s2": "Speed 2",
+          "s3": "Speed 3"
         }
       },
       "light_effect": {

@@ -767,11 +767,11 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
         self._attr_entity_category = EntityCategory.CONFIG
 
         # Speed options: S1, S2, S3 (mapped to operationName 1, 2, 3)
-        self._attr_options = ["S1", "S2", "S3"]
+        self._attr_options = ["s1", "s2", "s3"]
 
         # Mapping options → operationName values
-        self._speed_mapping = {"S1": "1", "S2": "2", "S3": "3"}
-        self._value_to_speed = {"1": "S1", "2": "S2", "3": "S3"}
+        self._speed_mapping = {"s1": "1", "s2": "2", "s3": "3"}
+        self._value_to_speed = {"1": "s1", "2": "s2", "3": "s3"}
 
     def _get_schedule_data(self) -> dict | None:
         """Get schedule data from coordinator."""
@@ -801,8 +801,8 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
         schedule = self._get_schedule_data()
         if schedule:
             operation = schedule.get("startActions", {}).get("operationName", "1")
-            return self._value_to_speed.get(str(operation), "S1")
-        return "S1"
+            return self._value_to_speed.get(str(operation), "s1")
+        return "s1"
 
     async def async_select_option(self, option: str) -> None:
         """Select new speed option."""
@@ -902,9 +902,9 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
     def icon(self) -> str:
         """Return the icon for the entity."""
         current = self.current_option
-        if current == "S1":
+        if current == "s1":
             return "mdi:speedometer-slow"
-        if current == "S2":
+        if current == "s2":
             return "mdi:speedometer-medium"
         return "mdi:speedometer"
 

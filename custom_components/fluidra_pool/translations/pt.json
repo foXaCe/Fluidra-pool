@@ -101,9 +101,9 @@
       "chlorinator_schedule_speed": {
         "name": "Programação {schedule_id} Velocidade",
         "state": {
-          "S1": "Velocidade 1",
-          "S2": "Velocidade 2",
-          "S3": "Velocidade 3"
+          "s1": "Velocidade 1",
+          "s2": "Velocidade 2",
+          "s3": "Velocidade 3"
         }
       },
       "light_effect": {
