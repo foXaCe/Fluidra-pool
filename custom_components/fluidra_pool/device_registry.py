@@ -383,29 +383,35 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info", "time"],
+        entities=["switch", "select", "number", "sensor_info", "time"],
         features={
-            "chlorination_level": 35,  # Component 35 (production level setpoint)
-            "chlorination_max": 10,  # EXO uses 0-10 range (not 0-100%)
-            "chlorination_step": 1,  # Step 1 (no rounding to 10)
-            "boost_mode": 14,  # Component 14 (boolean)
-            "skip_mode_select": True,  # No mode select for EXO
-            "skip_ph_orp": True,  # pH/ORP read via sensors, no setpoint controls
+            "chlorination_level": 38,  # Component 38 (production percentage, 0-100%)
+            "chlorination_max": 100,  # EXO uses 0-100% range (same as other chlorinators)
+            "chlorination_step": 5,  # Step 5% for EXO
+            # boost_mode: NOT supported on EXO (c14 unreadable + API 403 on write)
+            "mode_control": True,  # AUTO/ON/OFF mode
+            "mode_component": 13,  # Component 13 for mode
+            "mode_mapping": {0: "off", 1: "auto", 2: "on"},  # EXO: 1=AUTO (confirmed)
+            "orp_setpoint": 39,  # Component 39 (ORP setpoint in mV, e.g. 770 = 770 mV)
+            "ph_setpoint": 40,  # Component 40 (÷10) - pH setpoint (72 = 7.2 target)
+            "ph_setpoint_divisor": 10,  # EXO uses ÷10 (not ÷100 like CC chlorinators)
             "schedules": True,
             "schedule_count": 4,
             "exo_mode": True,  # Flag for EXO-specific handling
-            "on_off_component": 9,  # Component 9 (0=OFF, 1=ON)
+            # on_off_component: removed - mode select (AUTO/ON/OFF) replaces ON/OFF switch
             "sensor_divisors": {
                 "salinity": 1000,  # EXO reports salinity in mg/L (2750 = 2.75 g/L)
+                "ph": 10,  # EXO reports pH * 10 (69 = 6.9 pH)
+                "temperature": 1,  # EXO c64 is direct °C (14 = 14°C)
             },
             "sensors": {
-                "ph": 39,  # pH (÷100) - e.g., 730 = 7.30 pH
-                "orp": 63,  # ORP (mV) - e.g., 755 = 755 mV
-                "temperature": 40,  # Water temp (÷10) - e.g., 71 = 7.1°C
+                "ph": 62,  # pH measured (÷10) - e.g., 69 = 6.9 pH
+                "orp": 63,  # ORP (mV) - e.g., 738 = 738 mV
+                "temperature": 64,  # Water temp (direct °C) - e.g., 14 = 14°C
                 "salinity": 36,  # Salinity (÷1000 for g/L) - e.g., 2750 = 2.75 g/L
             },
             # Specific components for NS25 (Zodiac EXO iQ)
-            "specific_components": [9, 13, 14, 15, 17, 20, 35, 36, 39, 40, 63, 69, 90, 91, 92],
+            "specific_components": [9, 13, 14, 15, 17, 20, 35, 36, 38, 39, 40, 62, 63, 64],
         },
         priority=85,
     ),

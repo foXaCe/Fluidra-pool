@@ -39,10 +39,10 @@ async def async_setup_entry(
             # Chlorinator chlorination level
             if device_type == "chlorinator":
                 entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool["id"], device_id))
-                # Only add pH/ORP setpoints if not skipped (some models don't have pH/ORP)
-                skip_ph_orp = DeviceIdentifier.has_feature(device, "skip_ph_orp")
-                if not skip_ph_orp:
+                # Only add pH/ORP setpoints if the device has these features
+                if DeviceIdentifier.get_feature(device, "ph_setpoint"):
                     entities.append(FluidraChlorinatorPhSetpoint(coordinator, coordinator.api, pool["id"], device_id))
+                if DeviceIdentifier.get_feature(device, "orp_setpoint"):
                     entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool["id"], device_id))
 
             if device_type == DEVICE_TYPE_PUMP:
@@ -208,10 +208,8 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
         """Initialize the chlorinator level control."""
         super().__init__(coordinator, api, pool_id, device_id)
 
-        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
-
-        self._attr_name = f"{device_name} Chlorination Level"
         self._attr_unique_id = f"fluidra_{self._device_id}_chlorination_level"
+        self._attr_translation_key = "chlorination_level"
         self._attr_mode = "slider"
         self._attr_native_min_value = 0
         self._attr_native_max_value = DeviceIdentifier.get_feature(self.device_data, "chlorination_max", 100)
@@ -241,12 +239,9 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
         # Get chlorination level component from device config (default to 10 for CC* devices)
         chlorination_component = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", 10)
 
-        # Round to nearest multiple of 10 for CC* chlorinators (0-100% range)
-        chlorination_max = DeviceIdentifier.get_feature(self.device_data, "chlorination_max", 100)
-        if chlorination_max == 100:
-            int_value = round(value / 10) * 10
-        else:
-            int_value = int(value)
+        # Round to nearest step value
+        step = DeviceIdentifier.get_feature(self.device_data, "chlorination_step", 10)
+        int_value = round(value / step) * step
 
         # Optimistic update: Update coordinator data immediately for instant UI feedback
         components = self.device_data.get("components", {})
@@ -288,10 +283,8 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
         """Initialize the pH setpoint control."""
         super().__init__(coordinator, api, pool_id, device_id)
 
-        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
-
-        self._attr_name = f"{device_name} pH Setpoint"
         self._attr_unique_id = f"fluidra_{self._device_id}_ph_setpoint"
+        self._attr_translation_key = "ph_setpoint"
         self._attr_mode = "slider"
 
         # pH range: 7.0-7.8 (typical pool values)
@@ -315,22 +308,25 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
 
         components = self.device_data.get("components", {})
         component_data = components.get(str(read_component), {})
-        # Component value is pH * 100 (e.g., 720 = 7.20)
         # Use desiredValue preferentially to show immediate UI feedback
         raw_value = component_data.get("desiredValue", component_data.get("reportedValue"))
 
         if raw_value is None:
             return 7.2  # Default value
 
+        # Divisor: 100 by default (e.g., 720 = 7.20), 10 for EXO (e.g., 72 = 7.2)
+        divisor = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint_divisor", 100)
+
         try:
-            return float(raw_value) / 100
+            return float(raw_value) / divisor
         except (ValueError, TypeError):
             return 7.2
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the pH setpoint."""
-        # Convert pH value to API format (multiply by 100)
-        int_value = int(value * 100)
+        # Convert pH value to API format
+        divisor = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint_divisor", 100)
+        int_value = int(value * divisor)
 
         # Get component config dynamically
         ph_config = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint", {"write": 8, "read": 172})
@@ -381,8 +377,9 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
 
         current_ph = None
         if raw_reading is not None:
+            divisor = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint_divisor", 100)
             try:
-                current_ph = float(raw_reading) / 100
+                current_ph = float(raw_reading) / divisor
             except (ValueError, TypeError):
                 _LOGGER.debug("Failed to parse pH reading: %s", raw_reading)
 
@@ -408,10 +405,8 @@ class FluidraChlorinatorOrpSetpoint(FluidraPoolControlEntity, NumberEntity):
         """Initialize the ORP setpoint control."""
         super().__init__(coordinator, api, pool_id, device_id)
 
-        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
-
-        self._attr_name = f"{device_name} ORP Setpoint"
         self._attr_unique_id = f"fluidra_{self._device_id}_orp_setpoint"
+        self._attr_translation_key = "orp_setpoint"
         self._attr_mode = "slider"
 
         # ORP range: 600-850 mV (typical pool values)
@@ -513,10 +508,8 @@ class FluidraLightEffectSpeed(FluidraPoolControlEntity, NumberEntity):
         """Initialize the effect speed control."""
         super().__init__(coordinator, api, pool_id, device_id)
 
-        device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
-
-        self._attr_name = f"{device_name} Effect Speed"
         self._attr_unique_id = f"fluidra_{self._device_id}_effect_speed"
+        self._attr_translation_key = "effect_speed"
         self._attr_mode = "slider"
         self._attr_native_min_value = 1
         self._attr_native_max_value = 8

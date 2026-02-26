@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -51,17 +52,34 @@ class FluidraPoolEntity(CoordinatorEntity):
         return self.coordinator.data.get(self._pool_id, {})
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        """Return device info."""
+    def device_info(self) -> DeviceInfo:
+        """Return device info using device registry for consistent naming."""
+        from .device_registry import DeviceIdentifier
+
         device_data = self.device_data
+        config = DeviceIdentifier.identify_device(device_data)
+
+        # Use device registry to determine model type
+        if config:
+            model_map = {
+                "chlorinator": "Chlorinator",
+                "pump": "Pump",
+                "heat_pump": "Heat Pump",
+                "light": "Light",
+                "heater": "Heater",
+            }
+            default_model = model_map.get(config.device_type, "Pool Equipment")
+        else:
+            default_model = "Pool Equipment"
+
         device_name = device_data.get("name", f"Device {self._device_id}")
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": device_data.get("manufacturer", "Fluidra"),
-            "model": device_data.get("model", "Pool Equipment"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device_name,
+            manufacturer=device_data.get("manufacturer", "Fluidra"),
+            model=default_model,
+            via_device=(DOMAIN, self._pool_id),
+        )
 
     @property
     def available(self) -> bool:

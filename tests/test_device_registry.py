@@ -228,14 +228,20 @@ class TestIdentifyDevice:
         assert config is not None
         assert config.device_type == "chlorinator"
         assert config.features.get("exo_mode") is True
-        assert config.features.get("on_off_component") == 9
-        assert config.features.get("chlorination_level") == 35
-        assert config.features.get("boost_mode") == 14
+        # on_off_component removed - mode select (AUTO/ON/OFF) replaces ON/OFF switch
+        assert config.features.get("on_off_component") is None
+        assert config.features.get("chlorination_level") == 38
+        # boost_mode removed - API returns 403 + unreadable for EXO
+        assert config.features.get("boost_mode") is None
+        assert config.features.get("mode_control") is True
+        assert config.features.get("mode_component") == 13
         assert config.features.get("schedules") is True
-        assert config.features.get("skip_ph_orp") is True
-        assert config.features["sensors"]["ph"] == 39
+        assert config.features.get("orp_setpoint") == 39
+        assert config.features.get("ph_setpoint") == 40
+        assert config.features.get("ph_setpoint_divisor") == 10
+        assert config.features["sensors"]["ph"] == 62
         assert config.features["sensors"]["orp"] == 63
-        assert config.features["sensors"]["temperature"] == 40
+        assert config.features["sensors"]["temperature"] == 64
         assert config.features["sensors"]["salinity"] == 36
 
     def test_invalid_input_returns_none(self):

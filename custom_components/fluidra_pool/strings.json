@@ -91,20 +91,79 @@
       "target_temperature": {
         "name": "Target Temperature"
       },
+      "water_temperature": {
+        "name": "Water Temperature"
+      },
+      "air_temperature": {
+        "name": "Air Temperature"
+      },
+      "brightness": {
+        "name": "Brightness"
+      },
+      "speed_mode": {
+        "name": "Speed",
+        "state": {
+          "stopped": "Stopped",
+          "not_running": "Not Running",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        }
+      },
       "weather_temperature": {
         "name": "Weather Temperature"
       },
       "device_info": {
-        "name": "Device Information"
+        "name": "Device Information",
+        "state": {
+          "online": "Online",
+          "signal_excellent": "Signal Excellent",
+          "signal_very_good": "Signal Very Good",
+          "signal_good": "Signal Good",
+          "signal_low": "Signal Low",
+          "signal_very_low": "Signal Very Low",
+          "error": "Error"
+        }
       },
       "pool_status": {
-        "name": "Pool Status"
+        "name": "Pool Status",
+        "state": {
+          "using": "Active",
+          "maintenance": "Maintenance",
+          "offline": "Offline",
+          "winterized": "Winterized",
+          "connected": "Connected",
+          "unknown_state": "Unknown"
+        }
       },
       "pool_location": {
         "name": "Pool Location"
       },
       "water_quality": {
-        "name": "Water Quality"
+        "name": "Water Quality",
+        "state": {
+          "auto": "Automatic",
+          "manual": "Manual",
+          "not_configured": "Not Configured"
+        }
+      },
+      "chlorinator_ph": {
+        "name": "pH"
+      },
+      "chlorinator_orp": {
+        "name": "ORP"
+      },
+      "chlorinator_free_chlorine": {
+        "name": "Free Chlorine"
+      },
+      "chlorinator_water_temperature": {
+        "name": "Water Temperature"
+      },
+      "chlorinator_salinity": {
+        "name": "Salinity"
+      },
+      "chlorinator_chlorination_actual": {
+        "name": "Chlorination Actual"
       }
     },
     "switch": {
@@ -122,6 +181,12 @@
       },
       "schedule_enable": {
         "name": "Schedule {schedule_id}"
+      },
+      "chlorinator": {
+        "name": "Chlorinator"
+      },
+      "boost_mode": {
+        "name": "Boost Mode"
       }
     },
     "climate": {
@@ -156,6 +221,18 @@
       },
       "pump_vitesse": {
         "name": "{device_name} Speed Setting"
+      },
+      "chlorination_level": {
+        "name": "Chlorination Level"
+      },
+      "ph_setpoint": {
+        "name": "pH Setpoint"
+      },
+      "orp_setpoint": {
+        "name": "ORP Setpoint"
+      },
+      "effect_speed": {
+        "name": "Effect Speed"
       }
     },
     "time": {
@@ -196,6 +273,14 @@
           "off": "Off",
           "on": "On",
           "auto": "Auto"
+        }
+      },
+      "chlorinator_schedule_speed": {
+        "name": "Schedule {schedule_id} Speed",
+        "state": {
+          "S1": "Speed 1",
+          "S2": "Speed 2",
+          "S3": "Speed 3"
         }
       },
       "light_effect": {

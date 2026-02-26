@@ -1,7 +1,9 @@
 {
   "config": {
     "abort": {
-      "already_configured": "This account is already configured"
+      "already_configured": "This account is already configured",
+      "reauth_successful": "Re-authentication successful",
+      "reconfigure_successful": "Configuration updated successfully"
     },
     "error": {
       "cannot_connect": "Unable to connect to Fluidra API",
@@ -10,6 +12,26 @@
       "unknown": "Unexpected error"
     },
     "step": {
+      "confirm": {
+        "description": "We found a Fluidra Pool device. Would you like to add it?",
+        "title": "Discovered Fluidra Pool"
+      },
+      "reauth_confirm": {
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        },
+        "description": "Session expired for {email}. Please re-enter your credentials.",
+        "title": "Re-authenticate"
+      },
+      "reconfigure": {
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        },
+        "description": "Update credentials for {email}",
+        "title": "Reconfigure Fluidra Pool"
+      },
       "user": {
         "data": {
           "email": "Email",
@@ -48,6 +70,18 @@
       }
     },
     "number": {
+      "chlorination_level": {
+        "name": "Chlorination Level"
+      },
+      "effect_speed": {
+        "name": "Effect Speed"
+      },
+      "orp_setpoint": {
+        "name": "ORP Setpoint"
+      },
+      "ph_setpoint": {
+        "name": "pH Setpoint"
+      },
       "pump_vitesse": {
         "name": "{device_name} Speed Setting"
       },
@@ -62,6 +96,14 @@
           "auto": "Auto",
           "off": "Off",
           "on": "On"
+        }
+      },
+      "chlorinator_schedule_speed": {
+        "name": "Schedule {schedule_id} Speed",
+        "state": {
+          "S1": "Speed 1",
+          "S2": "Speed 2",
+          "S3": "Speed 3"
         }
       },
       "light_effect": {
@@ -97,6 +139,30 @@
       }
     },
     "sensor": {
+      "air_temperature": {
+        "name": "Air Temperature"
+      },
+      "brightness": {
+        "name": "Brightness"
+      },
+      "chlorinator_chlorination_actual": {
+        "name": "Chlorination Actual"
+      },
+      "chlorinator_free_chlorine": {
+        "name": "Free Chlorine"
+      },
+      "chlorinator_orp": {
+        "name": "ORP"
+      },
+      "chlorinator_ph": {
+        "name": "pH"
+      },
+      "chlorinator_salinity": {
+        "name": "Salinity"
+      },
+      "chlorinator_water_temperature": {
+        "name": "Water Temperature"
+      },
       "comm_errors": {
         "name": "Communication Errors"
       },
@@ -107,7 +173,16 @@
         "name": "Current Temperature"
       },
       "device_info": {
-        "name": "Device Information"
+        "name": "Device Information",
+        "state": {
+          "error": "Error",
+          "online": "Online",
+          "signal_excellent": "Signal Excellent",
+          "signal_good": "Signal Good",
+          "signal_low": "Signal Low",
+          "signal_very_good": "Signal Very Good",
+          "signal_very_low": "Signal Very Low"
+        }
       },
       "firmware_version": {
         "name": "Firmware Version"
@@ -128,13 +203,31 @@
         "name": "Pool Location"
       },
       "pool_status": {
-        "name": "Pool Status"
+        "name": "Pool Status",
+        "state": {
+          "connected": "Connected",
+          "maintenance": "Maintenance",
+          "offline": "Offline",
+          "unknown_state": "Unknown",
+          "using": "Active",
+          "winterized": "Winterized"
+        }
       },
       "schedule_count": {
         "name": "Active Schedules"
       },
       "signal_strength": {
         "name": "Signal Strength"
+      },
+      "speed_mode": {
+        "name": "Speed",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "medium": "Medium",
+          "not_running": "Not Running",
+          "stopped": "Stopped"
+        }
       },
       "speed_percent": {
         "name": "Speed Percentage"
@@ -143,7 +236,15 @@
         "name": "Target Temperature"
       },
       "water_quality": {
-        "name": "Water Quality"
+        "name": "Water Quality",
+        "state": {
+          "auto": "Automatic",
+          "manual": "Manual",
+          "not_configured": "Not Configured"
+        }
+      },
+      "water_temperature": {
+        "name": "Water Temperature"
       },
       "weather_temperature": {
         "name": "Weather Temperature"
@@ -152,6 +253,12 @@
     "switch": {
       "auto_mode": {
         "name": "Auto Mode"
+      },
+      "boost_mode": {
+        "name": "Boost Mode"
+      },
+      "chlorinator": {
+        "name": "Chlorinator"
       },
       "heat_pump": {
         "name": "Heat Pump"
@@ -182,8 +289,25 @@
     }
   },
   "exceptions": {
+    "auth_failed": {
+      "message": "Authentication failed, please re-authenticate"
+    },
     "temperature_out_of_range": {
       "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"
+    }
+  },
+  "issues": {
+    "connection_error": {
+      "description": "Unable to connect to Fluidra Pool service",
+      "title": "Connection error"
+    },
+    "firmware_update_available": {
+      "description": "Device {device} has firmware version {version} available",
+      "title": "Firmware update available"
+    },
+    "offline_device": {
+      "description": "Device {device} is offline",
+      "title": "Device offline"
     }
   },
   "options": {

@@ -32,24 +32,6 @@ class TestCoordinatorInit:
         assert coord.config_entry is None
 
 
-class TestOptimisticEntities:
-    """Test optimistic entity tracking."""
-
-    async def test_register_and_has_optimistic(self, coordinator: FluidraDataUpdateCoordinator):
-        assert coordinator.has_optimistic_entities() is False
-        coordinator.register_optimistic_entity("switch.pool_pump")
-        assert coordinator.has_optimistic_entities() is True
-
-    async def test_unregister_optimistic(self, coordinator: FluidraDataUpdateCoordinator):
-        coordinator.register_optimistic_entity("switch.pool_pump")
-        coordinator.unregister_optimistic_entity("switch.pool_pump")
-        assert coordinator.has_optimistic_entities() is False
-
-    async def test_unregister_nonexistent(self, coordinator: FluidraDataUpdateCoordinator):
-        coordinator.unregister_optimistic_entity("switch.nonexistent")
-        assert coordinator.has_optimistic_entities() is False
-
-
 class TestGetPoolsFromData:
     """Test get_pools_from_data method."""
 
@@ -83,15 +65,6 @@ class TestAsyncUpdateData:
         await coordinator._async_update_data()
         assert mock_api.get_pool_details.called
         assert mock_api.poll_device_status.called
-
-    async def test_skips_update_when_optimistic(self, coordinator: FluidraDataUpdateCoordinator):
-        """Should skip API polling when optimistic entities exist."""
-        # Set up existing data
-        coordinator.data = {"pool_001": {"name": "cached"}}
-        coordinator.register_optimistic_entity("switch.test")
-
-        result = await coordinator._async_update_data()
-        assert result == {"pool_001": {"name": "cached"}}
 
     async def test_raises_auth_failed_on_invalid_token(
         self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock

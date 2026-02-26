@@ -34,7 +34,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         """Initialize."""
         self.api = api
         self.config_entry = config_entry  # Store config entry for device cleanup
-        self._optimistic_entities = set()  # Entités avec état optimiste actif
         self._previous_schedule_entities = {}  # Track scheduler entities per device for cleanup
         self._first_update = True  # Skip heavy polling on first update for faster startup
 
@@ -56,18 +55,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                 immediate=False,
             ),
         )
-
-    def register_optimistic_entity(self, entity_id: str):
-        """Enregistrer une entité comme ayant un état optimiste actif."""
-        self._optimistic_entities.add(entity_id)
-
-    def unregister_optimistic_entity(self, entity_id: str):
-        """Désenregistrer une entité de l'état optimiste."""
-        self._optimistic_entities.discard(entity_id)
-
-    def has_optimistic_entities(self) -> bool:
-        """Vérifier si des entités ont un état optimiste actif."""
-        return len(self._optimistic_entities) > 0
 
     def get_pools_from_data(self) -> list[dict]:
         """Get pools list from coordinator data (no API call).
@@ -124,8 +111,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     async def _cleanup_schedule_sensor_if_empty(self, pool_id: str, device_id: str, schedule_data: list):
         """Clean up schedule sensor entity if no schedules remain."""
         try:
-            from homeassistant.helpers import entity_registry as er
-
             # If no schedules remain, we can consider removing the sensor entity
             if len(schedule_data) == 0:
                 entity_registry = er.async_get(self.hass)
@@ -510,12 +495,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Update data via library using optimized parallel polling."""
         try:
-            # Skip update if entities have optimistic state
-            if self.has_optimistic_entities():
-                current_data = getattr(self, "data", None)
-                if current_data:
-                    return current_data
-
             # Validate token before polling
             if not await self.api.ensure_valid_token():
                 # 🥈 Déclencher le reauth flow (Silver)
@@ -572,7 +551,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     for (device, _), status in zip(devices_with_ids, status_results, strict=False):
                         if status and not isinstance(status, Exception):
                             device["status"] = status
-                            device["connectivity"] = status.get("connectivity", {})
+                            connectivity = status.get("connectivity", {})
+                            device["connectivity"] = connectivity
+                            # Update online status from real connectivity data
+                            if "connected" in connectivity:
+                                device["online"] = connectivity["connected"]
 
                 # Parallel: fetch all components for all devices
                 for device in pool.get("devices", []):

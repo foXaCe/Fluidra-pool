@@ -733,6 +733,19 @@ class FluidraPoolAPI:
                     return await self.control_device_component(device_id, component_id, value)
                 return False
 
+            # Log non-200 responses for debugging
+            try:
+                error_body = await response.text()
+            except Exception:
+                error_body = "N/A"
+            _LOGGER.warning(
+                "Control component %s on %s failed: HTTP %s - %s (payload: %s)",
+                component_id,
+                device_id,
+                response.status,
+                error_body,
+                payload,
+            )
             return False
 
         except FluidraCircuitBreakerError:

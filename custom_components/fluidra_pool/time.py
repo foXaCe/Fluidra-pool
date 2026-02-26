@@ -167,24 +167,24 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
 
     @property
     def device_info(self) -> dict:
-        """Return device info."""
-        # Detect device type for appropriate naming
+        """Return device info using device registry for consistent naming."""
         config = DeviceIdentifier.identify_device(self.device_data)
-        device_type = config.device_type if config else "pump"
 
-        if device_type == "chlorinator":
-            default_name = f"Chlorinator {self._device_id}"
-            default_model = "Chlorinator"
-        else:
-            default_name = f"E30iQ Pump {self._device_id}"
-            default_model = "E30iQ"
+        model_map = {
+            "chlorinator": "Chlorinator",
+            "pump": "Pump",
+            "heat_pump": "Heat Pump",
+            "light": "Light",
+            "heater": "Heater",
+        }
+        default_model = model_map.get(config.device_type, "Pool Equipment") if config else "Pool Equipment"
 
-        device_name = self.device_data.get("name") or default_name
+        device_name = self.device_data.get("name") or f"Device {self._device_id}"
         return {
             "identifiers": {(DOMAIN, self._device_id)},
             "name": device_name,
             "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", default_model),
+            "model": default_model,
             "via_device": (DOMAIN, self._pool_id),
         }
 

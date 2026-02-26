@@ -18,6 +18,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 import voluptuous as vol
 
+from .api_resilience import FluidraError
 from .const import CONF_EMAIL, CONF_PASSWORD, DOMAIN, FluidraPoolConfigEntry, FluidraPoolRuntimeData
 
 if TYPE_CHECKING:
@@ -89,7 +90,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
         pools = await api.get_pools()
         # Continue setup even if no pools found - user may add equipment later
 
-    except Exception as err:
+    except (FluidraError, TimeoutError, OSError) as err:
         _LOGGER.error("Unable to connect to Fluidra Pool API: %s", err)
         raise ConfigEntryNotReady from err
 
@@ -114,11 +115,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     # 🏆 Utiliser runtime_data au lieu de hass.data (2024+)
     entry.runtime_data = FluidraPoolRuntimeData(coordinator=coordinator)
 
-    # Set up platforms immediately (non-blocking)
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # First refresh before platform setup so device_info has correct data
+    await coordinator.async_config_entry_first_refresh()
 
-    # Don't force first refresh - let it happen naturally on first update cycle
-    # This prevents blocking during startup
+    # Update device registry with correct names/models from coordinator data
+    from .device_registry import DeviceIdentifier
+
+    model_map = {
+        "chlorinator": "Chlorinator",
+        "pump": "Pump",
+        "heat_pump": "Heat Pump",
+        "light": "Light",
+        "heater": "Heater",
+    }
+    if coordinator.data:
+        for pool_id, pool_data in coordinator.data.items():
+            for device in pool_data.get("devices", []):
+                device_id = device.get("device_id")
+                if not device_id:
+                    continue
+                config = DeviceIdentifier.identify_device(device)
+                if config:
+                    model = model_map.get(config.device_type, "Pool Equipment")
+                    device_name = device.get("name", f"Device {device_id}")
+                    device_registry.async_get_or_create(
+                        config_entry_id=entry.entry_id,
+                        identifiers={(DOMAIN, device_id)},
+                        name=device_name,
+                        manufacturer="Fluidra",
+                        model=model,
+                        via_device=(DOMAIN, pool_id),
+                    )
+
+    # Set up platforms after coordinator has data
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Register services
     await _async_register_services(hass, coordinator)

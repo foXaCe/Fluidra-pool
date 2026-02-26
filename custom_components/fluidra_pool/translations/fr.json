@@ -1,8 +1,9 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Cette compte est déjà configuré",
-      "reauth_successful": "Ré-authentification réussie"
+      "already_configured": "Ce compte est déjà configuré",
+      "reauth_successful": "Ré-authentification réussie",
+      "reconfigure_successful": "Configuration mise à jour avec succès"
     },
     "error": {
       "cannot_connect": "Impossible de se connecter à l'API Fluidra",
@@ -17,14 +18,19 @@
       },
       "reauth_confirm": {
         "data": {
+          "email": "Adresse e-mail",
           "password": "Mot de passe"
         },
-        "description": "Veuillez réentrer votre mot de passe pour Fluidra Pool",
-        "title": "Re-authentification"
+        "description": "Session expirée pour {email}. Veuillez ressaisir vos identifiants.",
+        "title": "Ré-authentification"
       },
       "reconfigure": {
-        "description": "Mettre à jour vos paramètres Fluidra Pool",
-        "title": "Reconfigurer"
+        "data": {
+          "email": "Adresse e-mail",
+          "password": "Mot de passe"
+        },
+        "description": "Mettre à jour les identifiants pour {email}",
+        "title": "Reconfigurer Fluidra Pool"
       },
       "user": {
         "data": {
@@ -64,6 +70,18 @@
       }
     },
     "number": {
+      "chlorination_level": {
+        "name": "Niveau de Chloration"
+      },
+      "effect_speed": {
+        "name": "Vitesse d'Effet"
+      },
+      "orp_setpoint": {
+        "name": "Consigne ORP"
+      },
+      "ph_setpoint": {
+        "name": "Consigne pH"
+      },
       "pump_vitesse": {
         "name": "Réglage {device_name} Vitesse"
       },
@@ -78,6 +96,14 @@
           "auto": "Auto",
           "off": "Arrêt",
           "on": "Marche"
+        }
+      },
+      "chlorinator_schedule_speed": {
+        "name": "Planning {schedule_id} Vitesse",
+        "state": {
+          "S1": "Vitesse 1",
+          "S2": "Vitesse 2",
+          "S3": "Vitesse 3"
         }
       },
       "light_effect": {
@@ -113,6 +139,30 @@
       }
     },
     "sensor": {
+      "air_temperature": {
+        "name": "Température de l'Air"
+      },
+      "brightness": {
+        "name": "Luminosité"
+      },
+      "chlorinator_chlorination_actual": {
+        "name": "Chloration Réelle"
+      },
+      "chlorinator_free_chlorine": {
+        "name": "Chlore Libre"
+      },
+      "chlorinator_orp": {
+        "name": "ORP"
+      },
+      "chlorinator_ph": {
+        "name": "pH"
+      },
+      "chlorinator_salinity": {
+        "name": "Salinité"
+      },
+      "chlorinator_water_temperature": {
+        "name": "Température de l'Eau"
+      },
       "comm_errors": {
         "name": "Erreurs Communication"
       },
@@ -123,7 +173,16 @@
         "name": "Température Actuelle"
       },
       "device_info": {
-        "name": "Informations Appareil"
+        "name": "Informations Appareil",
+        "state": {
+          "error": "Erreur",
+          "online": "En ligne",
+          "signal_excellent": "Signal Excellent",
+          "signal_good": "Signal Bon",
+          "signal_low": "Signal Faible",
+          "signal_very_good": "Signal Très Bon",
+          "signal_very_low": "Signal Très Faible"
+        }
       },
       "firmware_version": {
         "name": "Version Firmware"
@@ -144,13 +203,31 @@
         "name": "Localisation Piscine"
       },
       "pool_status": {
-        "name": "Statut Piscine"
+        "name": "Statut Piscine",
+        "state": {
+          "connected": "Connecté",
+          "maintenance": "Maintenance",
+          "offline": "Hors ligne",
+          "unknown_state": "Inconnu",
+          "using": "Actif",
+          "winterized": "Hivernage"
+        }
       },
       "schedule_count": {
         "name": "Plannings Actifs"
       },
       "signal_strength": {
         "name": "Force du Signal"
+      },
+      "speed_mode": {
+        "name": "Vitesse",
+        "state": {
+          "high": "Élevée",
+          "low": "Faible",
+          "medium": "Moyenne",
+          "not_running": "Pas en marche",
+          "stopped": "Arrêtée"
+        }
       },
       "speed_percent": {
         "name": "Pourcentage de Vitesse"
@@ -159,7 +236,15 @@
         "name": "Température Cible"
       },
       "water_quality": {
-        "name": "Qualité de l'Eau"
+        "name": "Qualité de l'Eau",
+        "state": {
+          "auto": "Automatique",
+          "manual": "Manuel",
+          "not_configured": "Non configuré"
+        }
+      },
+      "water_temperature": {
+        "name": "Température de l'Eau"
       },
       "weather_temperature": {
         "name": "Température Météo"
@@ -168,6 +253,12 @@
     "switch": {
       "auto_mode": {
         "name": "Mode Auto"
+      },
+      "boost_mode": {
+        "name": "Mode Boost"
+      },
+      "chlorinator": {
+        "name": "Chlorinateur"
       },
       "heat_pump": {
         "name": "Pompe à Chaleur"
