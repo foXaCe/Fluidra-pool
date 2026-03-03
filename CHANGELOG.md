@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.0] - 2026-03-03
+
+### Added
+- **CC24042711 tecnoLC2 chlorinator support** (Issue #25)
+  - AstralPool Clear Connect non-scalable device config
+  - Correct temperature mapping (c172 instead of c183)
+  - Correct salinity mapping (c174 instead of c185)
+  - No pH/ORP sensors (device has no probes)
+  - Chlorination actual production sensor (c154)
+
 ## [2.16.0] - 2026-02-26
 
 ### Added
