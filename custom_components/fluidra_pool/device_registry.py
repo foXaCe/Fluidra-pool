@@ -348,6 +348,28 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=91,  # Higher than CC25013923 for more specific match
     ),
+    "cc24042711_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["CC24042711*"],  # tecnoLC2 (AstralPool Clear Connect non-scalable) - Issue #25
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],  # No pH/ORP on this model
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%, CC standard)
+            "boost_mode": 103,  # Component 103 (boolean, CC standard)
+            "skip_mode_select": True,  # No mode select on this model
+            "skip_ph_orp": True,  # No pH/ORP probes
+            "sensors": {
+                "temperature": 172,  # Pool temp (÷10) — confirmed: 144 = 14.4°C
+                "salinity": 174,  # Salinity (÷100, CC standard) — e.g., 310 = 3.10 g/L
+                "chlorination_actual": 154,  # Actual production (%) — CC standard
+            },
+            # Specific components for CC24042711 (no pH/ORP)
+            "specific_components": [10, 103, 154, 172, 174],
+        },
+        priority=92,  # Higher than CC25005502 (91)
+    ),
     "dm24049704_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["DM24049704*"],  # Domotic S2 chlorinator (SheepPool)
