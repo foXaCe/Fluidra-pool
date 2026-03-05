@@ -1,7 +1,7 @@
 {
   "domain": "fluidra_pool",
   "name": "Fluidra Pool",
-  "codeowners": ["@foxace66"],
+  "codeowners": ["@foXaCe"],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/foXaCe/fluidra-pool",
