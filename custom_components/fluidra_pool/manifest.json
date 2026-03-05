@@ -1,13 +1,13 @@
 {
   "domain": "fluidra_pool",
   "name": "Fluidra Pool",
-  "codeowners": ["@foxace66"],
+  "codeowners": ["@foXaCe"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/foxace66/fluidra-pool",
+  "documentation": "https://github.com/foXaCe/fluidra-pool",
   "integration_type": "hub",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/foxace66/fluidra-pool/issues",
+  "issue_tracker": "https://github.com/foXaCe/fluidra-pool/issues",
   "loggers": ["custom_components.fluidra_pool"],
   "requirements": ["aiohttp>=3.8.0", "PyJWT>=2.0.0"],
   "version": "2.17.0"
