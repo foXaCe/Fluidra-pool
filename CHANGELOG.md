@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.18.0] - 2026-03-08
+
+### Added
+- **LC24056317 Gre chlorinator support** (Issue #28)
+  - Gre chlorinator (I.D. Electroquimica/Fluidra) device config
+  - pH, temperature, salinity sensors (no ORP on this model)
+  - User-tested and validated
+
+### Fixed
+- **Token refresh fallback to full re-authentication** (Issue #29)
+  - When Cognito refresh token expires (~30 days), the integration now re-authenticates with stored credentials instead of showing a reauth prompt
+  - Reauth flow now tests only Cognito auth, preventing false "invalid credentials" errors from transient API issues
+  - Better logging for token refresh failures
+
+### Changed
+- Updated codeowner and documentation URLs
+
 ## [2.17.0] - 2026-03-03
 
 ### Added
