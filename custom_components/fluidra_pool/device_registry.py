@@ -204,6 +204,28 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=86,  # Same priority as LC24008313 (similar model)
     ),
+    "lc24056317_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["LC24056317*"],  # Gre chlorinator (I.D. Electroquimica/Fluidra) - Issue #28
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],  # No ORP on this model
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%)
+            "ph_setpoint": 16,  # Component 16 (÷100)
+            "boost_mode": 103,  # Component 103 (boolean: true/false)
+            "skip_mode_select": True,  # No mode select available
+            "sensors": {
+                "ph": 165,  # pH measured value (÷100) - e.g., 731 = 7.31 pH
+                "temperature": 172,  # Pool temperature (°C * 10) - e.g., 201 → 20.1°C
+                "salinity": 174,  # Salinity (g/L * 100) - e.g., 536 → 5.36 g/L
+            },
+            # Specific components for LC24056317
+            "specific_components": [10, 16, 103, 165, 172, 174],
+        },
+        priority=86,  # Same priority as other LC chlorinators
+    ),
     "cc24018202_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24018202*"],  # Specific CC24018202 model
