@@ -181,20 +181,29 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _test_credentials(self, email: str, password: str) -> str | None:
         """Test credentials and return error key if failed.
 
+        Only tests Cognito authentication, not pool discovery.
+        This ensures that transient API errors during pool discovery
+        don't prevent successful re-authentication.
+
         Returns:
             None if successful, error key string if failed.
         """
         api = FluidraPoolAPI(email, password)
 
         try:
-            await api.authenticate()
+            # Only test Cognito auth, not full pool discovery
+            # This prevents false "invalid_auth" when the API is temporarily down
+            await api._cognito_initial_auth()
             _LOGGER.info("Authentication successful for %s", email)
             return None
         except Exception as err:
             _LOGGER.error("Authentication failed for %s: %s", email, err)
-            if "401" in str(err) or "unauthorized" in str(err).lower():
+            error_str = str(err).lower()
+            if any(
+                keyword in error_str for keyword in ("notauthorized", "unauthorized", "401", "incorrect", "invalid")
+            ):
                 return "invalid_auth"
-            if "timeout" in str(err).lower() or "connect" in str(err).lower():
+            if any(keyword in error_str for keyword in ("timeout", "connect", "unreachable")):
                 return "cannot_connect"
             return "unknown"
         finally:

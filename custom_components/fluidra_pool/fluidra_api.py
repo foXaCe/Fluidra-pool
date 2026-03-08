@@ -446,10 +446,26 @@ class FluidraPoolAPI:
         return int(time.time()) >= self.token_expires_at
 
     async def ensure_valid_token(self) -> bool:
-        """S'assurer que le token est valide, le renouveler si nécessaire."""
-        if self.is_token_expired():
-            return await self.refresh_access_token()
-        return True
+        """S'assurer que le token est valide, le renouveler si nécessaire.
+
+        Returns True if token is valid/renewed, False only if credentials are invalid.
+        """
+        if not self.is_token_expired():
+            return True
+
+        # Try refresh token first (fastest path)
+        if await self.refresh_access_token():
+            return True
+
+        # Refresh failed — try full re-authentication with stored credentials
+        _LOGGER.info("Token refresh failed, attempting full re-authentication with stored credentials")
+        try:
+            await self._cognito_initial_auth()
+            _LOGGER.info("Full re-authentication successful")
+            return True
+        except Exception as err:
+            _LOGGER.warning("Re-authentication also failed: %s", err)
+            return False
 
     async def refresh_access_token(self) -> bool:
         """Renouveler l'access token avec le refresh token."""
@@ -493,9 +509,16 @@ class FluidraPoolAPI:
                 self.token_expires_at = int(time.time()) + expires_in - 300
 
                 return True
+            # Log the specific error from Cognito for debugging
+            error_text = await response.text()
+            _LOGGER.warning(
+                "Token refresh failed with status %d: %s",
+                response.status,
+                error_text[:200],
+            )
             return False
         except FluidraError as err:
-            _LOGGER.warning("Token refresh failed: %s", err)
+            _LOGGER.warning("Token refresh failed (connection error): %s", err)
             return False
 
     async def get_pools(self) -> list[dict[str, Any]]:
