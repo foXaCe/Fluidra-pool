@@ -54,7 +54,6 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: Fluidra
         "coordinator": {
             "last_update_success": coordinator.last_update_success,
             "update_interval": str(coordinator.update_interval),
-            "optimistic_entities_count": len(coordinator._optimistic_entities),
         },
         "pools": _redact_pools_data(coordinator_data),
     }
