@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.0] - 2026-03-14
+
+### Added
+- **LC24013306 Irripool iSALT chlorinator support** (Issue #31)
+  - pH, ORP, temperature, salinity sensors with correct component mappings
+
+### Fixed
+- **Diagnostics 500 Internal Server Error** — removed reference to non-existent `_optimistic_entities` attribute that caused diagnostics download to fail
+
 ## [2.18.0] - 2026-03-08
 
 ### Added
