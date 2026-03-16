@@ -113,7 +113,7 @@ class FluidraPoolSwitchEntity(FluidraPoolControlEntity, SwitchEntity):
     async def _refresh_device_state(self) -> None:
         """Refresh device state by polling real API components."""
         try:
-            # Rafraîchir les états des composants critiques
+            # Refresh critical component states
             # Component 9 (on/off)
             pump_state = await self._api.get_device_component_state(self._device_id, 9)
             if pump_state:
@@ -895,10 +895,13 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
 
     @property
     def available(self) -> bool:
-        """Boost only available when mode is ON."""
+        """Boost only available when mode is ON (or always if no mode select)."""
         base_available = super().available
         if not base_available:
             return False
+        # Devices without mode select (skip_mode_select) are always available for boost
+        if DeviceIdentifier.has_feature(self.device_data, "skip_mode_select"):
+            return True
         # Only available in ON mode (not AUTO, not OFF)
         return self._get_current_mode() == "on"
 
@@ -935,10 +938,11 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
         try:
             self._set_pending_state(True)
 
-            # Set mode to ON first
-            if self._get_current_mode() != "on":
-                await self._api.control_device_component(self._device_id, mode_comp, on_value)
-                await asyncio.sleep(0.5)
+            # Set mode to ON first (skip for devices without mode select)
+            if not DeviceIdentifier.has_feature(self.device_data, "skip_mode_select"):
+                if self._get_current_mode() != "on":
+                    await self._api.control_device_component(self._device_id, mode_comp, on_value)
+                    await asyncio.sleep(0.5)
 
             success = await self._api.control_device_component(self._device_id, boost_component, True)
 
