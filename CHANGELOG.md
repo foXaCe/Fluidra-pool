@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.1] - 2026-03-16
+
+### Fixed
+- **Boost switch unavailable for chlorinators without mode select** (Issue #25)
+  - Boost switch was always marked `unavailable` for devices with `skip_mode_select` (CC24042711, CC25005502, all LC models) because mode component c20 was null
+  - Skip unnecessary mode ON command before activating boost on these devices
+
 ## [2.19.0] - 2026-03-14
 
 ### Added
