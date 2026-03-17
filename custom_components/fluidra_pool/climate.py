@@ -423,7 +423,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             self.async_write_ha_state()
 
             # Ici il faudrait implémenter la méthode pour définir la température
-            # via l'API Fluidra - à adapter selon les composants découverts
+            # via Fluidra API - adapt based on discovered components
             success = await self._api.set_heat_pump_temperature(self._device_id, temperature)
 
             if success:
@@ -522,7 +522,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             "heat_pump_reported": device_data.get("heat_pump_reported"),
             "is_heating": device_data.get("is_heating"),
             "is_running": device_data.get("is_running"),
-            # Données brutes des composants
+            # Raw component data
             "component_13_raw": device_data.get("component_13_data", {}).get("reportedValue"),
             "component_15_raw": device_data.get("component_15_speed"),
             "component_15_temperature": device_data.get("target_temperature"),

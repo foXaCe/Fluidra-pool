@@ -248,7 +248,7 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
     async def _refresh_device_state(self) -> None:
         """Refresh device state by polling real API components."""
         try:
-            # Rafraîchir les états des composants critiques
+            # Refresh critical component states
             # Component 9 (on/off)
             pump_state = await self._api.get_device_component_state(self._device_id, 9)
             if pump_state:

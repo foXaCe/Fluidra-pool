@@ -846,7 +846,7 @@ class FluidraPoolAPI:
                 if device:
                     device["target_temperature"] = temperature
                 return True
-            # Fallback: essayer d'autres composants possibles
+            # Fallback: try other possible components
             for fallback_component in [12, 13, 14, 16]:
                 success = await self.control_device_component(device_id, fallback_component, temperature_value)
                 if success:
