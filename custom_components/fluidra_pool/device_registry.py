@@ -421,7 +421,7 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
     ),
     "cc24017504_chlorinator": DeviceConfig(
         device_type="chlorinator",
-        identifier_patterns=["CC24017504*"],  # Energy Connect tecnoLC2 (with pH/ORP) - nicolaspolizzi
+        identifier_patterns=["CC24017504*"],  # Energy Connect tecnoLC2 (with pH/ORP) - nicolasp
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
