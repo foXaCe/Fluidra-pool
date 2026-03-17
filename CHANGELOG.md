@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.21.0] - 2026-03-17
+
+### Added
+- **CC24017504 chlorinator support** (PR #34 by @Profusio83)
+  - Energy Connect tecnoLC2 with pH/ORP probes
+  - Same component mappings as CC24068402
+
 ## [2.20.0] - 2026-03-17
 
 ### Added
