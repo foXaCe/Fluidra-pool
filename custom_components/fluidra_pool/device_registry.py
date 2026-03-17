@@ -394,6 +394,31 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=91,  # Higher than CC25013923 for more specific match
     ),
+    "cc24068402_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["CC24068402*"],  # Energy Connect tecnoLC2 (with pH/ORP) - Issue #33
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],  # Sensors enabled
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%) - e.g., 100 = 100%
+            "ph_setpoint": 16,  # Component 16 (÷100) - e.g., 740 = 7.40 pH
+            "orp_setpoint": 20,  # Component 20 (mV)
+            "boost_mode": 103,  # Component 103 (boolean: true/false)
+            "skip_mode_select": True,  # No mode select available
+            "sensors": {
+                "ph": 165,  # pH measured value (÷100) - e.g., 680 = 6.80 pH
+                "orp": 170,  # ORP/Redox measured value (mV)
+                "temperature": 172,  # Pool temperature (°C * 10) - 144 = 14.4°C
+                "salinity": 174,  # Salinity (g/L * 100)
+                "chlorination_actual": 154,  # Actual production (%)
+            },
+            # Specific components for CC24068402
+            "specific_components": [10, 16, 20, 103, 154, 165, 170, 172, 174],
+        },
+        priority=92,  # Higher than CC25005502 (91)
+    ),
     "cc24042711_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24042711*"],  # tecnoLC2 (AstralPool Clear Connect non-scalable) - Issue #25
