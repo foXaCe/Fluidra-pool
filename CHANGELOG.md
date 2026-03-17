@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.20.0] - 2026-03-17
+
+### Added
+- **CC24068402 Energy Connect chlorinator support** (Issue #33)
+  - AstralPool Energy Connect (tecnoLC2 with pH/ORP probes)
+  - pH, ORP, temperature, salinity, chlorination actual sensors
+  - Correct component mappings (c165, c170, c172, c174, c154)
+
 ## [2.19.1] - 2026-03-16
 
 ### Fixed
