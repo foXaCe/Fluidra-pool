@@ -18,6 +18,8 @@ from .utils import convert_cron_days
 
 _LOGGER = logging.getLogger(__name__)
 
+PARALLEL_UPDATES = 0  # Coordinator handles all updates
+
 
 def parse_schedule_time(time_value) -> time | None:
     """Parse schedule time - handles both numeric (minutes) and CRON format.

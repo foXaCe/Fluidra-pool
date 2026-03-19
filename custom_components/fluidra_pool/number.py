@@ -18,6 +18,8 @@ from .entity import FluidraPoolControlEntity
 
 _LOGGER = logging.getLogger(__name__)
 
+PARALLEL_UPDATES = 0  # Coordinator handles all updates
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
