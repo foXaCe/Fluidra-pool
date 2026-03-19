@@ -394,6 +394,31 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=91,  # Higher than CC25013923 for more specific match
     ),
+    "cc24058902_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["CC24058902*"],  # Issue #35 - Enkil13
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],  # Sensors enabled
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%)
+            "ph_setpoint": 16,  # Component 16 (÷100)
+            "orp_setpoint": 20,  # Component 20 (mV)
+            "boost_mode": 103,  # Component 103 (boolean: true/false)
+            "skip_mode_select": True,  # No mode select available
+            "sensors": {
+                "ph": 165,  # pH measured value (÷100)
+                "orp": 177,  # ORP/Redox measured value (mV) - c177 for this model
+                "free_chlorine": 178,  # Free chlorine (mg/L)
+                "temperature": 172,  # Pool temperature (°C * 10)
+                "salinity": 174,  # Salinity (g/L * 100)
+            },
+            # Specific components for CC24058902
+            "specific_components": [10, 16, 20, 103, 165, 172, 174, 177, 178],
+        },
+        priority=93,  # Higher than CC24068402
+    ),
     "cc24068402_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24068402*"],  # Energy Connect tecnoLC2 (with pH/ORP) - Issue #33
