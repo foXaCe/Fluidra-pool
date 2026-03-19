@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.22.0] - 2026-03-19
+
+### Added
+- **CC24058902 chlorinator support** (Issue #35 by @Enkil13)
+  - pH, ORP (c177), free chlorine (c178), temperature, salinity sensors
+
+### Changed
+- Add `PARALLEL_UPDATES = 0` to all 7 entity platforms (coordinator-based optimization)
+
+### Fixed
+- Config flow tests now mock `_cognito_initial_auth` instead of `authenticate` (119/119 tests pass)
+
 ## [2.21.0] - 2026-03-17
 
 ### Added
