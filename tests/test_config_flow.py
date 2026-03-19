@@ -39,7 +39,7 @@ async def test_user_flow_success(hass: HomeAssistant, mock_api: AsyncMock) -> No
 
 async def test_user_flow_invalid_auth(hass: HomeAssistant, mock_api: AsyncMock) -> None:
     """Test user flow with invalid authentication."""
-    mock_api.authenticate.side_effect = Exception("401 Unauthorized")
+    mock_api._cognito_initial_auth.side_effect = Exception("401 Unauthorized")
 
     with patch(
         "custom_components.fluidra_pool.config_flow.FluidraPoolAPI",
@@ -57,7 +57,7 @@ async def test_user_flow_invalid_auth(hass: HomeAssistant, mock_api: AsyncMock) 
 
 async def test_user_flow_cannot_connect(hass: HomeAssistant, mock_api: AsyncMock) -> None:
     """Test user flow with connection error."""
-    mock_api.authenticate.side_effect = Exception("Connection timeout")
+    mock_api._cognito_initial_auth.side_effect = Exception("Connection timeout")
 
     with patch(
         "custom_components.fluidra_pool.config_flow.FluidraPoolAPI",
@@ -75,7 +75,7 @@ async def test_user_flow_cannot_connect(hass: HomeAssistant, mock_api: AsyncMock
 
 async def test_user_flow_unknown_error(hass: HomeAssistant, mock_api: AsyncMock) -> None:
     """Test user flow with unknown error."""
-    mock_api.authenticate.side_effect = Exception("Something weird happened")
+    mock_api._cognito_initial_auth.side_effect = Exception("Something weird happened")
 
     with patch(
         "custom_components.fluidra_pool.config_flow.FluidraPoolAPI",
