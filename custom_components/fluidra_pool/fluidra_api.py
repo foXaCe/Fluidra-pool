@@ -169,6 +169,7 @@ class FluidraPoolAPI:
         # Retry with exponential backoff
         last_error: Exception | None = None
         backoff = INITIAL_BACKOFF
+        token_refreshed = False
 
         for attempt in range(MAX_RETRIES + 1):
             try:
@@ -180,6 +181,16 @@ class FluidraPoolAPI:
                     response = await self._session.put(url, headers=headers, json=json_data)
                 else:
                     raise ValueError(f"Unsupported HTTP method: {method}")
+
+                # Handle 401: token expired mid-request, refresh and retry once
+                if response.status == 401 and not skip_circuit_breaker and not token_refreshed:
+                    token_refreshed = True
+                    _LOGGER.debug("Got 401, refreshing token and retrying")
+                    if await self.ensure_valid_token():
+                        if headers and "Authorization" in headers:
+                            headers["Authorization"] = f"Bearer {self.access_token}"
+                        continue
+                    return response
 
                 # Record success for circuit breaker
                 if not skip_circuit_breaker:
