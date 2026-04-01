@@ -394,6 +394,34 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=91,  # Higher than CC25013923 for more specific match
     ),
+    "cc24054221_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=["CC24054221*"],  # Energy Connect bridged tecnoLC2 - Issue #36
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],  # ON/OFF switch + sensors
+        features={
+            "on_off_component": 0,  # Component 0 = ON/OFF (1=ON, 0=OFF)
+            "chlorination_level": 10,  # Component 10 (write, 0-100%)
+            "ph_setpoint": 157,  # Component 157 (÷10, e.g., 72 → 7.2 pH)
+            "ph_setpoint_divisor": 10,  # This device uses ÷10 (not ÷100)
+            "skip_mode_select": True,  # No mode select
+            "skip_ph_orp": True,  # No ORP probe
+            "sensors": {
+                "ph": 165,  # pH measured value (÷100) - e.g., 686 → 6.86 pH
+                "temperature": 172,  # Pool temperature (÷10) - e.g., 136 → 13.6°C
+                "salinity": 160,  # Salinity (÷1000) - e.g., 3580 → 3.58 g/L
+                "chlorination_actual": 154,  # Current production (%) - e.g., 60 = 60%
+            },
+            "sensor_divisors": {
+                "salinity": 1000,  # This device reports salinity in mg/L (÷1000 for g/L)
+            },
+            # Specific components for CC24054221
+            "specific_components": [0, 10, 152, 154, 157, 160, 165, 172],
+        },
+        priority=93,  # Higher than CC24068402
+    ),
     "cc24058902_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24058902*"],  # Issue #35 - Enkil13
