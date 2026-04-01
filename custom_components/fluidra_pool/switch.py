@@ -1032,7 +1032,14 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
             else:
                 return self._pending_state
 
-        # Use pump_reported (set by coordinator from component 9)
+        # Read state from the on_off_component via component data
+        on_off_component = DeviceIdentifier.get_feature(self.device_data, "on_off_component", 9)
+        components = self.device_data.get("components", {})
+        comp_data = components.get(str(on_off_component), {})
+        reported = comp_data.get("reportedValue")
+        if reported is not None:
+            return bool(reported)
+        # Fallback to pump_reported (legacy)
         pump_reported = self.device_data.get("pump_reported")
         if pump_reported is not None:
             return bool(pump_reported)
