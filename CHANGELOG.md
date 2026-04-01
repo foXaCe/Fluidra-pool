@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - 2026-03-27
+
+### Added
+- **CC24054221 Energy Connect bridged chlorinator support** (Issue #36 by @cortalys)
+  - ON/OFF control via c0, pH setpoint c157 (÷10), salinity c160 (÷1000)
+  - Custom sensor divisors for non-standard component formats
+
+### Fixed
+- **Auto-retry with token refresh on HTTP 401** — when token expires mid-polling during parallel requests, each request now automatically refreshes the token and retries once instead of failing silently
+- **Chlorinator ON/OFF switch** reads state from `on_off_component` (device-specific) instead of always using c9
+
 ## [2.22.0] - 2026-03-19
 
 ### Added
