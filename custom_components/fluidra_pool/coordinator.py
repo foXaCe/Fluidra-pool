@@ -507,7 +507,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             # Validate token before polling
             if not await self.api.ensure_valid_token():
-                # 🥈 Déclencher le reauth flow (Silver)
+                _LOGGER.error(
+                    "Token validation failed — triggering reauth flow "
+                    "(token_expires_at=%s, has_refresh=%s, has_access=%s)",
+                    self.api.token_expires_at,
+                    bool(self.api.refresh_token),
+                    bool(self.api.access_token),
+                )
                 raise ConfigEntryAuthFailed(
                     translation_domain=DOMAIN,
                     translation_key="auth_failed",

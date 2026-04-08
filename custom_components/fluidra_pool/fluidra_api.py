@@ -185,11 +185,12 @@ class FluidraPoolAPI:
                 # Handle 401: token expired mid-request, refresh and retry once
                 if response.status == 401 and not skip_circuit_breaker and not token_refreshed:
                     token_refreshed = True
-                    _LOGGER.debug("Got 401, refreshing token and retrying")
+                    _LOGGER.warning("Got 401 on %s, refreshing token and retrying", url.split("/")[-1])
                     if await self.ensure_valid_token():
                         if headers and "Authorization" in headers:
                             headers["Authorization"] = f"Bearer {self.access_token}"
                         continue
+                    _LOGGER.error("Token refresh failed after 401, returning error response")
                     return response
 
                 # Record success for circuit breaker
@@ -464,23 +465,36 @@ class FluidraPoolAPI:
         if not self.is_token_expired():
             return True
 
+        now = int(time.time())
+        _LOGGER.debug(
+            "Token expired (now=%d, expires_at=%s, has_refresh=%s)",
+            now,
+            self.token_expires_at,
+            bool(self.refresh_token),
+        )
+
         # Try refresh token first (fastest path)
         if await self.refresh_access_token():
+            _LOGGER.debug("Token refresh successful, new expires_at=%s", self.token_expires_at)
             return True
 
         # Refresh failed — try full re-authentication with stored credentials
-        _LOGGER.info("Token refresh failed, attempting full re-authentication with stored credentials")
+        _LOGGER.warning(
+            "Token refresh failed, attempting full re-authentication with stored credentials (email=%s)",
+            self.email[:3] + "***" if self.email else "None",
+        )
         try:
             await self._cognito_initial_auth()
-            _LOGGER.info("Full re-authentication successful")
+            _LOGGER.info("Full re-authentication successful, new expires_at=%s", self.token_expires_at)
             return True
         except Exception as err:
-            _LOGGER.warning("Re-authentication also failed: %s", err)
+            _LOGGER.error("Re-authentication also failed: %s (type: %s)", err, type(err).__name__)
             return False
 
     async def refresh_access_token(self) -> bool:
         """Renouveler l'access token avec le refresh token."""
         if not self.refresh_token:
+            _LOGGER.warning("No refresh token available, cannot refresh")
             return False
 
         refresh_payload = {
