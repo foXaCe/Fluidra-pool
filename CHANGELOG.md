@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.24.0] - 2026-04-08
+
+### Added
+- **Zodiac Z260iQ heat pump support** (Issue #41)
+  - Combined mode/preset via c14 (smart/boost/silence × heat/cool/auto)
+  - Air temperature sensor via generic `air_temp_component` handling
+  - Status c17, no flow alarm c28
+
+### Fixed
+- **Detailed auth logging** for diagnosing reauthentication issues (Issue #29)
+  - Logs token expiration, refresh attempts, re-auth fallback, and exact failure reason
+  - Helps users provide actionable debug data
+
 ## [2.23.0] - 2026-03-27
 
 ### Added
