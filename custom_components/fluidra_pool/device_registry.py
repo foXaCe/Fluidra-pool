@@ -73,6 +73,27 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=95,
     ),
+    "z260iq_heat_pump": DeviceConfig(
+        device_type="heat_pump",
+        name_patterns=["z260", "z26"],
+        family_patterns=["heat pump"],
+        components_range=5,  # Minimal scan, specific components below
+        required_components=[0, 1, 2, 3],
+        entities=["climate", "switch", "sensor_info", "sensor_temperature"],
+        features={
+            "preset_modes": True,
+            "temperature_control": True,
+            "hvac_modes": ["off", "heat", "cool", "auto"],
+            "skip_auto_mode": True,
+            "skip_schedules": True,
+            # Same combined mode system as LG (component 14: 0-6)
+            # 0=Smart Heating, 1=Smart Cooling, 2=Smart Heat/Cool
+            # 3=Boost Heating, 4=Silence Heating, 5=Boost Cooling, 6=Silence Cooling
+            "air_temp_component": 67,  # Air temperature (÷10)
+            "specific_components": [0, 13, 14, 15, 17, 19, 28, 67],
+        },
+        priority=97,  # Higher than z550iq
+    ),
     "z550iq_heat_pump": DeviceConfig(
         device_type="heat_pump",
         identifier_patterns=["LD*"],
