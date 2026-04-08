@@ -122,6 +122,11 @@ LG_MODE_TO_VALUE: Final = {
 
 LG_VALUE_TO_MODE: Final = {v: k for k, v in LG_MODE_TO_VALUE.items()}
 
+# Z260iQ Heat Pump Constants
+Z260_MIN_TEMP: Final = 7.0
+Z260_MAX_TEMP: Final = 40.0
+Z260_TEMP_STEP: Final = 1.0
+
 # LumiPlus Connect component IDs
 LUMIPLUS_COMPONENT_POWER: Final = 11
 LUMIPLUS_COMPONENT_BRIGHTNESS: Final = 17
