@@ -79,11 +79,22 @@ async def async_setup_entry(
                     entities.append(
                         FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "air")
                     )
+                # Z260iQ heat pump specific temperature sensors
+                if DeviceIdentifier.has_feature(device, "z260iq_mode"):
+                    entities.append(
+                        FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "water")
+                    )
+                    entities.append(
+                        FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "air")
+                    )
 
             if DeviceIdentifier.should_create_entity(device, "sensor_brightness"):
                 # Brightness sensor for lights
                 if "brightness" in device:
                     entities.append(FluidraLightBrightnessSensor(coordinator, coordinator.api, pool["id"], device_id))
+
+            if DeviceIdentifier.should_create_entity(device, "sensor_running_hours"):
+                entities.append(FluidraRunningHoursSensor(coordinator, coordinator.api, pool["id"], device_id))
 
             # Chlorinator sensors - create based on sensors_config from device registry
             device_type = device.get("type", "")
@@ -286,6 +297,24 @@ class FluidraLightBrightnessSensor(FluidraPoolSensorEntity):
     def icon(self) -> str:
         """Return the icon of the sensor."""
         return "mdi:brightness-percent"
+
+
+class FluidraRunningHoursSensor(FluidraPoolSensorEntity):
+    """Running hours sensor for Z260iQ heat pumps (component 0)."""
+
+    _attr_translation_key = "running_hours"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "h"
+    _attr_icon = "mdi:clock-outline"
+
+    def __init__(self, coordinator, api, pool_id: str, device_id: str):
+        """Initialize running hours sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "running_hours")
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the running hours from component 0."""
+        return self.device_data.get("running_hours")
 
 
 class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):

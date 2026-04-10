@@ -338,6 +338,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
         if component_id == 0:
             device["device_id_component"] = reported_value
+            if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
+                try:
+                    device["running_hours"] = int(reported_value)
+                except (ValueError, TypeError):
+                    pass
         elif component_id == 1:
             device["part_numbers_component"] = reported_value
         elif component_id == 2:
@@ -382,6 +387,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                 device["is_heating"] = bool(reported_value)
         elif component_id == 14:
             device["component_14_data"] = component_state
+            if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
+                try:
+                    device["z260iq_mode_value"] = int(reported_value)
+                except (ValueError, TypeError):
+                    pass
         elif component_id == 15:
             device["component_15_speed"] = reported_value or component_state.get("desiredValue") or 0
             temp_raw = reported_value or component_state.get("desiredValue")
@@ -473,17 +483,23 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                 except (ValueError, TypeError):
                     pass
             device[f"component_{component_id}_data"] = component_state
-        else:
-            # Generic air temperature component (e.g., Z260iQ c67)
-            air_temp_comp = DeviceIdentifier.get_feature(device, "air_temp_component")
-            if air_temp_comp and component_id == air_temp_comp and reported_value is not None:
+        elif component_id == 28:
+            device["component_28_data"] = component_state
+            if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
+                try:
+                    device["no_flow_alarm"] = int(reported_value) != 0
+                except (ValueError, TypeError):
+                    pass
+        elif component_id == 67:
+            device["component_67_data"] = component_state
+            if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
                 try:
                     air_temp = float(reported_value) / 10.0
-                    if -20.0 <= air_temp <= 60.0:
+                    if -30.0 <= air_temp <= 60.0:
                         device["air_temperature"] = air_temp
                 except (ValueError, TypeError):
                     pass
-
+        else:
             schedule_comp = DeviceIdentifier.get_feature(device, "schedule_component")
             if schedule_comp and component_id == schedule_comp:
                 if isinstance(reported_value, dict) and "programs" in reported_value:
