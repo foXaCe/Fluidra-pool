@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.25.0] - 2026-04-10
+
+### Added
+- **Full Zodiac Z260iQ feature exposure** (PR #42 by @h3nnes)
+  - Air temperature sensor (c67) now properly exposed as HA entity
+  - Running hours sensor (c0) with TOTAL_INCREASING state class
+  - No-flow alarm state tracking (c28)
+  - HVAC mode control via c13 (ON/OFF) + c14 (mode/preset)
+  - Heat/Cool/Heat+Cool modes with proper preset preservation
+  - Custom temperature range (7-40°C, 1°C step)
+  - BXWAD component 7 signature check to differentiate from Z250iQ (both use LF* prefix)
+
 ## [2.24.0] - 2026-04-08
 
 ### Added
