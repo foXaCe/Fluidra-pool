@@ -67,6 +67,7 @@ class FluidraPoolAPI:
         "speed_percentages",
         "_circuit_breaker",
         "_rate_limiter",
+        "_token_lock",
     )
 
     def __init__(self, email: str, password: str, hass: HomeAssistant | None = None) -> None:
@@ -90,6 +91,9 @@ class FluidraPoolAPI:
         # 🏆 God Tier: Circuit breaker and rate limiter
         self._circuit_breaker = CircuitBreaker()
         self._rate_limiter = RateLimiter()
+
+        # Lock to serialize token refresh (prevents concurrent refreshes on parallel requests)
+        self._token_lock = asyncio.Lock()
 
         # Component control mappings discovered via reverse engineering
         self.component_mappings: Final[dict[str, int]] = {
@@ -281,9 +285,11 @@ class FluidraPoolAPI:
         self.refresh_token = auth_result.get("RefreshToken")
         self.id_token = auth_result.get("IdToken")
 
-        # Calculer l'expiration du token (AWS Cognito = 1 heure par défaut)
-        expires_in = auth_result.get("ExpiresIn", 3600)  # 1 heure par défaut
-        self.token_expires_at = int(time.time()) + expires_in - 300  # Renouveler 5 min avant expiration
+        # Calculate token expiration. Fluidra Cognito pool may return short-lived tokens
+        # (e.g. ExpiresIn=300s). Use adaptive margin: 10% of lifetime, min 30s, max 300s.
+        expires_in = auth_result.get("ExpiresIn", 3600)
+        margin = min(300, max(30, expires_in // 10))
+        self.token_expires_at = int(time.time()) + expires_in - margin
 
         if not self.access_token:
             raise FluidraAuthError("Access token non reçu")
@@ -461,35 +467,41 @@ class FluidraPoolAPI:
         """S'assurer que le token est valide, le renouveler si nécessaire.
 
         Returns True if token is valid/renewed, False only if credentials are invalid.
+        Uses a lock to serialize concurrent refresh attempts from parallel requests.
         """
         if not self.is_token_expired():
             return True
 
-        now = int(time.time())
-        _LOGGER.debug(
-            "Token expired (now=%d, expires_at=%s, has_refresh=%s)",
-            now,
-            self.token_expires_at,
-            bool(self.refresh_token),
-        )
+        async with self._token_lock:
+            # Double-check: another coroutine may have refreshed while we were waiting
+            if not self.is_token_expired():
+                return True
 
-        # Try refresh token first (fastest path)
-        if await self.refresh_access_token():
-            _LOGGER.debug("Token refresh successful, new expires_at=%s", self.token_expires_at)
-            return True
+            now = int(time.time())
+            _LOGGER.debug(
+                "Token expired (now=%d, expires_at=%s, has_refresh=%s)",
+                now,
+                self.token_expires_at,
+                bool(self.refresh_token),
+            )
 
-        # Refresh failed — try full re-authentication with stored credentials
-        _LOGGER.warning(
-            "Token refresh failed, attempting full re-authentication with stored credentials (email=%s)",
-            self.email[:3] + "***" if self.email else "None",
-        )
-        try:
-            await self._cognito_initial_auth()
-            _LOGGER.info("Full re-authentication successful, new expires_at=%s", self.token_expires_at)
-            return True
-        except Exception as err:
-            _LOGGER.error("Re-authentication also failed: %s (type: %s)", err, type(err).__name__)
-            return False
+            # Try refresh token first (fastest path)
+            if await self.refresh_access_token():
+                _LOGGER.debug("Token refresh successful, new expires_at=%s", self.token_expires_at)
+                return True
+
+            # Refresh failed — try full re-authentication with stored credentials
+            _LOGGER.warning(
+                "Token refresh failed, attempting full re-authentication with stored credentials (email=%s)",
+                self.email[:3] + "***" if self.email else "None",
+            )
+            try:
+                await self._cognito_initial_auth()
+                _LOGGER.info("Full re-authentication successful, new expires_at=%s", self.token_expires_at)
+                return True
+            except Exception as err:
+                _LOGGER.error("Re-authentication also failed: %s (type: %s)", err, type(err).__name__)
+                return False
 
     async def refresh_access_token(self) -> bool:
         """Renouveler l'access token avec le refresh token."""
@@ -529,9 +541,10 @@ class FluidraPoolAPI:
                 if new_refresh:
                     self.refresh_token = new_refresh
 
-                # Mettre à jour l'expiration
+                # Update expiration with adaptive margin (see _cognito_initial_auth)
                 expires_in = auth_result.get("ExpiresIn", 3600)
-                self.token_expires_at = int(time.time()) + expires_in - 300
+                margin = min(300, max(30, expires_in // 10))
+                self.token_expires_at = int(time.time()) + expires_in - margin
 
                 return True
             # Log the specific error from Cognito for debugging
