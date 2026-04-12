@@ -25,6 +25,7 @@ from .api_resilience import (
     FluidraCircuitBreakerError,
     FluidraConnectionError,
     FluidraError,
+    FluidraMFARequired,
     RateLimiter,
 )
 from .const import PUMP_START_DELAY
@@ -68,9 +69,17 @@ class FluidraPoolAPI:
         "_circuit_breaker",
         "_rate_limiter",
         "_token_lock",
+        "_on_token_persist",
     )
 
-    def __init__(self, email: str, password: str, hass: HomeAssistant | None = None) -> None:
+    def __init__(
+        self,
+        email: str,
+        password: str,
+        hass: HomeAssistant | None = None,
+        refresh_token: str | None = None,
+        on_token_persist: Any | None = None,
+    ) -> None:
         """Initialize the API wrapper."""
         self.email: str = email
         self.password: str = password
@@ -79,9 +88,12 @@ class FluidraPoolAPI:
 
         # AWS Cognito tokens
         self.access_token: str | None = None
-        self.refresh_token: str | None = None
+        self.refresh_token: str | None = refresh_token  # Pre-seed from stored entry data
         self.id_token: str | None = None
         self.token_expires_at: int | None = None  # Timestamp d'expiration
+
+        # Callback to persist refresh_token back to the config entry (avoids MFA on restart)
+        self._on_token_persist: Any | None = on_token_persist
 
         # Account data
         self.user_pools: list[dict[str, Any]] = []
@@ -228,15 +240,27 @@ class FluidraPoolAPI:
         raise FluidraConnectionError(f"Request failed after {MAX_RETRIES + 1} attempts: {last_error}")
 
     async def authenticate(self) -> None:
-        """Authentification réelle via AWS Cognito."""
+        """Authentification réelle via AWS Cognito.
+
+        If a refresh_token was supplied (e.g. persisted from a previous session), it is
+        tried first so that MFA is not re-triggered on every HA restart or integration reload.
+        Falls back to full email/password auth only when the refresh token is absent or expired.
+        """
         try:
-            # Étape 1: Authentification initiale AWS Cognito
+            if self.refresh_token:
+                # Try to exchange the stored refresh token for a fresh access token.
+                # This succeeds silently without triggering SMS/TOTP MFA.
+                refreshed = await self.refresh_access_token()
+                if refreshed:
+                    _LOGGER.info("Authenticated via stored refresh token (no MFA required)")
+                    await self._get_user_profile()
+                    await self.async_update_data()
+                    return
+                _LOGGER.warning("Stored refresh token expired or invalid, falling back to full auth")
+
+            # Full authentication — may raise FluidraMFARequired if MFA is enabled.
             await self._cognito_initial_auth()
-
-            # Étape 2: Récupérer les informations du compte
             await self._get_user_profile()
-
-            # Étape 3: Découvrir les piscines et équipements
             await self.async_update_data()
 
         except FluidraError:
@@ -279,7 +303,15 @@ class FluidraPoolAPI:
         except json.JSONDecodeError as e:
             raise FluidraAuthError(f"Invalid JSON response: {e}") from e
 
-        auth_result = auth_data.get("AuthenticationResult", {})
+        auth_result = auth_data.get("AuthenticationResult")
+
+        # Cognito may return a challenge (e.g. MFA) instead of tokens directly.
+        if not auth_result:
+            challenge_name = auth_data.get("ChallengeName", "")
+            session = auth_data.get("Session", "")
+            if challenge_name in ("SOFTWARE_TOKEN_MFA", "SMS_MFA"):
+                raise FluidraMFARequired(challenge_name, session)
+            raise FluidraAuthError(f"Unexpected Cognito response: {auth_data}")
 
         self.access_token = auth_result.get("AccessToken")
         self.refresh_token = auth_result.get("RefreshToken")
@@ -293,6 +325,62 @@ class FluidraPoolAPI:
 
         if not self.access_token:
             raise FluidraAuthError("Access token non reçu")
+
+        # Persist the refresh token so HA can bypass MFA on next restart.
+        if self.refresh_token and self._on_token_persist:
+            self._on_token_persist(self.refresh_token)
+
+    async def _cognito_respond_to_mfa(self, code: str, session: str, challenge_name: str = "SOFTWARE_TOKEN_MFA") -> None:
+        """Complete a Cognito MFA challenge with a TOTP or SMS code."""
+        payload = {
+            "ChallengeName": challenge_name,
+            "ClientId": COGNITO_CLIENT_ID,
+            "Session": session,
+            "ChallengeResponses": {
+                "USERNAME": self.email,
+                f"{challenge_name}_CODE": code,
+            },
+        }
+
+        headers = {
+            "Content-Type": "application/x-amz-json-1.1; charset=utf-8",
+            "X-Amz-Target": "AWSCognitoIdentityProviderService.RespondToAuthChallenge",
+            "User-Agent": "com.fluidra.iaqualinkplus/1741857021 (Linux; U; Android 14; fr_FR; MI PAD 4; Build/UQ1A.240205.004; Cronet/140.0.7289.0)",
+        }
+
+        response = await self._request(
+            "POST",
+            COGNITO_ENDPOINT,
+            headers=headers,
+            json_data=payload,
+            skip_circuit_breaker=True,
+        )
+
+        if response.status != 200:
+            error_text = await response.text()
+            raise FluidraAuthError(f"MFA verification failed: {response.status} - {error_text}")
+
+        response_text = await response.text()
+        try:
+            auth_data = json.loads(response_text)
+        except json.JSONDecodeError as e:
+            raise FluidraAuthError(f"Invalid JSON response after MFA: {e}") from e
+
+        auth_result = auth_data.get("AuthenticationResult", {})
+        self.access_token = auth_result.get("AccessToken")
+        self.refresh_token = auth_result.get("RefreshToken")
+        self.id_token = auth_result.get("IdToken")
+
+        expires_in = auth_result.get("ExpiresIn", 3600)
+        margin = min(300, max(30, expires_in // 10))
+        self.token_expires_at = int(time.time()) + expires_in - margin
+
+        if not self.access_token:
+            raise FluidraAuthError("Access token non reçu après MFA")
+
+        # Persist the refresh token so HA can bypass MFA on next restart.
+        if self.refresh_token and self._on_token_persist:
+            self._on_token_persist(self.refresh_token)
 
     async def _get_user_profile(self) -> dict[str, Any]:
         """Récupérer le profil utilisateur."""
@@ -499,6 +587,11 @@ class FluidraPoolAPI:
                 await self._cognito_initial_auth()
                 _LOGGER.info("Full re-authentication successful, new expires_at=%s", self.token_expires_at)
                 return True
+            except FluidraMFARequired:
+                # MFA is required — signal auth failure so the coordinator triggers the reauth flow.
+                # Returning False (not re-raising) prevents an unhandled exception loop.
+                _LOGGER.warning("MFA required during token re-authentication, triggering reauth flow")
+                return False
             except Exception as err:
                 _LOGGER.error("Re-authentication also failed: %s (type: %s)", err, type(err).__name__)
                 return False
@@ -545,6 +638,10 @@ class FluidraPoolAPI:
                 expires_in = auth_result.get("ExpiresIn", 3600)
                 margin = min(300, max(30, expires_in // 10))
                 self.token_expires_at = int(time.time()) + expires_in - margin
+
+                # Persist updated refresh token if Cognito rotated it.
+                if self.refresh_token and self._on_token_persist:
+                    self._on_token_persist(self.refresh_token)
 
                 return True
             # Log the specific error from Cognito for debugging
