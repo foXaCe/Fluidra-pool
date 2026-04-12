@@ -13,16 +13,16 @@
       "unknown": "Erreur inattendue"
     },
     "step": {
-      "mfa": {
-        "title": "Authentification à deux facteurs",
-        "description": "Votre compte nécessite un code de vérification. Saisissez le code de votre application d'authentification ou reçu par SMS.",
-        "data": {
-          "mfa_code": "Code de vérification"
-        }
-      },
       "confirm": {
         "description": "Nous avons trouvé un équipement Fluidra Pool. Voulez-vous l'ajouter ?",
         "title": "Piscine Fluidra découverte"
+      },
+      "mfa": {
+        "data": {
+          "mfa_code": "Code de vérification"
+        },
+        "description": "Votre compte nécessite un code de vérification. Saisissez le code de votre application d'authentification ou reçu par SMS.",
+        "title": "Authentification à deux facteurs"
       },
       "reauth_confirm": {
         "data": {

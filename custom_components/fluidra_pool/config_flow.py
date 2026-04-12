@@ -287,7 +287,9 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
         finally:
             await api.close()
 
-    async def _verify_mfa(self, email: str, password: str, session: str, challenge_name: str, code: str) -> tuple[str | None, str | None]:
+    async def _verify_mfa(
+        self, email: str, password: str, session: str, challenge_name: str, code: str
+    ) -> tuple[str | None, str | None]:
         """Send the MFA code to Cognito and return (error_key, refresh_token).
 
         Returns:

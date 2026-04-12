@@ -330,7 +330,9 @@ class FluidraPoolAPI:
         if self.refresh_token and self._on_token_persist:
             self._on_token_persist(self.refresh_token)
 
-    async def _cognito_respond_to_mfa(self, code: str, session: str, challenge_name: str = "SOFTWARE_TOKEN_MFA") -> None:
+    async def _cognito_respond_to_mfa(
+        self, code: str, session: str, challenge_name: str = "SOFTWARE_TOKEN_MFA"
+    ) -> None:
         """Complete a Cognito MFA challenge with a TOTP or SMS code."""
         payload = {
             "ChallengeName": challenge_name,
