@@ -281,6 +281,31 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=86,  # Same priority as other LC chlorinators
     ),
+    "lc24015802_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # LC24015802 is a Tecno LC2 bridge; its child device ID is LC24015802.nn_1
+        identifier_patterns=["LC24015802.nn_*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%)
+            "ph_setpoint": 16,         # Component 16 (÷100) — e.g., 740 = 7.40 pH
+            "orp_setpoint": 20,        # Component 20 (mV)
+            "boost_mode": 103,         # Component 103 (boolean: true/false)
+            "skip_mode_select": True,  # No mode select (tecnoLC2 bridge style)
+            "sensors": {
+                "ph": 165,          # pH measured (÷100)
+                "orp": 170,         # ORP/Redox measured (mV)
+                "temperature": 172, # Pool temperature (°C × 10)
+                "salinity": 174,    # Salinity (g/L × 100)
+            },
+            # Same component set as iSALT LC24013306 (same tecnoLC2 thingType)
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
+        },
+        priority=87,  # Higher than generic *.nn_* (80) and other LC models (86)
+    ),
     "lc24056317_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["LC24056317*"],  # Gre chlorinator (I.D. Electroquimica/Fluidra) - Issue #28
