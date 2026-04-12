@@ -87,9 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
 
     def _persist_refresh_token(new_token: str) -> None:
         """Persist the latest refresh token back into the config entry."""
-        hass.config_entries.async_update_entry(
-            entry, data={**entry.data, "refresh_token": new_token}
-        )
+        hass.config_entries.async_update_entry(entry, data={**entry.data, "refresh_token": new_token})
 
     api = FluidraPoolAPI(
         email,

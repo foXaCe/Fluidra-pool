@@ -291,15 +291,15 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         entities=["switch", "number", "sensor_info"],
         features={
             "chlorination_level": 10,  # Component 10 (0-100%)
-            "ph_setpoint": 16,         # Component 16 (÷100) — e.g., 740 = 7.40 pH
-            "orp_setpoint": 20,        # Component 20 (mV)
-            "boost_mode": 103,         # Component 103 (boolean: true/false)
+            "ph_setpoint": 16,  # Component 16 (÷100) — e.g., 740 = 7.40 pH
+            "orp_setpoint": 20,  # Component 20 (mV)
+            "boost_mode": 103,  # Component 103 (boolean: true/false)
             "skip_mode_select": True,  # No mode select (tecnoLC2 bridge style)
             "sensors": {
-                "ph": 165,          # pH measured (÷100)
-                "orp": 170,         # ORP/Redox measured (mV)
-                "temperature": 172, # Pool temperature (°C × 10)
-                "salinity": 174,    # Salinity (g/L × 100)
+                "ph": 165,  # pH measured (÷100)
+                "orp": 170,  # ORP/Redox measured (mV)
+                "temperature": 172,  # Pool temperature (°C × 10)
+                "salinity": 174,  # Salinity (g/L × 100)
             },
             # Same component set as iSALT LC24013306 (same tecnoLC2 thingType)
             "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
