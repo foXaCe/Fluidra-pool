@@ -53,6 +53,15 @@ class FluidraCircuitBreakerError(FluidraError):
     """Exception when circuit breaker is open."""
 
 
+class FluidraMFARequired(FluidraError):
+    """Exception raised when Cognito requires an MFA challenge to complete authentication."""
+
+    def __init__(self, challenge_name: str, session: str) -> None:
+        self.challenge_name = challenge_name
+        self.session = session
+        super().__init__(f"MFA required: {challenge_name}")
+
+
 # --- Circuit Breaker ---
 
 

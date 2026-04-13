@@ -13,12 +13,12 @@ from typing import TYPE_CHECKING, Final
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 import voluptuous as vol
 
-from .api_resilience import FluidraError
+from .api_resilience import FluidraError, FluidraMFARequired
 from .const import CONF_EMAIL, CONF_PASSWORD, DOMAIN, FluidraPoolConfigEntry, FluidraPoolRuntimeData
 
 if TYPE_CHECKING:
@@ -82,7 +82,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     # Initialize API client
     from .fluidra_api import FluidraPoolAPI
 
-    api = FluidraPoolAPI(email, password, hass)
+    # Pass any stored refresh token so the API can bypass MFA on reload/restart.
+    stored_refresh_token = entry.data.get("refresh_token")
+
+    def _persist_refresh_token(new_token: str) -> None:
+        """Persist the latest refresh token back into the config entry."""
+        hass.config_entries.async_update_entry(entry, data={**entry.data, "refresh_token": new_token})
+
+    api = FluidraPoolAPI(
+        email,
+        password,
+        hass,
+        refresh_token=stored_refresh_token,
+        on_token_persist=_persist_refresh_token,
+    )
 
     try:
         # Test connection and authentication
@@ -90,6 +103,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
         pools = await api.get_pools()
         # Continue setup even if no pools found - user may add equipment later
 
+    except FluidraMFARequired as err:
+        _LOGGER.warning("MFA required for %s, triggering reauth flow", email[:3] + "***")
+        raise ConfigEntryAuthFailed("MFA required") from err
     except (FluidraError, TimeoutError, OSError) as err:
         _LOGGER.error("Unable to connect to Fluidra Pool API: %s", err)
         raise ConfigEntryNotReady from err
