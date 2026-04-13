@@ -612,6 +612,17 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     for component_id, component_state in component_states.items():
                         self._process_component_state(device, pool_id, component_id, component_state)
 
+                    # Debug: dump all non-null components for EXO devices (issue #39 - cover mode investigation)
+                    if DeviceIdentifier.has_feature(device, "exo_mode"):
+                        non_null = {
+                            cid: state.get("reportedValue")
+                            for cid, state in component_states.items()
+                            if state.get("reportedValue") is not None
+                            and state.get("reportedValue") != []
+                            and state.get("reportedValue") != ""
+                        }
+                        _LOGGER.warning("EXO device %s non-null components: %s", device_id, non_null)
+
             # Collect current device IDs for cleanup
             current_device_ids = set()
             for pool in pools:
