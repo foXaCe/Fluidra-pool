@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.26.1] - 2026-04-13
+
+### Changed
+- **Debug scan for EXO chlorinators** (Issue #39)
+  - Extended component scan to 0-200 on NS25 EXO devices
+  - Added WARNING log dumping all non-null components per polling cycle
+  - Temporary diagnostic release to find the "actual production" component for cover mode detection
+
 ## [2.26.0] - 2026-04-12
 
 ### Added
