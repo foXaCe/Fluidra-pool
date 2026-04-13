@@ -472,9 +472,11 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=91,  # Higher than CC25013923 for more specific match
     ),
-    "cc24054221_chlorinator": DeviceConfig(
+    "cc_energy_connect_bridged_chlorinator": DeviceConfig(
         device_type="chlorinator",
-        identifier_patterns=["CC24054221*"],  # Energy Connect bridged tecnoLC2 - Issue #36
+        # Energy Connect bridged tecnoLC2 devices - Issue #36
+        # Confirmed on: CC24054221 (cortalys), CC24041107 (StenGarny)
+        identifier_patterns=["CC24054221*", "CC24041107*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
@@ -495,7 +497,6 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
             "sensor_divisors": {
                 "salinity": 1000,  # This device reports salinity in mg/L (÷1000 for g/L)
             },
-            # Specific components for CC24054221
             "specific_components": [0, 10, 152, 154, 157, 160, 165, 172],
         },
         priority=93,  # Higher than CC24068402
