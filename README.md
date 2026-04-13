@@ -22,6 +22,7 @@ Your contributions help me continue improving this project and adding new featur
 **🔬 Testing Status:**
 - ✅ **E30iQ Pump**: Fully tested and functional
 - ✅ **LumiPlus Connect**: RGBW lighting control tested
+- ✅ **LC24015802 / iSalt 7**: Chlorinator tested
 - ⚠️ **Other equipment** (heaters, etc.): Code implemented but **requires user testing**
 
 ## ✨ Features
@@ -38,6 +39,7 @@ Your contributions help me continue improving this project and adding new featur
 - **Device information** ✅: Firmware, network signal, diagnostics
 - **Temperature** ⚠️: Sensors for heaters (current/target) - **NOT TESTED**
 - **Lighting** ⚠️: Brightness of LED equipment - **NOT TESTED**
+- **Chlorinator** : Sensors (Signal, ORP, pH, Salt, water temperature) and Controls (ORP, pH, Boost, Chlorine)
 
 ### ⚙️ **Home Assistant Entities**
 - `switch`: Pump on/off and automatic mode
@@ -67,6 +69,7 @@ Your contributions help me continue improving this project and adding new featur
     - CC25113623 ✅
     - LC24008313 (Blauswim - I.D. Electroquimica/Fluidra) ✅
     - CC24033907 ✅
+    - LC24015802 ✅
   - **Features**:
     - Chlorination level control (0-100%)
     - **pH Control**: Adjustable setpoint (6.8-7.6)
@@ -252,6 +255,7 @@ This integration was developed through **reverse engineering** of the Fluidra Co
 **✅ Tested equipment:**
 - **E30iQ Pump**: Complete control (speeds, modes, scheduling)
 - **LumiPlus Connect**: RGBW lighting control (on/off, brightness, color)
+- **LC24015802 / iSalt 7 Chlorinator** : Complete control and sensors
 
 **⚠️ Untested equipment (help needed):**
 - **Heaters**: Temperature sensors implemented but not tested
