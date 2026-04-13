@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.26.0] - 2026-04-12
+
+### Added
+- **MFA / 2FA authentication support** (PR #43 by @PhilJung)
+  - Handles Cognito MFA challenges (SOFTWARE_TOKEN_MFA, SMS_MFA)
+  - New MFA verification step in config flow with translated UI (EN/FR)
+  - Persists refresh token in config entry data to bypass MFA on HA restart
+- **LC24015802 iSALT 7 chlorinator support** (PR #44 by @PhilJung)
+  - Bridged tecnoLC2 device with full pH/ORP/temp/salinity sensors
+- **CC24041107 chlorinator support** (Issue #36 reported by @StenGarny)
+  - Added to the Energy Connect bridged chlorinator family
+
 ## [2.25.1] - 2026-04-11
 
 ### Fixed
