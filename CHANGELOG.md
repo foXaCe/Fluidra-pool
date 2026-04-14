@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.26.2] - 2026-04-14
+
+### Fixed
+- **No more reauth prompts on transient network errors** (Issue #29)
+  - DNS timeouts, Cognito unreachable, or short internet outages (Starlink micro-outages, etc.) were incorrectly triggering the reauth prompt
+  - Connection errors (`FluidraConnectionError`, `FluidraCircuitBreakerError`) now propagate as `UpdateFailed` so the coordinator simply retries on the next polling cycle
+  - Reauth flow is now only triggered for actual auth failures (invalid credentials, MFA required)
+
 ## [2.26.1] - 2026-04-13
 
 ### Changed
