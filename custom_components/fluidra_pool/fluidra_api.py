@@ -594,6 +594,12 @@ class FluidraPoolAPI:
                 # Returning False (not re-raising) prevents an unhandled exception loop.
                 _LOGGER.warning("MFA required during token re-authentication, triggering reauth flow")
                 return False
+            except (FluidraConnectionError, FluidraCircuitBreakerError) as err:
+                # Transient network/DNS issue (e.g., Starlink micro-outage) — propagate so the
+                # coordinator treats it as UpdateFailed and retries on next poll, instead of
+                # incorrectly triggering the reauth flow.
+                _LOGGER.warning("Re-authentication failed due to network error (will retry): %s", err)
+                raise
             except Exception as err:
                 _LOGGER.error("Re-authentication also failed: %s (type: %s)", err, type(err).__name__)
                 return False
