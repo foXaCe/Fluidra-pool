@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.27.0] - 2026-04-17
+
+### Added
+- **LC25007119 chlorinator support** (PR #49 by @keltakmaster)
+  - Same mappings as other LC models (pH, ORP, temperature, salinity)
+
+### Changed
+- Removed EXO debug scan and component log dump (Issue #39 — investigation complete, cover mode not exposed by Fluidra API)
+- CI: bump `softprops/action-gh-release` from v2 to v3 (Node 24)
+
 ## [2.26.2] - 2026-04-14
 
 ### Fixed
