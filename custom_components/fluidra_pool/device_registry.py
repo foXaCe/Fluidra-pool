@@ -686,26 +686,7 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
                 "salinity": 36,  # Salinity (÷1000 for g/L) - e.g., 2750 = 2.75 g/L
             },
             # Specific components for NS25 (Zodiac EXO iQ)
-            # Debug: extended scan to find cover mode / actual production (issue #39)
-            "specific_components": [
-                9,
-                13,
-                14,
-                15,
-                17,
-                20,
-                35,
-                36,
-                38,
-                39,
-                40,
-                62,
-                63,
-                64,
-                # Extended debug scan
-                *range(65, 100),
-                *range(100, 200),
-            ],
+            "specific_components": [9, 13, 14, 15, 17, 20, 35, 36, 38, 39, 40, 62, 63, 64],
         },
         priority=85,
     ),
