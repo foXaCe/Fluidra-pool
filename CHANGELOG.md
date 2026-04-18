@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.27.1] - 2026-04-18
+
+### Fixed
+- **HTTP client connection leaks and dangerous fallbacks** (`fluidra_api.py` rewrite)
+  - Responses were returned without `async with`/`release()`, eventually saturating the aiohttp connection pool on long-running HA instances
+  - `close()` could shut down the session shared with every other HA integration when the API was reused outside the HA lifecycle
+  - `set_heat_pump_temperature` fell back to components 12/13/14/16 on failure — component 13 is the pump ON/OFF, so a retry could silently switch the heat pump off instead of adjusting the setpoint
+  - A hidden `test_pool` fallback exposed a fake device in the UI when the account returned no pools
+  - Tokens are now refreshed from `_request` without the call-site recursion that could loop
+- **Home Assistant crash on repair flow** (`repairs.py`)
+  - `connection_error` was declared `is_fixable=True` with no `async_create_fix_flow`, so clicking "Fix" in the UI raised `ValueError`
+- **`FluidraHeaterSwitch` was a no-op**
+  - Constructor was called with the wrong arity and `async_turn_on/off` used `hasattr(dict, "turn_on")`, which is always false
+- **Entities were mutating shared coordinator data**
+  - Switch, number, select and light platforms wrote optimistic state directly into `coordinator.data`, which raced with the poll cycle and bypassed state-change notifications; all optimistic state is now local
+- **Retry loop ignored HTTP 429/5xx**
+  - Transient server errors (503, rate limiting) are now retried with `Retry-After` honoured, instead of surfacing as "device unavailable"
+- **Schedules interpreted in the wrong time zone**
+  - `_calculate_auto_speed_from_schedules` used `datetime.now()` (system TZ) instead of `dt_util.now()` (HA TZ)
+- **One broken pool marked every entity unavailable**
+  - `_async_update_data` wrapped the whole poll in a single try/except; per-pool failures are now isolated and keep previous data
+
+### Changed
+- **`device_id` / `pool_id` URL-encoded** in every endpoint path (`fluidra_api.py`) to stop path injection through user-supplied service payloads
+- **Logs redact credentials** via new `mask_email` / `mask_device_id` helpers; response bodies containing tokens are no longer echoed to the warning logs
+- **Dependencies**: drop unused `PyJWT` from `manifest.json`, raise `aiohttp` floor to `3.11` to match HA Core
+- **Quality Scale**: add `quality_scale.yaml` declaring the `silver` level with explicit `todo`/`exempt` annotations for the rules not yet met
+- **`config_flow` exception handling** narrowed to `FluidraAuthError` / `FluidraConnectionError` / `aiohttp.ClientError` so transient errors no longer look like bad credentials
+
+### Performance
+- **`identify_device` cached** on the device dict keyed by the component-7 signature, and wildcard patterns compiled through `functools.lru_cache` — reduces per-tick work from thousands of regex matches to near-zero
+
+### Removed
+- Dead classes and no-op properties: `FluidraSpeedControl`, `FluidraPumpComponentNumber`, `entity_picture` returning `None`, duplicated `device_class = "switch"` string literals, the unused `UPDATE_INTERVAL` constant in `__init__.py`
+- `_cached_device_data` / `_cached_pool_data` anti-pattern on the sensor base class
+
+### Translations
+- **MFA step** and `invalid_mfa_code` error added to `en.json`, `es.json`, `pt.json` (previously only French was complete; other locales showed the raw keys when MFA was required)
+
 ## [2.27.0] - 2026-04-17
 
 ### Added
