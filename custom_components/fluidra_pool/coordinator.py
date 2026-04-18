@@ -3,26 +3,26 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 from datetime import timedelta
 import logging
-from typing import Final
 
+import aiohttp
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
+from .api_resilience import FluidraError
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
 from .fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
-
-# Optimized polling interval (30s minimum per HA guidelines)
-UPDATE_INTERVAL: Final = timedelta(seconds=30)
 
 
 class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
@@ -105,7 +105,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     # Then remove the device itself
                     device_registry.async_remove_device(device_entry.id)
 
-        except Exception as err:
+        except HomeAssistantError as err:
             _LOGGER.debug("Failed to cleanup removed devices: %s", err)
 
     async def _cleanup_schedule_sensor_if_empty(self, pool_id: str, device_id: str, schedule_data: list):
@@ -124,7 +124,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                         entity_registry.async_remove(entity_id)
                         break
 
-        except Exception as err:
+        except HomeAssistantError as err:
             _LOGGER.debug("Failed to cleanup schedule sensor: %s", err)
 
     def _parse_dm24049704_schedule_format(self, reported_value: dict) -> list:
@@ -224,20 +224,20 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug("Parsed DM24049704 schedule: %s -> %s", reported_value, result)
             return result
 
-        except Exception as e:
-            _LOGGER.warning("Failed to parse DM24049704 schedule format: %s", e)
+        except (ValueError, TypeError, KeyError) as err:
+            _LOGGER.warning("Failed to parse DM24049704 schedule format: %s", err)
             return []
 
     def _calculate_auto_speed_from_schedules(self, device: dict) -> int:
         """Calculate current speed based on active schedules in auto mode."""
         try:
-            from datetime import datetime, time
+            from datetime import time  # noqa: PLC0415
 
             schedule_data = device.get("schedule_data", [])
             if not schedule_data:
                 return 0
 
-            now = datetime.now()
+            now = dt_util.now()
             current_time = now.time()
             current_weekday = now.weekday()  # 0 = Monday, 6 = Sunday
 
@@ -545,75 +545,23 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
             previous_data = self.data if isinstance(self.data, dict) else {}
 
-            # Process each pool with parallel API calls
+            # Process each pool, isolating failures so one broken pool does not
+            # make the whole integration unavailable.
             for pool in pools:
-                pool_id = pool["id"]
-                prev_pool = previous_data.get(pool_id, {})
-                prev_devices_by_id = {d.get("device_id"): d for d in prev_pool.get("devices", []) if d.get("device_id")}
-
-                # Parallel: pool details + water quality
-                pool_details_task = self.api.get_pool_details(pool_id)
-                water_quality_task = self.api.poll_water_quality(pool_id)
-                pool_details, water_quality = await asyncio.gather(
-                    pool_details_task, water_quality_task, return_exceptions=True
-                )
-
-                if pool_details and not isinstance(pool_details, Exception):
-                    api_devices = pool.get("devices", [])
-                    pool.update(pool_details)
-                    pool["devices"] = api_devices
-
-                if water_quality and not isinstance(water_quality, Exception):
-                    pool["water_quality"] = water_quality
-
-                # Preserve previous component data
-                for device in pool.get("devices", []):
-                    device_id = device.get("device_id")
-                    if device_id and device_id in prev_devices_by_id:
-                        prev_device = prev_devices_by_id[device_id]
-                        if "components" in prev_device:
-                            device["components"] = dict(prev_device["components"])
-
-                # Parallel: device status for all devices in pool
-                devices_with_ids = [(d, d.get("device_id")) for d in pool.get("devices", []) if d.get("device_id")]
-                if devices_with_ids:
-                    status_tasks = [self.api.poll_device_status(pool_id, did) for _, did in devices_with_ids]
-                    status_results = await asyncio.gather(*status_tasks, return_exceptions=True)
-
-                    for (device, _), status in zip(devices_with_ids, status_results, strict=False):
-                        if status and not isinstance(status, Exception):
-                            device["status"] = status
-                            connectivity = status.get("connectivity", {})
-                            device["connectivity"] = connectivity
-                            # Update online status from real connectivity data
-                            if "connected" in connectivity:
-                                device["online"] = connectivity["connected"]
-
-                # Parallel: fetch all components for all devices
-                for device in pool.get("devices", []):
-                    device_id = device.get("device_id")
-                    if not device_id:
-                        continue
-
-                    if "components" not in device:
-                        device["components"] = {}
-
-                    # Build list of components to scan
-                    component_range = DeviceIdentifier.get_components_range(device)
-                    specific_components = DeviceIdentifier.get_feature(device, "specific_components", [])
-                    components_to_scan = list(range(0, component_range))
-                    if specific_components:
-                        components_to_scan.extend([c for c in specific_components if c not in components_to_scan])
-
-                    # Fetch all components in parallel
-                    component_states = await self._fetch_components_parallel(device_id, components_to_scan)
-
-                    # Process all component states
-                    for component_id, component_state in component_states.items():
-                        self._process_component_state(device, pool_id, component_id, component_state)
+                try:
+                    await self._refresh_pool(pool, previous_data)
+                except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+                    _LOGGER.warning(
+                        "Failed to refresh pool %s, keeping previous data: %s",
+                        pool.get("id"),
+                        err,
+                    )
+                    prev_pool = previous_data.get(pool.get("id"))
+                    if prev_pool:
+                        pool.update(prev_pool)
 
             # Collect current device IDs for cleanup
-            current_device_ids = set()
+            current_device_ids: set[str] = set()
             for pool in pools:
                 current_device_ids.add(pool["id"])
                 for device in pool.get("devices", []):
@@ -621,13 +569,67 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     if device_id:
                         current_device_ids.add(device_id)
 
-            # Cleanup removed devices
             await self._cleanup_removed_devices(current_device_ids)
 
             return {pool["id"]: pool for pool in pools}
 
         except ConfigEntryAuthFailed:
             raise
-        except Exception as err:
-            _LOGGER.error("Error updating Fluidra Pool data: %s", err)
-            raise UpdateFailed(f"Error communicating with API: {err}") from err
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            _LOGGER.exception("Error updating Fluidra Pool data")
+            raise UpdateFailed(f"Error communicating with API: {type(err).__name__}") from err
+
+    async def _refresh_pool(self, pool: dict, previous_data: dict) -> None:
+        """Refresh a single pool and its devices."""
+        pool_id = pool["id"]
+        prev_pool = previous_data.get(pool_id, {})
+        prev_devices_by_id = {d.get("device_id"): d for d in prev_pool.get("devices", []) if d.get("device_id")}
+
+        pool_details_task = self.api.get_pool_details(pool_id)
+        water_quality_task = self.api.poll_water_quality(pool_id)
+        pool_details, water_quality = await asyncio.gather(
+            pool_details_task, water_quality_task, return_exceptions=True
+        )
+
+        if isinstance(pool_details, dict):
+            api_devices = pool.get("devices", [])
+            pool.update(pool_details)
+            pool["devices"] = api_devices
+
+        if isinstance(water_quality, dict):
+            pool["water_quality"] = water_quality
+
+        # Preserve previous component data with deep copy to avoid aliasing
+        for device in pool.get("devices", []):
+            device_id = device.get("device_id")
+            if device_id and device_id in prev_devices_by_id:
+                prev_device = prev_devices_by_id[device_id]
+                if "components" in prev_device:
+                    device["components"] = copy.deepcopy(prev_device["components"])
+
+        devices_with_ids = [(d, d.get("device_id")) for d in pool.get("devices", []) if d.get("device_id")]
+        if devices_with_ids:
+            status_tasks = [self.api.poll_device_status(pool_id, did) for _, did in devices_with_ids]
+            status_results = await asyncio.gather(*status_tasks, return_exceptions=True)
+
+            for (device, _), status in zip(devices_with_ids, status_results, strict=False):
+                if isinstance(status, dict):
+                    device["status"] = status
+                    connectivity = status.get("connectivity", {})
+                    device["connectivity"] = connectivity
+                    if "connected" in connectivity:
+                        device["online"] = connectivity["connected"]
+
+        for device in pool.get("devices", []):
+            device_id = device.get("device_id")
+            if not device_id:
+                continue
+            device.setdefault("components", {})
+            component_range = DeviceIdentifier.get_components_range(device)
+            specific_components = DeviceIdentifier.get_feature(device, "specific_components", [])
+            components_to_scan = list(range(component_range))
+            if specific_components:
+                components_to_scan.extend(c for c in specific_components if c not in components_to_scan)
+            component_states = await self._fetch_components_parallel(device_id, components_to_scan)
+            for component_id, component_state in component_states.items():
+                self._process_component_state(device, pool_id, component_id, component_state)
