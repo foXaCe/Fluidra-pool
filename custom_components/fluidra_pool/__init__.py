@@ -6,7 +6,6 @@ This integration provides support for Fluidra Pool systems.
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
 from typing import TYPE_CHECKING, Final
 
@@ -20,6 +19,7 @@ import voluptuous as vol
 
 from .api_resilience import FluidraError, FluidraMFARequired
 from .const import CONF_EMAIL, CONF_PASSWORD, DOMAIN, FluidraPoolConfigEntry, FluidraPoolRuntimeData
+from .utils import mask_email
 
 if TYPE_CHECKING:
     from .coordinator import FluidraDataUpdateCoordinator
@@ -35,8 +35,6 @@ PLATFORMS: Final = [
     Platform.CLIMATE,  # Pour contrôle température pompes à chaleur
     Platform.LIGHT,  # Pour LumiPlus Connect et autres éclairages
 ]
-
-UPDATE_INTERVAL: Final = timedelta(seconds=45)  # Reduced frequency for better performance
 
 # Service schemas
 SERVICE_SET_SCHEDULE = "set_schedule"
@@ -104,7 +102,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
         # Continue setup even if no pools found - user may add equipment later
 
     except FluidraMFARequired as err:
-        _LOGGER.warning("MFA required for %s, triggering reauth flow", email[:3] + "***")
+        _LOGGER.warning("MFA required for %s, triggering reauth flow", mask_email(email))
         raise ConfigEntryAuthFailed("MFA required") from err
     except (FluidraError, TimeoutError, OSError) as err:
         _LOGGER.error("Unable to connect to Fluidra Pool API: %s", err)
@@ -254,19 +252,20 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
             }
             fluidra_schedules.append(fluidra_schedule)
 
-        # Send to API
         try:
             success = await coordinator.api.set_schedule(device_id, fluidra_schedules)
-            if success:
-                await coordinator.async_request_refresh()
-                return {
-                    "success": True,
-                    "device_id": device_id,
-                    "schedules_count": len(fluidra_schedules),
-                }
-            return {"success": False, "device_id": device_id, "error": "API call failed"}
-        except Exception as err:
-            return {"success": False, "device_id": device_id, "error": str(err)}
+        except FluidraError:
+            _LOGGER.exception("Service %s failed for device %s", SERVICE_SET_SCHEDULE, device_id)
+            return {"success": False, "device_id": device_id, "error": "Fluidra API error"}
+
+        if success:
+            await coordinator.async_request_refresh()
+            return {
+                "success": True,
+                "device_id": device_id,
+                "schedules_count": len(fluidra_schedules),
+            }
+        return {"success": False, "device_id": device_id, "error": "API call failed"}
 
     async def _handle_clear_schedule(call: ServiceCall) -> ServiceResponse:
         """Handle clear_schedule service call.
@@ -277,12 +276,14 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
 
         try:
             success = await coordinator.api.clear_schedule(device_id)
-            if success:
-                await coordinator.async_request_refresh()
-                return {"success": True, "device_id": device_id}
-            return {"success": False, "device_id": device_id, "error": "API call failed"}
-        except Exception as err:
-            return {"success": False, "device_id": device_id, "error": str(err)}
+        except FluidraError:
+            _LOGGER.exception("Service %s failed for device %s", SERVICE_CLEAR_SCHEDULE, device_id)
+            return {"success": False, "device_id": device_id, "error": "Fluidra API error"}
+
+        if success:
+            await coordinator.async_request_refresh()
+            return {"success": True, "device_id": device_id}
+        return {"success": False, "device_id": device_id, "error": "API call failed"}
 
     async def _handle_set_preset_schedule(call: ServiceCall) -> ServiceResponse:
         """Handle set_preset_schedule service call.
@@ -368,17 +369,19 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
 
         try:
             success = await coordinator.api.set_schedule(device_id, fluidra_schedules)
-            if success:
-                await coordinator.async_request_refresh()
-                return {
-                    "success": True,
-                    "device_id": device_id,
-                    "preset": preset,
-                    "schedules_count": len(fluidra_schedules),
-                }
-            return {"success": False, "device_id": device_id, "error": "API call failed"}
-        except Exception as err:
-            return {"success": False, "device_id": device_id, "error": str(err)}
+        except FluidraError:
+            _LOGGER.exception("Service %s failed for device %s", SERVICE_SET_PRESET_SCHEDULE, device_id)
+            return {"success": False, "device_id": device_id, "error": "Fluidra API error"}
+
+        if success:
+            await coordinator.async_request_refresh()
+            return {
+                "success": True,
+                "device_id": device_id,
+                "preset": preset,
+                "schedules_count": len(fluidra_schedules),
+            }
+        return {"success": False, "device_id": device_id, "error": "API call failed"}
 
     # 🏆 Platinum: Register services with supports_response
     hass.services.async_register(

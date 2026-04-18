@@ -6,41 +6,37 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
-# Default CRON expression for all days
+# Default CRON expression for all days (Mon-Sun in mobile format)
 DEFAULT_CRON_ALL_DAYS = "00 00 * * 1,2,3,4,5,6,7"
+
+# CRON day number → weekday name (Fluidra mobile-app format: 1=Monday, 7=Sunday)
+CRON_DAY_TO_NAME = {
+    1: "monday",
+    2: "tuesday",
+    3: "wednesday",
+    4: "thursday",
+    5: "friday",
+    6: "saturday",
+    7: "sunday",
+}
+
+DAY_NAME_TO_CRON = {name: num for num, name in CRON_DAY_TO_NAME.items()}
 
 
 def convert_cron_days(cron_time: str) -> str:
-    """Convert cron time from HA format (0,1,2,3,4,5,6) to mobile format (1,2,3,4,5,6,7).
-
-    In Home Assistant/standard cron format, Sunday is 0 and Saturday is 6.
-    In Fluidra mobile app format, Monday is 1 and Sunday is 7.
-
-    Args:
-        cron_time: CRON expression string (e.g., "30 08 * * 0,1,2,3,4,5,6")
-
-    Returns:
-        Converted CRON expression with days in mobile format
-    """
+    """Convert cron day numbers from HA format (0=Sun..6=Sat) to mobile format (1=Mon..7=Sun)."""
     if not cron_time:
         return DEFAULT_CRON_ALL_DAYS
 
     parts = cron_time.split()
     if len(parts) >= 5:
         try:
-            # Convert day numbers: 0->7, 1->1, 2->2, etc.
             old_days = parts[4].split(",")
-            new_days = []
+            new_days: list[int] = []
             for day in old_days:
                 day_num = int(day.strip())
-                if day_num == 0:  # Sunday: 0 -> 7
-                    new_days.append("7")
-                else:  # Monday-Saturday: 1-6 -> 1-6
-                    new_days.append(str(day_num))
-
-            # Sort days to match mobile app format
-            new_days_sorted = sorted(int(d) for d in new_days)
-            parts[4] = ",".join(map(str, new_days_sorted))
+                new_days.append(7 if day_num == 0 else day_num)
+            parts[4] = ",".join(str(d) for d in sorted(new_days))
             return " ".join(parts)
         except (ValueError, IndexError) as err:
             _LOGGER.debug("Failed to convert CRON days '%s': %s", cron_time, err)
@@ -49,14 +45,7 @@ def convert_cron_days(cron_time: str) -> str:
 
 
 def parse_cron_time(cron_time: str) -> tuple[int, int] | None:
-    """Extract hour and minute from a CRON expression.
-
-    Args:
-        cron_time: CRON expression string (e.g., "30 08 * * 1,2,3,4,5,6,7")
-
-    Returns:
-        Tuple of (hour, minute) or None if parsing fails
-    """
+    """Extract ``(hour, minute)`` from a CRON expression."""
     if not cron_time:
         return None
 
@@ -73,14 +62,23 @@ def parse_cron_time(cron_time: str) -> tuple[int, int] | None:
 
 
 def build_cron_expression(hour: int, minute: int, days: str = "1,2,3,4,5,6,7") -> str:
-    """Build a CRON expression from hour, minute and days.
-
-    Args:
-        hour: Hour (0-23)
-        minute: Minute (0-59)
-        days: Comma-separated day numbers in mobile format (1=Monday, 7=Sunday)
-
-    Returns:
-        CRON expression string
-    """
+    """Build a CRON expression from ``hour``, ``minute`` and ``days``."""
     return f"{minute:02d} {hour:02d} * * {days}"
+
+
+def mask_email(email: str | None) -> str:
+    """Return a privacy-friendly representation of an email for logging."""
+    if not email:
+        return "***"
+    if len(email) < 3:
+        return "***"
+    return f"{email[:3]}***"
+
+
+def mask_device_id(device_id: str | None) -> str:
+    """Return a privacy-friendly representation of a device id for logging."""
+    if not device_id:
+        return "***"
+    if len(device_id) < 6:
+        return "***"
+    return f"{device_id[:3]}***{device_id[-3:]}"

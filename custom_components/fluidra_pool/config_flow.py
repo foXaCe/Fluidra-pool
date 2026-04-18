@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import aiohttp
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -15,9 +16,15 @@ from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, CONF_SCAN_INTERVAL
 from homeassistant.core import callback
 import voluptuous as vol
 
-from .api_resilience import FluidraMFARequired
+from .api_resilience import (
+    FluidraAuthError,
+    FluidraConnectionError,
+    FluidraError,
+    FluidraMFARequired,
+)
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
 from .fluidra_api import FluidraPoolAPI
+from .utils import mask_email
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -269,20 +276,19 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             await api._cognito_initial_auth()
-            _LOGGER.info("Authentication successful for %s", email)
+            _LOGGER.info("Authentication successful for %s", mask_email(email))
             return None, None
         except FluidraMFARequired as mfa_err:
-            _LOGGER.info("MFA required for %s (%s)", email, mfa_err.challenge_name)
+            _LOGGER.info("MFA required for %s (%s)", mask_email(email), mfa_err.challenge_name)
             return None, {"session": mfa_err.session, "challenge_name": mfa_err.challenge_name}
-        except Exception as err:
-            _LOGGER.error("Authentication failed for %s: %s", email, err)
-            error_str = str(err).lower()
-            if any(
-                keyword in error_str for keyword in ("notauthorized", "unauthorized", "401", "incorrect", "invalid")
-            ):
-                return "invalid_auth", None
-            if any(keyword in error_str for keyword in ("timeout", "connect", "unreachable")):
-                return "cannot_connect", None
+        except FluidraAuthError:
+            _LOGGER.warning("Invalid credentials for %s", mask_email(email))
+            return "invalid_auth", None
+        except (FluidraConnectionError, aiohttp.ClientError, TimeoutError):
+            _LOGGER.warning("Cannot reach Fluidra API for %s", mask_email(email))
+            return "cannot_connect", None
+        except FluidraError:
+            _LOGGER.exception("Unexpected Fluidra error during auth for %s", mask_email(email))
             return "unknown", None
         finally:
             await api.close()
@@ -301,15 +307,16 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             await api._cognito_respond_to_mfa(code, session, challenge_name)
-            _LOGGER.info("MFA verification successful for %s", email)
+            _LOGGER.info("MFA verification successful for %s", mask_email(email))
             return None, api.refresh_token
-        except Exception as err:
-            _LOGGER.error("MFA verification failed for %s: %s", email, err)
-            error_str = str(err).lower()
-            if any(keyword in error_str for keyword in ("notauthorized", "codemismatch", "invalid", "expired")):
-                return "invalid_mfa_code", None
-            if any(keyword in error_str for keyword in ("timeout", "connect", "unreachable")):
-                return "cannot_connect", None
+        except FluidraAuthError:
+            _LOGGER.warning("MFA verification rejected for %s", mask_email(email))
+            return "invalid_mfa_code", None
+        except (FluidraConnectionError, aiohttp.ClientError, TimeoutError):
+            _LOGGER.warning("Cannot reach Fluidra API during MFA for %s", mask_email(email))
+            return "cannot_connect", None
+        except FluidraError:
+            _LOGGER.exception("Unexpected Fluidra error during MFA for %s", mask_email(email))
             return "unknown", None
         finally:
             await api.close()

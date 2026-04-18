@@ -12,18 +12,17 @@ if TYPE_CHECKING:
 
 DOMAIN: Final = "fluidra_pool"
 
-# 🏆 Type alias for ConfigEntry (Platinum) - Compatible Python 3.11+
 FluidraPoolConfigEntry: TypeAlias = "ConfigEntry[FluidraPoolRuntimeData]"  # noqa: UP040
 
 
 @dataclass(frozen=True, slots=True)
 class FluidraPoolRuntimeData:
-    """Runtime data for Fluidra Pool integration (Platinum - frozen, slots)."""
+    """Runtime data for the Fluidra Pool integration."""
 
     coordinator: FluidraDataUpdateCoordinator
 
 
-# Configuration
+# Configuration keys
 CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
 
@@ -33,6 +32,7 @@ DEVICE_TYPE_HEAT_PUMP = "heat_pump"
 DEVICE_TYPE_HEATER = "heater"
 DEVICE_TYPE_LIGHT = "light"
 DEVICE_TYPE_SENSOR = "sensor"
+DEVICE_TYPE_CHLORINATOR = "chlorinator"
 
 # Attributes
 ATTR_DEVICE_ID = "device_id"
@@ -51,7 +51,7 @@ SERVICE_SET_LIGHT_BRIGHTNESS = "set_light_brightness"
 
 # Default values
 DEFAULT_SCAN_INTERVAL = 30  # seconds
-DEFAULT_TIMEOUT = 10  # seconds
+DEFAULT_TIMEOUT = 30  # seconds — aligned with HTTP request timeout
 
 # Timing constants for optimistic state management
 OPTIMISTIC_STATE_CLEAR_DELAY = 5  # seconds - delay before clearing optimistic state
@@ -59,24 +59,47 @@ COMMAND_CONFIRMATION_DELAY = 3  # seconds - delay after command before refresh
 SWITCH_CONFIRMATION_DELAY = 2  # seconds - delay after switch toggle before refresh
 UI_UPDATE_DELAY = 0.1  # seconds - small delay for UI responsiveness
 PUMP_START_DELAY = 1  # seconds - delay after pump start before setting speed
+OPTIMISTIC_ACTION_TIMEOUT = 10  # seconds - timeout for optimistic local state
 
-# Z550iQ+ Heat Pump Constants
+# Fluidra component IDs (discovered via reverse engineering)
+COMPONENT_PUMP_ONOFF: Final = 9
+COMPONENT_AUTO_MODE: Final = 10
+COMPONENT_PUMP_SPEED: Final = 11
+COMPONENT_HEAT_PUMP_ONOFF: Final = 13
+COMPONENT_HEAT_PUMP_PRESET: Final = 14
+COMPONENT_HEAT_PUMP_SETPOINT: Final = 15
+COMPONENT_HEAT_PUMP_MODE: Final = 16
+COMPONENT_HEAT_PUMP_PRESET_Z550: Final = 17
+COMPONENT_LIGHT_BRIGHTNESS: Final = 17
+COMPONENT_LIGHT_EFFECT: Final = 18
+COMPONENT_SCHEDULE: Final = 20
+COMPONENT_HEAT_PUMP_ONOFF_ALT: Final = 21
+COMPONENT_LIGHT_COLOR: Final = 45
+COMPONENT_LIGHT_SCHEDULE: Final = 40
+COMPONENT_DM24049704_SCHEDULE: Final = 258
+COMPONENT_Z550_STATE: Final = 61
+
+# Pump speed mapping: API level → displayed percentage
+PUMP_SPEED_PERCENTAGES: Final[dict[int, int]] = {
+    0: 45,  # Low
+    1: 65,  # Medium
+    2: 100,  # High
+}
+
+# Z550iQ+ Heat Pump constants
 Z550_MIN_TEMP = 15.0
 Z550_MAX_TEMP = 40.0
 Z550_TEMP_STEP = 1.0
 
-# Z550iQ+ HVAC modes (component 16 values)
 Z550_MODE_HEATING = 0
 Z550_MODE_COOLING = 1
 Z550_MODE_AUTO = 2
 
-# Z550iQ+ state values (component 61)
 Z550_STATE_IDLE = 0
 Z550_STATE_HEATING = 2
 Z550_STATE_COOLING = 3
 Z550_STATE_NO_FLOW = 11
 
-# Z550iQ+ preset modes (component 17 values)
 Z550_PRESET_SILENCE = "silence"
 Z550_PRESET_SMART = "smart"
 Z550_PRESET_BOOST = "boost"
@@ -91,7 +114,7 @@ Z550_PRESET_TO_VALUE = {
 
 Z550_VALUE_TO_PRESET = {v: k for k, v in Z550_PRESET_TO_VALUE.items()}
 
-# LG Heat Pump Constants (component 14 values)
+# LG Heat Pump constants (component 14 values)
 LG_PRESET_SMART_HEATING: Final = "smart_heating"
 LG_PRESET_SMART_COOLING: Final = "smart_cooling"
 LG_PRESET_SMART_HEAT_COOL: Final = "smart_heat_cool"
@@ -122,12 +145,12 @@ LG_MODE_TO_VALUE: Final = {
 
 LG_VALUE_TO_MODE: Final = {v: k for k, v in LG_MODE_TO_VALUE.items()}
 
-# Z260iQ Heat Pump Constants
+# Z260iQ Heat Pump constants
 Z260_MIN_TEMP: Final = 7.0
 Z260_MAX_TEMP: Final = 40.0
 Z260_TEMP_STEP: Final = 1.0
 
-# LumiPlus Connect component IDs
+# LumiPlus Connect component IDs (re-export of generic constants)
 LUMIPLUS_COMPONENT_POWER: Final = 11
-LUMIPLUS_COMPONENT_BRIGHTNESS: Final = 17
-LUMIPLUS_COMPONENT_COLOR: Final = 45
+LUMIPLUS_COMPONENT_BRIGHTNESS: Final = COMPONENT_LIGHT_BRIGHTNESS
+LUMIPLUS_COMPONENT_COLOR: Final = COMPONENT_LIGHT_COLOR
