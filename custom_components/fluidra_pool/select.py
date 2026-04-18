@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from typing import Any
 
+import aiohttp
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .api_resilience import FluidraError
 from .const import (
     COMMAND_CONFIRMATION_DELAY,
+    COMPONENT_PUMP_ONOFF,
+    COMPONENT_PUMP_SPEED,
     UI_UPDATE_DELAY,
     FluidraPoolConfigEntry,
 )
@@ -213,72 +218,22 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
 
             # For "stopped", ensure pump is ON but no active speed
             if option == "stopped":
-                # 1. S'assurer que la pompe est ON (component 9 = 1)
-                success = await self._api.control_device_component(self._device_id, 9, 1)
+                success = await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 1)
                 if success:
-                    # 2. CRUCIAL: Explicitly disable speed by sending special value
-                    # Try sending -1 or a value meaning "no active speed"
-                    try:
-                        await self._api.control_device_component(self._device_id, 11, -1)
-                    except Exception:
-                        _LOGGER.debug("Failed to disable speed for %s, using fallback", self._device_id)
-                        # Fallback: manually mark in device data
-                        device = self._api.get_device_by_id(self._device_id)
-                        if device:
-                            device["speed_percent"] = 0
-                            device["speed_level_reported"] = None
+                    # Best-effort attempt to clear active speed; server may reject
+                    with contextlib.suppress(FluidraError, aiohttp.ClientError, TimeoutError):
+                        await self._api.control_device_component(self._device_id, COMPONENT_PUMP_SPEED, -1)
             else:
-                # Pour les autres modes, d'abord s'assurer que la pompe est ON puis définir la vitesse
-                # 1. S'assurer que la pompe est ON
-                await self._api.control_device_component(self._device_id, 9, 1)
-                # 2. Définir la vitesse
+                await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 1)
                 success = await self._api.control_device_component(self._device_id, component, value)
 
             if success:
-                # Attendre que l'API se synchronise
-
-                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)  # Augmenté à 3 secondes pour plus de stabilité
-                # Récupérer l'état réel immédiatement
-                await self._refresh_device_state()
+                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
 
         finally:
-            # Toujours effacer l'option optimiste
             self._optimistic_option = None
             self.async_write_ha_state()
-
-    async def _refresh_device_state(self) -> None:
-        """Refresh device state by polling real API components."""
-        try:
-            # Refresh critical component states
-            # Component 9 (on/off)
-            pump_state = await self._api.get_device_component_state(self._device_id, 9)
-            if pump_state:
-                reported_value = pump_state.get("reportedValue", 0)
-                device = self._api.get_device_by_id(self._device_id)
-                if device:
-                    device["is_running"] = bool(reported_value)
-
-            # Component 11 (speed level)
-            speed_state = await self._api.get_device_component_state(self._device_id, 11)
-            if speed_state:
-                speed_level = speed_state.get("reportedValue", 0)
-                device = self._api.get_device_by_id(self._device_id)
-                if device:
-                    # Si la pompe est ON
-                    if device.get("is_running", False):
-                        # Enregistrer le niveau de vitesse rapporté
-                        device["speed_level_reported"] = speed_level
-                        # Calculer le pourcentage correspondant
-                        speed_percent = self._api.speed_percentages.get(speed_level, 45)
-                        device["speed_percent"] = speed_percent
-                    else:
-                        # Pompe OFF (ne devrait plus arriver avec la nouvelle logique)
-                        device["speed_percent"] = 0
-                        device["speed_level_reported"] = None
-
-        except Exception:
-            _LOGGER.debug("Failed to refresh device state for %s", self._device_id)
 
     @property
     def icon(self) -> str:
@@ -377,7 +332,7 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
 
-        except Exception:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
@@ -453,7 +408,7 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
             if success:
                 await self.coordinator.async_request_refresh()
 
-        except Exception:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to update schedule mode for %s", self._device_id)
 
     @property
@@ -574,16 +529,8 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
         success = await self._api.control_device_component(self._device_id, mode_comp, mode_value)
 
         if success:
-            # Update local component data so other entities (boost) see the change immediately
-            components = self.device_data.get("components", {})
-            comp_key = str(mode_comp)
-            if comp_key in components:
-                components[comp_key]["reportedValue"] = mode_value
-            else:
-                components[comp_key] = {"id": mode_comp, "reportedValue": mode_value}
-            self.coordinator.async_set_updated_data(self.coordinator.data)
+            await self.coordinator.async_request_refresh()
         else:
-            # Revert on failure
             self._optimistic_option = None
             self.async_write_ha_state()
 
@@ -717,7 +664,15 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
                 await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
 
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.error("Failed to set light effect: %s", err)
             raise
         finally:
@@ -794,7 +749,7 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
                     schedule_id = schedule.get("id")
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
-        except Exception:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
@@ -911,7 +866,15 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
                 self._optimistic_option = None
                 self.async_write_ha_state()
 
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.error("Failed to set schedule speed: %s", err)
             self._optimistic_option = None
             self.async_write_ha_state()

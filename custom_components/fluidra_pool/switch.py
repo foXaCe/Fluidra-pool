@@ -7,12 +7,20 @@ import logging
 import time
 from typing import Any
 
+import aiohttp
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, SWITCH_CONFIRMATION_DELAY, FluidraPoolConfigEntry
+from .api_resilience import FluidraError
+from .const import (
+    COMPONENT_PUMP_ONOFF,
+    DOMAIN,
+    OPTIMISTIC_ACTION_TIMEOUT,
+    SWITCH_CONFIRMATION_DELAY,
+    FluidraPoolConfigEntry,
+)
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolControlEntity
@@ -54,7 +62,7 @@ async def async_setup_entry(
                     elif device_type == "pump":
                         entities.append(FluidraPumpSwitch(coordinator, coordinator.api, pool["id"], device_id))
                     elif device_type == "heater":
-                        entities.append(FluidraHeaterSwitch(coordinator, pool, device))
+                        entities.append(FluidraHeaterSwitch(coordinator, coordinator.api, pool["id"], device_id))
                     elif device_type == "chlorinator" and DeviceIdentifier.has_feature(device, "on_off_component"):
                         entities.append(FluidraChlorinatorSwitch(coordinator, coordinator.api, pool["id"], device_id))
 
@@ -112,44 +120,6 @@ class FluidraPoolSwitchEntity(FluidraPoolControlEntity, SwitchEntity):
         self._last_action_time = None
         self.async_write_ha_state()
 
-    async def _refresh_device_state(self) -> None:
-        """Refresh device state by polling real API components."""
-        try:
-            # Refresh critical component states
-            # Component 9 (on/off)
-            pump_state = await self._api.get_device_component_state(self._device_id, 9)
-            if pump_state:
-                reported_value = pump_state.get("reportedValue", 0)
-                device = self._api.get_device_by_id(self._device_id)
-                if device:
-                    device["is_running"] = bool(reported_value)
-                    device["pump_reported"] = reported_value
-
-            # Component 10 (auto mode) - AJOUTÉ
-            auto_state = await self._api.get_device_component_state(self._device_id, 10)
-            if auto_state:
-                auto_reported = auto_state.get("reportedValue", 0)
-                device = self._api.get_device_by_id(self._device_id)
-                if device:
-                    device["auto_mode_enabled"] = bool(auto_reported)
-                    device["auto_reported"] = auto_reported
-
-            # Component 11 (speed level)
-            speed_state = await self._api.get_device_component_state(self._device_id, 11)
-            if speed_state:
-                speed_level = speed_state.get("reportedValue", 0)
-                device = self._api.get_device_by_id(self._device_id)
-                if device:
-                    # Seulement si la pompe tourne
-                    if device.get("is_running", False):
-                        speed_percent = self._api.speed_percentages.get(speed_level, 45)
-                        device["speed_percent"] = speed_percent
-                    else:
-                        device["speed_percent"] = 0
-
-        except Exception:
-            _LOGGER.debug("Failed to refresh device state for %s", self._device_id)
-
 
 class FluidraPumpSwitch(FluidraPoolSwitchEntity):
     """Switch for controlling pool pumps (ON/OFF)."""
@@ -176,16 +146,6 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
         if self.is_on:
             return "mdi:pump"
         return "mdi:pump-off"
-
-    @property
-    def entity_picture(self) -> str:
-        """Return entity picture for better visual representation."""
-        return None
-
-    @property
-    def device_class(self) -> str:
-        """Return device class for proper styling."""
-        return "switch"
 
     @property
     def is_on(self) -> bool:
@@ -217,14 +177,21 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
 
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 # Récupérer l'état réel immédiatement
-                await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
                 # Effacer l'état en attente après confirmation
                 self._clear_pending_state()
             else:
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to turn on pump: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
@@ -241,14 +208,21 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
 
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 # Récupérer l'état réel immédiatement
-                await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
                 # Effacer l'état en attente après confirmation
                 self._clear_pending_state()
             else:
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to turn off pump: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
@@ -307,16 +281,6 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
         return "mdi:heat-pump-outline"
 
     @property
-    def entity_picture(self) -> str:
-        """Return entity picture for better visual representation."""
-        return None
-
-    @property
-    def device_class(self) -> str:
-        """Return device class for proper styling."""
-        return "switch"
-
-    @property
     def is_on(self) -> bool:
         """Return true if the heat pump is on using optimistic UI or real-time reported value."""
         # Si on a un état en attente, l'utiliser pour la réactivité
@@ -368,7 +332,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
                 self.async_write_ha_state()
-        except Exception as e:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError) as e:
             _LOGGER.error("Error turning on heat pump %s: %s", self._device_id, e)
             self._clear_pending_state()
             self.async_write_ha_state()
@@ -396,25 +360,10 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
                 self.async_write_ha_state()
-        except Exception as e:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError) as e:
             _LOGGER.error("Error turning off heat pump %s: %s", self._device_id, e)
             self._clear_pending_state()
             self.async_write_ha_state()
-
-    async def _refresh_heat_pump_state(self) -> None:
-        """Refresh heat pump state by polling real API components."""
-        try:
-            # Component 9 (on/off) - standard pour pompes et pompes à chaleur
-            heat_pump_state = await self._api.get_device_component_state(self._device_id, 9)
-            if heat_pump_state:
-                reported_value = heat_pump_state.get("reportedValue", 0)
-                device = self._api.get_device_by_id(self._device_id)
-                if device:
-                    device["is_heating"] = bool(reported_value)
-                    device["heat_pump_reported"] = reported_value
-
-        except Exception:
-            _LOGGER.debug("Failed to refresh heat pump state for %s", self._device_id)
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -445,58 +394,51 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
 class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
     """Switch for controlling pool heaters."""
 
-    @property
-    def name(self) -> str:
-        """Return the name of the switch."""
-        device_name = self.device_data.get("name", f"Device {self._device_id}")
-        pool_name = self.pool_data.get("name", "Pool")
-        return f"{pool_name} {device_name}"
+    _attr_has_entity_name = True
+    _attr_translation_key = "heater"
 
     @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "heater"
+    def unique_id(self) -> str:
+        """Return unique ID."""
+        return f"{DOMAIN}_{self._pool_id}_{self._device_id}_heater"
 
     @property
     def icon(self) -> str:
         """Return the icon of the switch."""
-        if self.is_on:
-            return "mdi:heat-wave"
-        return "mdi:snowflake"
-
-    @property
-    def entity_picture(self) -> str:
-        """Return entity picture for better visual representation."""
-        return None
-
-    @property
-    def device_class(self) -> str:
-        """Return device class for proper styling."""
-        return "switch"
+        return "mdi:heat-wave" if self.is_on else "mdi:snowflake"
 
     @property
     def is_on(self) -> bool:
         """Return true if the heater is on."""
-        return self.device_data.get("is_heating", False)
+        if self._pending_state is not None:
+            if time.time() - self._last_action_time > OPTIMISTIC_ACTION_TIMEOUT:
+                self._clear_pending_state()
+            else:
+                return self._pending_state
+        return bool(self.device_data.get("is_heating") or self.device_data.get("is_running"))
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn the heater on."""
-        device = self._api.get_device_by_id(self._device_id)
-        if device and hasattr(device, "turn_on"):
-            await device.turn_on()
+        """Turn the heater on (component 9 = generic ON/OFF)."""
+        self._set_pending_state(True)
+        success = await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 1)
+        if success:
             await self.coordinator.async_request_refresh()
+        else:
+            self._clear_pending_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn the heater off."""
-        device = self._api.get_device_by_id(self._device_id)
-        if device and hasattr(device, "turn_off"):
-            await device.turn_off()
+        """Turn the heater off (component 9 = generic ON/OFF)."""
+        self._set_pending_state(False)
+        success = await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 0)
+        if success:
             await self.coordinator.async_request_refresh()
+        else:
+            self._clear_pending_state()
 
     @property
     def extra_state_attributes(self) -> dict:
         """Return extra state attributes."""
-        attrs = {}
+        attrs: dict[str, Any] = {}
         if "current_temperature" in self.device_data:
             attrs["current_temperature"] = self.device_data["current_temperature"]
         if "target_temperature" in self.device_data:
@@ -536,16 +478,6 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
         return "mdi:autorenew-off"
 
     @property
-    def entity_picture(self) -> str:
-        """Return entity picture for better visual representation."""
-        return None
-
-    @property
-    def device_class(self) -> str:
-        """Return device class for proper styling."""
-        return "switch"
-
-    @property
     def is_on(self) -> bool:
         """Return true if auto mode is on using optimistic UI or real-time reported value."""
         # Si on a un état en attente, l'utiliser pour la réactivité
@@ -575,14 +507,21 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
 
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 # Récupérer l'état réel immédiatement
-                await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
                 # Effacer l'état en attente après confirmation
                 self._clear_pending_state()
             else:
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to enable auto mode: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
@@ -599,14 +538,21 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
 
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 # Récupérer l'état réel immédiatement
-                await self._refresh_device_state()
                 await self.coordinator.async_request_refresh()
                 # Effacer l'état en attente après confirmation
                 self._clear_pending_state()
             else:
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to disable auto mode: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
@@ -658,16 +604,6 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             return "mdi:calendar-clock"
         return "mdi:calendar-outline"
 
-    @property
-    def entity_picture(self) -> str:
-        """Return entity picture for better visual representation."""
-        return None
-
-    @property
-    def device_class(self) -> str:
-        """Return device class for proper styling."""
-        return "switch"
-
     def _get_schedule_data(self) -> dict | None:
         """Get schedule data from coordinator."""
         try:
@@ -687,7 +623,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
 
-        except Exception:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
@@ -767,7 +703,15 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
 
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to enable schedule: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
@@ -827,7 +771,15 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
 
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to disable schedule: %s", err)
             # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
@@ -954,7 +906,15 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             else:
                 self._clear_pending_state()
 
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to enable boost mode: %s", err)
             self._clear_pending_state()
             raise
@@ -974,7 +934,15 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             else:
                 self._clear_pending_state()
 
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to disable boost mode: %s", err)
             self._clear_pending_state()
             raise
@@ -1059,7 +1027,15 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
                 self._clear_pending_state()
             else:
                 self._clear_pending_state()
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to turn on chlorinator: %s", err)
             self._clear_pending_state()
 
@@ -1077,7 +1053,15 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
                 self._clear_pending_state()
             else:
                 self._clear_pending_state()
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to turn off chlorinator: %s", err)
             self._clear_pending_state()
 

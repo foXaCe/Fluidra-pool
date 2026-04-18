@@ -6,6 +6,7 @@ import logging
 import time
 from typing import Any
 
+import aiohttp
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -14,9 +15,10 @@ from homeassistant.components.climate import (
 )
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .api_resilience import FluidraError
 from .const import (
     DOMAIN,
     LG_MODE_TO_VALUE,
@@ -45,6 +47,7 @@ from .const import (
 )
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolControlEntity
+from .utils import mask_device_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -430,30 +433,22 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                     return
 
             if success:
-                # Keep optimistic state - property will auto-clear after 5 seconds
                 await self.coordinator.async_request_refresh()
             else:
-                # Clear optimistic state on failure
                 self._pending_hvac_mode = None
                 self._last_hvac_action_time = None
                 self.async_write_ha_state()
-                # Stocker l'erreur pour affichage utilisateur
-                device = self._api.get_device_by_id(self._device_id)
-                if device:
-                    device["last_control_error"] = f"Failed to set mode to {hvac_mode}"
-                    device["permission_error"] = True
                 await self.coordinator.async_request_refresh()
+                raise HomeAssistantError(f"Failed to set heat-pump mode to {hvac_mode}")
 
-        except Exception as e:
-            # Clear optimistic state on error
+        except HomeAssistantError:
+            raise
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
             self._pending_hvac_mode = None
             self._last_hvac_action_time = None
             self.async_write_ha_state()
-            # Stocker l'erreur pour affichage utilisateur
-            device = self._api.get_device_by_id(self._device_id)
-            if device:
-                device["last_control_error"] = str(e)
-                device["permission_error"] = "403" in str(e) or "permission" in str(e).lower()
+            _LOGGER.exception("Error setting HVAC mode for %s", mask_device_id(self._device_id))
+            raise HomeAssistantError(f"Heat-pump control failed: {type(err).__name__}") from err
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
@@ -496,7 +491,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                 self._last_action_time = None
                 self.async_write_ha_state()
 
-        except Exception as e:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError) as e:
             _LOGGER.error("Error setting temperature for %s: %s", self._device_id, e)
             # Annuler la température optimiste en cas d'erreur
             self._pending_temperature = None
@@ -537,31 +532,20 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                 return
 
             if success:
-                # Keep optimistic state until coordinator refresh completes
-                # The property will clear it after 5 seconds automatically
                 await self.coordinator.async_request_refresh()
             else:
-                # Clear optimistic state on failure
                 self._pending_preset_mode = None
                 self._last_preset_action_time = None
-                # Stocker l'erreur pour affichage utilisateur
-                device = self._api.get_device_by_id(self._device_id)
-                if device:
-                    device["last_control_error"] = f"Failed to set preset mode to {preset_mode}"
-                    device["permission_error"] = True
-
-                # Demander un refresh pour obtenir l'état réel depuis l'API
                 await self.coordinator.async_request_refresh()
+                raise HomeAssistantError(f"Failed to set preset mode to {preset_mode}")
 
-        except Exception as e:
-            # Clear optimistic state on error
+        except HomeAssistantError:
+            raise
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
             self._pending_preset_mode = None
             self._last_preset_action_time = None
-            # Stocker l'erreur pour affichage utilisateur
-            device = self._api.get_device_by_id(self._device_id)
-            if device:
-                device["last_control_error"] = str(e)
-                device["permission_error"] = "403" in str(e) or "permission" in str(e).lower()
+            _LOGGER.exception("Error setting preset mode for %s", mask_device_id(self._device_id))
+            raise HomeAssistantError(f"Preset control failed: {type(err).__name__}") from err
 
     @property
     def extra_state_attributes(self) -> dict:

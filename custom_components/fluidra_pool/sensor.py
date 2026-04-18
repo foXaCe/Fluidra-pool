@@ -6,16 +6,17 @@ from datetime import datetime, time
 import logging
 from typing import TYPE_CHECKING, Any
 
+import aiohttp
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
 from homeassistant.const import PERCENTAGE, UnitOfTemperature
-from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .api_resilience import FluidraError
 from .const import DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
 
@@ -128,10 +129,9 @@ async def async_setup_entry(
 class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
     """Base class for Fluidra Pool sensor entities."""
 
-    # 🏆 __slots__ for memory efficiency (Platinum)
-    __slots__ = ("_api", "_pool_id", "_device_id", "_sensor_type", "_cached_device_data", "_cached_pool_data")
+    __slots__ = ("_api", "_pool_id", "_device_id", "_sensor_type")
 
-    _attr_has_entity_name = True  # 🥉 OBLIGATOIRE (Bronze)
+    _attr_has_entity_name = True
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str, sensor_type: str = ""):
         """Initialize the sensor."""
@@ -140,48 +140,25 @@ class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
         self._pool_id = pool_id
         self._device_id = device_id
         self._sensor_type = sensor_type
-        # 🏆 Cache values for performance (Platinum)
-        self._cached_device_data: dict | None = None
-        self._cached_pool_data: dict | None = None
 
     @property
     def device_data(self) -> dict:
         """Get device data from coordinator."""
-        # 🏆 Use cached value for performance (Platinum)
-        if self._cached_device_data is not None:
-            return self._cached_device_data
-
         if self.coordinator.data is None:
             return {}
         pool = self.coordinator.data.get(self._pool_id)
         if pool:
             for device in pool.get("devices", []):
                 if device.get("device_id") == self._device_id:
-                    self._cached_device_data = device
                     return device
-        self._cached_device_data = {}
         return {}
 
     @property
     def pool_data(self) -> dict:
         """Get pool data from coordinator."""
-        # 🏆 Use cached value for performance (Platinum)
-        if self._cached_pool_data is not None:
-            return self._cached_pool_data
-
         if self.coordinator.data is None:
             return {}
-        pool_data = self.coordinator.data.get(self._pool_id, {})
-        self._cached_pool_data = pool_data
-        return pool_data
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle coordinator data update and clear cache."""
-        # 🏆 Clear cache when coordinator updates (Platinum)
-        self._cached_device_data = None
-        self._cached_pool_data = None
-        super()._handle_coordinator_update()
+        return self.coordinator.data.get(self._pool_id, {})
 
     @property
     def unique_id(self) -> str:
@@ -484,7 +461,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
             if not schedules:
                 return 0
             return sum(1 for s in schedules if s.get("enabled", False))
-        except Exception:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule state for %s", self._device_id)
             return None
 
@@ -526,7 +503,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                         current_schedule.get("startActions", {}).get("operationName", "0")
                     )
 
-        except Exception as e:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError) as e:
             attrs["error"] = str(e)
 
         return attrs
@@ -608,7 +585,7 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
                 return "signal_very_low"
             return "online"
 
-        except Exception:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get device info state for %s", self._device_id)
             return "error"
 
@@ -667,7 +644,7 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
             attrs["model"] = self.device_data.get("model", "Unknown")
             attrs["online"] = self.device_data.get("online", False)
 
-        except Exception as e:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError) as e:
             attrs["error"] = str(e)
 
         return attrs

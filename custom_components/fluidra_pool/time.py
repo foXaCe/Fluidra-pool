@@ -6,11 +6,13 @@ import asyncio
 from datetime import time
 import logging
 
+import aiohttp
 from homeassistant.components.time import TimeEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .api_resilience import FluidraError
 from .const import COMMAND_CONFIRMATION_DELAY, DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolControlEntity
@@ -209,7 +211,7 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
 
-        except Exception:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
@@ -266,7 +268,7 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
                     )
 
             return True, ""
-        except Exception:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to validate schedule overlap for %s", self._device_id)
             return True, ""  # Allow if validation fails
 
@@ -439,7 +441,15 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                 self._optimistic_value = None
                 self.async_write_ha_state()
 
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to set schedule start time for %s: %s", self._device_id, err)
             self._optimistic_value = None
             self.async_write_ha_state()
@@ -483,7 +493,7 @@ class FluidraLightScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
                     schedule_id = schedule.get("id")
                     if str(schedule_id) == str(self._schedule_id):
                         return schedule
-        except Exception:
+        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
@@ -576,7 +586,15 @@ class FluidraLightScheduleStartTimeEntity(FluidraLightScheduleTimeEntity):
             if success:
                 await self.coordinator.async_request_refresh()
 
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to set light schedule start time for %s: %s", self._device_id, err)
 
 
@@ -647,7 +665,15 @@ class FluidraLightScheduleEndTimeEntity(FluidraLightScheduleTimeEntity):
             if success:
                 await self.coordinator.async_request_refresh()
 
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to set light schedule end time for %s: %s", self._device_id, err)
 
 
@@ -791,7 +817,15 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                 self._optimistic_value = None
                 self.async_write_ha_state()
 
-        except Exception as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.debug("Failed to set schedule end time for %s: %s", self._device_id, err)
             self._optimistic_value = None
             self.async_write_ha_state()
