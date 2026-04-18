@@ -7,6 +7,8 @@ and reduce the risk of breaking existing devices.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import lru_cache
+import re
 from typing import Any
 
 
@@ -757,26 +759,98 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
 }
 
 
+@lru_cache(maxsize=1024)
+def _compile_wildcard_pattern(pattern_lower: str) -> re.Pattern[str]:
+    """Compile a wildcard pattern (``*`` supported) into a case-insensitive regex."""
+    regex = re.escape(pattern_lower).replace(r"\*", ".*")
+    return re.compile(f"^{regex}$")
+
+
+def _match(value: str, patterns: tuple[str, ...]) -> bool:
+    """Pure-function equivalent of ``DeviceIdentifier._matches_pattern`` for caching."""
+    if not value or not patterns:
+        return False
+    value_lower = value.lower()
+    for pattern in patterns:
+        pattern_lower = pattern.lower()
+        if "*" in pattern_lower:
+            if _compile_wildcard_pattern(pattern_lower).match(value_lower):
+                return True
+        elif pattern_lower in value_lower:
+            return True
+    return False
+
+
+@lru_cache(maxsize=512)
+def _identify_device_uncached(
+    *,
+    device_id: str,
+    device_name: str,
+    family: str,
+    model: str,
+    device_type_hint: str,
+    comp7_value: str,
+) -> DeviceConfig | None:
+    """Resolve a :class:`DeviceConfig` from hashable primitives so lru_cache can memoise."""
+    sorted_configs = sorted(DEVICE_CONFIGS.items(), key=lambda x: x[1].priority, reverse=True)
+
+    best_match: DeviceConfig | None = None
+    best_score = 0
+
+    for config_name, config in sorted_configs:
+        score = 0
+
+        if _match(device_id, tuple(config.identifier_patterns)):
+            score += 50
+        if _match(device_name, tuple(config.name_patterns)):
+            score += 30
+        if _match(family, tuple(config.family_patterns)):
+            score += 20
+        if _match(model, tuple(config.model_patterns)):
+            score += 20
+        if config.device_type in device_type_hint:
+            score += 10
+
+        if config_name == "lg_heat_pump" and _match(comp7_value, ("BXWAA",)):
+            score += 100
+
+        if config_name == "z260iq_heat_pump":
+            if _match(comp7_value, ("BXWAD",)):
+                score += 100
+            else:
+                score = 0
+
+        if score > best_score:
+            best_score = score
+            best_match = config
+
+    if best_score < 10:
+        if "heat_pump" in device_type_hint or "heat" in device_type_hint:
+            return DEVICE_CONFIGS.get("generic_heat_pump")
+        if "pump" in device_type_hint:
+            return DEVICE_CONFIGS.get("generic_pump")
+        if "heater" in device_type_hint:
+            return DEVICE_CONFIGS.get("generic_heater")
+        if "light" in device_type_hint:
+            return DEVICE_CONFIGS.get("generic_light")
+
+    return best_match
+
+
 class DeviceIdentifier:
     """Helper to identify device type from device data."""
 
     @staticmethod
-    def _matches_pattern(value: str, patterns: list[str]) -> bool:
-        """Check if value matches any pattern (supports * wildcard)."""
+    def _matches_pattern(value: str, patterns: list[str] | tuple[str, ...]) -> bool:
+        """Check if value matches any pattern (supports ``*`` wildcard)."""
         if not value or not patterns:
             return False
-
-        import re
 
         value_lower = value.lower()
         for pattern in patterns:
             pattern_lower = pattern.lower()
             if "*" in pattern_lower:
-                # Convert wildcard pattern to regex
-                # Escape special regex chars except *
-                regex_pattern = re.escape(pattern_lower).replace(r"\*", ".*")
-                regex_pattern = f"^{regex_pattern}$"
-                if re.match(regex_pattern, value_lower):
+                if _compile_wildcard_pattern(pattern_lower).match(value_lower):
                     return True
             elif pattern_lower in value_lower:
                 return True
@@ -800,79 +874,43 @@ class DeviceIdentifier:
         """Identify device type and return its configuration.
 
         Returns the best matching DeviceConfig based on priority and matching criteria.
+        Results are cached in-place on the device dict to avoid recomputation.
         """
         if not isinstance(device, dict):
             return None
 
-        device_id = device.get("device_id", "")
-        device_name = device.get("name", "")
         family = device.get("family", "")
-        model = device.get("model", "")
-        device_type_hint = device.get("type", "").lower()
-
-        # Skip bridges - they are not controllable devices
         if family and "bridge" in family.lower():
             return None
 
-        # Sort configs by priority (highest first)
-        sorted_configs = sorted(DEVICE_CONFIGS.items(), key=lambda x: x[1].priority, reverse=True)
+        # Cache result on the device itself — the key includes the component-7
+        # signature so a signature change (first vs subsequent polls) invalidates it.
+        components = device.get("components") if isinstance(device.get("components"), dict) else {}
+        comp7_value = ""
+        if "7" in components and isinstance(components["7"], dict):
+            comp7_value = str(components["7"].get("reportedValue", ""))
 
-        best_match = None
-        best_score = 0
+        cache_key = (
+            device.get("device_id", ""),
+            family,
+            device.get("model", ""),
+            device.get("type", ""),
+            comp7_value,
+        )
+        cache = device.get("_identify_cache")
+        if isinstance(cache, dict) and cache.get("key") == cache_key:
+            return cache.get("config")
 
-        for config_name, config in sorted_configs:
-            score = 0
-
-            # Check identifier patterns
-            if DeviceIdentifier._matches_pattern(device_id, config.identifier_patterns):
-                score += 50
-
-            # Check name patterns
-            if DeviceIdentifier._matches_pattern(device_name, config.name_patterns):
-                score += 30
-
-            # Check family patterns
-            if DeviceIdentifier._matches_pattern(family, config.family_patterns):
-                score += 20
-
-            # Check model patterns
-            if DeviceIdentifier._matches_pattern(model, config.model_patterns):
-                score += 20
-
-            # Check if device_type hint matches
-            if config.device_type in device_type_hint:
-                score += 10
-
-            # Special case: LG heat pump signature (component 7 with BXWAA)
-            if config_name == "lg_heat_pump":
-                if DeviceIdentifier._check_component_signature(device, 7, ["BXWAA"]):
-                    score += 100  # Very strong indicator
-
-            # Special case: Z260iQ heat pump signature (component 7 with BXWAD)
-            if config_name == "z260iq_heat_pump":
-                if DeviceIdentifier._check_component_signature(device, 7, ["BXWAD"]):
-                    score += 100  # Very strong indicator
-                else:
-                    score = 0  # Without BXWAD, never match z260iq (fall back to z250iq)
-
-            # Update best match if this score is higher
-            if score > best_score:
-                best_score = score
-                best_match = config
-
-        # Fallback to generic configs if no strong match
-        if best_score < 10:
-            # Use device type hint for fallback
-            if "heat_pump" in device_type_hint or "heat" in device_type_hint:
-                return DEVICE_CONFIGS.get("generic_heat_pump")
-            if "pump" in device_type_hint:
-                return DEVICE_CONFIGS.get("generic_pump")
-            if "heater" in device_type_hint:
-                return DEVICE_CONFIGS.get("generic_heater")
-            if "light" in device_type_hint:
-                return DEVICE_CONFIGS.get("generic_light")
-
-        return best_match
+        result = _identify_device_uncached(
+            device_id=str(cache_key[0]),
+            device_name=device.get("name", ""),
+            family=family,
+            model=str(cache_key[2]),
+            device_type_hint=str(cache_key[3]).lower(),
+            comp7_value=comp7_value,
+        )
+        device["_identify_cache"] = {"key": cache_key, "config": result}
+        return result
 
     @staticmethod
     def should_create_entity(device: dict, entity_type: str) -> bool:
