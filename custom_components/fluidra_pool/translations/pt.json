@@ -8,6 +8,7 @@
     "error": {
       "cannot_connect": "Não foi possível conectar à API Fluidra",
       "invalid_auth": "Credenciais inválidas. Verifique seu e-mail e senha",
+      "invalid_mfa_code": "Código de verificação inválido ou expirado. Tente novamente.",
       "no_pools": "Nenhuma piscina encontrada. Certifique-se de que seus equipamentos estão configurados no app Fluidra Pool",
       "unknown": "Erro inesperado"
     },
@@ -15,6 +16,13 @@
       "confirm": {
         "description": "Encontramos um dispositivo Fluidra Pool. Deseja adicioná-lo?",
         "title": "Fluidra Pool descoberto"
+      },
+      "mfa": {
+        "data": {
+          "mfa_code": "Código de verificação"
+        },
+        "description": "Sua conta requer um código de verificação. Insira o código do seu aplicativo autenticador ou recebido por SMS.",
+        "title": "Autenticação de dois fatores"
       },
       "reauth_confirm": {
         "data": {

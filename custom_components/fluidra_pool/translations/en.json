@@ -8,6 +8,7 @@
     "error": {
       "cannot_connect": "Unable to connect to Fluidra API",
       "invalid_auth": "Invalid credentials. Check your email and password",
+      "invalid_mfa_code": "Invalid or expired verification code. Please try again.",
       "no_pools": "No pools found. Make sure your equipment is configured in the Fluidra Pool app",
       "unknown": "Unexpected error"
     },
@@ -15,6 +16,13 @@
       "confirm": {
         "description": "We found a Fluidra Pool device. Would you like to add it?",
         "title": "Discovered Fluidra Pool"
+      },
+      "mfa": {
+        "data": {
+          "mfa_code": "Verification code"
+        },
+        "description": "Your account requires a verification code. Enter the code from your authenticator app or SMS.",
+        "title": "Two-Factor Authentication"
       },
       "reauth_confirm": {
         "data": {
