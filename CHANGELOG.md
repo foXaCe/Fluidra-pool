@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.28.0] - 2026-04-19
+
+### Added
+- **CC24042517 — AstralPool Clear Connect Evo 21g** chlorinator support (Issue #51, reported by @benoitma)
+  - Full mapping for pH (component 165, ÷100), ORP (170), water temperature (172, ÷10), salinity (174, ÷100) and free chlorine (178, ÷100)
+  - Chlorination level on component 10, pH/ORP setpoints on 16/20, boost mode on component 103
+  - Previously fell back to the generic chlorinator config, which misread the temperature as pH
+
 ## [2.27.1] - 2026-04-18
 
 ### Fixed
