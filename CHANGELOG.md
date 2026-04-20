@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.29.0] - 2026-04-19
+
+### Added
+- **CC24000304 — Fluidra Energy Connect (basic tecnoLC2)** chlorinator support (Issue #52, reported by @Srekcah007)
+  - Basic model without pH/ORP probes — `skip_ph_orp` enabled
+  - Component mapping: chlorination level 164, boost 245, temperature 172 (÷10), salinity 185 (÷100)
+  - Previously fell back to the generic `*.nn_*` config, which misread temperature as pH
+
 ## [2.28.0] - 2026-04-19
 
 ### Added
