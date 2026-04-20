@@ -626,6 +626,29 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=92,  # Same as CC24068402 (similar model)
     ),
+    "cc24000304_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Basic Energy Connect tecnoLC2 without pH/ORP probes (Issue #52, @Srekcah007)
+        # Matches both the bridge (CC24000304) and the bridged child (CC24000304.nn_1)
+        identifier_patterns=["CC24000304*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],  # No pH/ORP on this model
+        features={
+            "chlorination_level": 164,  # Component 164 (0-100%)
+            "boost_mode": 245,  # Component 245 (boolean: true/false)
+            "skip_mode_select": True,  # No mode select
+            "skip_ph_orp": True,  # No pH/ORP probes
+            "sensors": {
+                "temperature": 172,  # Pool temperature (°C × 10)
+                "salinity": 185,  # Salinity (g/L × 100)
+            },
+            # Specific components for CC24000304 (no pH/ORP)
+            "specific_components": [164, 172, 185, 245],
+        },
+        priority=88,  # Higher than generic *.nn_* (80)
+    ),
     "cc24042711_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24042711*"],  # tecnoLC2 (AstralPool Clear Connect non-scalable) - Issue #25
