@@ -293,17 +293,15 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         entities=["switch", "number", "sensor_info"],
         features={
             "chlorination_level": 10,  # Component 10 (0-100%) — e.g., 40 = 40%
-            "ph_setpoint": 16,  # Component 16 (÷100) — e.g., 730 = 7.30 pH
             "orp_setpoint": 20,  # Component 20 (mV) — e.g., 740 mV
             "skip_mode_select": True,  # No mode select on this model
             "sensors": {
-                "orp": 177,  # ORP/Redox measured value (mV) — e.g., 784 mV
-                "free_chlorine": 178,  # Free chlorine (mg/L ÷ 100)
+                "ph": 16,  # pH measured (÷100) — e.g., 730 = 7.30 pH (matches mobile app)
+                "orp": 177,  # ORP/Redox measured (mV)
                 "temperature": 172,  # Pool temperature (°C × 10) — e.g., 190 = 19.0°C
-                "salinity": 185,  # Salinity (g/L × 100)
             },
-            # Specific components for LC25000122
-            "specific_components": [10, 16, 20, 172, 177, 178, 185],
+            # Specific components for LC25000122 (no free-chlorine or salinity exposed)
+            "specific_components": [10, 16, 20, 172, 177],
         },
         priority=87,  # Higher than generic *.nn_* (80) and the LC2 family (86)
     ),
