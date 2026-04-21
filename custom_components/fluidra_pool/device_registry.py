@@ -283,6 +283,29 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=86,  # Same priority as other LC chlorinators
     ),
+    "cc24009711_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # AstralPool Clear Connect Scalable 21 G/H (tecnoLC2) — Issue #55
+        # Bridge CC24009711 with child device CC24009711.nn_1
+        identifier_patterns=["CC24009711.nn_*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%) — e.g., 100 = 100%
+            "orp_setpoint": 20,  # Component 20 (mV) — matches ORP target (e.g., 700)
+            "skip_mode_select": True,  # No mode select on this model
+            "sensors": {
+                "ph": 16,  # pH measured (÷100) — e.g., 750 = 7.50 pH
+                "orp": 177,  # ORP/Redox measured (mV)
+                "temperature": 172,  # Pool temperature (°C × 10) — e.g., 236 = 23.6°C
+            },
+            # Specific components for CC24009711 (no salinity / free-chlorine exposed)
+            "specific_components": [10, 16, 20, 172, 177],
+        },
+        priority=88,
+    ),
     "lc25000122_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # IrriPool iSalt tecnoLC2 bridge; child device ID is LC25000122.nn_1 (Issue #53)
