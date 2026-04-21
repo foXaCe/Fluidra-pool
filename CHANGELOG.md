@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.31.0] - 2026-04-21
+
+### Added
+- **CC24009711 — AstralPool Clear Connect Scalable 21 G/H** (tecnoLC2) chlorinator support (Issue #55, reported by @smartincervera)
+  - Component mapping: chlorination 10, ORP setpoint 20, pH sensor 16 (÷100), ORP 177, temperature 172 (÷10)
+  - Previously fell back to the generic `*.nn_*` config which read temperature (component 172) as pH, showing 2.36 instead of 7.50
+
+### Fixed
+- **LC25000122 IrriPool iSalt** sensor mapping (Issue #53)
+  - Move component 16 from pH setpoint to pH sensor (it's actually the measured pH, 7.30)
+  - Remove free_chlorine and salinity sensors — this model doesn't expose them through this API path (values stay at 0)
+
 ## [2.30.0] - 2026-04-21
 
 ### Added
