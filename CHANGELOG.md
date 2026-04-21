@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.30.0] - 2026-04-21
+
+### Added
+- **LC25000122 — IrriPool iSalt (tecnoLC2)** chlorinator support (Issue #53, reported by @flyman1664)
+  - Component mapping: chlorination level 10, pH setpoint 16 (÷100), ORP setpoint 20, ORP 177, temperature 172 (÷10), free chlorine 178, salinity 185
+  - Previously fell back to the generic `*.nn_*` config, which read temperature as pH and missed the real temperature on component 172
+
 ## [2.29.0] - 2026-04-19
 
 ### Added
