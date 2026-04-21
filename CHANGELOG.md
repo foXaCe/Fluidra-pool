@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.31.1] - 2026-04-21
+
+### Fixed
+- **LC25000122 IrriPool iSalt** mapping corrected (Issue #53 follow-up, confirmed by @flyman1664)
+  - Component 16 is the pH **setpoint** (not the measured value) — moving the app's pH target did update component 16 while the measured pH stayed put
+  - Component 177 (= 782) is **not** the measured ORP — the app shows 733 mV; removed the sensor until the correct component is found
+  - Widen the component scan to `[165, 170, 174, 177, 178, 183, 185]` to discover the real measured pH/ORP on next diagnostics dump
+
 ## [2.31.0] - 2026-04-21
 
 ### Added
