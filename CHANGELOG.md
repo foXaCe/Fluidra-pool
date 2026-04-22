@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.31.2] - 2026-04-21
+
+### Fixed
+- **LC25000122 IrriPool iSalt** — real measured sensors wired up (Issue #53 resolved, thanks @flyman1664 for the diagnostics)
+  - pH measured on component 165 (÷100, e.g. 7.31)
+  - ORP measured on component 170 (mV, e.g. 727)
+  - Temperature on component 172 (÷10, e.g. 18.8°C)
+  - Salinity on component 174 (÷100, e.g. 5.89 g/L)
+  - Same mapping as the other tecnoLC2 models (LC24013306, LC24015802)
+
 ## [2.31.1] - 2026-04-21
 
 ### Fixed
