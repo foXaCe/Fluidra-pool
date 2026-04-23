@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.31.4] - 2026-04-23
+
+### Fixed
+- **Zodiac Z550iQ+** preset modes disabled (Issue #56, reported by @3stradastone)
+  - Component 17 is not the preset component — writing it returns HTTP 403 and the reported raw value 6 doesn't match our \[0,1,2\] mapping (likely the LG 7-value scheme on a different component)
+  - Remove `preset_modes` / `preset_component` from the Z550 config so HA stops offering a control that always fails. Temperature and HVAC mode still work; presets will be re-enabled once diagnostics identify the correct component
+
 ## [2.31.3] - 2026-04-21
 
 ### Fixed

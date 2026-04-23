@@ -11,5 +11,5 @@
   "loggers": ["custom_components.fluidra_pool"],
   "quality_scale": "silver",
   "requirements": ["aiohttp>=3.11.0"],
-  "version": "2.31.3"
+  "version": "2.31.4"
 }
