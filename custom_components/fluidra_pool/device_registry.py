@@ -138,7 +138,9 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         entities=["climate", "switch", "sensor_info", "sensor_temperature"],
         features={
             "temperature_control": True,
-            "preset_modes": True,  # Enable preset modes (silence, smart, boost)
+            # preset_modes disabled: the real preset component is unknown. Writing
+            # component 17 returns HTTP 403 (Issue #56). Re-enable once diagnostics
+            # from a real Z550iQ+ identify the correct component and value scheme.
             "hvac_modes": ["off", "heat", "cool", "auto"],
             "skip_auto_mode": True,
             "skip_schedules": True,
@@ -147,14 +149,13 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
             # - 21: ON/OFF (0=OFF, 1=ON)
             # - 15: Temperature setpoint (decidegrees, 290=29.0°C)
             # - 16: Mode (0=heating, 1=cooling, 2=auto)
-            # - 17: Preset mode (0=silence, 1=smart, 2=boost) - to be confirmed
+            # - 17: Read-only status of some kind (value 6 reported; writes return 403)
             # - 37: Water temperature (decidegrees)
             # - 40: Air temperature (decidegrees)
             # - 61: State (0=idle, 2=heating, 3=cooling, 11=no flow)
             "on_off_component": 21,
             "setpoint_component": 15,
             "mode_component": 16,
-            "preset_component": 17,  # Preset mode component - to be confirmed
             "water_temp_component": 37,
             "air_temp_component": 40,
             "state_component": 61,
