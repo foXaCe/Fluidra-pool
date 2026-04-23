@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.31.3] - 2026-04-21
+
+### Fixed
+- **CC24009711 Clear Connect Scalable** ORP mapping (Issue #55 follow-up, thanks @smartincervera)
+  - Component 177 isn't the measured ORP (stuck near 700 while the app shows 661)
+  - Drop the wrong sensor, mark component 16 as pH setpoint (same pattern as LC25000122)
+  - Widen the component scan to `[165, 170, 174, 178, 183, 185]` so the real measured pH/ORP can be discovered from a fresh diagnostics dump
+
 ## [2.31.2] - 2026-04-21
 
 ### Fixed
