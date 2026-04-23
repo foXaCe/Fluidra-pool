@@ -294,15 +294,17 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         entities=["switch", "number", "sensor_info"],
         features={
             "chlorination_level": 10,  # Component 10 (0-100%) — e.g., 100 = 100%
-            "orp_setpoint": 20,  # Component 20 (mV) — matches ORP target (e.g., 700)
+            "ph_setpoint": 16,  # Component 16 (÷100) — pH setpoint
+            "orp_setpoint": 20,  # Component 20 (mV) — ORP setpoint
             "skip_mode_select": True,  # No mode select on this model
             "sensors": {
-                "ph": 16,  # pH measured (÷100) — e.g., 750 = 7.50 pH
-                "orp": 177,  # ORP/Redox measured (mV)
+                # Measured values: component 177 is NOT the measured ORP (it stays near
+                # 700 while the mobile app shows 661 mV). Scan the typical tecnoLC2
+                # locations (165/170/174) and keep only the temperature for now.
                 "temperature": 172,  # Pool temperature (°C × 10) — e.g., 236 = 23.6°C
             },
-            # Specific components for CC24009711 (no salinity / free-chlorine exposed)
-            "specific_components": [10, 16, 20, 172, 177],
+            # Widen scan to discover real measured pH/ORP/salinity components
+            "specific_components": [10, 16, 20, 165, 170, 172, 174, 177, 178, 183, 185],
         },
         priority=88,
     ),
