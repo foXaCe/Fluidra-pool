@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.32.0] - 2026-04-25
+
+### Added
+- **LC24026011 — IrriPool iSalt** (tecnoLC2) chlorinator support (Issue #58, reported by @rmechineau)
+  - Same mapping as LC25000122: chlorination 10, pH setpoint 16, ORP setpoint 20, pH 165, ORP 170, temperature 172, salinity 174
+
+### Fixed
+- **CC24009711 Clear Connect Scalable** — measured pH/ORP/salinity wired up (Issue #55 resolved, thanks @smartincervera for the diagnostics)
+  - pH measured on component 165 (e.g. 7.51), ORP measured on 170 (e.g. 657 mV), salinity on 174 (e.g. 3.27 g/L)
+  - Component 16 confirmed as pH setpoint (target value)
+
 ## [2.31.4] - 2026-04-23
 
 ### Fixed
