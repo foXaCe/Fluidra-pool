@@ -288,6 +288,7 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         device_type="chlorinator",
         # AstralPool Clear Connect Scalable 21 G/H (tecnoLC2) — Issue #55
         # Bridge CC24009711 with child device CC24009711.nn_1
+        # Mapping confirmed by @smartincervera (same as LC25000122 / LC24026011)
         identifier_patterns=["CC24009711.nn_*"],
         family_patterns=["chlorinator"],
         components_range=25,
@@ -295,17 +296,16 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         entities=["switch", "number", "sensor_info"],
         features={
             "chlorination_level": 10,  # Component 10 (0-100%) — e.g., 100 = 100%
-            "ph_setpoint": 16,  # Component 16 (÷100) — pH setpoint
+            "ph_setpoint": 16,  # Component 16 (÷100) — pH setpoint (target)
             "orp_setpoint": 20,  # Component 20 (mV) — ORP setpoint
             "skip_mode_select": True,  # No mode select on this model
             "sensors": {
-                # Measured values: component 177 is NOT the measured ORP (it stays near
-                # 700 while the mobile app shows 661 mV). Scan the typical tecnoLC2
-                # locations (165/170/174) and keep only the temperature for now.
+                "ph": 165,  # pH measured (÷100) — e.g., 751 = 7.51 pH
+                "orp": 170,  # ORP/Redox measured (mV) — e.g., 657 mV
                 "temperature": 172,  # Pool temperature (°C × 10) — e.g., 236 = 23.6°C
+                "salinity": 174,  # Salinity (g/L × 100) — e.g., 327 = 3.27 g/L
             },
-            # Widen scan to discover real measured pH/ORP/salinity components
-            "specific_components": [10, 16, 20, 165, 170, 172, 174, 177, 178, 183, 185],
+            "specific_components": [10, 16, 20, 165, 170, 172, 174],
         },
         priority=88,
     ),
