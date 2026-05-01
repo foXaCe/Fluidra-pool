@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.33.0] - 2026-04-29
+
+### Added
+- **CC25064524 — Astralpool Clear Connect 12** (tecnoLC2 minimal model) chlorinator support (Issue #55 follow-up)
+  - Chlorination level on component 10, temperature on 172. No pH/ORP entities (components 13-20 are null on this model)
+- **LC25012727 — KLINWASS MARK SALT 12 GR/H** (tecnoLC2) chlorinator support (Issue #55 follow-up, reported by @FernandoArnanz)
+  - Chlorination level on component 10, pH setpoint on 16, temperature on 172
+- Both configs scan components 165/170/174 to surface measured pH/ORP/salinity if exposed on a fresh diagnostics dump
+
 ## [2.32.0] - 2026-04-25
 
 ### Added
