@@ -309,6 +309,49 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=88,
     ),
+    "cc25064524_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Astralpool Clear Connect 12 (tecnoLC2 — minimal model) — Issue #55 follow-up
+        # Bridge CC25064524 with child device CC25064524.nn_1
+        identifier_patterns=["CC25064524.nn_*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%) — e.g., 80 = 80%
+            "skip_mode_select": True,  # No mode select on this model
+            "sensors": {
+                # Components 13-20 reported as null on this minimal model — no
+                # pH/ORP setpoints or measurements exposed here. Widen scan to
+                # 165/170/174 in case they appear after a fresh diagnostic.
+                "temperature": 172,  # Pool temperature (°C × 10) — e.g., 151 = 15.1°C
+            },
+            "specific_components": [10, 16, 20, 165, 170, 172, 174],
+        },
+        priority=87,
+    ),
+    "lc25012727_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # KLINWASS MARK SALT 12 GR/H (tecnoLC2) — Issue #55 follow-up
+        # Bridge LC25012727 with child device LC25012727.nn_1
+        identifier_patterns=["LC25012727.nn_*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%)
+            "ph_setpoint": 16,  # Component 16 (÷100) — e.g., 720 = 7.20 pH
+            "skip_mode_select": True,  # No mode select on this model
+            "sensors": {
+                "temperature": 172,  # Pool temperature (°C × 10) — e.g., 193 = 19.3°C
+            },
+            # Widen scan to discover measured pH/ORP/salinity (typical 165/170/174)
+            "specific_components": [10, 16, 20, 165, 170, 172, 174, 178],
+        },
+        priority=87,
+    ),
     "lc24026011_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # IrriPool iSalt tecnoLC2 bridge; child device ID is LC24026011.nn_1 (Issue #58)
