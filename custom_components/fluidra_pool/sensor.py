@@ -1124,8 +1124,15 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
+        """Return True if entity is available.
+
+        Bridged chlorinator children (`*.nn_*`) often report ``online=False``
+        through their connectivity flag even when polling them succeeds, so
+        gating on ``online`` makes the sensors permanently unavailable. Use
+        the presence of fresh component data as the availability signal
+        instead (Issue #63).
+        """
+        return self.coordinator.last_update_success and bool(self.device_data.get("components"))
 
     @property
     def native_value(self) -> float | None:
