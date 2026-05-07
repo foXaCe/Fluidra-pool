@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.34.0] - 2026-05-07
+
+### Added
+- **CC25102423 — Astralpool Clear Connect Evo21** (tecnoLC2) chlorinator support (Issue #63, analysis by @baracouda57)
+  - Mapping: pH 165 (÷100), ORP 170, temperature 172 (÷10), salinity 174 (÷100), pH setpoint 16, ORP setpoint 20
+- **CC25019007 — Zodiac OE iQ 12** (tecnoLC2) preliminary support (Issue #55 follow-up)
+  - Same mapping as the rest of the tecnoLC2 family; awaiting diagnostics confirmation
+
+### Fixed
+- **LC25012727 — KLINWASS MARK SALT 12 GR/H** (tecnoLC2) — finalised the sensor mapping (Issue #55, thanks @FernandoArnanz for the fresh diagnostics)
+  - pH measured on 165 (e.g. 7.19), temperature on 172, salinity on 174 (e.g. 6.20 g/L). No ORP/chlorine probes on this model.
+- **Bridged chlorinator sensors stuck unavailable** (Issue #63)
+  - `*.nn_*` children often report `online=False` even while polling succeeds; sensor availability now keys off the presence of fresh component data instead of the `online` flag, so values surface as soon as the device responds.
+- **Spurious "Circuit breaker opened" warnings** (Issue #64, reported by @flyman1664)
+  - Each retry inside `_request` was bumping the failure counter, so a single transient hiccup that succeeded after 3 retries still pushed the breaker by 3. Failures are now counted at most once per request, only when all retries have been exhausted.
+
 ## [2.33.0] - 2026-04-29
 
 ### Added
