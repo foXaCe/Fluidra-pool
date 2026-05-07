@@ -331,10 +331,36 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=87,
     ),
+    "cc25102423_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Astralpool Clear Connect Evo21 (tecnoLC2) — Issue #63 (analysis by @baracouda57)
+        # Bridge CC25102423 with child device CC25102423.nn_1
+        # Mapping matches the tecnoLC2 family (LC25000122 / LC24026011 / CC24009711)
+        identifier_patterns=["CC25102423.nn_*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%)
+            "ph_setpoint": 16,  # Component 16 (÷100) — pH setpoint
+            "orp_setpoint": 20,  # Component 20 (mV) — ORP setpoint
+            "skip_mode_select": True,  # No mode select on this model
+            "sensors": {
+                "ph": 165,  # pH measured (÷100) — confirmed by user (7.5)
+                "orp": 170,  # ORP measured (mV) — same family as LC25000122 (177 reads wrong)
+                "temperature": 172,  # Pool temperature (°C × 10) — confirmed (17.6°C)
+                "salinity": 174,  # Salinity (g/L × 100) — same family as other tecnoLC2
+            },
+            "specific_components": [10, 16, 20, 165, 170, 172, 174],
+        },
+        priority=88,
+    ),
     "lc25012727_chlorinator": DeviceConfig(
         device_type="chlorinator",
-        # KLINWASS MARK SALT 12 GR/H (tecnoLC2) — Issue #55 follow-up
+        # KLINWASS MARK SALT 12 GR/H (tecnoLC2) — Issue #55 (confirmed by @FernandoArnanz)
         # Bridge LC25012727 with child device LC25012727.nn_1
+        # No ORP / free-chlorine probes on this model.
         identifier_patterns=["LC25012727.nn_*"],
         family_patterns=["chlorinator"],
         components_range=25,
@@ -345,10 +371,36 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
             "ph_setpoint": 16,  # Component 16 (÷100) — e.g., 720 = 7.20 pH
             "skip_mode_select": True,  # No mode select on this model
             "sensors": {
-                "temperature": 172,  # Pool temperature (°C × 10) — e.g., 193 = 19.3°C
+                "ph": 165,  # pH measured (÷100) — e.g., 719 = 7.19 pH
+                "temperature": 172,  # Pool temperature (°C × 10) — e.g., 206 = 20.6°C
+                "salinity": 174,  # Salinity (g/L × 100) — e.g., 620 = 6.20 g/L
             },
-            # Widen scan to discover measured pH/ORP/salinity (typical 165/170/174)
-            "specific_components": [10, 16, 20, 165, 170, 172, 174, 178],
+            "specific_components": [10, 16, 165, 172, 174],
+        },
+        priority=87,
+    ),
+    "cc25019007_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Zodiac OE iQ 12 (tecnoLC2) — Issue #55 follow-up
+        # Bridge CC25019007 with child device CC25019007.nn_1
+        # Mapping by analogy with the tecnoLC2 family — confirm with diagnostics dump.
+        identifier_patterns=["CC25019007.nn_*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "orp_setpoint": 20,
+            "skip_mode_select": True,
+            "sensors": {
+                "ph": 165,  # pH measured (÷100)
+                "orp": 170,  # ORP measured (mV)
+                "temperature": 172,  # Pool temperature (÷10)
+                "salinity": 174,  # Salinity (÷100)
+            },
+            "specific_components": [10, 16, 20, 165, 170, 172, 174],
         },
         priority=87,
     ),
