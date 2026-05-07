@@ -199,8 +199,9 @@ class FluidraPoolAPI:
                     return status, _parse_json(raw_text), raw_text
 
                 if status in _RETRYABLE_STATUSES and attempt < MAX_RETRIES:
-                    if not skip_circuit_breaker:
-                        self._circuit_breaker.record_failure()
+                    # Don't record_failure per-retry: a request that eventually
+                    # succeeds shouldn't push the circuit breaker toward open
+                    # state (Issue #64). Only the *final* failure counts.
                     retry_after = _parse_retry_after(response) if status == 429 else None
                     sleep_for = retry_after if retry_after is not None else backoff
                     _LOGGER.debug(
@@ -222,9 +223,6 @@ class FluidraPoolAPI:
 
             except (aiohttp.ClientError, TimeoutError) as err:
                 last_error = err
-                if not skip_circuit_breaker:
-                    self._circuit_breaker.record_failure()
-
                 if attempt < MAX_RETRIES:
                     _LOGGER.debug(
                         "Request failed (attempt %d/%d): %s, retrying in %.1fs",
@@ -242,6 +240,9 @@ class FluidraPoolAPI:
                         err,
                     )
 
+        # All retries exhausted — record exactly one failure for the circuit breaker
+        if not skip_circuit_breaker:
+            self._circuit_breaker.record_failure()
         raise FluidraConnectionError(f"Request failed after {MAX_RETRIES + 1} attempts: {last_error}")
 
     async def authenticate(self) -> None:
