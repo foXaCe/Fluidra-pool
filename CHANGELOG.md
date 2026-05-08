@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.34.1] - 2026-05-07
+
+### Fixed
+- **CC25064524 — Astralpool Clear Connect 12** salinity now exposed (Issue #55, confirmed by @eabin)
+  - Added `salinity` sensor on component 174 (e.g. 634 → 6.34 g/L). The base model still has no pH/ORP probes, but components 165/170 stay in the scan so they surface automatically if probes are added later.
+
 ## [2.34.0] - 2026-05-07
 
 ### Added
