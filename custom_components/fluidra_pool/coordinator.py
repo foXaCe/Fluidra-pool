@@ -6,6 +6,7 @@ import asyncio
 import copy
 from datetime import timedelta
 import logging
+from typing import Any
 
 import aiohttp
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -34,7 +35,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         """Initialize."""
         self.api = api
         self.config_entry = config_entry  # Store config entry for device cleanup
-        self._previous_schedule_entities = {}  # Track scheduler entities per device for cleanup
+        self._previous_schedule_entities: dict[str, int] = {}  # Track scheduler entities per device for cleanup
         self._first_update = True  # Skip heavy polling on first update for faster startup
 
         # 🥇 Gold: Utiliser l'intervalle configuré dans les options
@@ -165,7 +166,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             }
 
             # Group days by program ID
-            program_days = {}
+            program_days: dict[int, list[int]] = {}
             for day_name, program_id in day_programs.items():
                 if program_id not in program_days:
                     program_days[program_id] = []
@@ -331,7 +332,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         Extracted from _async_update_data to reduce code duplication.
         """
         reported_value = component_state.get("reportedValue")
-        device_id = device.get("device_id")
+        raw_device_id = device.get("device_id")
+        device_id = str(raw_device_id) if raw_device_id is not None else ""
 
         # Store ALL component data
         device["components"][str(component_id)] = component_state
@@ -587,17 +589,18 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
         pool_details_task = self.api.get_pool_details(pool_id)
         water_quality_task = self.api.poll_water_quality(pool_id)
-        pool_details, water_quality = await asyncio.gather(
+        refresh_results: tuple[Any, Any] = await asyncio.gather(
             pool_details_task, water_quality_task, return_exceptions=True
         )
+        pool_details_result, water_quality_result = refresh_results
 
-        if isinstance(pool_details, dict):
+        if isinstance(pool_details_result, dict):
             api_devices = pool.get("devices", [])
-            pool.update(pool_details)
+            pool.update(pool_details_result)
             pool["devices"] = api_devices
 
-        if isinstance(water_quality, dict):
-            pool["water_quality"] = water_quality
+        if isinstance(water_quality_result, dict):
+            pool["water_quality"] = water_quality_result
 
         # Preserve previous component data with deep copy to avoid aliasing
         for device in pool.get("devices", []):

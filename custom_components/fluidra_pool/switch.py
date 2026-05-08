@@ -39,7 +39,7 @@ async def async_setup_entry(
     """Set up Fluidra Pool switch entities."""
     coordinator = config_entry.runtime_data.coordinator
 
-    entities = []
+    entities: list[SwitchEntity] = []
 
     # Use cached pools data instead of API call for faster startup
     pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
@@ -94,8 +94,8 @@ class FluidraPoolSwitchEntity(FluidraPoolControlEntity, SwitchEntity):
     def __init__(self, coordinator, api, pool_id: str, device_id: str):
         """Initialize the switch."""
         super().__init__(coordinator, api, pool_id, device_id)
-        self._pending_state = None
-        self._last_action_time = None
+        self._pending_state: bool | None = None
+        self._last_action_time: float | None = None
 
     @property
     def unique_id(self) -> str:
@@ -119,6 +119,10 @@ class FluidraPoolSwitchEntity(FluidraPoolControlEntity, SwitchEntity):
         self._pending_state = None
         self._last_action_time = None
         self.async_write_ha_state()
+
+    def _pending_state_expired(self, timeout: float) -> bool:
+        """Return True if a pending optimistic state has timed out."""
+        return self._last_action_time is None or time.time() - self._last_action_time > timeout
 
 
 class FluidraPumpSwitch(FluidraPoolSwitchEntity):
@@ -153,7 +157,7 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
             # Effacer l'état en attente après 10 secondes de sécurité
-            if time.time() - self._last_action_time > 10:
+            if self._pending_state_expired(10):
                 self._clear_pending_state()
             else:
                 return self._pending_state
@@ -286,7 +290,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
             # Effacer l'état en attente après 10 secondes de sécurité
-            if time.time() - self._last_action_time > 10:
+            if self._pending_state_expired(10):
                 self._clear_pending_state()
             else:
                 return self._pending_state
@@ -411,7 +415,7 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
     def is_on(self) -> bool:
         """Return true if the heater is on."""
         if self._pending_state is not None:
-            if time.time() - self._last_action_time > OPTIMISTIC_ACTION_TIMEOUT:
+            if self._pending_state_expired(OPTIMISTIC_ACTION_TIMEOUT):
                 self._clear_pending_state()
             else:
                 return self._pending_state
@@ -483,7 +487,7 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
             # Effacer l'état en attente après 10 secondes de sécurité
-            if time.time() - self._last_action_time > 10:
+            if self._pending_state_expired(10):
                 self._clear_pending_state()
             else:
                 return self._pending_state
@@ -595,7 +599,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
     @property
     def unique_id(self) -> str:
         """Return unique ID."""
-        return self._attr_unique_id
+        return self._attr_unique_id or f"{DOMAIN}_{self._pool_id}_{self._device_id}_schedule_{self._schedule_id}"
 
     @property
     def icon(self) -> str:
@@ -627,6 +631,10 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None
 
+    def _get_schedule_component(self) -> int:
+        """Get the schedule component used by this device."""
+        return DeviceIdentifier.get_feature(self.device_data, "schedule_component", 20)
+
     @property
     def available(self) -> bool:
         """Return True if the schedule exists."""
@@ -638,7 +646,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         # Si on a un état en attente, l'utiliser pour la réactivité
         if self._pending_state is not None:
             # Effacer l'état en attente après 10 secondes de sécurité
-            if time.time() - self._last_action_time > 10:
+            if self._pending_state_expired(10):
                 self._clear_pending_state()
             else:
                 return self._pending_state
@@ -656,11 +664,14 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
+                self._clear_pending_state()
                 return
 
             current_schedules = device_data["schedule_data"]
             if not current_schedules:
+                self._clear_pending_state()
                 return
+            schedule_component = self._get_schedule_component()
 
             # Create complete schedule list with EXACT format from mobile app
             updated_schedules = []
@@ -679,8 +690,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 }
                 updated_schedules.append(scheduler)
 
-            # Ensure we have exactly 8 schedulers (add missing ones)
-            while len(updated_schedules) < 8:
+            # Ensure pumps have exactly 8 schedulers (add missing ones)
+            while schedule_component == 20 and len(updated_schedules) < 8:
                 missing_id = len(updated_schedules) + 1
                 updated_schedules.append(
                     {
@@ -694,7 +705,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 )
 
             # Send update to API
-            success = await self._api.set_schedule(self._device_id, updated_schedules)
+            success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
             if success:
                 await self.coordinator.async_request_refresh()
                 # Effacer l'état en attente après confirmation
@@ -724,11 +735,14 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
+                self._clear_pending_state()
                 return
 
             current_schedules = device_data["schedule_data"]
             if not current_schedules:
+                self._clear_pending_state()
                 return
+            schedule_component = self._get_schedule_component()
 
             # Create complete schedule list with EXACT format from mobile app
             updated_schedules = []
@@ -747,8 +761,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 }
                 updated_schedules.append(scheduler)
 
-            # Ensure we have exactly 8 schedulers (add missing ones)
-            while len(updated_schedules) < 8:
+            # Ensure pumps have exactly 8 schedulers (add missing ones)
+            while schedule_component == 20 and len(updated_schedules) < 8:
                 missing_id = len(updated_schedules) + 1
                 updated_schedules.append(
                     {
@@ -762,7 +776,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 )
 
             # Send update to API
-            success = await self._api.set_schedule(self._device_id, updated_schedules)
+            success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
             if success:
                 await self.coordinator.async_request_refresh()
                 # Effacer l'état en attente après confirmation
@@ -788,7 +802,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
     def extra_state_attributes(self) -> dict:
         """Return extra state attributes."""
         schedule = self._get_schedule_data()
-        attrs = {
+        attrs: dict[str, Any] = {
             "schedule_id": self._schedule_id,
             "device_id": self._device_id,
         }
@@ -830,7 +844,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
     @property
     def unique_id(self) -> str:
         """Return unique ID (override base class to use _attr_unique_id)."""
-        return self._attr_unique_id
+        return self._attr_unique_id or f"{DOMAIN}_{self._pool_id}_{self._device_id}_boost_mode"
 
     def _get_current_mode(self) -> str:
         """Get current chlorinator mode from mode component."""
@@ -844,7 +858,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             mode_value = 0
         mode_mapping = DeviceIdentifier.get_feature(self.device_data, "mode_mapping", None)
         if mode_mapping:
-            return {int(k): v for k, v in mode_mapping.items()}.get(mode_value, "off")
+            return str({int(k): v for k, v in mode_mapping.items()}.get(mode_value, "off"))
         return {0: "off", 1: "on", 2: "auto"}.get(mode_value, "off")
 
     @property
@@ -870,7 +884,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
         actual_state = bool(boost_value)
 
         if self._pending_state is not None:
-            if actual_state == self._pending_state or time.time() - self._last_action_time > 10:
+            if actual_state == self._pending_state or self._pending_state_expired(10):
                 self._clear_pending_state()
                 return actual_state
             return self._pending_state
@@ -995,7 +1009,7 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
     def is_on(self) -> bool:
         """Return true if the chlorinator is on."""
         if self._pending_state is not None:
-            if time.time() - self._last_action_time > 10:
+            if self._pending_state_expired(10):
                 self._clear_pending_state()
             else:
                 return self._pending_state

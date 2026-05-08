@@ -1102,7 +1102,8 @@ class DeviceIdentifier:
 
         # Cache result on the device itself — the key includes the component-7
         # signature so a signature change (first vs subsequent polls) invalidates it.
-        components = device.get("components") if isinstance(device.get("components"), dict) else {}
+        raw_components = device.get("components")
+        components: dict[str, Any] = raw_components if isinstance(raw_components, dict) else {}
         comp7_value = ""
         if "7" in components and isinstance(components["7"], dict):
             comp7_value = str(components["7"].get("reportedValue", ""))

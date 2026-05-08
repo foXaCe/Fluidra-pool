@@ -93,9 +93,9 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
     def __init__(self, coordinator, api, pool_id: str, device_id: str):
         """Initialize the climate entity."""
         super().__init__(coordinator, api, pool_id, device_id)
-        self._pending_temperature = None
-        self._pending_preset_mode = None
-        self._pending_hvac_mode = None
+        self._pending_temperature: float | None = None
+        self._pending_preset_mode: str | None = None
+        self._pending_hvac_mode: HVACMode | None = None
         self._is_updating = False
         self._last_action_time: float | None = None
         self._last_preset_action_time: float | None = None
@@ -172,7 +172,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         return 1.0
 
     @property
-    def supported_features(self) -> int:
+    def supported_features(self) -> ClimateEntityFeature:
         """Return the supported features."""
         features = ClimateEntityFeature.TARGET_TEMPERATURE
 
@@ -206,7 +206,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         return []
 
     @property
-    def preset_mode(self) -> str:
+    def preset_mode(self) -> str | None:
         """Return current preset mode for heat pumps with this feature."""
         device_data = self.device_data
 
@@ -404,11 +404,15 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                     current_preset = self.preset_mode
                     if hvac_mode == HVACMode.HEAT:
                         # Keep current preset if it's already a HEAT preset, else default to Smart Heat
-                        mode_value = LG_MODE_TO_VALUE.get(current_preset, LG_MODE_TO_VALUE[LG_PRESET_SMART_HEATING])
+                        mode_value = LG_MODE_TO_VALUE.get(
+                            current_preset or LG_PRESET_SMART_HEATING, LG_MODE_TO_VALUE[LG_PRESET_SMART_HEATING]
+                        )
                         if mode_value not in (0, 3, 4):
                             mode_value = LG_MODE_TO_VALUE[LG_PRESET_SMART_HEATING]
                     elif hvac_mode == HVACMode.COOL:
-                        mode_value = LG_MODE_TO_VALUE.get(current_preset, LG_MODE_TO_VALUE[LG_PRESET_SMART_COOLING])
+                        mode_value = LG_MODE_TO_VALUE.get(
+                            current_preset or LG_PRESET_SMART_COOLING, LG_MODE_TO_VALUE[LG_PRESET_SMART_COOLING]
+                        )
                         if mode_value not in (1, 5, 6):
                             mode_value = LG_MODE_TO_VALUE[LG_PRESET_SMART_COOLING]
                     elif hvac_mode == HVACMode.HEAT_COOL:

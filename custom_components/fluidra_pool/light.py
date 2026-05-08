@@ -64,7 +64,7 @@ class FluidraLight(FluidraPoolControlEntity, LightEntity):
         "_optimistic_rgbw",
     )
 
-    _attr_translation_key = "light"
+    _attr_translation_key = "pool_light"
     _attr_color_mode = ColorMode.RGBW
     _attr_supported_color_modes = {ColorMode.RGBW}
 
@@ -116,10 +116,13 @@ class FluidraLight(FluidraPoolControlEntity, LightEntity):
         reported = self._get_component(LUMIPLUS_COMPONENT_COLOR).get("reportedValue")
         if not isinstance(reported, dict):
             return None
-        r = int(reported.get("r", 0))
-        g = int(reported.get("g", 0))
-        b = int(reported.get("b", 0))
-        w = int(reported.get("extra", {}).get("w", 0))
+        try:
+            r = int(reported.get("r", 0))
+            g = int(reported.get("g", 0))
+            b = int(reported.get("b", 0))
+            w = int(reported.get("extra", {}).get("w", 0))
+        except (TypeError, ValueError):
+            return None
         return (r, g, b, w)
 
     @callback

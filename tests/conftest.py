@@ -12,8 +12,11 @@ from custom_components.fluidra_pool.fluidra_api import FluidraPoolAPI
 
 
 @pytest.fixture(autouse=True)
-def enable_custom_integrations(hass: HomeAssistant) -> None:
-    """Enable custom integrations in the test environment."""
+def enable_custom_integrations(request: pytest.FixtureRequest) -> None:
+    """Enable custom integrations only for tests that use Home Assistant."""
+    if "hass" not in request.fixturenames:
+        return
+    hass: HomeAssistant = request.getfixturevalue("hass")
     hass.data.pop(DATA_CUSTOM_COMPONENTS, None)
 
 

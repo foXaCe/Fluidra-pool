@@ -32,6 +32,9 @@ TO_REDACT = {
     "location",
     "address",
 }
+TO_REDACT_LOWER = {key.lower() for key in TO_REDACT}
+REDACTED = "**REDACTED**"
+SAFE_COMPONENT_KEYS = {"timestamp", "last_update", "lastUpdate", "unit", "type"}
 
 
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: FluidraPoolConfigEntry) -> dict[str, Any]:
@@ -66,17 +69,17 @@ def _redact_pools_data(pools_data: dict) -> dict:
     if not pools_data:
         return {}
 
-    redacted = {}
+    redacted: dict[str, Any] = {}
     for pool_id, pool_data in pools_data.items():
         # Redact pool ID but keep structure
         redacted_pool_id = f"pool_{hash(pool_id) % 10000:04d}"
-        redacted_pool = {}
+        redacted_pool: Any = {}
 
         if isinstance(pool_data, dict):
             for key, value in pool_data.items():
                 # Skip sensitive keys
-                if key.lower() in {k.lower() for k in TO_REDACT}:
-                    redacted_pool[key] = "**REDACTED**"
+                if key.lower() in TO_REDACT_LOWER:
+                    redacted_pool[key] = REDACTED
                 elif key == "devices":
                     # Redact device data
                     redacted_pool["devices"] = _redact_devices_data(value)
@@ -103,10 +106,10 @@ def _redact_devices_data(devices: list) -> list:
     redacted_devices = []
     for i, device in enumerate(devices):
         if isinstance(device, dict):
-            redacted_device = {}
+            redacted_device: dict[str, Any] = {}
             for key, value in device.items():
-                if key.lower() in {k.lower() for k in TO_REDACT}:
-                    redacted_device[key] = "**REDACTED**"
+                if key.lower() in TO_REDACT_LOWER:
+                    redacted_device[key] = REDACTED
                 elif key == "components":
                     # Keep component IDs but redact values
                     redacted_device["components"] = {
@@ -133,9 +136,12 @@ def _redact_component_data(component: dict) -> dict:
     if not isinstance(component, dict):
         return component
 
-    # Keep component structure for debugging
-    return {
-        "reportedValue": component.get("reportedValue"),
-        "desiredValue": component.get("desiredValue"),
-        "timestamp": component.get("timestamp"),
-    }
+    redacted: dict[str, Any] = {}
+    for key, value in component.items():
+        if key in SAFE_COMPONENT_KEYS:
+            redacted[key] = value
+        elif key.lower() in TO_REDACT_LOWER:
+            redacted[key] = REDACTED
+        else:
+            redacted[key] = REDACTED
+    return redacted

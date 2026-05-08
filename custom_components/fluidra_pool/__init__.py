@@ -7,18 +7,30 @@ This integration provides support for Fluidra Pool systems.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryNotReady,
+    HomeAssistantError,
+    ServiceValidationError,
+)
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 import voluptuous as vol
 
 from .api_resilience import FluidraError, FluidraMFARequired
-from .const import CONF_EMAIL, CONF_PASSWORD, DOMAIN, FluidraPoolConfigEntry, FluidraPoolRuntimeData
+from .const import (
+    COMPONENT_SCHEDULE,
+    CONF_EMAIL,
+    CONF_PASSWORD,
+    DOMAIN,
+    FluidraPoolConfigEntry,
+    FluidraPoolRuntimeData,
+)
 from .utils import mask_email
 
 if TYPE_CHECKING:
@@ -41,13 +53,15 @@ SERVICE_SET_SCHEDULE = "set_schedule"
 SERVICE_CLEAR_SCHEDULE = "clear_schedule"
 SERVICE_SET_PRESET_SCHEDULE = "set_preset_schedule"
 
+ALL_MOBILE_DAYS: Final = [1, 2, 3, 4, 5, 6, 7]
+
 SCHEDULE_SCHEMA = vol.Schema(
     {
         vol.Required("enabled"): cv.boolean,
         vol.Required("start_time"): cv.string,
         vol.Required("end_time"): cv.string,
         vol.Required("mode"): vol.In(["0", "1", "2"]),  # 0=Faible, 1=Moyenne, 2=Élevée
-        vol.Optional("days", default=[0, 1, 2, 3, 4, 5, 6]): [vol.Range(min=0, max=6)],  # 0=Lundi, 6=Dimanche
+        vol.Optional("days", default=ALL_MOBILE_DAYS): [vol.Range(min=1, max=7)],  # 1=Monday, 7=Sunday
     }
 )
 
@@ -70,6 +84,12 @@ SET_PRESET_SCHEDULE_SCHEMA = vol.Schema(
         vol.Required("preset"): vol.In(["standard", "intensive", "eco", "summer", "winter"]),
     }
 )
+
+
+async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
+    """Set up Fluidra Pool integration-wide services."""
+    await _async_register_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) -> bool:
@@ -111,7 +131,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     # Create devices for each pool
     device_registry = dr.async_get(hass)
     for pool in pools:
-        pool_id = pool.get("id")
+        raw_pool_id = pool.get("id")
+        if raw_pool_id is None:
+            continue
+        pool_id = str(raw_pool_id)
         pool_name = pool.get("name", f"Pool {pool_id}")
         device_registry.async_get_or_create(
             config_entry_id=entry.entry_id,
@@ -164,9 +187,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     # Set up platforms after coordinator has data
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register services
-    await _async_register_services(hass, coordinator)
-
     # 🥇 Gold: Recharger l'intégration quand les options changent
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
@@ -211,11 +231,99 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _async_register_services(hass: HomeAssistant, coordinator: FluidraDataUpdateCoordinator) -> None:
+def _get_device_data(coordinator: FluidraDataUpdateCoordinator, device_id: str) -> dict[str, Any] | None:
+    """Return device data from a coordinator for a Fluidra device ID."""
+    if not coordinator.data:
+        return None
+
+    for pool_data in coordinator.data.values():
+        for device in pool_data.get("devices", []):
+            if device.get("device_id") == device_id:
+                return device
+    return None
+
+
+def _coordinator_has_device(coordinator: FluidraDataUpdateCoordinator, device_id: str) -> bool:
+    """Return True when a coordinator owns the requested Fluidra device."""
+    return _get_device_data(coordinator, device_id) is not None
+
+
+def _get_schedule_component(coordinator: FluidraDataUpdateCoordinator, device_id: str) -> int:
+    """Return the schedule component for a device, defaulting to pump schedules."""
+    from .device_registry import DeviceIdentifier
+
+    device = _get_device_data(coordinator, device_id)
+    if device is None:
+        return COMPONENT_SCHEDULE
+    return DeviceIdentifier.get_feature(device, "schedule_component", COMPONENT_SCHEDULE)
+
+
+def _get_coordinator_for_device(hass: HomeAssistant, device_id: str) -> FluidraDataUpdateCoordinator:
+    """Find the loaded entry coordinator that owns a service target device."""
+    coordinators: list[FluidraDataUpdateCoordinator] = []
+    for entry in hass.config_entries.async_loaded_entries(DOMAIN):
+        runtime_data = getattr(entry, "runtime_data", None)
+        coordinator = getattr(runtime_data, "coordinator", None)
+        if coordinator is None:
+            continue
+
+        coordinators.append(coordinator)
+        if _coordinator_has_device(coordinator, device_id):
+            return coordinator
+
+    if len(coordinators) == 1:
+        return coordinators[0]
+
+    raise ServiceValidationError(f"Fluidra device '{device_id}' was not found in any loaded config entry")
+
+
+def _parse_service_time(value: str) -> tuple[int, int]:
+    """Parse service HH:MM input into hour/minute integers."""
+    try:
+        hour_text, minute_text = value.split(":", 1)
+        hour = int(hour_text)
+        minute = int(minute_text)
+    except (AttributeError, ValueError) as err:
+        raise ServiceValidationError(f"Invalid time '{value}', expected HH:MM") from err
+
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        raise ServiceValidationError(f"Invalid time '{value}', expected HH:MM")
+    return hour, minute
+
+
+def _service_schedule_to_fluidra(schedule: dict[str, Any], schedule_id: int) -> dict[str, Any]:
+    """Convert service schedule input to the Fluidra CRON schedule shape."""
+    start_hour, start_minute = _parse_service_time(schedule["start_time"])
+    end_hour, end_minute = _parse_service_time(schedule["end_time"])
+    days = sorted({int(day) for day in schedule["days"]})
+    if not days:
+        raise ServiceValidationError("Schedule days cannot be empty")
+    days_str = ",".join(str(day) for day in days)
+
+    return {
+        "id": f"schedule_{schedule_id}",
+        "enabled": schedule["enabled"],
+        "startTime": f"{start_minute:02d} {start_hour:02d} * * {days_str}",
+        "endTime": f"{end_minute:02d} {end_hour:02d} * * {days_str}",
+        "startActions": {
+            "componentToChange": 11,  # Speed component
+            "operationName": schedule["mode"],
+        },
+        "endActions": {
+            "componentToChange": 9,  # Pump component
+            "operationName": "0",  # Turn off
+        },
+        "state": "IDLE",
+    }
+
+
+async def _async_register_services(hass: HomeAssistant) -> None:
     """Register services for Fluidra Pool.
 
     🏆 Platinum: Services avec supports_response pour retourner des données.
     """
+    if hass.services.has_service(DOMAIN, SERVICE_SET_SCHEDULE):
+        return
 
     async def _handle_set_schedule(call: ServiceCall) -> ServiceResponse:
         """Handle set_schedule service call.
@@ -224,39 +332,18 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         """
         device_id = call.data["device_id"]
         schedules_data = call.data["schedules"]
+        coordinator = _get_coordinator_for_device(hass, device_id)
 
         # Convert HA format to Fluidra API format
-        fluidra_schedules = []
-        for i, schedule in enumerate(schedules_data):
-            # Convert time format "08:00" to cron format "0 8 * * 1,2,3,4,5"
-            start_parts = schedule["start_time"].split(":")
-            end_parts = schedule["end_time"].split(":")
-
-            start_cron = f"{start_parts[1]} {start_parts[0]} * * {','.join(map(str, schedule['days']))}"
-            end_cron = f"{end_parts[1]} {end_parts[0]} * * {','.join(map(str, schedule['days']))}"
-
-            fluidra_schedule = {
-                "id": f"schedule_{i + 1}",
-                "enabled": schedule["enabled"],
-                "startTime": start_cron,
-                "endTime": end_cron,
-                "startActions": {
-                    "componentToChange": 11,  # Speed component
-                    "operationName": schedule["mode"],
-                },
-                "endActions": {
-                    "componentToChange": 9,  # Pump component
-                    "operationName": "0",  # Turn off
-                },
-                "state": "IDLE",
-            }
-            fluidra_schedules.append(fluidra_schedule)
+        fluidra_schedules = [
+            _service_schedule_to_fluidra(schedule, i) for i, schedule in enumerate(schedules_data, start=1)
+        ]
 
         try:
             success = await coordinator.api.set_schedule(device_id, fluidra_schedules)
-        except FluidraError:
+        except FluidraError as err:
             _LOGGER.exception("Service %s failed for device %s", SERVICE_SET_SCHEDULE, device_id)
-            return {"success": False, "device_id": device_id, "error": "Fluidra API error"}
+            raise HomeAssistantError(f"Fluidra API failed while setting schedule for {device_id}") from err
 
         if success:
             await coordinator.async_request_refresh()
@@ -265,7 +352,7 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
                 "device_id": device_id,
                 "schedules_count": len(fluidra_schedules),
             }
-        return {"success": False, "device_id": device_id, "error": "API call failed"}
+        raise HomeAssistantError(f"Fluidra API rejected schedule update for {device_id}")
 
     async def _handle_clear_schedule(call: ServiceCall) -> ServiceResponse:
         """Handle clear_schedule service call.
@@ -273,17 +360,20 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         🏆 Platinum: Retourne le résultat de l'opération.
         """
         device_id = call.data["device_id"]
+        coordinator = _get_coordinator_for_device(hass, device_id)
 
         try:
-            success = await coordinator.api.clear_schedule(device_id)
-        except FluidraError:
+            success = await coordinator.api.clear_schedule(
+                device_id, component_id=_get_schedule_component(coordinator, device_id)
+            )
+        except FluidraError as err:
             _LOGGER.exception("Service %s failed for device %s", SERVICE_CLEAR_SCHEDULE, device_id)
-            return {"success": False, "device_id": device_id, "error": "Fluidra API error"}
+            raise HomeAssistantError(f"Fluidra API failed while clearing schedule for {device_id}") from err
 
         if success:
             await coordinator.async_request_refresh()
             return {"success": True, "device_id": device_id}
-        return {"success": False, "device_id": device_id, "error": "API call failed"}
+        raise HomeAssistantError(f"Fluidra API rejected schedule clear for {device_id}")
 
     async def _handle_set_preset_schedule(call: ServiceCall) -> ServiceResponse:
         """Handle set_preset_schedule service call.
@@ -292,6 +382,7 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
         """
         device_id = call.data["device_id"]
         preset = call.data["preset"]
+        coordinator = _get_coordinator_for_device(hass, device_id)
 
         # Define presets
         presets: dict[str, list[dict]] = {
@@ -305,7 +396,7 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
                     "start_time": "08:00",
                     "end_time": "18:00",
                     "mode": "2",
-                    "days": [0, 1, 2, 3, 4, 5, 6],
+                    "days": ALL_MOBILE_DAYS,
                 }
             ],
             "eco": [
@@ -314,7 +405,7 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
                     "start_time": "10:00",
                     "end_time": "14:00",
                     "mode": "0",
-                    "days": [0, 1, 2, 3, 4, 5, 6],
+                    "days": ALL_MOBILE_DAYS,
                 }
             ],
             "summer": [
@@ -323,14 +414,14 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
                     "start_time": "06:00",
                     "end_time": "10:00",
                     "mode": "2",
-                    "days": [0, 1, 2, 3, 4, 5, 6],
+                    "days": ALL_MOBILE_DAYS,
                 },
                 {
                     "enabled": True,
                     "start_time": "16:00",
                     "end_time": "22:00",
                     "mode": "2",
-                    "days": [0, 1, 2, 3, 4, 5, 6],
+                    "days": ALL_MOBILE_DAYS,
                 },
             ],
             "winter": [
@@ -339,39 +430,24 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
                     "start_time": "12:00",
                     "end_time": "16:00",
                     "mode": "0",
-                    "days": [0, 1, 2, 3, 4, 5, 6],
+                    "days": ALL_MOBILE_DAYS,
                 }
             ],
         }
 
         if preset not in presets:
-            return {"success": False, "device_id": device_id, "error": f"Unknown preset: {preset}"}
+            raise ServiceValidationError(f"Unknown preset: {preset}")
 
         # Build schedules in Fluidra format
-        fluidra_schedules = []
-        for i, schedule in enumerate(presets[preset]):
-            start_parts = schedule["start_time"].split(":")
-            end_parts = schedule["end_time"].split(":")
-            start_cron = f"{start_parts[1]} {start_parts[0]} * * {','.join(map(str, schedule['days']))}"
-            end_cron = f"{end_parts[1]} {end_parts[0]} * * {','.join(map(str, schedule['days']))}"
-
-            fluidra_schedules.append(
-                {
-                    "id": f"schedule_{i + 1}",
-                    "enabled": schedule["enabled"],
-                    "startTime": start_cron,
-                    "endTime": end_cron,
-                    "startActions": {"componentToChange": 11, "operationName": schedule["mode"]},
-                    "endActions": {"componentToChange": 9, "operationName": "0"},
-                    "state": "IDLE",
-                }
-            )
+        fluidra_schedules = [
+            _service_schedule_to_fluidra(schedule, i) for i, schedule in enumerate(presets[preset], start=1)
+        ]
 
         try:
             success = await coordinator.api.set_schedule(device_id, fluidra_schedules)
-        except FluidraError:
+        except FluidraError as err:
             _LOGGER.exception("Service %s failed for device %s", SERVICE_SET_PRESET_SCHEDULE, device_id)
-            return {"success": False, "device_id": device_id, "error": "Fluidra API error"}
+            raise HomeAssistantError(f"Fluidra API failed while setting preset schedule for {device_id}") from err
 
         if success:
             await coordinator.async_request_refresh()
@@ -381,7 +457,7 @@ async def _async_register_services(hass: HomeAssistant, coordinator: FluidraData
                 "preset": preset,
                 "schedules_count": len(fluidra_schedules),
             }
-        return {"success": False, "device_id": device_id, "error": "API call failed"}
+        raise HomeAssistantError(f"Fluidra API rejected preset schedule update for {device_id}")
 
     # 🏆 Platinum: Register services with supports_response
     hass.services.async_register(

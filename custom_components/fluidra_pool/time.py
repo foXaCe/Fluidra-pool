@@ -9,6 +9,7 @@ import logging
 import aiohttp
 from homeassistant.components.time import TimeEntity
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -16,7 +17,7 @@ from .api_resilience import FluidraError
 from .const import COMMAND_CONFIRMATION_DELAY, DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolControlEntity
-from .utils import convert_cron_days
+from .utils import convert_cron_days, extract_cron_days
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ async def async_setup_entry(
     """Set up Fluidra Pool time entities."""
     coordinator = config_entry.runtime_data.coordinator
 
-    entities = []
+    entities: list[TimeEntity] = []
 
     # Use cached pools data instead of API call for faster startup
     pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
@@ -135,7 +136,7 @@ async def async_setup_entry(
             # Chlorinators with schedules (e.g., DM24049704)
             elif device_type == "chlorinator" and DeviceIdentifier.has_feature(device, "schedules"):
                 schedule_count = DeviceIdentifier.get_feature(device, "schedule_count", 3)
-                for i in range(schedule_count):
+                for i in range(1, schedule_count + 1):
                     schedule_id = str(i)
                     entities.append(
                         FluidraScheduleStartTimeEntity(coordinator, coordinator.api, pool["id"], device_id, schedule_id)
@@ -170,7 +171,7 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         return 20
 
     @property
-    def device_info(self) -> dict:
+    def device_info(self) -> DeviceInfo:
         """Return device info using device registry for consistent naming."""
         config = DeviceIdentifier.identify_device(self.device_data)
 
@@ -229,12 +230,18 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         """Parse cron time format or numeric minutes to time object."""
         return parse_schedule_time(cron_time)
 
-    def _format_time_to_cron(self, time_obj: time, days: list = None) -> str:
+    def _format_time_to_cron(self, time_obj: time, days: list[int] | None = None) -> str:
         """Format time object to cron format."""
         if days is None:
             days = [1, 2, 3, 4, 5, 6, 7]  # All days in mobile format
         days_str = ",".join(map(str, days))
         return f"{time_obj.minute} {time_obj.hour} * * {days_str}"
+
+    def _get_schedule_days(self, schedule: dict | None) -> set[int]:
+        """Return the active days for a schedule."""
+        if not schedule:
+            return set(range(1, 8))
+        return extract_cron_days(schedule.get("startTime") or schedule.get("endTime"))
 
     def _validate_schedule_overlap(
         self, new_start_time: time, new_end_time: time, schedule_id_to_update: str
@@ -246,10 +253,18 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
                 return True, ""
 
             current_schedules = device_data["schedule_data"]
+            current_schedule = next(
+                (schedule for schedule in current_schedules if str(schedule.get("id")) == str(schedule_id_to_update)),
+                None,
+            )
+            new_days = self._get_schedule_days(current_schedule)
 
             for schedule in current_schedules:
                 # Skip the schedule we're updating and disabled schedules
                 if str(schedule.get("id")) == str(schedule_id_to_update) or not schedule.get("enabled", False):
+                    continue
+
+                if new_days.isdisjoint(self._get_schedule_days(schedule)):
                     continue
 
                 # Parse existing schedule times
@@ -280,14 +295,19 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         start2_min = start2.hour * 60 + start2.minute
         end2_min = end2.hour * 60 + end2.minute
 
-        # Handle overnight schedules (end time < start time)
-        if end1_min < start1_min:
-            end1_min += 24 * 60
-        if end2_min < start2_min:
-            end2_min += 24 * 60
+        return any(
+            interval1_start < interval2_end and interval2_start < interval1_end
+            for interval1_start, interval1_end in self._minute_intervals(start1_min, end1_min)
+            for interval2_start, interval2_end in self._minute_intervals(start2_min, end2_min)
+        )
 
-        # Check for overlap
-        return not (end1_min <= start2_min or start1_min >= end2_min)
+    def _minute_intervals(self, start_min: int, end_min: int) -> list[tuple[int, int]]:
+        """Split a possibly overnight time range into same-day minute intervals."""
+        if start_min == end_min:
+            return [(0, 24 * 60)]
+        if end_min < start_min:
+            return [(start_min, 24 * 60), (0, end_min)]
+        return [(start_min, end_min)]
 
     def _format_cron_time_chlorinator(self, cron_time: str) -> str:
         """Format CRON time for DM24049704 chlorinator (00 05 * * 1,2,3,4,5,6,7)."""
@@ -340,10 +360,14 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
+                self._optimistic_value = None
+                self.async_write_ha_state()
                 return
 
             current_schedules = device_data["schedule_data"]
             if not current_schedules:
+                self._optimistic_value = None
+                self.async_write_ha_state()
                 return
 
             # Get current end time for this schedule to validate overlap
@@ -469,7 +493,7 @@ class FluidraLightScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         self._time_type = time_type
 
     @property
-    def device_info(self) -> dict:
+    def device_info(self) -> DeviceInfo:
         """Return device info."""
         device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
         return {
@@ -511,7 +535,7 @@ class FluidraLightScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         """Parse cron time format or numeric minutes to time object."""
         return parse_schedule_time(cron_time)
 
-    def _format_time_to_cron(self, time_obj: time, days: list = None) -> str:
+    def _format_time_to_cron(self, time_obj: time, days: list[int] | None = None) -> str:
         """Format time object to cron format."""
         if days is None:
             days = [1, 2, 3, 4, 5, 6, 7]
@@ -716,10 +740,14 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
+                self._optimistic_value = None
+                self.async_write_ha_state()
                 return
 
             current_schedules = device_data["schedule_data"]
             if not current_schedules:
+                self._optimistic_value = None
+                self.async_write_ha_state()
                 return
 
             # Get current start time for this schedule to validate overlap

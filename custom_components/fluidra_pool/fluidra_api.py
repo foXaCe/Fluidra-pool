@@ -40,7 +40,7 @@ from .const import (
     PUMP_START_DELAY,
 )
 from .device_registry import DeviceIdentifier
-from .utils import mask_device_id, mask_email
+from .utils import CRON_DAY_TO_NAME, extract_cron_days, mask_device_id, mask_email
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -192,7 +192,7 @@ class FluidraPoolAPI:
                 if status in (401, 403) and not skip_auth_refresh and refresh_attempts < _MAX_REFRESH_ATTEMPTS:
                     refresh_attempts += 1
                     _LOGGER.debug("Got %d, refreshing token and retrying", status)
-                    if await self.ensure_valid_token():
+                    if await self.force_refresh_token():
                         if "Authorization" in request_headers:
                             request_headers["Authorization"] = f"Bearer {self.access_token}"
                         continue
@@ -539,6 +539,29 @@ class FluidraPoolAPI:
             except (FluidraConnectionError, FluidraCircuitBreakerError):
                 raise
 
+    async def force_refresh_token(self) -> bool:
+        """Refresh credentials after the API rejects the current access token."""
+        async with self._token_lock:
+            if await self.refresh_access_token():
+                return True
+
+            _LOGGER.warning(
+                "Forced token refresh failed, attempting full re-authentication (email=%s)",
+                mask_email(self.email),
+            )
+            if not self.password:
+                _LOGGER.warning("No password stored, cannot re-authenticate; reauth flow required")
+                return False
+            try:
+                await self._cognito_initial_auth()
+                _LOGGER.info("Full re-authentication successful after rejected token")
+                return True
+            except FluidraMFARequired:
+                _LOGGER.warning("MFA required during forced token refresh, triggering reauth flow")
+                return False
+            except (FluidraConnectionError, FluidraCircuitBreakerError):
+                raise
+
     async def refresh_access_token(self) -> bool:
         """Renew the access token with the stored refresh token."""
         if not self.refresh_token:
@@ -867,19 +890,7 @@ class FluidraPoolAPI:
 
         Time encoding: hours * 256 + minutes.
         """
-        cron_day_to_name = {
-            1: "monday",
-            2: "tuesday",
-            3: "wednesday",
-            4: "thursday",
-            5: "friday",
-            6: "saturday",
-            7: "sunday",
-        }
-
-        all_scheduled_days: set[int] = set()
-        slots: list[dict[str, int]] = []
-        slot_id = 0
+        day_slots: dict[int, list[tuple[int, int, int]]] = {day: [] for day in CRON_DAY_TO_NAME}
 
         for sched in schedules:
             if not sched.get("enabled", True):
@@ -892,7 +903,7 @@ class FluidraPoolAPI:
             start_parts = start_cron.split() if start_cron else []
             end_parts = end_cron.split() if end_cron else []
 
-            if len(start_parts) >= 5 and len(end_parts) >= 2:
+            if len(start_parts) >= 2 and len(end_parts) >= 2:
                 try:
                     start_minute = int(start_parts[0])
                     start_hour = int(start_parts[1])
@@ -903,31 +914,46 @@ class FluidraPoolAPI:
                     end_encoded = end_hour * 256 + end_minute
 
                     mode = int(operation) if operation else 1
+                    slot = (start_encoded, end_encoded, mode)
 
-                    slots.append({"id": slot_id, "start": start_encoded, "end": end_encoded, "mode": mode})
-                    slot_id += 1
-
-                    days_str = start_parts[4]
-                    if days_str != "*":
-                        for day in days_str.split(","):
-                            try:
-                                all_scheduled_days.add(int(day.strip()))
-                            except ValueError:
-                                continue
-                    else:
-                        all_scheduled_days.update(range(1, 8))
+                    for day in extract_cron_days(start_cron):
+                        day_slots.setdefault(day, []).append(slot)
 
                 except (ValueError, IndexError) as err:
                     _LOGGER.warning("Failed to parse schedule: %s, error: %s", sched, err)
                     continue
 
-        day_programs = {
-            day_name: 1 if cron_day in all_scheduled_days else 0 for cron_day, day_name in cron_day_to_name.items()
-        }
+        program_ids: dict[tuple[tuple[int, int, int], ...], int] = {}
+        day_programs: dict[str, int] = {}
+        programs: list[dict[str, Any]] = []
+        next_program_id = 1
+
+        for cron_day, day_name in CRON_DAY_TO_NAME.items():
+            slots_key = tuple(day_slots.get(cron_day, []))
+            if not slots_key:
+                day_programs[day_name] = 0
+                continue
+
+            program_id = program_ids.get(slots_key)
+            if program_id is None:
+                program_id = next_program_id
+                next_program_id += 1
+                program_ids[slots_key] = program_id
+                programs.append(
+                    {
+                        "id": program_id,
+                        "slots": [
+                            {"id": slot_id, "start": start, "end": end, "mode": mode}
+                            for slot_id, (start, end, mode) in enumerate(slots_key)
+                        ],
+                    }
+                )
+
+            day_programs[day_name] = program_id
 
         return {
             "dayPrograms": day_programs,
-            "programs": [{"id": 1, "slots": slots}] if slots else [],
+            "programs": programs,
         }
 
     async def set_schedule(
@@ -947,7 +973,10 @@ class FluidraPoolAPI:
             f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}"
             f"/components/{int(component_id)}?deviceType=connected"
         )
-        payload = {"desiredValue": schedules}
+        desired_value: Any = schedules
+        if int(component_id) == 258:
+            desired_value = self._convert_schedules_to_dm24049704_format(schedules)
+        payload = {"desiredValue": desired_value}
 
         try:
             status, _, raw_text = await self._request("PUT", url, headers=headers, json_data=payload)
@@ -1010,9 +1039,9 @@ class FluidraPoolAPI:
             return False
         return status == 200
 
-    async def clear_schedule(self, device_id: str) -> bool:
+    async def clear_schedule(self, device_id: str, component_id: int = COMPONENT_SCHEDULE) -> bool:
         """Clear all schedules for a device."""
-        return await self.set_schedule(device_id, [])
+        return await self.set_schedule(device_id, [], component_id=component_id)
 
     async def get_pool_details(self, pool_id: str) -> dict[str, Any] | None:
         """Fetch pool details and status data."""

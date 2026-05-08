@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.components.number import NumberDeviceClass, NumberEntity
+from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -28,14 +28,18 @@ async def async_setup_entry(
     """Set up Fluidra Pool number entities."""
     coordinator = config_entry.runtime_data.coordinator
 
-    entities = []
+    entities: list[NumberEntity] = []
 
     # Use cached pools data instead of API call for faster startup
     pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
     for pool in pools:
         for device in pool["devices"]:
             device_id = device.get("device_id")
-            device_type = device.get("type", "")
+            if not device_id:
+                continue
+
+            config = DeviceIdentifier.identify_device(device)
+            device_type = config.device_type if config else device.get("type", "")
 
             # Chlorinator chlorination level
             if device_type == "chlorinator":
@@ -72,7 +76,7 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
 
         self._attr_unique_id = f"fluidra_{self._device_id}_chlorination_level"
         self._attr_translation_key = "chlorination_level"
-        self._attr_mode = "slider"
+        self._attr_mode = NumberMode.SLIDER
         self._attr_native_min_value = 0
         self._attr_native_max_value = DeviceIdentifier.get_feature(self.device_data, "chlorination_max", 100)
         self._attr_native_step = DeviceIdentifier.get_feature(self.device_data, "chlorination_step", 1)
@@ -141,7 +145,7 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
 
         self._attr_unique_id = f"fluidra_{self._device_id}_ph_setpoint"
         self._attr_translation_key = "ph_setpoint"
-        self._attr_mode = "slider"
+        self._attr_mode = NumberMode.SLIDER
 
         # pH range: 7.0-7.8 (typical pool values)
         self._attr_native_min_value = 7.0
@@ -255,7 +259,7 @@ class FluidraChlorinatorOrpSetpoint(FluidraPoolControlEntity, NumberEntity):
 
         self._attr_unique_id = f"fluidra_{self._device_id}_orp_setpoint"
         self._attr_translation_key = "orp_setpoint"
-        self._attr_mode = "slider"
+        self._attr_mode = NumberMode.SLIDER
 
         # ORP range: 600-850 mV (typical pool values)
         self._attr_native_min_value = 600
@@ -350,7 +354,7 @@ class FluidraLightEffectSpeed(FluidraPoolControlEntity, NumberEntity):
 
         self._attr_unique_id = f"fluidra_{self._device_id}_effect_speed"
         self._attr_translation_key = "effect_speed"
-        self._attr_mode = "slider"
+        self._attr_mode = NumberMode.SLIDER
         self._attr_native_min_value = 1
         self._attr_native_max_value = 8
         self._attr_native_step = 1

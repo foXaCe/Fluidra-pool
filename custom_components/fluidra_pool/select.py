@@ -40,7 +40,7 @@ async def async_setup_entry(
     """Set up the Fluidra Pool select entities."""
     coordinator = config_entry.runtime_data.coordinator
 
-    entities = []
+    entities: list[SelectEntity] = []
 
     # Use cached pools data instead of API call for faster startup
     pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
@@ -99,7 +99,7 @@ async def async_setup_entry(
             # Schedule speed selects for chlorinators with schedule_component (e.g., DM24049704)
             if device_type == "chlorinator" and DeviceIdentifier.has_feature(device, "schedule_component"):
                 schedule_count = DeviceIdentifier.get_feature(device, "schedule_count", 3)
-                for i in range(schedule_count):
+                for i in range(1, schedule_count + 1):
                     schedule_id = str(i)
                     entities.append(
                         FluidraChlorinatorScheduleSpeedSelect(
@@ -132,7 +132,7 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
     ) -> None:
         """Initialize the pump speed select."""
         super().__init__(coordinator, api, pool_id, device_id)
-        self._optimistic_option = None  # Option optimiste temporaire pendant les actions
+        self._optimistic_option: str | None = None  # Option optimiste temporaire pendant les actions
 
         self._attr_unique_id = f"fluidra_{self._device_id}_speed_level"
         self._attr_translation_key = "pump_speed"
@@ -359,10 +359,14 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
             # Get all current schedule data
             device_data = self.device_data
             if "schedule_data" not in device_data:
+                self._optimistic_option = None
+                self.async_write_ha_state()
                 return
 
             current_schedules = device_data["schedule_data"]
             if not current_schedules:
+                self._optimistic_option = None
+                self.async_write_ha_state()
                 return
 
             # Create complete schedule list with EXACT format from mobile app
@@ -419,7 +423,7 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
             "1": "mdi:speedometer-medium",
             "2": "mdi:speedometer",
         }
-        return icons.get(self.current_option, "mdi:speedometer")
+        return icons.get(self.current_option or "", "mdi:speedometer")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -447,7 +451,7 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
 class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
     """Select entity for chlorinator mode (OFF/ON/AUTO)."""
 
-    __slots__ = ("_optimistic_option", "_mode_mapping", "_value_to_mode")
+    __slots__ = ("_optimistic_option", "_optimistic_time", "_mode_mapping", "_value_to_mode")
 
     def __init__(
         self,
@@ -458,7 +462,7 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
     ) -> None:
         """Initialize the chlorinator mode select."""
         super().__init__(coordinator, api, pool_id, device_id)
-        self._optimistic_option = None
+        self._optimistic_option: str | None = None
         self._optimistic_time = 0.0
 
         self._attr_unique_id = f"fluidra_{self._device_id}_mode"
@@ -572,7 +576,7 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
     ) -> None:
         """Initialize the light effect select."""
         super().__init__(coordinator, api, pool_id, device_id)
-        self._optimistic_option = None
+        self._optimistic_option: str | None = None
 
         self._attr_unique_id = f"fluidra_{self._device_id}_effect"
         self._attr_translation_key = "light_effect"
@@ -716,7 +720,7 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
         """Initialize the chlorinator schedule speed select."""
         super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
-        self._optimistic_option = None
+        self._optimistic_option: str | None = None
 
         # Detect output type from device config
         device_data = self.device_data

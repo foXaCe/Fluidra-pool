@@ -39,7 +39,7 @@ async def async_setup_entry(
     """Set up Fluidra Pool sensor entities."""
     coordinator = config_entry.runtime_data.coordinator
 
-    entities = []
+    entities: list[SensorEntity] = []
 
     # Use cached pools data instead of API call for faster startup
     pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
@@ -98,7 +98,8 @@ async def async_setup_entry(
                 entities.append(FluidraRunningHoursSensor(coordinator, coordinator.api, pool["id"], device_id))
 
             # Chlorinator sensors - create based on sensors_config from device registry
-            device_type = device.get("type", "")
+            config = DeviceIdentifier.identify_device(device)
+            device_type = config.device_type if config else device.get("type", "")
             if device_type == "chlorinator":
                 # Get sensor components from device registry
                 sensors_config = DeviceIdentifier.get_feature(device, "sensors", {})
@@ -468,7 +469,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
-        attrs = {}
+        attrs: dict[str, Any] = {}
 
         try:
             schedules = self._get_schedules_data()
@@ -830,7 +831,7 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
         attrs["total_devices"] = len(devices)
 
         # Types d'équipements
-        device_types = {}
+        device_types: dict[str, int] = {}
         for device in devices:
             device_type = device.get("type", "unknown")
             device_types[device_type] = device_types.get(device_type, 0) + 1
@@ -1034,7 +1035,7 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
         self._component_id = component_id
 
         # Sensor configuration based on type
-        self._sensor_config = {
+        self._sensor_config: dict[str, dict[str, Any]] = {
             "ph": {
                 "translation_key": "chlorinator_ph",
                 "unit": None,

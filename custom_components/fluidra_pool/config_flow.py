@@ -254,11 +254,17 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def _get_reauth_entry(self) -> ConfigEntry:
         """Get the config entry being reauthenticated."""
-        return self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        if entry is None:
+            raise RuntimeError("Reauth config entry not found")
+        return entry
 
     def _get_reconfigure_entry(self) -> ConfigEntry:
         """Get the config entry being reconfigured."""
-        return self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        if entry is None:
+            raise RuntimeError("Reconfigure config entry not found")
+        return entry
 
     async def _test_credentials(self, email: str, password: str) -> tuple[str | None, dict | None]:
         """Test credentials and return (error_key, mfa_info) tuple.
@@ -330,7 +336,7 @@ class FluidraPoolOptionsFlowHandler(OptionsFlow):
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        self._config_entry = config_entry
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
@@ -338,7 +344,7 @@ class FluidraPoolOptionsFlowHandler(OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         # Get current values or defaults
-        current_scan_interval = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        current_scan_interval = self._config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
         return self.async_show_form(
             step_id="init",

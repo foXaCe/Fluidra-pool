@@ -9,6 +9,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
 
+from custom_components.fluidra_pool.api_resilience import FluidraConnectionError
 from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordinator
 
 
@@ -78,7 +79,7 @@ class TestAsyncUpdateData:
     async def test_raises_update_failed_on_error(self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock):
         """Should raise UpdateFailed on API errors."""
         mock_api.ensure_valid_token.return_value = True
-        mock_api.get_pools.side_effect = Exception("Network error")
+        mock_api.get_pools.side_effect = FluidraConnectionError("Network error")
 
         with pytest.raises(UpdateFailed, match="Error communicating with API"):
             await coordinator._async_update_data()
