@@ -357,6 +357,28 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=88,
     ),
+    "cc25019224_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Astralpool Clear Connect 12 G/H (tecnoLC2) — Issue #66
+        # Bridge CC25019224 with child device CC25019224.nn_1
+        # Same model as CC25064524 (Clear Connect 12) — mapping validated by @eabin.
+        identifier_patterns=["CC25019224.nn_*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,  # Component 10 (0-100%)
+            "skip_mode_select": True,  # No mode select on this model
+            "sensors": {
+                "temperature": 172,  # Pool temperature (°C × 10)
+                "salinity": 174,  # Salinity (g/L × 100)
+            },
+            # Keep 165/170 in scan in case the user adds pH/ORP probes later.
+            "specific_components": [10, 16, 20, 165, 170, 172, 174],
+        },
+        priority=87,
+    ),
     "lc25012727_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # KLINWASS MARK SALT 12 GR/H (tecnoLC2) — Issue #55 (confirmed by @FernandoArnanz)
