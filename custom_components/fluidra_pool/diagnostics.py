@@ -34,7 +34,6 @@ TO_REDACT = {
 }
 TO_REDACT_LOWER = {key.lower() for key in TO_REDACT}
 REDACTED = "**REDACTED**"
-SAFE_COMPONENT_KEYS = {"timestamp", "last_update", "lastUpdate", "unit", "type"}
 
 
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: FluidraPoolConfigEntry) -> dict[str, Any]:
@@ -132,16 +131,22 @@ def _redact_devices_data(devices: list) -> list:
 
 
 def _redact_component_data(component: dict) -> dict:
-    """Redact component data, keeping structure but hiding sensitive values."""
+    """Redact component data.
+
+    Component reported/desired values are water-quality readings and device
+    telemetry (pH, ORP, temperature, speed, schedules, …) — not sensitive —
+    so they are kept in clear text to make diagnostics actually useful for
+    debugging device mappings. Only explicitly sensitive keys are redacted.
+    """
     if not isinstance(component, dict):
         return component
 
     redacted: dict[str, Any] = {}
     for key, value in component.items():
-        if key in SAFE_COMPONENT_KEYS:
-            redacted[key] = value
-        elif key.lower() in TO_REDACT_LOWER:
+        if key.lower() in TO_REDACT_LOWER:
             redacted[key] = REDACTED
+        elif isinstance(value, dict):
+            redacted[key] = async_redact_data(value, TO_REDACT)
         else:
-            redacted[key] = REDACTED
+            redacted[key] = value
     return redacted
