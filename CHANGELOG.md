@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.35.1] - 2026-05-19
+
+### Fixed
+- **Diagnostics no longer redact component values** (Issue #66)
+  - `_redact_component_data` was hiding every component reading (pH, ORP, temperature, salinity, …) behind `**REDACTED**`, making diagnostics dumps useless for debugging device mappings. Component values are water-quality readings / telemetry, not sensitive — they are now kept in clear text; only explicitly sensitive keys (credentials, IDs, location) remain redacted.
+
 ## [2.35.0] - 2026-05-15
 
 ### Added
