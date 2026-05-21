@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.35.2] - 2026-05-21
+
+### Fixed
+- **CC25019224 Clear Connect 12 G/H** — pH/ORP sensors and setpoints now exposed (Issue #66, confirmed by @alapedra)
+  - The unit actually ships with pH and ORP probes (not the base model as initially assumed). Diagnostics confirmed: pH on 165 (7.21), ORP on 170 (654 mV), pH setpoint on 16, ORP setpoint on 20. Same mapping as the rest of the tecnoLC2 family.
+
 ## [2.35.1] - 2026-05-19
 
 ### Fixed
