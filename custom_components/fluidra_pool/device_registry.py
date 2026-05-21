@@ -361,7 +361,8 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         device_type="chlorinator",
         # Astralpool Clear Connect 12 G/H (tecnoLC2) — Issue #66
         # Bridge CC25019224 with child device CC25019224.nn_1
-        # Same model as CC25064524 (Clear Connect 12) — mapping validated by @eabin.
+        # Full mapping confirmed by @alapedra's v2.35.1 diagnostics: this unit
+        # ships with pH and ORP probes (not the base model as initially assumed).
         identifier_patterns=["CC25019224.nn_*"],
         family_patterns=["chlorinator"],
         components_range=25,
@@ -369,12 +370,15 @@ DEVICE_CONFIGS: dict[str, DeviceConfig] = {
         entities=["switch", "number", "sensor_info"],
         features={
             "chlorination_level": 10,  # Component 10 (0-100%)
+            "ph_setpoint": 16,  # Component 16 (÷100) — e.g., 720 = 7.20 pH
+            "orp_setpoint": 20,  # Component 20 (mV) — e.g., 720 mV
             "skip_mode_select": True,  # No mode select on this model
             "sensors": {
-                "temperature": 172,  # Pool temperature (°C × 10)
-                "salinity": 174,  # Salinity (g/L × 100)
+                "ph": 165,  # pH measured (÷100) — e.g., 721 = 7.21 pH
+                "orp": 170,  # ORP/Redox measured (mV) — e.g., 654 mV
+                "temperature": 172,  # Pool temperature (°C × 10) — e.g., 260 = 26.0°C
+                "salinity": 174,  # Salinity (g/L × 100) — e.g., 627 = 6.27 g/L
             },
-            # Keep 165/170 in scan in case the user adds pH/ORP probes later.
             "specific_components": [10, 16, 20, 165, 170, 172, 174],
         },
         priority=87,
