@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.35.3] - 2026-05-23
+
+### Performance
+- **Component scan no longer floods the API** (Issue #63, analysis by @baracouda57)
+  - When a device config declares `specific_components`, the coordinator was *also* sweeping `range(0, components_range)` — ~25 redundant requests per device on top of the specific ones. With several bridged `*.nn_*` devices this triggered HTTP 429 rate limiting and pushed poll time to 60-70 s.
+  - The full sweep is now skipped when `specific_components` exists: only device-info components (0-3) plus the specific list are scanned (~11 requests instead of ~32). Poll time drops back to a few seconds. Unknown hardware with no specific list keeps the full sweep as a discovery fallback.
+
 ## [2.35.2] - 2026-05-21
 
 ### Fixed
