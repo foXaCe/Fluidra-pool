@@ -628,11 +628,18 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             if not device_id:
                 continue
             device.setdefault("components", {})
-            component_range = DeviceIdentifier.get_components_range(device)
             specific_components = DeviceIdentifier.get_feature(device, "specific_components", [])
-            components_to_scan = list(range(component_range))
             if specific_components:
+                # When a device declares specific_components, that list is the
+                # exhaustive set of useful components. Scan only the device-info
+                # components (0-3) plus the specific ones, instead of the full
+                # 0..range sweep — the sweep fired 25+ parallel requests per
+                # device and triggered HTTP 429 rate limiting (Issue #63).
+                components_to_scan = [0, 1, 2, 3]
                 components_to_scan.extend(c for c in specific_components if c not in components_to_scan)
+            else:
+                component_range = DeviceIdentifier.get_components_range(device)
+                components_to_scan = list(range(component_range))
             component_states = await self._fetch_components_parallel(device_id, components_to_scan)
             for component_id, component_state in component_states.items():
                 self._process_component_state(device, pool_id, component_id, component_state)
