@@ -18,7 +18,16 @@ CIRCUIT_BREAKER_FAILURES: Final = 5
 CIRCUIT_BREAKER_TIMEOUT: Final = 300  # 5 minutes recovery time
 
 # Rate limiting configuration
-RATE_LIMIT_REQUESTS: Final = 30
+#
+# 30 req/60s was tuned for the legacy ~6-component poll. The current coordinator
+# can issue 10-15 reads per 30-second cycle on a single device, plus poll-status
+# / pool-details / water-quality, easily reaching 25-30 req/min on its own.
+# A user toggle then queues behind 20+ s of wait time, so the UI feels frozen
+# and users click repeatedly — making the queue worse (Issue #63 follow-up).
+# 90 req/60s leaves comfortable headroom for ≥ 1 device while staying well
+# below the real Fluidra cloud limit (we've never seen HTTP 429 with this
+# value in practice).
+RATE_LIMIT_REQUESTS: Final = 90
 RATE_LIMIT_WINDOW: Final = 60  # Per 60 seconds
 
 # Retry configuration
