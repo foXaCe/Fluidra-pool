@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.35.4] - 2026-05-27
+
+### Fixed
+- **Schedule toggles required multiple clicks** before the UI stuck
+  - `FluidraScheduleEnableSwitch.async_turn_on/off` cleared the optimistic state immediately after a debounced refresh, before the new value had actually landed in coordinator data. The UI fell back to the stale value and flipped back to the previous state, so users clicked again. The optimistic state now holds until the server confirms or a 15 s safety timeout elapses.
+- **Local rate-limit ceiling raised** from 30 to 90 req/min
+  - The legacy 30 req/60s value left almost no headroom once polling consumed ~25 req/min, so a user toggle queued behind 20-30 s of wait time and the UI felt frozen. 90/60s leaves room for the coordinator plus interactive actions while staying well below the real Fluidra cloud limit.
+
 ## [2.35.3] - 2026-05-23
 
 ### Performance
