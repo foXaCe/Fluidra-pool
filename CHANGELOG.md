@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.36.0] - 2026-05-27
+
+### Added
+- **Scan interval max raised to 30 minutes** (Issue #69, requested by @EricBx33)
+  - The options-flow ceiling moves from 300 s (5 min) to 1800 s (30 min), letting users match each device's natural cadence — useful for slow-measuring units like the Zodiac Blue Connect Silver (refreshes every ~20 min) and for accounts with many bridged devices who want lighter polling.
+
 ## [2.35.4] - 2026-05-27
 
 ### Fixed
