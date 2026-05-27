@@ -353,7 +353,7 @@ class FluidraPoolOptionsFlowHandler(OptionsFlow):
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
                         default=current_scan_interval,
-                    ): vol.All(vol.Coerce(int), vol.Range(min=30, max=300)),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=30, max=1800)),
                 }
             ),
         )
