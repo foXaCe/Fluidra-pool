@@ -643,15 +643,18 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if the schedule is enabled using optimistic UI."""
-        # Si on a un état en attente, l'utiliser pour la réactivité
+        schedule = self._get_schedule_data()
         if self._pending_state is not None:
-            # Effacer l'état en attente après 10 secondes de sécurité
-            if self._pending_state_expired(10):
+            # Drop the optimistic state as soon as the server has caught up,
+            # or after 15 s as a safety net (the coordinator debounces refresh
+            # by 1.5 s and a full poll can take a few seconds on top).
+            if schedule and bool(schedule.get("enabled", False)) == self._pending_state:
+                self._clear_pending_state()
+            elif self._pending_state_expired(15):
                 self._clear_pending_state()
             else:
                 return self._pending_state
 
-        schedule = self._get_schedule_data()
         if schedule:
             return schedule.get("enabled", False)
         return False
@@ -707,11 +710,13 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
             if success:
+                # Keep the optimistic state — `is_on` clears it once the next
+                # coordinator refresh confirms the server has caught up
+                # (or after the 15 s timeout). Clearing it here, before the
+                # debounced refresh has had time to land, caused the UI to
+                # flip back and forced users to click multiple times.
                 await self.coordinator.async_request_refresh()
-                # Effacer l'état en attente après confirmation
-                self._clear_pending_state()
             else:
-                # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
 
         except (
@@ -724,7 +729,6 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             AttributeError,
         ) as err:
             _LOGGER.debug("Failed to enable schedule: %s", err)
-            # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -778,11 +782,9 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             # Send update to API
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
             if success:
+                # See async_turn_on: keep optimistic state until is_on clears it.
                 await self.coordinator.async_request_refresh()
-                # Effacer l'état en attente après confirmation
-                self._clear_pending_state()
             else:
-                # Annuler l'état optimiste en cas d'échec
                 self._clear_pending_state()
 
         except (
@@ -795,7 +797,6 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             AttributeError,
         ) as err:
             _LOGGER.debug("Failed to disable schedule: %s", err)
-            # Annuler l'état optimiste en cas d'erreur
             self._clear_pending_state()
 
     @property
