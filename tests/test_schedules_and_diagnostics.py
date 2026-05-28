@@ -48,16 +48,27 @@ def test_dm24049704_conversion_keeps_day_specific_programs() -> None:
     assert converted["programs"][1]["slots"] == [{"id": 0, "start": 1822, "end": 2093, "mode": 3}]
 
 
-def test_diagnostics_redacts_component_values() -> None:
-    """Diagnostics keep component shape but hide raw state values."""
+def test_diagnostics_keep_component_values_but_redact_sensitive_keys() -> None:
+    """Component readings are kept in clear text; only sensitive keys are redacted.
+
+    Component reported/desired values are water-quality telemetry (pH, ORP, etc.)
+    and need to stay readable so users can self-debug device mappings. Sensitive
+    keys (device_id, password, …) are still hidden, even when nested inside the
+    component dict.
+    """
     redacted = _redact_component_data(
+        "9",  # Component 9: pump ON/OFF — not an identifier slot.
         {
-            "reportedValue": "device-secret",
-            "desiredValue": {"nested": "secret"},
+            "reportedValue": 731,
+            "desiredValue": {"r": 200, "device_id": "LE24500883"},
             "timestamp": "2026-05-08T12:00:00Z",
-        }
+            "password": "should-never-leak",
+        },
     )
 
-    assert redacted["reportedValue"] == REDACTED
-    assert redacted["desiredValue"] == REDACTED
+    assert redacted["reportedValue"] == 731
     assert redacted["timestamp"] == "2026-05-08T12:00:00Z"
+    assert redacted["password"] == REDACTED
+    # Sensitive keys must still be redacted recursively inside nested dicts.
+    assert redacted["desiredValue"]["r"] == 200
+    assert redacted["desiredValue"]["device_id"] == REDACTED
