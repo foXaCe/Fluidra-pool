@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class FluidraPoolEntity(CoordinatorEntity):
     """Base class for all Fluidra Pool entities (read-only)."""
 
-    __slots__ = ("_pool_id", "_device_id")
+    __slots__ = ("_device_id", "_pool_id")
 
     _attr_has_entity_name = True
 

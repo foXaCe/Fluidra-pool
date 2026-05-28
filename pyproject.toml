@@ -12,10 +12,15 @@ select = [
     "B",      # flake8-bugbear
     "C4",     # flake8-comprehensions
     "LOG",    # flake8-logging
+    "RET",    # flake8-return
+    "PT",     # flake8-pytest-style
+    "RUF",    # ruff-specific rules
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
+    "RUF012", # mutable class attrs need ClassVar — HA convention skips this
 ]
+allowed-confusables = ["×"]  # Used deliberately for decidegrees notation (°C × 10).
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true

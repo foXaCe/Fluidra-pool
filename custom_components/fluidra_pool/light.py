@@ -59,8 +59,8 @@ class FluidraLight(FluidraPoolControlEntity, LightEntity):
     """Representation of a Fluidra LumiPlus Connect light."""
 
     __slots__ = (
-        "_optimistic_is_on",
         "_optimistic_brightness",
+        "_optimistic_is_on",
         "_optimistic_rgbw",
     )
 

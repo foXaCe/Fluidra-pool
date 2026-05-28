@@ -80,8 +80,10 @@ CAPTURE_*.md
 analyze_*.py
 debug_*.py
 check_*_direct.py
+check_*_component.py
 get_*_info.py
 pool_*.json
+scan_*_components.py
 
 # Development documentation
 *_DEV.md

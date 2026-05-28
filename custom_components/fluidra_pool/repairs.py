@@ -63,9 +63,9 @@ def async_delete_connection_issue(hass: HomeAssistant) -> None:
 
 
 async def async_create_fix_flow(
-    hass: HomeAssistant,  # noqa: ARG001
-    issue_id: str,  # noqa: ARG001
-    data: dict | None,  # noqa: ARG001
+    hass: HomeAssistant,
+    issue_id: str,
+    data: dict | None,
 ) -> RepairsFlow:
     """Create a repair flow for a fixable issue.
 
