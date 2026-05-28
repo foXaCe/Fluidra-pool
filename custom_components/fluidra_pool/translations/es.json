@@ -89,12 +89,6 @@
       },
       "ph_setpoint": {
         "name": "Consigna pH"
-      },
-      "pump_vitesse": {
-        "name": "Ajuste de Velocidad {device_name}"
-      },
-      "speed_control": {
-        "name": "Control de Velocidad"
       }
     },
     "select": {
@@ -179,12 +173,6 @@
       "chlorinator_water_temperature": {
         "name": "Temperatura del Agua"
       },
-      "comm_errors": {
-        "name": "Errores de Comunicación"
-      },
-      "connectivity": {
-        "name": "Conectividad"
-      },
       "current_temperature": {
         "name": "Temperatura Actual"
       },
@@ -200,21 +188,6 @@
           "signal_very_low": "Señal Muy Débil"
         }
       },
-      "firmware_version": {
-        "name": "Versión de Firmware"
-      },
-      "hardware_errors": {
-        "name": "Errores de Hardware"
-      },
-      "network_status": {
-        "name": "Estado de Red"
-      },
-      "next_schedule": {
-        "name": "Próxima Programación"
-      },
-      "operation_mode": {
-        "name": "Modo de Operación"
-      },
       "pool_location": {
         "name": "Ubicación de la Piscina"
       },
@@ -229,11 +202,11 @@
           "winterized": "Invernaje"
         }
       },
+      "running_hours": {
+        "name": "Horas de funcionamiento"
+      },
       "schedule_count": {
         "name": "Programaciones Activas"
-      },
-      "signal_strength": {
-        "name": "Intensidad de Señal"
       },
       "speed_mode": {
         "name": "Velocidad",
@@ -244,9 +217,6 @@
           "not_running": "Sin funcionar",
           "stopped": "Detenida"
         }
-      },
-      "speed_percent": {
-        "name": "Porcentaje de Velocidad"
       },
       "target_temperature": {
         "name": "Temperatura Objetivo"
@@ -308,8 +278,53 @@
     "auth_failed": {
       "message": "Error de autenticación, por favor re-autentícate"
     },
+    "device_not_found": {
+      "message": "No se encontró el dispositivo Fluidra '{device_id}' en ninguna entrada de configuración cargada"
+    },
+    "empty_schedule_days": {
+      "message": "Los días del horario no pueden estar vacíos"
+    },
+    "heat_pump_control_failed": {
+      "message": "Error de control de la bomba de calor ({error_type})"
+    },
+    "hvac_mode_set_failed": {
+      "message": "No se pudo establecer el modo de la bomba de calor en {hvac_mode}"
+    },
+    "invalid_time_format": {
+      "message": "Hora '{value}' no válida, se esperaba HH:MM"
+    },
+    "mfa_required": {
+      "message": "Se requiere autenticación de dos factores para iniciar sesión en Fluidra Pool"
+    },
+    "preset_mode_control_failed": {
+      "message": "Error de control del modo predefinido ({error_type})"
+    },
+    "preset_mode_set_failed": {
+      "message": "No se pudo establecer el modo predefinido en {preset_mode}"
+    },
+    "preset_schedule_set_failed": {
+      "message": "La llamada a la API de Fluidra falló al aplicar el horario predefinido para {device_id}"
+    },
+    "preset_schedule_set_rejected": {
+      "message": "La API de Fluidra rechazó la actualización del horario predefinido para {device_id}"
+    },
+    "schedule_clear_failed": {
+      "message": "La llamada a la API de Fluidra falló al borrar el horario para {device_id}"
+    },
+    "schedule_clear_rejected": {
+      "message": "La API de Fluidra rechazó el borrado del horario para {device_id}"
+    },
+    "schedule_set_failed": {
+      "message": "La llamada a la API de Fluidra falló al establecer el horario para {device_id}"
+    },
+    "schedule_set_rejected": {
+      "message": "La API de Fluidra rechazó la actualización del horario para {device_id}"
+    },
     "temperature_out_of_range": {
       "message": "La temperatura {temperature}°C está fuera de rango ({min_temp}°C - {max_temp}°C)"
+    },
+    "unknown_preset": {
+      "message": "Predefinido desconocido '{preset}'"
     }
   },
   "issues": {
@@ -335,6 +350,46 @@
         "description": "Configurar opciones avanzadas",
         "title": "Opciones de Fluidra Pool"
       }
+    }
+  },
+  "services": {
+    "clear_schedule": {
+      "description": "Eliminar todos los horarios de la bomba",
+      "fields": {
+        "device_id": {
+          "description": "Identificador del dispositivo (p. ej. LE24500883)",
+          "name": "ID del dispositivo"
+        }
+      },
+      "name": "Borrar el horario de la bomba"
+    },
+    "set_preset_schedule": {
+      "description": "Aplicar un horario predefinido",
+      "fields": {
+        "device_id": {
+          "description": "Identificador del dispositivo (p. ej. LE24500883)",
+          "name": "ID del dispositivo"
+        },
+        "preset": {
+          "description": "Tipo de horario predefinido",
+          "name": "Predefinido"
+        }
+      },
+      "name": "Aplicar horario predefinido"
+    },
+    "set_schedule": {
+      "description": "Configurar el horario de la bomba",
+      "fields": {
+        "device_id": {
+          "description": "Identificador del dispositivo (p. ej. LE24500883)",
+          "name": "ID del dispositivo"
+        },
+        "schedules": {
+          "description": "Lista de franjas horarias",
+          "name": "Horarios"
+        }
+      },
+      "name": "Definir el horario de la bomba"
     }
   }
 }

@@ -89,12 +89,6 @@
       },
       "ph_setpoint": {
         "name": "Referência pH"
-      },
-      "pump_vitesse": {
-        "name": "Configuração {device_name} Velocidade"
-      },
-      "speed_control": {
-        "name": "Controle de Velocidade"
       }
     },
     "select": {
@@ -179,12 +173,6 @@
       "chlorinator_water_temperature": {
         "name": "Temperatura da Água"
       },
-      "comm_errors": {
-        "name": "Erros de Comunicação"
-      },
-      "connectivity": {
-        "name": "Conectividade"
-      },
       "current_temperature": {
         "name": "Temperatura Atual"
       },
@@ -200,21 +188,6 @@
           "signal_very_low": "Sinal Muito Fraco"
         }
       },
-      "firmware_version": {
-        "name": "Versão do Firmware"
-      },
-      "hardware_errors": {
-        "name": "Erros de Hardware"
-      },
-      "network_status": {
-        "name": "Estado da Rede"
-      },
-      "next_schedule": {
-        "name": "Próxima Programação"
-      },
-      "operation_mode": {
-        "name": "Modo de Operação"
-      },
       "pool_location": {
         "name": "Localização da Piscina"
       },
@@ -229,11 +202,11 @@
           "winterized": "Hibernação"
         }
       },
+      "running_hours": {
+        "name": "Horas de funcionamento"
+      },
       "schedule_count": {
         "name": "Programações Ativas"
-      },
-      "signal_strength": {
-        "name": "Força do Sinal"
       },
       "speed_mode": {
         "name": "Velocidade",
@@ -244,9 +217,6 @@
           "not_running": "Sem funcionar",
           "stopped": "Parada"
         }
-      },
-      "speed_percent": {
-        "name": "Porcentagem de Velocidade"
       },
       "target_temperature": {
         "name": "Temperatura Alvo"
@@ -308,8 +278,53 @@
     "auth_failed": {
       "message": "Falha na autenticação, por favor re-autentique-se"
     },
+    "device_not_found": {
+      "message": "O dispositivo Fluidra '{device_id}' não foi encontrado em nenhuma entrada de configuração carregada"
+    },
+    "empty_schedule_days": {
+      "message": "Os dias do programa não podem estar vazios"
+    },
+    "heat_pump_control_failed": {
+      "message": "Erro de controlo da bomba de calor ({error_type})"
+    },
+    "hvac_mode_set_failed": {
+      "message": "Não foi possível definir o modo da bomba de calor para {hvac_mode}"
+    },
+    "invalid_time_format": {
+      "message": "Hora '{value}' inválida, formato esperado HH:MM"
+    },
+    "mfa_required": {
+      "message": "É necessária autenticação de dois fatores para iniciar sessão no Fluidra Pool"
+    },
+    "preset_mode_control_failed": {
+      "message": "Erro de controlo da predefinição ({error_type})"
+    },
+    "preset_mode_set_failed": {
+      "message": "Não foi possível definir a predefinição para {preset_mode}"
+    },
+    "preset_schedule_set_failed": {
+      "message": "A chamada à API Fluidra falhou ao aplicar a predefinição para {device_id}"
+    },
+    "preset_schedule_set_rejected": {
+      "message": "A API Fluidra rejeitou a atualização da predefinição para {device_id}"
+    },
+    "schedule_clear_failed": {
+      "message": "A chamada à API Fluidra falhou ao limpar o programa para {device_id}"
+    },
+    "schedule_clear_rejected": {
+      "message": "A API Fluidra rejeitou a limpeza do programa para {device_id}"
+    },
+    "schedule_set_failed": {
+      "message": "A chamada à API Fluidra falhou ao definir o programa para {device_id}"
+    },
+    "schedule_set_rejected": {
+      "message": "A API Fluidra rejeitou a atualização do programa para {device_id}"
+    },
     "temperature_out_of_range": {
       "message": "A temperatura {temperature}°C está fora do intervalo ({min_temp}°C - {max_temp}°C)"
+    },
+    "unknown_preset": {
+      "message": "Predefinição desconhecida '{preset}'"
     }
   },
   "issues": {
@@ -335,6 +350,46 @@
         "description": "Configurar opções avançadas",
         "title": "Opções Fluidra Pool"
       }
+    }
+  },
+  "services": {
+    "clear_schedule": {
+      "description": "Eliminar todos os programas da bomba",
+      "fields": {
+        "device_id": {
+          "description": "Identificador do dispositivo (por ex. LE24500883)",
+          "name": "ID do dispositivo"
+        }
+      },
+      "name": "Limpar o programa da bomba"
+    },
+    "set_preset_schedule": {
+      "description": "Aplicar um programa predefinido",
+      "fields": {
+        "device_id": {
+          "description": "Identificador do dispositivo (por ex. LE24500883)",
+          "name": "ID do dispositivo"
+        },
+        "preset": {
+          "description": "Tipo de programa predefinido",
+          "name": "Predefinição"
+        }
+      },
+      "name": "Aplicar programa predefinido"
+    },
+    "set_schedule": {
+      "description": "Configurar o programa da bomba",
+      "fields": {
+        "device_id": {
+          "description": "Identificador do dispositivo (por ex. LE24500883)",
+          "name": "ID do dispositivo"
+        },
+        "schedules": {
+          "description": "Lista de períodos horários",
+          "name": "Programas"
+        }
+      },
+      "name": "Definir o programa da bomba"
     }
   }
 }

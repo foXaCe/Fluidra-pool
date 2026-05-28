@@ -1,19 +1,15 @@
-# Services for pump schedule management
+# Services for pump schedule management.
+# Name/description strings live in strings.json + translations/*.json so the
+# UI can display them in the user's language.
 set_schedule:
-  name: Set pump schedule
-  description: Configure the pump schedule
   target:
   fields:
     device_id:
-      name: Device ID
-      description: Device identifier (e.g., LE24500883)
       example: "LE24500883"
       required: true
       selector:
         text:
     schedules:
-      name: Schedules
-      description: List of time slots
       required: true
       example: |
         - enabled: true
@@ -30,33 +26,23 @@ set_schedule:
         object:
 
 clear_schedule:
-  name: Clear pump schedule
-  description: Delete all pump schedules
   target:
   fields:
     device_id:
-      name: Device ID
-      description: Device identifier (e.g., LE24500883)
       example: "LE24500883"
       required: true
       selector:
         text:
 
 set_preset_schedule:
-  name: Preset schedule
-  description: Apply a preset schedule
   target:
   fields:
     device_id:
-      name: Device ID
-      description: Device identifier (e.g., LE24500883)
       example: "LE24500883"
       required: true
       selector:
         text:
     preset:
-      name: Preset
-      description: Type of preset schedule
       required: true
       default: "standard"
       selector:

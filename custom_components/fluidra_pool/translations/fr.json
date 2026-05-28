@@ -89,12 +89,6 @@
       },
       "ph_setpoint": {
         "name": "Consigne pH"
-      },
-      "pump_vitesse": {
-        "name": "Réglage {device_name} Vitesse"
-      },
-      "speed_control": {
-        "name": "Contrôle Vitesse"
       }
     },
     "select": {
@@ -179,12 +173,6 @@
       "chlorinator_water_temperature": {
         "name": "Température de l'Eau"
       },
-      "comm_errors": {
-        "name": "Erreurs Communication"
-      },
-      "connectivity": {
-        "name": "Connectivité"
-      },
       "current_temperature": {
         "name": "Température Actuelle"
       },
@@ -200,21 +188,6 @@
           "signal_very_low": "Signal Très Faible"
         }
       },
-      "firmware_version": {
-        "name": "Version Firmware"
-      },
-      "hardware_errors": {
-        "name": "Erreurs Matériel"
-      },
-      "network_status": {
-        "name": "État Réseau"
-      },
-      "next_schedule": {
-        "name": "Prochain Planning"
-      },
-      "operation_mode": {
-        "name": "Mode de Fonctionnement"
-      },
       "pool_location": {
         "name": "Localisation Piscine"
       },
@@ -229,11 +202,11 @@
           "winterized": "Hivernage"
         }
       },
+      "running_hours": {
+        "name": "Heures de fonctionnement"
+      },
       "schedule_count": {
         "name": "Plannings Actifs"
-      },
-      "signal_strength": {
-        "name": "Force du Signal"
       },
       "speed_mode": {
         "name": "Vitesse",
@@ -244,9 +217,6 @@
           "not_running": "Pas en marche",
           "stopped": "Arrêtée"
         }
-      },
-      "speed_percent": {
-        "name": "Pourcentage de Vitesse"
       },
       "target_temperature": {
         "name": "Température Cible"
@@ -308,8 +278,53 @@
     "auth_failed": {
       "message": "Échec d'authentification, veuillez vous ré-authentifier"
     },
+    "device_not_found": {
+      "message": "L'appareil Fluidra « {device_id} » n'a été trouvé dans aucune entrée de configuration chargée"
+    },
+    "empty_schedule_days": {
+      "message": "Les jours du programme ne peuvent pas être vides"
+    },
+    "heat_pump_control_failed": {
+      "message": "Échec du contrôle de la pompe à chaleur ({error_type})"
+    },
+    "hvac_mode_set_failed": {
+      "message": "Impossible de régler le mode de la pompe à chaleur sur {hvac_mode}"
+    },
+    "invalid_time_format": {
+      "message": "Heure « {value} » invalide, format attendu HH:MM"
+    },
+    "mfa_required": {
+      "message": "L'authentification à deux facteurs est requise pour se connecter à Fluidra Pool"
+    },
+    "preset_mode_control_failed": {
+      "message": "Échec du contrôle du préréglage ({error_type})"
+    },
+    "preset_mode_set_failed": {
+      "message": "Impossible de régler le préréglage sur {preset_mode}"
+    },
+    "preset_schedule_set_failed": {
+      "message": "L'appel à l'API Fluidra a échoué lors de l'application du programme prédéfini pour {device_id}"
+    },
+    "preset_schedule_set_rejected": {
+      "message": "L'API Fluidra a refusé la mise à jour du programme prédéfini pour {device_id}"
+    },
+    "schedule_clear_failed": {
+      "message": "L'appel à l'API Fluidra a échoué lors de l'effacement du programme pour {device_id}"
+    },
+    "schedule_clear_rejected": {
+      "message": "L'API Fluidra a refusé l'effacement du programme pour {device_id}"
+    },
+    "schedule_set_failed": {
+      "message": "L'appel à l'API Fluidra a échoué lors de la définition du programme pour {device_id}"
+    },
+    "schedule_set_rejected": {
+      "message": "L'API Fluidra a refusé la mise à jour du programme pour {device_id}"
+    },
     "temperature_out_of_range": {
       "message": "La température {temperature}°C est hors plage ({min_temp}°C - {max_temp}°C)"
+    },
+    "unknown_preset": {
+      "message": "Préréglage inconnu « {preset} »"
     }
   },
   "issues": {
@@ -335,6 +350,46 @@
         "description": "Configurer les options avancées",
         "title": "Options Fluidra Pool"
       }
+    }
+  },
+  "services": {
+    "clear_schedule": {
+      "description": "Supprimer tous les programmes de la pompe",
+      "fields": {
+        "device_id": {
+          "description": "Identifiant de l'appareil (par exemple LE24500883)",
+          "name": "Identifiant de l'appareil"
+        }
+      },
+      "name": "Effacer le programme de la pompe"
+    },
+    "set_preset_schedule": {
+      "description": "Appliquer un programme prédéfini",
+      "fields": {
+        "device_id": {
+          "description": "Identifiant de l'appareil (par exemple LE24500883)",
+          "name": "Identifiant de l'appareil"
+        },
+        "preset": {
+          "description": "Type de programme prédéfini",
+          "name": "Préréglage"
+        }
+      },
+      "name": "Appliquer un programme prédéfini"
+    },
+    "set_schedule": {
+      "description": "Configurer le programme de la pompe",
+      "fields": {
+        "device_id": {
+          "description": "Identifiant de l'appareil (par exemple LE24500883)",
+          "name": "Identifiant de l'appareil"
+        },
+        "schedules": {
+          "description": "Liste des créneaux horaires",
+          "name": "Programmes"
+        }
+      },
+      "name": "Définir le programme de la pompe"
     }
   }
 }

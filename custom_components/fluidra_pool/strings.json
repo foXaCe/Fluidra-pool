@@ -63,35 +63,11 @@
   },
   "entity": {
     "sensor": {
-      "speed_percent": {
-        "name": "Speed Percentage"
-      },
-      "operation_mode": {
-        "name": "Operation Mode"
-      },
-      "connectivity": {
-        "name": "Connectivity"
-      },
-      "signal_strength": {
-        "name": "Signal Strength"
-      },
-      "firmware_version": {
-        "name": "Firmware Version"
-      },
-      "hardware_errors": {
-        "name": "Hardware Errors"
-      },
-      "comm_errors": {
-        "name": "Communication Errors"
-      },
-      "network_status": {
-        "name": "Network Status"
-      },
       "schedule_count": {
         "name": "Active Schedules"
       },
-      "next_schedule": {
-        "name": "Next Schedule"
+      "running_hours": {
+        "name": "Running Hours"
       },
       "current_temperature": {
         "name": "Current Temperature"
@@ -224,12 +200,6 @@
       }
     },
     "number": {
-      "speed_control": {
-        "name": "Speed Control"
-      },
-      "pump_vitesse": {
-        "name": "{device_name} Speed Setting"
-      },
       "chlorination_level": {
         "name": "Chlorination Level"
       },
@@ -321,6 +291,51 @@
     },
     "auth_failed": {
       "message": "Authentication failed, please re-authenticate"
+    },
+    "mfa_required": {
+      "message": "Multi-factor authentication is required to sign in to Fluidra Pool"
+    },
+    "device_not_found": {
+      "message": "Fluidra device '{device_id}' was not found in any loaded config entry"
+    },
+    "invalid_time_format": {
+      "message": "Invalid time '{value}', expected HH:MM"
+    },
+    "empty_schedule_days": {
+      "message": "Schedule days cannot be empty"
+    },
+    "unknown_preset": {
+      "message": "Unknown preset '{preset}'"
+    },
+    "schedule_set_failed": {
+      "message": "Fluidra API call failed while setting the schedule for {device_id}"
+    },
+    "schedule_set_rejected": {
+      "message": "Fluidra API rejected the schedule update for {device_id}"
+    },
+    "schedule_clear_failed": {
+      "message": "Fluidra API call failed while clearing the schedule for {device_id}"
+    },
+    "schedule_clear_rejected": {
+      "message": "Fluidra API rejected the schedule clear for {device_id}"
+    },
+    "preset_schedule_set_failed": {
+      "message": "Fluidra API call failed while applying the preset schedule for {device_id}"
+    },
+    "preset_schedule_set_rejected": {
+      "message": "Fluidra API rejected the preset schedule update for {device_id}"
+    },
+    "hvac_mode_set_failed": {
+      "message": "Failed to set heat-pump mode to {hvac_mode}"
+    },
+    "heat_pump_control_failed": {
+      "message": "Heat-pump control failed ({error_type})"
+    },
+    "preset_mode_set_failed": {
+      "message": "Failed to set preset mode to {preset_mode}"
+    },
+    "preset_mode_control_failed": {
+      "message": "Preset mode control failed ({error_type})"
     }
   },
   "issues": {
@@ -335,6 +350,46 @@
     "connection_error": {
       "title": "Connection error",
       "description": "Unable to connect to Fluidra Pool service"
+    }
+  },
+  "services": {
+    "set_schedule": {
+      "name": "Set pump schedule",
+      "description": "Configure the pump schedule",
+      "fields": {
+        "device_id": {
+          "name": "Device ID",
+          "description": "Device identifier (e.g. LE24500883)"
+        },
+        "schedules": {
+          "name": "Schedules",
+          "description": "List of time slots"
+        }
+      }
+    },
+    "clear_schedule": {
+      "name": "Clear pump schedule",
+      "description": "Delete all pump schedules",
+      "fields": {
+        "device_id": {
+          "name": "Device ID",
+          "description": "Device identifier (e.g. LE24500883)"
+        }
+      }
+    },
+    "set_preset_schedule": {
+      "name": "Apply preset schedule",
+      "description": "Apply a preset schedule",
+      "fields": {
+        "device_id": {
+          "name": "Device ID",
+          "description": "Device identifier (e.g. LE24500883)"
+        },
+        "preset": {
+          "name": "Preset",
+          "description": "Type of preset schedule"
+        }
+      }
     }
   }
 }

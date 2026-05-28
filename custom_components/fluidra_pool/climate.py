@@ -81,13 +81,13 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
     """Climate entity for Fluidra heat pumps."""
 
     __slots__ = (
-        "_pending_temperature",
-        "_pending_preset_mode",
-        "_pending_hvac_mode",
         "_is_updating",
         "_last_action_time",
-        "_last_preset_action_time",
         "_last_hvac_action_time",
+        "_last_preset_action_time",
+        "_pending_hvac_mode",
+        "_pending_preset_mode",
+        "_pending_temperature",
     )
 
     def __init__(self, coordinator, api, pool_id: str, device_id: str):
@@ -276,9 +276,9 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             z550_mode = device_data.get("z550_mode_reported")
             if z550_mode == Z550_MODE_HEATING:
                 return HVACMode.HEAT
-            elif z550_mode == Z550_MODE_COOLING:
+            if z550_mode == Z550_MODE_COOLING:
                 return HVACMode.COOL
-            elif z550_mode == Z550_MODE_AUTO:
+            if z550_mode == Z550_MODE_AUTO:
                 return HVACMode.HEAT_COOL
             # Default to HEAT if mode unknown but pump is ON
             return HVACMode.HEAT
@@ -295,9 +295,9 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                 # 2=Smart H+C → HEAT_COOL
                 if mode_value in (0, 3, 4):
                     return HVACMode.HEAT
-                elif mode_value in (1, 5, 6):
+                if mode_value in (1, 5, 6):
                     return HVACMode.COOL
-                elif mode_value == 2:
+                if mode_value == 2:
                     return HVACMode.HEAT_COOL
             # Fallback: if ON, assume HEAT
             return HVACMode.HEAT if bool(heat_pump_reported) else HVACMode.OFF
@@ -349,9 +349,9 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             z550_state = device_data.get("z550_state_reported")
             if z550_state == Z550_STATE_HEATING:
                 return HVACAction.HEATING
-            elif z550_state == Z550_STATE_COOLING:
+            if z550_state == Z550_STATE_COOLING:
                 return HVACAction.COOLING
-            elif z550_state == Z550_STATE_IDLE:
+            if z550_state == Z550_STATE_IDLE:
                 return HVACAction.IDLE
             # No flow or unknown state = OFF
             return HVACAction.OFF
@@ -443,7 +443,11 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                 self._last_hvac_action_time = None
                 self.async_write_ha_state()
                 await self.coordinator.async_request_refresh()
-                raise HomeAssistantError(f"Failed to set heat-pump mode to {hvac_mode}")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="hvac_mode_set_failed",
+                    translation_placeholders={"hvac_mode": str(hvac_mode)},
+                )
 
         except HomeAssistantError:
             raise
@@ -452,7 +456,11 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             self._last_hvac_action_time = None
             self.async_write_ha_state()
             _LOGGER.exception("Error setting HVAC mode for %s", mask_device_id(self._device_id))
-            raise HomeAssistantError(f"Heat-pump control failed: {type(err).__name__}") from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="heat_pump_control_failed",
+                translation_placeholders={"error_type": type(err).__name__},
+            ) from err
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
@@ -541,7 +549,11 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                 self._pending_preset_mode = None
                 self._last_preset_action_time = None
                 await self.coordinator.async_request_refresh()
-                raise HomeAssistantError(f"Failed to set preset mode to {preset_mode}")
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="preset_mode_set_failed",
+                    translation_placeholders={"preset_mode": preset_mode},
+                )
 
         except HomeAssistantError:
             raise
@@ -549,7 +561,11 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             self._pending_preset_mode = None
             self._last_preset_action_time = None
             _LOGGER.exception("Error setting preset mode for %s", mask_device_id(self._device_id))
-            raise HomeAssistantError(f"Preset control failed: {type(err).__name__}") from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="preset_mode_control_failed",
+                translation_placeholders={"error_type": type(err).__name__},
+            ) from err
 
     @property
     def extra_state_attributes(self) -> dict:

@@ -89,12 +89,6 @@
       },
       "ph_setpoint": {
         "name": "pH Setpoint"
-      },
-      "pump_vitesse": {
-        "name": "{device_name} Speed Setting"
-      },
-      "speed_control": {
-        "name": "Speed Control"
       }
     },
     "select": {
@@ -179,12 +173,6 @@
       "chlorinator_water_temperature": {
         "name": "Water Temperature"
       },
-      "comm_errors": {
-        "name": "Communication Errors"
-      },
-      "connectivity": {
-        "name": "Connectivity"
-      },
       "current_temperature": {
         "name": "Current Temperature"
       },
@@ -200,21 +188,6 @@
           "signal_very_low": "Signal Very Low"
         }
       },
-      "firmware_version": {
-        "name": "Firmware Version"
-      },
-      "hardware_errors": {
-        "name": "Hardware Errors"
-      },
-      "network_status": {
-        "name": "Network Status"
-      },
-      "next_schedule": {
-        "name": "Next Schedule"
-      },
-      "operation_mode": {
-        "name": "Operation Mode"
-      },
       "pool_location": {
         "name": "Pool Location"
       },
@@ -229,11 +202,11 @@
           "winterized": "Winterized"
         }
       },
+      "running_hours": {
+        "name": "Running Hours"
+      },
       "schedule_count": {
         "name": "Active Schedules"
-      },
-      "signal_strength": {
-        "name": "Signal Strength"
       },
       "speed_mode": {
         "name": "Speed",
@@ -244,9 +217,6 @@
           "not_running": "Not Running",
           "stopped": "Stopped"
         }
-      },
-      "speed_percent": {
-        "name": "Speed Percentage"
       },
       "target_temperature": {
         "name": "Target Temperature"
@@ -308,8 +278,53 @@
     "auth_failed": {
       "message": "Authentication failed, please re-authenticate"
     },
+    "device_not_found": {
+      "message": "Fluidra device '{device_id}' was not found in any loaded config entry"
+    },
+    "empty_schedule_days": {
+      "message": "Schedule days cannot be empty"
+    },
+    "heat_pump_control_failed": {
+      "message": "Heat-pump control failed ({error_type})"
+    },
+    "hvac_mode_set_failed": {
+      "message": "Failed to set heat-pump mode to {hvac_mode}"
+    },
+    "invalid_time_format": {
+      "message": "Invalid time '{value}', expected HH:MM"
+    },
+    "mfa_required": {
+      "message": "Multi-factor authentication is required to sign in to Fluidra Pool"
+    },
+    "preset_mode_control_failed": {
+      "message": "Preset mode control failed ({error_type})"
+    },
+    "preset_mode_set_failed": {
+      "message": "Failed to set preset mode to {preset_mode}"
+    },
+    "preset_schedule_set_failed": {
+      "message": "Fluidra API call failed while applying the preset schedule for {device_id}"
+    },
+    "preset_schedule_set_rejected": {
+      "message": "Fluidra API rejected the preset schedule update for {device_id}"
+    },
+    "schedule_clear_failed": {
+      "message": "Fluidra API call failed while clearing the schedule for {device_id}"
+    },
+    "schedule_clear_rejected": {
+      "message": "Fluidra API rejected the schedule clear for {device_id}"
+    },
+    "schedule_set_failed": {
+      "message": "Fluidra API call failed while setting the schedule for {device_id}"
+    },
+    "schedule_set_rejected": {
+      "message": "Fluidra API rejected the schedule update for {device_id}"
+    },
     "temperature_out_of_range": {
       "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"
+    },
+    "unknown_preset": {
+      "message": "Unknown preset '{preset}'"
     }
   },
   "issues": {
@@ -335,6 +350,46 @@
         "description": "Configure advanced options",
         "title": "Fluidra Pool Options"
       }
+    }
+  },
+  "services": {
+    "clear_schedule": {
+      "description": "Delete all pump schedules",
+      "fields": {
+        "device_id": {
+          "description": "Device identifier (e.g. LE24500883)",
+          "name": "Device ID"
+        }
+      },
+      "name": "Clear pump schedule"
+    },
+    "set_preset_schedule": {
+      "description": "Apply a preset schedule",
+      "fields": {
+        "device_id": {
+          "description": "Device identifier (e.g. LE24500883)",
+          "name": "Device ID"
+        },
+        "preset": {
+          "description": "Type of preset schedule",
+          "name": "Preset"
+        }
+      },
+      "name": "Apply preset schedule"
+    },
+    "set_schedule": {
+      "description": "Configure the pump schedule",
+      "fields": {
+        "device_id": {
+          "description": "Device identifier (e.g. LE24500883)",
+          "name": "Device ID"
+        },
+        "schedules": {
+          "description": "List of time slots",
+          "name": "Schedules"
+        }
+      },
+      "name": "Set pump schedule"
     }
   }
 }
