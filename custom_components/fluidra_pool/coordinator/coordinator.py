@@ -16,12 +16,12 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.util import dt as dt_util
 
-from .api_resilience import FluidraError
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, FluidraPoolConfigEntry
-from .device_registry import DeviceIdentifier
-from .fluidra_api import FluidraPoolAPI
+from ..api_resilience import FluidraError
+from ..const import DEFAULT_SCAN_INTERVAL, DOMAIN, FluidraPoolConfigEntry
+from ..device_registry import DeviceIdentifier
+from ..fluidra_api import FluidraPoolAPI
+from ._parsers import calculate_auto_speed_from_schedules, parse_dm24049704_schedule_format
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,11 +34,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     ) -> None:
         """Initialize."""
         self.api = api
-        self.config_entry = config_entry  # Store config entry for device cleanup
-        self._previous_schedule_entities: dict[str, int] = {}  # Track scheduler entities per device for cleanup
-        self._first_update = True  # Skip heavy polling on first update for faster startup
+        self.config_entry = config_entry  # Used for HA device cleanup.
+        # Track scheduler entities per device for cleanup.
+        self._previous_schedule_entities: dict[str, int] = {}
+        # Skip heavy polling on first update for faster startup.
+        self._first_update = True
 
-        # 🥇 Gold: Utiliser l'intervalle configuré dans les options
+        # Honour the user-configured polling interval.
         scan_interval = DEFAULT_SCAN_INTERVAL
         if config_entry and config_entry.options:
             scan_interval = config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
@@ -48,11 +50,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name="fluidra_pool",
             update_interval=timedelta(seconds=scan_interval),
-            # 🏆 Platinum: Debouncer pour éviter les appels API trop fréquents
+            # Debounce manual refresh requests so multiple toggles share a poll.
             request_refresh_debouncer=Debouncer(
                 hass,
                 _LOGGER,
-                cooldown=1.5,  # 1.5 secondes entre les requêtes
+                cooldown=1.5,
                 immediate=False,
             ),
         )
@@ -69,17 +71,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     async def _cleanup_removed_devices(self, current_device_ids: set):
         """Remove devices and entities that no longer exist in Fluidra API."""
         if not self.config_entry:
-            return  # Cannot cleanup without config entry
+            return
 
         try:
             device_registry = dr.async_get(self.hass)
             entity_registry = er.async_get(self.hass)
 
-            # Get all devices for this integration
             devices_to_check = dr.async_entries_for_config_entry(device_registry, self.config_entry.entry_id)
 
             for device_entry in devices_to_check:
-                # Extract device_id from identifiers
                 device_id = None
                 for identifier in device_entry.identifiers:
                     if identifier[0] == DOMAIN:
@@ -89,13 +89,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                 if not device_id:
                     continue
 
-                # Skip pool devices (they are parent devices, not actual equipment)
+                # Pool devices are parent placeholders, not actual equipment.
                 if device_entry.model == "Pool":
                     continue
 
-                # If device_id not in current API data, remove it
                 if device_id not in current_device_ids:
-                    # First, remove all entities associated with this device
                     entities_to_remove = er.async_entries_for_device(
                         entity_registry, device_entry.id, include_disabled_entities=True
                     )
@@ -103,7 +101,6 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     for entity_entry in entities_to_remove:
                         entity_registry.async_remove(entity_entry.entity_id)
 
-                    # Then remove the device itself
                     device_registry.async_remove_device(device_entry.id)
 
         except HomeAssistantError as err:
@@ -112,14 +109,12 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     async def _cleanup_schedule_sensor_if_empty(self, pool_id: str, device_id: str, schedule_data: list):
         """Clean up schedule sensor entity if no schedules remain."""
         try:
-            # If no schedules remain, we can consider removing the sensor entity
             if len(schedule_data) == 0:
                 entity_registry = er.async_get(self.hass)
 
-                # The unique_id format for schedule sensor is: fluidra_pool_{pool_id}_{device_id}_sensor_schedules
+                # Unique-id format for the schedule sensor.
                 expected_unique_id = f"fluidra_pool_{pool_id}_{device_id}_sensor_schedules"
 
-                # Look for the schedule sensor entity
                 for entity_id, entry in entity_registry.entities.items():
                     if entry.platform == "fluidra_pool" and entry.unique_id == expected_unique_id:
                         entity_registry.async_remove(entity_id)
@@ -128,186 +123,21 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         except HomeAssistantError as err:
             _LOGGER.debug("Failed to cleanup schedule sensor: %s", err)
 
+    # Kept as a thin wrapper so existing callers (and tests) keep working.
     def _parse_dm24049704_schedule_format(self, reported_value: dict) -> list:
-        """Parse DM24049704 chlorinator schedule format (programs/slots) to standard format.
-
-        The API returns component 258 in this format:
-        {
-            "dayPrograms": {"monday": 1, "tuesday": 1, ...},
-            "programs": [{"id": 1, "slots": [{"id": 0, "start": 1280, "end": 1536, "mode": 3}]}]
-        }
-
-        Where time is encoded as: hours * 256 + minutes
-        Mode 1=S1, 2=S2, 3=S3
-
-        Returns standard schedule format:
-        [{"id": 0, "startTime": "0 5 * * 1,2,3,4,5", "endTime": "0 6 * * 1,2,3,4,5",
-          "startActions": {"operationName": "3"}, "enabled": True}]
-        """
-        try:
-            if not isinstance(reported_value, dict):
-                return []
-
-            day_programs = reported_value.get("dayPrograms", {})
-            programs = reported_value.get("programs", [])
-
-            if not programs:
-                return []
-
-            # Map day names to CRON day numbers (1=Monday, 7=Sunday)
-            day_name_to_cron = {
-                "monday": 1,
-                "tuesday": 2,
-                "wednesday": 3,
-                "thursday": 4,
-                "friday": 5,
-                "saturday": 6,
-                "sunday": 7,
-            }
-
-            # Group days by program ID
-            program_days: dict[int, list[int]] = {}
-            for day_name, program_id in day_programs.items():
-                if program_id not in program_days:
-                    program_days[program_id] = []
-                cron_day = day_name_to_cron.get(day_name.lower())
-                if cron_day:
-                    program_days[program_id].append(cron_day)
-
-            # Sort days for consistent output
-            for days in program_days.values():
-                days.sort()
-
-            result = []
-            schedule_id = 1  # DM24049704 uses IDs starting at 1
-
-            for program in programs:
-                program_id = program.get("id")
-                slots = program.get("slots", [])
-                days = program_days.get(program_id, [])
-
-                if not days:
-                    continue
-
-                days_str = ",".join(str(d) for d in days)
-
-                for slot in slots:
-                    start_raw = slot.get("start", 0)
-                    end_raw = slot.get("end", 0)
-                    mode = slot.get("mode", 0)
-
-                    # Skip empty slots (mode=0 with no time set)
-                    if mode == 0 and start_raw == 0 and end_raw == 0:
-                        continue
-
-                    # Decode time: hours * 256 + minutes
-                    start_hour = start_raw // 256
-                    start_minute = start_raw % 256
-                    end_hour = end_raw // 256
-                    end_minute = end_raw % 256
-
-                    # Create CRON format: "minute hour * * days"
-                    start_cron = f"{start_minute} {start_hour} * * {days_str}"
-                    end_cron = f"{end_minute} {end_hour} * * {days_str}"
-
-                    result.append(
-                        {
-                            "id": schedule_id,
-                            "groupId": schedule_id,  # groupId must match id for API
-                            "startTime": start_cron,
-                            "endTime": end_cron,
-                            "startActions": {"operationName": str(mode)},
-                            "enabled": True,
-                        }
-                    )
-                    schedule_id += 1
-
-            _LOGGER.debug("Parsed DM24049704 schedule: %s -> %s", reported_value, result)
-            return result
-
-        except (ValueError, TypeError, KeyError) as err:
-            _LOGGER.warning("Failed to parse DM24049704 schedule format: %s", err)
-            return []
+        """Parse DM24049704 chlorinator schedule format (programs/slots) to standard format."""
+        return parse_dm24049704_schedule_format(reported_value)
 
     def _calculate_auto_speed_from_schedules(self, device: dict) -> int:
         """Calculate current speed based on active schedules in auto mode."""
-        try:
-            from datetime import time  # noqa: PLC0415
-
-            schedule_data = device.get("schedule_data", [])
-            if not schedule_data:
-                return 0
-
-            now = dt_util.now()
-            current_time = now.time()
-            current_weekday = now.weekday()  # 0 = Monday, 6 = Sunday
-
-            # Mapping operationName to percentage (from mitmproxy capture)
-            operation_to_percent = {
-                "0": 45,  # Faible
-                "1": 65,  # Moyenne
-                "2": 100,  # Élevée
-            }
-
-            def _parse_cron_time(cron_time: str):
-                """Parse cron time format to time object."""
-                try:
-                    parts = cron_time.split()
-                    if len(parts) >= 2:
-                        minute = int(parts[0])
-                        hour = int(parts[1])
-                        return time(hour, minute)
-                except (ValueError, IndexError):
-                    pass
-                return None
-
-            def _parse_cron_days(cron_time: str):
-                """Parse cron days format."""
-                try:
-                    parts = cron_time.split()
-                    if len(parts) >= 5:
-                        days_str = parts[4]
-                        if days_str == "*":
-                            return list(range(7))  # All days
-                        days = []
-                        for day in days_str.split(","):
-                            day_num = int(day.strip())
-                            # Convert from cron format (0=Sunday) to Python format (0=Monday)
-                            if day_num == 0:  # Sunday
-                                days.append(6)
-                            else:  # Monday-Saturday
-                                days.append(day_num - 1)
-                        return days
-                except (ValueError, IndexError):
-                    pass
-                return []
-
-            # Check each schedule to see if it's currently active
-            for schedule in schedule_data:
-                if not schedule.get("enabled", False):
-                    continue
-
-                start_time_obj = _parse_cron_time(schedule.get("startTime", ""))
-                end_time_obj = _parse_cron_time(schedule.get("endTime", ""))
-                schedule_days = _parse_cron_days(schedule.get("startTime", ""))
-
-                if start_time_obj and end_time_obj and current_weekday in schedule_days:
-                    # Check if current time is within this schedule
-                    if start_time_obj <= current_time <= end_time_obj:
-                        operation = schedule.get("startActions", {}).get("operationName", "0")
-                        return operation_to_percent.get(operation, 0)
-
-            return 0
-
-        except (ValueError, TypeError):
-            return 0
+        return calculate_auto_speed_from_schedules(device)
 
     async def _fetch_components_parallel(self, device_id: str, components_to_scan: list[int]) -> dict[int, dict]:
         """Fetch multiple component states in parallel for a device.
 
         Returns a dict mapping component_id to component_state.
         """
-        # Limit concurrent requests to avoid overwhelming the API
+        # Cap concurrency so we don't trip rate limits or exhaust the connector.
         semaphore = asyncio.Semaphore(10)
 
         async def fetch_one(component_id: int) -> tuple[int, dict | None]:
@@ -318,7 +148,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         tasks = [fetch_one(cid) for cid in components_to_scan]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        component_states = {}
+        component_states: dict[int, dict] = {}
         for result in results:
             if isinstance(result, tuple):
                 cid, state = result
@@ -335,7 +165,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         raw_device_id = device.get("device_id")
         device_id = str(raw_device_id) if raw_device_id is not None else ""
 
-        # Store ALL component data
+        # Store ALL component data.
         device["components"][str(component_id)] = component_state
 
         if component_id == 0:
@@ -373,7 +203,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             else:
                 auto_mode = device.get("auto_mode_enabled", False)
                 if auto_mode:
-                    device["speed_percent"] = self._calculate_auto_speed_from_schedules(device)
+                    device["speed_percent"] = calculate_auto_speed_from_schedules(device)
                 elif reported_value == 0:
                     device["speed_percent"] = 45
                 elif reported_value == 1:
@@ -424,7 +254,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         elif component_id == 20:
             device_type = device.get("type", "")
             if device_type == "chlorinator":
-                # EXO chlorinators have schedule data (list) in component 20
+                # EXO chlorinators expose schedules (list) on component 20.
                 if isinstance(reported_value, list):
                     device["schedule_data"] = reported_value
                     self._track_schedule_count(pool_id, device_id, reported_value)
@@ -505,7 +335,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             schedule_comp = DeviceIdentifier.get_feature(device, "schedule_component")
             if schedule_comp and component_id == schedule_comp:
                 if isinstance(reported_value, dict) and "programs" in reported_value:
-                    schedule_data = self._parse_dm24049704_schedule_format(reported_value)
+                    schedule_data = parse_dm24049704_schedule_format(reported_value)
                 elif isinstance(reported_value, list):
                     schedule_data = reported_value
                 else:
@@ -517,13 +347,12 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
     def _track_schedule_count(self, pool_id: str, device_id: str, schedule_data: list) -> None:
         """Track schedule count changes for cleanup."""
         device_key = f"{pool_id}_{device_id}"
-        # Note: cleanup is now done asynchronously in a separate task to avoid blocking
+        # Cleanup happens asynchronously in a separate task to avoid blocking.
         self._previous_schedule_entities[device_key] = len(schedule_data)
 
     async def _async_update_data(self):
         """Update data via library using optimized parallel polling."""
         try:
-            # Validate token before polling
             if not await self.api.ensure_valid_token():
                 _LOGGER.error(
                     "Token validation failed — triggering reauth flow "
@@ -537,10 +366,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     translation_key="auth_failed",
                 )
 
-            # Get pool structure
             pools = await self.api.get_pools()
 
-            # Fast startup: minimal data on first update
+            # Fast startup: minimal data on first update.
             if self._first_update:
                 self._first_update = False
                 return {pool["id"]: pool for pool in pools}
@@ -562,7 +390,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                     if prev_pool:
                         pool.update(prev_pool)
 
-            # Collect current device IDs for cleanup
+            # Collect current device IDs for cleanup.
             current_device_ids: set[str] = set()
             for pool in pools:
                 current_device_ids.add(pool["id"])
@@ -602,7 +430,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         if isinstance(water_quality_result, dict):
             pool["water_quality"] = water_quality_result
 
-        # Preserve previous component data with deep copy to avoid aliasing
+        # Preserve previous component data with deep copy to avoid aliasing.
         for device in pool.get("devices", []):
             device_id = device.get("device_id")
             if device_id and device_id in prev_devices_by_id:
