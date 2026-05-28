@@ -69,7 +69,7 @@ class TestFluidraPoolEntity:
         assert (DOMAIN, "E30-001") in info["identifiers"]
         assert info["name"] == "Pool Pump"
         assert info["manufacturer"] == "Fluidra"
-        assert (DOMAIN, "pool_001") == info["via_device"]
+        assert info["via_device"] == (DOMAIN, "pool_001")
 
     def test_device_info_unknown_device(self, mock_coordinator: MagicMock):
         entity = FluidraPoolEntity(mock_coordinator, "pool_001", "UNKNOWN")
