@@ -296,16 +296,16 @@
       "message": "Multi-factor authentication is required to sign in to Fluidra Pool"
     },
     "device_not_found": {
-      "message": "Fluidra device '{device_id}' was not found in any loaded config entry"
+      "message": "Fluidra device {device_id} was not found in any loaded config entry"
     },
     "invalid_time_format": {
-      "message": "Invalid time '{value}', expected HH:MM"
+      "message": "Invalid time {value}, expected HH:MM"
     },
     "empty_schedule_days": {
       "message": "Schedule days cannot be empty"
     },
     "unknown_preset": {
-      "message": "Unknown preset '{preset}'"
+      "message": "Unknown preset {preset}"
     },
     "schedule_set_failed": {
       "message": "Fluidra API call failed while setting the schedule for {device_id}"

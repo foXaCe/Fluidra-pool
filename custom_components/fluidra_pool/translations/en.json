@@ -279,7 +279,7 @@
       "message": "Authentication failed, please re-authenticate"
     },
     "device_not_found": {
-      "message": "Fluidra device '{device_id}' was not found in any loaded config entry"
+      "message": "Fluidra device {device_id} was not found in any loaded config entry"
     },
     "empty_schedule_days": {
       "message": "Schedule days cannot be empty"
@@ -291,7 +291,7 @@
       "message": "Failed to set heat-pump mode to {hvac_mode}"
     },
     "invalid_time_format": {
-      "message": "Invalid time '{value}', expected HH:MM"
+      "message": "Invalid time {value}, expected HH:MM"
     },
     "mfa_required": {
       "message": "Multi-factor authentication is required to sign in to Fluidra Pool"
@@ -324,7 +324,7 @@
       "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"
     },
     "unknown_preset": {
-      "message": "Unknown preset '{preset}'"
+      "message": "Unknown preset {preset}"
     }
   },
   "issues": {

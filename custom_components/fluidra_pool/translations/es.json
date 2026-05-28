@@ -279,7 +279,7 @@
       "message": "Error de autenticación, por favor re-autentícate"
     },
     "device_not_found": {
-      "message": "No se encontró el dispositivo Fluidra '{device_id}' en ninguna entrada de configuración cargada"
+      "message": "No se encontró el dispositivo Fluidra {device_id} en ninguna entrada de configuración cargada"
     },
     "empty_schedule_days": {
       "message": "Los días del horario no pueden estar vacíos"
@@ -291,7 +291,7 @@
       "message": "No se pudo establecer el modo de la bomba de calor en {hvac_mode}"
     },
     "invalid_time_format": {
-      "message": "Hora '{value}' no válida, se esperaba HH:MM"
+      "message": "Hora {value} no válida, se esperaba HH:MM"
     },
     "mfa_required": {
       "message": "Se requiere autenticación de dos factores para iniciar sesión en Fluidra Pool"
@@ -324,7 +324,7 @@
       "message": "La temperatura {temperature}°C está fuera de rango ({min_temp}°C - {max_temp}°C)"
     },
     "unknown_preset": {
-      "message": "Predefinido desconocido '{preset}'"
+      "message": "Predefinido desconocido {preset}"
     }
   },
   "issues": {
