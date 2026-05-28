@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.37.0] - 2026-05-28
+
+### Added
+- **Zodiac Blue Connect Silver support** (Issue #69, dump confirmed by @LykkeConsult)
+  - New `WA*` device pattern matched as a water-analyser probe. pH (component 13, decimal direct) and ORP (component 14, mV direct) sensors are now created — both values match the Fluidra Pool app readings. Temperature mapping still pending diagnostic confirmation; the device entity surfaces only the confirmed sensors plus device info for now.
+- **AstralPool Clear Connect Escalable (model 77020)** support (Issue #70, reported by @VICTOR28N)
+  - New `CC25024927.nn_*` config maps the bridged child to the tecnoLC2 family (same as CC24009711 / LC25000122). Chlorination level (10), pH/ORP setpoints (16/20), and the standard 165/170/172/174 sensor quartet now expose values instead of staying at 0.
+
+### Changed
+- **Diagnostics dump redaction tightened**
+  - Components 1/2/6/8 (typical serial/MAC/SKU/IP slots) now have their string `reportedValue`/`desiredValue` masked unconditionally. Device-extracted mirror fields (`part_numbers_component`, `signal_strength_component`, `comm_errors_component`, `device_id_component`) are also redacted. A defensive regex pass catches IPv4 / MAC / Fluidra serials / hardware UIDs anywhere they surface. New TO_REDACT entries: `sn`, `alias`, `bleAccessCode`, `sessionIdentifier`, `ip`/`ipAddress`. Telemetry components (pH, ORP, temperature, signal dBm) stay readable so users can keep self-debugging device mappings.
+- **Exception messages now translatable** (Quality Scale Gold #17)
+  - All 17 user-facing exceptions (`mfa_required`, `device_not_found`, `invalid_time_format`, `empty_schedule_days`, `unknown_preset`, the six `schedule_*_failed/rejected` + `preset_schedule_*` variants, `hvac_mode_set_failed`, `heat_pump_control_failed`, `preset_mode_set_failed`, `preset_mode_control_failed`) now use `translation_domain` + `translation_key` + `translation_placeholders`. Messages display in the user's language.
+- **Services translated**
+  - `set_schedule`, `clear_schedule`, `set_preset_schedule` names and field descriptions moved from `services.yaml` to `strings.json` + 4 language files (EN/FR/ES/PT). The Developer Tools UI now shows them in the user's language.
+- **Code structure refactored**
+  - Seven large modules (1167 to 645 lines) split into focused packages: `sensor/`, `switch/`, `select/`, `time/`, `device_registry/`, `fluidra_api/` (mixin pattern), `coordinator/`. Public imports unchanged — `from custom_components.fluidra_pool.X import Y` still works.
+
+### Fixed
+- **Missing `running_hours` translation** — the Z260iQ running-hours sensor was displaying its raw translation key.
+
 ## [2.36.0] - 2026-05-27
 
 ### Added
