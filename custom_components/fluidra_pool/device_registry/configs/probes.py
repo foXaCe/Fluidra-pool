@@ -15,10 +15,10 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
         device_type="chlorinator",
         # Zodiac Blue Connect Silver — Issue #69.
         # Cloud SKU "WA000099", thingType "BC3" (component 7).
-        # Confirmed by @LykkeConsult: comp 13 = pH (direct decimal),
-        # comp 14 = ORP (mV, direct).
-        # Temperature mapping not confirmed yet (comp 16 or 19 — pending diagnostics
-        # with a known reference temp).
+        # Mapping confirmed against the Fluidra Pool app by @LykkeConsult:
+        #  - comp 12 = water temperature (direct °C, e.g. 16 = 16°C)
+        #  - comp 13 = pH (direct decimal, e.g. 7.3)
+        #  - comp 14 = ORP (mV, direct, e.g. 764)
         identifier_patterns=["WA*"],
         family_patterns=["data collectors"],
         components_range=25,
@@ -31,15 +31,17 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
             "skip_mode_select": True,
             # No chlorination_level — probe doesn't dose.
             "sensors": {
+                "temperature": 12,  # Water temperature (direct °C).
                 "ph": 13,  # Decimal pH (7.3 = 7.3 pH).
                 "orp": 14,  # ORP in mV (764 = 764 mV).
             },
             # Override default chlorinator divisors: Blue Connect reports decimal directly.
             "sensor_divisors": {
+                "temperature": 1,  # Direct °C (default chlorinator divisor is ×10).
                 "ph": 1,  # No ×100 scaling.
                 "orp": 1,  # No scaling.
             },
-            "specific_components": [13, 14, 16, 19],  # Include 16/19 in scan for future mapping.
+            "specific_components": [12, 13, 14],
         },
         priority=88,  # Above generic chlorinator (80); identifier_patterns disambiguates.
     ),
