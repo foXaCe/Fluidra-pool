@@ -142,6 +142,62 @@ async def test_discover_devices_flattens_bridged_children() -> None:
     assert devices[0]["type"] == "chlorinator"
 
 
+async def test_discover_devices_bridged_pump_child_is_variable_speed() -> None:
+    """A pump behind a bridge gets variable_speed/pump_type so its speed-select is created."""
+    api = _FakeAPI()
+    api._request.return_value = (
+        200,
+        [
+            {
+                "id": "BRIDGE-1",
+                "info": {"name": "Connect", "family": "bridge"},
+                "type": "connected",
+                "devices": [
+                    {
+                        "id": "BRIDGE-1.nn_1",
+                        "info": {"name": "VSP Pump", "family": "pump"},
+                        "type": "connected",
+                    }
+                ],
+            }
+        ],
+        "[]",
+    )
+
+    devices = await api._discover_devices_for_pool("pool_1", {})
+
+    assert devices[0]["type"] == "pump"
+    assert devices[0]["variable_speed"] is True
+    assert devices[0]["pump_type"] == "variable_speed"
+
+
+async def test_discover_devices_bridged_non_pump_child_not_variable_speed() -> None:
+    """A non-pump child is not flagged variable_speed."""
+    api = _FakeAPI()
+    api._request.return_value = (
+        200,
+        [
+            {
+                "id": "BRIDGE-1",
+                "info": {"name": "Connect", "family": "bridge"},
+                "type": "connected",
+                "devices": [
+                    {
+                        "id": "BRIDGE-1.nn_1",
+                        "info": {"name": "tecnoLC2", "family": "chlorinator"},
+                        "type": "connected",
+                    }
+                ],
+            }
+        ],
+        "[]",
+    )
+
+    devices = await api._discover_devices_for_pool("pool_1", {})
+
+    assert devices[0]["variable_speed"] is False
+
+
 async def test_discover_devices_marks_offline_when_connection_type_not_connected() -> None:
     """A `type` other than "connected" results in online=False."""
     api = _FakeAPI()
@@ -251,6 +307,18 @@ async def test_poll_device_status_finds_bridged_child() -> None:
     )
     result = await api.poll_device_status("pool_1", "BRIDGE-1.nn_1")
     assert result == {"id": "BRIDGE-1.nn_1", "connectivity": {"connected": True}}
+
+
+async def test_poll_device_status_handles_dict_envelope() -> None:
+    """The tree endpoint may return a {"devices": [...]} envelope — accept it."""
+    api = _FakeAPI()
+    api._request.return_value = (
+        200,
+        {"devices": [{"id": "DEV-1", "connectivity": {"connected": True}}]},
+        "{}",
+    )
+    result = await api.poll_device_status("pool_1", "DEV-1")
+    assert result == {"id": "DEV-1", "connectivity": {"connected": True}}
 
 
 async def test_poll_device_status_returns_none_when_circuit_breaker_open() -> None:

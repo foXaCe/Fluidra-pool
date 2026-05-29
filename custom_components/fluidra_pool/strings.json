@@ -286,6 +286,18 @@
     }
   },
   "exceptions": {
+    "temperature_set_failed": {
+      "message": "Failed to set the target temperature to {temperature}°C"
+    },
+    "light_set_failed": {
+      "message": "Failed to set the LumiPlus light state"
+    },
+    "light_schedule_set_failed": {
+      "message": "Failed to set the light schedule {schedule_id} time"
+    },
+    "schedule_overlap": {
+      "message": "This schedule overlaps another active schedule"
+    },
     "temperature_out_of_range": {
       "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"
     },

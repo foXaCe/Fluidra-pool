@@ -17,12 +17,13 @@ from ..api_resilience import (
     FluidraMFARequired,
 )
 from ..utils import mask_email
+from ._base import FluidraAPIBase
 from ._constants import COGNITO_CLIENT_ID, COGNITO_ENDPOINT, FLUIDRA_EMEA_BASE, FLUIDRA_USER_AGENT
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class AuthMixin:
+class AuthMixin(FluidraAPIBase):
     """Cognito sign-in, MFA, refresh-token rotation, and standard auth headers."""
 
     async def authenticate(self) -> None:

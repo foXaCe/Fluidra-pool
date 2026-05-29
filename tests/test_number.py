@@ -110,6 +110,32 @@ async def test_chlorination_async_set_rounds_to_step_and_writes_component() -> N
     number.coordinator.async_request_refresh.assert_awaited_once()
 
 
+def test_chlorination_native_value_supports_dict_component() -> None:
+    """A dict-form chlorination_level reads from its `read` component (Issue #3/#4)."""
+    device = _chlorinator_device(
+        components={"164": {"reportedValue": 60}},
+        features={"chlorination_level": {"write": 4, "read": 164}},
+    )
+    number = FluidraChlorinatorLevelNumber(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+    assert number.native_value == 60.0
+
+
+async def test_chlorination_async_set_dict_component_writes_to_write_component() -> None:
+    """A dict-form chlorination_level writes to its `write` component, never crashing."""
+    device = _chlorinator_device(
+        components={"164": {"reportedValue": 30}},
+        features={"chlorination_level": {"write": 4, "read": 164}, "chlorination_step": 10},
+    )
+    api = _api()
+    number = FluidraChlorinatorLevelNumber(_coord_with(device), api, POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    await number.async_set_native_value(72.0)
+
+    api.control_device_component.assert_awaited_once_with(DEVICE_ID, 4, 70)
+
+
 # --- FluidraChlorinatorPhSetpoint ----------------------------------------
 
 

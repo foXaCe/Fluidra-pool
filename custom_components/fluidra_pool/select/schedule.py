@@ -66,8 +66,8 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the schedule exists."""
-        return self._get_schedule_data() is not None
+        """Return True if the device/coordinator are healthy and the schedule exists."""
+        return super().available and self._get_schedule_data() is not None
 
     @property
     def current_option(self) -> str | None:
@@ -86,14 +86,10 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
         try:
             device_data = self.device_data
             if "schedule_data" not in device_data:
-                self._optimistic_option = None
-                self.async_write_ha_state()
                 return
 
             current_schedules = device_data["schedule_data"]
             if not current_schedules:
-                self._optimistic_option = None
-                self.async_write_ha_state()
                 return
 
             updated_schedules = []
@@ -225,8 +221,8 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
 
     @property
     def available(self) -> bool:
-        """Return True if the schedule exists."""
-        return self._get_schedule_data() is not None
+        """Return True if the device/coordinator are healthy and the schedule exists."""
+        return super().available and self._get_schedule_data() is not None
 
     @property
     def current_option(self) -> str | None:

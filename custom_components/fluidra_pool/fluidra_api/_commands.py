@@ -14,11 +14,12 @@ from ..const import (
     PUMP_START_DELAY,
 )
 from ..device_registry import DeviceIdentifier
+from ._base import FluidraAPIBase
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class CommandsMixin:
+class CommandsMixin(FluidraAPIBase):
     """Convenience commands wrapping ``control_device_component`` calls."""
 
     async def set_heat_pump_temperature(self, device_id: str, temperature: float) -> bool:

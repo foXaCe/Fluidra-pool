@@ -117,6 +117,9 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
                 if refresh_token:
                     entry_data["refresh_token"] = refresh_token
                 if self._mfa_origin == "reauth":
+                    # Reauth must re-authenticate the *same* account.
+                    await self.async_set_unique_id(self._pending_email.lower())
+                    self._abort_if_unique_id_mismatch()
                     return self.async_update_reload_and_abort(
                         self._get_reauth_entry(),
                         data=entry_data,
@@ -173,7 +176,9 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
             if error:
                 errors["base"] = error
             else:
-                # Update the existing config entry
+                # Update the existing config entry — only for the same account.
+                await self.async_set_unique_id(email.lower())
+                self._abort_if_unique_id_mismatch()
                 return self.async_update_reload_and_abort(
                     self._get_reauth_entry(),
                     data={

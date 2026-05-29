@@ -31,6 +31,7 @@ TO_REDACT = {
     "longitude",
     "lat",
     "lng",
+    "lon",  # OpenWeather coord block uses "lon"/"lat".
     "location",
     "address",
     "alias",

@@ -7,14 +7,15 @@ from typing import Any
 from urllib.parse import quote
 
 from ..api_resilience import FluidraAuthError, FluidraError
-from ..const import COMPONENT_SCHEDULE
+from ..const import COMPONENT_DM24049704_SCHEDULE, COMPONENT_SCHEDULE
 from ..utils import CRON_DAY_TO_NAME, extract_cron_days
+from ._base import FluidraAPIBase
 from ._constants import FLUIDRA_EMEA_BASE
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class SchedulesMixin:
+class SchedulesMixin(FluidraAPIBase):
     """Schedule encoding (CRON ↔ programs/slots) + ``set_schedule`` / ``clear_schedule``."""
 
     def _convert_schedules_to_dm24049704_format(self, schedules: list[dict[str, Any]]) -> dict:
@@ -116,7 +117,7 @@ class SchedulesMixin:
             f"/components/{int(component_id)}?deviceType=connected"
         )
         desired_value: Any = schedules
-        if int(component_id) == 258:
+        if int(component_id) == COMPONENT_DM24049704_SCHEDULE:
             desired_value = self._convert_schedules_to_dm24049704_format(schedules)
         payload = {"desiredValue": desired_value}
 

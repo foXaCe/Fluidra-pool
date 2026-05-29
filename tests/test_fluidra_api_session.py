@@ -285,6 +285,30 @@ async def test_request_skip_auth_refresh_does_not_trigger_refresh_on_401() -> No
     api.force_refresh_token.assert_not_awaited()
 
 
+async def test_request_refreshes_token_on_final_transient_attempt_then_resends() -> None:
+    """A 401 after the transient-retry budget is spent still re-sends after refresh (Issue #22)."""
+    session = _mock_session(
+        [
+            _mock_response(status=503, text="busy"),
+            _mock_response(status=503, text="busy"),
+            _mock_response(status=503, text="busy"),
+            _mock_response(status=401, text="expired"),
+            _mock_response(status=200, text='{"ok": true}'),
+        ]
+    )
+    api = _FakeAPI(session=session)
+    api._circuit_breaker.record_failure = MagicMock(wraps=api._circuit_breaker.record_failure)
+
+    status, _, _ = await api._request("GET", "https://example.com")
+
+    # The refreshed request is re-sent (5 HTTP calls) and succeeds — no spurious
+    # circuit-breaker failure / "after N attempts: None" error.
+    assert status == 200
+    api.force_refresh_token.assert_awaited_once()
+    assert session.request.call_count == 5
+    api._circuit_breaker.record_failure.assert_not_called()
+
+
 async def test_request_does_not_refresh_when_refresh_attempts_exhausted() -> None:
     """Only ONE refresh attempt per request — a second 401 returns the response."""
     session = _mock_session(

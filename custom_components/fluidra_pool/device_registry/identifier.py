@@ -47,41 +47,53 @@ def _identify_device_uncached(
 
     best_match: DeviceConfig | None = None
     best_score = 0
+    # Did the winning config match on a real device signal (id/name/family/model/
+    # signature) rather than only the bare device_type bonus? A type-only match
+    # scores exactly 10 and must still fall through to the generic config.
+    best_has_signal = False
 
     for config_name, config in sorted_configs:
-        score = 0
+        signal = 0
 
         if _match(device_id, tuple(config.identifier_patterns)):
-            score += 50
+            signal += 50
         if _match(device_name, tuple(config.name_patterns)):
-            score += 30
+            signal += 30
         if _match(family, tuple(config.family_patterns)):
-            score += 20
+            signal += 20
         if _match(model, tuple(config.model_patterns)):
-            score += 20
+            signal += 20
+
+        score = signal
         if config.device_type in device_type_hint:
             score += 10
 
         if config_name == "lg_heat_pump" and _match(comp7_value, ("BXWAA",)):
             score += 100
+            signal += 100
 
         if config_name == "z260iq_heat_pump":
             if _match(comp7_value, ("BXWAD",)):
                 score += 100
+                signal += 100
             else:
                 score = 0
+                signal = 0
 
         if score > best_score:
             best_score = score
             best_match = config
+            best_has_signal = signal > 0
 
-    if best_score < 10:
-        if "heat_pump" in device_type_hint or "heat" in device_type_hint:
+    if not best_has_signal:
+        if "heat_pump" in device_type_hint:
+            return DEVICE_CONFIGS.get("generic_heat_pump")
+        if "heater" in device_type_hint:  # check 'heater' before the broader 'heat'
+            return DEVICE_CONFIGS.get("generic_heater")
+        if "heat" in device_type_hint:
             return DEVICE_CONFIGS.get("generic_heat_pump")
         if "pump" in device_type_hint:
             return DEVICE_CONFIGS.get("generic_pump")
-        if "heater" in device_type_hint:
-            return DEVICE_CONFIGS.get("generic_heater")
         if "light" in device_type_hint:
             return DEVICE_CONFIGS.get("generic_light")
 

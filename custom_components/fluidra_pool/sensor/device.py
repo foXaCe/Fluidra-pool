@@ -11,6 +11,7 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import PERCENTAGE, UnitOfTemperature
 
 from ..api_resilience import FluidraError
+from ..const import LUMIPLUS_COMPONENT_BRIGHTNESS
 from .base import FluidraPoolSensorEntity
 
 if TYPE_CHECKING:
@@ -79,8 +80,24 @@ class FluidraLightBrightnessSensor(FluidraPoolSensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Return the state of the sensor."""
-        return self.device_data.get("brightness")
+        """Return the brightness percentage (0-100)."""
+        device = self.device_data
+        # Legacy / test-injected field, already a 0-100 percentage.
+        if "brightness" in device:
+            return device.get("brightness")
+        # Otherwise read the LumiPlus brightness component (reportedValue is the
+        # raw 0-100 percentage — the light entity scales it to HA's 0-255).
+        components = device.get("components", {})
+        comp = components.get(str(LUMIPLUS_COMPONENT_BRIGHTNESS))
+        if not isinstance(comp, dict):
+            return None
+        reported = comp.get("reportedValue")
+        if reported is None:
+            return None
+        try:
+            return round(float(reported))
+        except (TypeError, ValueError):
+            return None
 
     @property
     def native_unit_of_measurement(self) -> str:

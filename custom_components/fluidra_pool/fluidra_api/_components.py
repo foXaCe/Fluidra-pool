@@ -9,12 +9,13 @@ from urllib.parse import quote
 from ..api_resilience import FluidraAuthError, FluidraCircuitBreakerError, FluidraError
 from ..const import COMPONENT_AUTO_MODE, COMPONENT_PUMP_ONOFF
 from ..utils import mask_device_id
+from ._base import FluidraAPIBase
 from ._constants import FLUIDRA_EMEA_BASE
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class ComponentsMixin:
+class ComponentsMixin(FluidraAPIBase):
     """Read/write a single device component (with local state mirroring)."""
 
     async def get_component_state(self, device_id: str, component_id: int) -> dict[str, Any] | None:

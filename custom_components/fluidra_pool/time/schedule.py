@@ -7,10 +7,11 @@ from datetime import time
 import logging
 
 import aiohttp
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity import EntityCategory
 
 from ..api_resilience import FluidraError
-from ..const import COMMAND_CONFIRMATION_DELAY
+from ..const import COMMAND_CONFIRMATION_DELAY, DOMAIN
 from ..utils import convert_cron_days
 from .base import FluidraScheduleTimeEntity
 
@@ -66,10 +67,16 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             current_schedule = self._get_schedule_data()
             if current_schedule:
                 current_end_time = self._parse_cron_time(current_schedule.get("endTime", ""))
-                if current_end_time:
+                # Only validate a forward, same-day window. An inverted pair
+                # (start > end) mid-edit is an in-progress state, not a real
+                # overnight range, so skip the overlap check (the user usually
+                # fixes the other endpoint next; the device is the final arbiter).
+                if current_end_time and value < current_end_time:
                     is_valid, error_msg = self._validate_schedule_overlap(value, current_end_time, self._schedule_id)
                     if not is_valid:
-                        raise ValueError(error_msg)
+                        raise ServiceValidationError(
+                            error_msg, translation_domain=DOMAIN, translation_key="schedule_overlap"
+                        )
 
             updated_schedules = []
             for sched in current_schedules:
@@ -137,27 +144,32 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                     )
 
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
-            if success:
-                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
-                await self.coordinator.async_request_refresh()
+            if not success:
                 self._optimistic_value = None
                 self.async_write_ha_state()
-            else:
-                self._optimistic_value = None
-                self.async_write_ha_state()
-
-        except (
-            aiohttp.ClientError,
-            TimeoutError,
-            FluidraError,
-            ValueError,
-            TypeError,
-            KeyError,
-            AttributeError,
-        ) as err:
-            _LOGGER.debug("Failed to set schedule start time for %s: %s", self._device_id, err)
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="schedule_set_rejected",
+                    translation_placeholders={"device_id": self._device_id},
+                )
+            await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
+            await self.coordinator.async_request_refresh()
             self._optimistic_value = None
             self.async_write_ha_state()
+
+        except HomeAssistantError:
+            self._optimistic_value = None
+            self.async_write_ha_state()
+            raise
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            _LOGGER.error("Failed to set schedule start time for %s: %s", self._device_id, err)
+            self._optimistic_value = None
+            self.async_write_ha_state()
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_set_failed",
+                translation_placeholders={"device_id": self._device_id},
+            ) from err
 
 
 class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
@@ -209,10 +221,13 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             current_schedule = self._get_schedule_data()
             if current_schedule:
                 current_start_time = self._parse_cron_time(current_schedule.get("startTime", ""))
-                if current_start_time:
+                # Only validate a forward, same-day window (see start-time entity).
+                if current_start_time and value > current_start_time:
                     is_valid, error_msg = self._validate_schedule_overlap(current_start_time, value, self._schedule_id)
                     if not is_valid:
-                        raise ValueError(error_msg)
+                        raise ServiceValidationError(
+                            error_msg, translation_domain=DOMAIN, translation_key="schedule_overlap"
+                        )
 
             updated_schedules = []
             for sched in current_schedules:
@@ -278,24 +293,29 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
                     )
 
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
-            if success:
-                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
-                await self.coordinator.async_request_refresh()
+            if not success:
                 self._optimistic_value = None
                 self.async_write_ha_state()
-            else:
-                self._optimistic_value = None
-                self.async_write_ha_state()
-
-        except (
-            aiohttp.ClientError,
-            TimeoutError,
-            FluidraError,
-            ValueError,
-            TypeError,
-            KeyError,
-            AttributeError,
-        ) as err:
-            _LOGGER.debug("Failed to set schedule end time for %s: %s", self._device_id, err)
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="schedule_set_rejected",
+                    translation_placeholders={"device_id": self._device_id},
+                )
+            await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
+            await self.coordinator.async_request_refresh()
             self._optimistic_value = None
             self.async_write_ha_state()
+
+        except HomeAssistantError:
+            self._optimistic_value = None
+            self.async_write_ha_state()
+            raise
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            _LOGGER.error("Failed to set schedule end time for %s: %s", self._device_id, err)
+            self._optimistic_value = None
+            self.async_write_ha_state()
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_set_failed",
+                translation_placeholders={"device_id": self._device_id},
+            ) from err

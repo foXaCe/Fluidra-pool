@@ -136,8 +136,8 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the schedule exists."""
-        return self._get_schedule_data() is not None
+        """Return True if the device/coordinator are healthy and the schedule exists."""
+        return super().available and self._get_schedule_data() is not None
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -280,8 +280,8 @@ class FluidraLightScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the schedule exists."""
-        return self._get_schedule_data() is not None
+        """Return True if the device/coordinator are healthy and the schedule exists."""
+        return super().available and self._get_schedule_data() is not None
 
     @callback
     def _handle_coordinator_update(self) -> None:

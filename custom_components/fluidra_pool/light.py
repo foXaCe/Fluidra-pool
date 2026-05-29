@@ -12,6 +12,7 @@ from homeassistant.components.light import (
     LightEntity,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
@@ -135,8 +136,32 @@ class FluidraLight(FluidraPoolControlEntity, LightEntity):
                     self._optimistic_is_on = None
             except (TypeError, ValueError):
                 pass
-        self._optimistic_brightness = None
-        self._optimistic_rgbw = None
+
+        # Brightness: compare on the 0-100 wire scale (the device reports 0-100)
+        # to avoid the 255<->100 rounding mismatch, and only clear once confirmed.
+        if self._optimistic_brightness is not None:
+            reported_b = self._get_component(LUMIPLUS_COMPONENT_BRIGHTNESS).get("reportedValue")
+            if reported_b is not None:
+                try:
+                    if round(float(reported_b)) == round(self._optimistic_brightness * 100 / 255):
+                        self._optimistic_brightness = None
+                except (TypeError, ValueError):
+                    pass
+
+        # RGBW: exact tuple match (no scaling involved).
+        if self._optimistic_rgbw is not None:
+            reported_c = self._get_component(LUMIPLUS_COMPONENT_COLOR).get("reportedValue")
+            if isinstance(reported_c, dict):
+                try:
+                    r = int(reported_c.get("r", 0))
+                    g = int(reported_c.get("g", 0))
+                    b = int(reported_c.get("b", 0))
+                    w = int(reported_c.get("extra", {}).get("w", 0))
+                    if (r, g, b, w) == self._optimistic_rgbw:
+                        self._optimistic_rgbw = None
+                except (TypeError, ValueError):
+                    pass
+
         super()._handle_coordinator_update()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -155,13 +180,23 @@ class FluidraLight(FluidraPoolControlEntity, LightEntity):
             self._optimistic_rgbw = (int(r), int(g), int(b), int(w))
             await self._api.set_component_json_value(self._device_id, LUMIPLUS_COMPONENT_COLOR, color_value)
 
-        await self._api.set_component_string_value(self._device_id, LUMIPLUS_COMPONENT_POWER, "1")
+        success = await self._api.set_component_string_value(self._device_id, LUMIPLUS_COMPONENT_POWER, "1")
+        if not success:
+            self._optimistic_is_on = None
+            self._optimistic_brightness = None
+            self._optimistic_rgbw = None
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="light_set_failed")
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the light off."""
         self._optimistic_is_on = False
-        await self._api.set_component_string_value(self._device_id, LUMIPLUS_COMPONENT_POWER, "0")
+        success = await self._api.set_component_string_value(self._device_id, LUMIPLUS_COMPONENT_POWER, "0")
+        if not success:
+            self._optimistic_is_on = None
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="light_set_failed")
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()

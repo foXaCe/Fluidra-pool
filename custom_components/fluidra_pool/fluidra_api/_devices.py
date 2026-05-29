@@ -8,13 +8,14 @@ from urllib.parse import quote
 
 from ..api_resilience import FluidraAuthError, FluidraCircuitBreakerError, FluidraError
 from ..utils import mask_device_id
+from ._base import FluidraAPIBase
 from ._constants import FLUIDRA_EMEA_BASE
 from ._helpers import classify_device_type
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class DevicesMixin:
+class DevicesMixin(FluidraAPIBase):
     """Pool & device discovery, caching, and polling."""
 
     async def async_update_data(self) -> None:
@@ -87,6 +88,7 @@ class DevicesMixin:
                         child_connection_type = child_device.get("type", "unknown")
 
                         child_device_type = classify_device_type(child_family, child_device_name)
+                        child_is_pump = child_device_type == "pump"
 
                         result.append(
                             {
@@ -104,6 +106,10 @@ class DevicesMixin:
                                 "operation_mode": 0,
                                 "speed_percent": 0,
                                 "parent_id": device_id,
+                                # Pumps behind a bridge must still expose the speed-select
+                                # entity, gated on these keys by the select platform.
+                                "variable_speed": child_is_pump,
+                                "pump_type": "variable_speed" if child_is_pump else child_device_type,
                             }
                         )
                 continue
@@ -189,7 +195,13 @@ class DevicesMixin:
             _LOGGER.debug("Poll device status failed: %s", err)
             return None
 
-        if status != 200 or not isinstance(data, list):
+        if status != 200:
+            return None
+        # The tree endpoint may return a bare list or a {"devices": [...]} envelope —
+        # accept both, exactly as _discover_devices_for_pool does for the same request.
+        if isinstance(data, dict):
+            data = data.get("devices", [])
+        if not isinstance(data, list):
             return None
 
         for device in data:

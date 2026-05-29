@@ -101,22 +101,12 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         self._last_preset_action_time: float | None = None
         self._last_hvac_action_time: float | None = None
 
+    _attr_translation_key = "heat_pump"
+
     @property
     def unique_id(self) -> str:
         """Return unique ID."""
         return f"{DOMAIN}_{self._pool_id}_{self._device_id}_climate"
-
-    @property
-    def name(self) -> str:
-        """Return the name of the climate entity."""
-        pool_name = self.pool_data.get("name", "Pool")
-        device_name = self.device_data.get("name", "Heat Pump")
-        return f"{pool_name} {device_name}"
-
-    @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "heat_pump"
 
     @property
     def temperature_unit(self) -> str:
@@ -356,6 +346,40 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             # No flow or unknown state = OFF
             return HVACAction.OFF
 
+        # Z260iQ: derive the action from ON/OFF + mode direction (component 14),
+        # not is_heating — otherwise an actively-cooling unit reports HEATING.
+        if DeviceIdentifier.has_feature(device_data, "z260iq_mode"):
+            heat_pump_reported = device_data.get("heat_pump_reported")
+            if heat_pump_reported is not None and not bool(heat_pump_reported):
+                return HVACAction.OFF
+            if device_data.get("no_flow_alarm"):
+                return HVACAction.IDLE
+            mode_value = device_data.get("z260iq_mode_value")
+            if mode_value in (1, 5, 6):  # Smart/Boost/Silence Cool
+                return HVACAction.COOLING
+            if mode_value in (0, 3, 4):  # Smart/Boost/Silence Heat
+                return HVACAction.HEATING
+            if mode_value == 2:  # Smart Heat+Cool: direction unknown
+                return HVACAction.IDLE
+            return HVACAction.HEATING if bool(heat_pump_reported) else HVACAction.OFF
+
+        # LG heat pumps: decode the same component-14 direction values.
+        if DeviceIdentifier.has_feature(device_data, "preset_modes"):
+            on = device_data.get("heat_pump_reported")
+            if on is None:
+                on = device_data.get("pump_reported")
+            if on is None:
+                on = device_data.get("is_running")
+            if not on:
+                return HVACAction.OFF
+            components = device_data.get("components", {})
+            reported = components.get("14", {}).get("reportedValue") if isinstance(components, dict) else None
+            if reported in (1, 5, 6):  # cooling presets
+                return HVACAction.COOLING
+            if reported == 2:  # heat_cool: direction unknown
+                return HVACAction.IDLE
+            return HVACAction.HEATING
+
         if device_data.get("is_heating", False):
             return HVACAction.HEATING
         return HVACAction.OFF
@@ -498,18 +522,38 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                 # Keep optimistic state - property will auto-clear after 5 seconds
                 await self.coordinator.async_request_refresh()
             else:
-                # Annuler la température optimiste en cas d'échec
+                # Revert the optimistic value and surface a translated error.
                 self._pending_temperature = None
                 self._last_action_time = None
                 self.async_write_ha_state()
+                await self.coordinator.async_request_refresh()
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="temperature_set_failed",
+                    translation_placeholders={"temperature": str(temperature)},
+                )
 
-        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError) as e:
-            _LOGGER.error("Error setting temperature for %s: %s", self._device_id, e)
-            # Annuler la température optimiste en cas d'erreur
+        except HomeAssistantError:
+            raise
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
+            # Revert the optimistic value and wrap raw errors in a translated one.
             self._pending_temperature = None
             self._last_action_time = None
             self.async_write_ha_state()
-            raise
+            _LOGGER.exception("Error setting temperature for %s", mask_device_id(self._device_id))
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="heat_pump_control_failed",
+                translation_placeholders={"error_type": type(err).__name__},
+            ) from err
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode for heat pumps with this feature."""

@@ -6,9 +6,11 @@ from datetime import time
 import logging
 
 import aiohttp
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import EntityCategory
 
 from ..api_resilience import FluidraError
+from ..const import DOMAIN
 from .base import FluidraLightScheduleTimeEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -78,9 +80,16 @@ class FluidraLightScheduleStartTimeEntity(FluidraLightScheduleTimeEntity):
                 updated_schedules.append(scheduler)
 
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=40)
-            if success:
-                await self.coordinator.async_request_refresh()
+            if not success:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="light_schedule_set_failed",
+                    translation_placeholders={"schedule_id": str(self._schedule_id)},
+                )
+            await self.coordinator.async_request_refresh()
 
+        except HomeAssistantError:
+            raise
         except (
             aiohttp.ClientError,
             TimeoutError,
@@ -90,7 +99,12 @@ class FluidraLightScheduleStartTimeEntity(FluidraLightScheduleTimeEntity):
             KeyError,
             AttributeError,
         ) as err:
-            _LOGGER.debug("Failed to set light schedule start time for %s: %s", self._device_id, err)
+            _LOGGER.error("Failed to set light schedule start time for %s: %s", self._device_id, err)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="light_schedule_set_failed",
+                translation_placeholders={"schedule_id": str(self._schedule_id)},
+            ) from err
 
 
 class FluidraLightScheduleEndTimeEntity(FluidraLightScheduleTimeEntity):
@@ -157,9 +171,16 @@ class FluidraLightScheduleEndTimeEntity(FluidraLightScheduleTimeEntity):
                 updated_schedules.append(scheduler)
 
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=40)
-            if success:
-                await self.coordinator.async_request_refresh()
+            if not success:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="light_schedule_set_failed",
+                    translation_placeholders={"schedule_id": str(self._schedule_id)},
+                )
+            await self.coordinator.async_request_refresh()
 
+        except HomeAssistantError:
+            raise
         except (
             aiohttp.ClientError,
             TimeoutError,
@@ -169,4 +190,9 @@ class FluidraLightScheduleEndTimeEntity(FluidraLightScheduleTimeEntity):
             KeyError,
             AttributeError,
         ) as err:
-            _LOGGER.debug("Failed to set light schedule end time for %s: %s", self._device_id, err)
+            _LOGGER.error("Failed to set light schedule end time for %s: %s", self._device_id, err)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="light_schedule_set_failed",
+                translation_placeholders={"schedule_id": str(self._schedule_id)},
+            ) from err

@@ -293,6 +293,12 @@
     "invalid_time_format": {
       "message": "Invalid time {value}, expected HH:MM"
     },
+    "light_schedule_set_failed": {
+      "message": "Failed to set the light schedule {schedule_id} time"
+    },
+    "light_set_failed": {
+      "message": "Failed to set the LumiPlus light state"
+    },
     "mfa_required": {
       "message": "Multi-factor authentication is required to sign in to Fluidra Pool"
     },
@@ -314,6 +320,9 @@
     "schedule_clear_rejected": {
       "message": "Fluidra API rejected the schedule clear for {device_id}"
     },
+    "schedule_overlap": {
+      "message": "This schedule overlaps another active schedule"
+    },
     "schedule_set_failed": {
       "message": "Fluidra API call failed while setting the schedule for {device_id}"
     },
@@ -322,6 +331,9 @@
     },
     "temperature_out_of_range": {
       "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"
+    },
+    "temperature_set_failed": {
+      "message": "Failed to set the target temperature to {temperature}°C"
     },
     "unknown_preset": {
       "message": "Unknown preset {preset}"

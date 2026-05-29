@@ -148,12 +148,16 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
                 current = weather_value.get("current", {})
                 if current:
                     attrs["weather_available"] = True
-                    if "main" in current:
-                        attrs["air_temperature"] = round(current["main"]["temp"] - 273.15, 1)
-                        attrs["humidity"] = current["main"]["humidity"]
-                        attrs["pressure"] = current["main"]["pressure"]
-                    if "wind" in current:
-                        attrs["wind_speed"] = current["wind"]["speed"]
+                    main = current.get("main")
+                    if isinstance(main, dict):
+                        temp_kelvin = main.get("temp")
+                        if temp_kelvin is not None:
+                            attrs["air_temperature"] = round(temp_kelvin - 273.15, 1)
+                        attrs["humidity"] = main.get("humidity")
+                        attrs["pressure"] = main.get("pressure")
+                    wind = current.get("wind")
+                    if isinstance(wind, dict):
+                        attrs["wind_speed"] = wind.get("speed")
 
         return attrs
 

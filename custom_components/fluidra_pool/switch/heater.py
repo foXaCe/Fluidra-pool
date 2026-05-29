@@ -18,27 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     """Switch for controlling pool heat pumps (Astralpool Eco Elyo, etc.)."""
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str):
-        """Initialize the switch."""
-        super().__init__(coordinator, api, pool_id, device_id)
-        self._is_eco_elyo = False
-
-    @property
-    def name(self) -> str:
-        """Return the name of the switch."""
-        pool_name = self.pool_data.get("name", "Pool")
-        device_name = self.device_data.get("name", "Heat Pump")
-
-        device_config = DeviceIdentifier.identify_device(self.device_data)
-        if device_config and "lg" in device_config.identifier_patterns[0].lower():
-            return f"{pool_name} Eco Elyo"
-
-        return f"{pool_name} {device_name}"
-
-    @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "heat_pump"
+    _attr_translation_key = "heat_pump"
 
     @property
     def icon(self) -> str:

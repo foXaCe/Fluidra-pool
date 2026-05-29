@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.fluidra_pool.time.schedule import (
@@ -312,7 +313,8 @@ async def test_start_time_set_value_clears_optimistic_when_api_fails() -> None:
     entity = FluidraScheduleStartTimeEntity(_coord(device), api, POOL_ID, PUMP_ID, schedule_id="1")
     _attach_ha(entity)
 
-    await entity.async_set_value(time(7, 0))
+    with pytest.raises(HomeAssistantError):
+        await entity.async_set_value(time(7, 0))
 
     assert entity._optimistic_value is None
 
@@ -392,7 +394,8 @@ async def test_start_time_set_value_rejects_overlap_with_other_enabled_schedule(
     _attach_ha(entity)
 
     # Moving slot 2 to start at 7:00 — collides with slot 1's 6:00-10:00.
-    await entity.async_set_value(time(7, 0))
+    with pytest.raises(ServiceValidationError):
+        await entity.async_set_value(time(7, 0))
 
     # Validation raises → optimistic cleared, API not called.
     assert entity._optimistic_value is None

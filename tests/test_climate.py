@@ -11,7 +11,7 @@ from homeassistant.components.climate import (
     ClimateEntityFeature,
     HVACMode,
 )
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.fluidra_pool.climate import FluidraHeatPumpClimate
@@ -305,5 +305,6 @@ async def test_async_set_temperature_clears_optimistic_on_api_failure() -> None:
     climate = FluidraHeatPumpClimate(_coord(device), api, POOL_ID, DEVICE_ID)
     _attach_ha(climate)
 
-    await climate.async_set_temperature(**{ATTR_TEMPERATURE: 30.0})
+    with pytest.raises(HomeAssistantError):
+        await climate.async_set_temperature(**{ATTR_TEMPERATURE: 30.0})
     assert climate._pending_temperature is None

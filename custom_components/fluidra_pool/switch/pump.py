@@ -9,7 +9,7 @@ from typing import Any
 import aiohttp
 
 from ..api_resilience import FluidraError
-from ..const import DOMAIN, SWITCH_CONFIRMATION_DELAY
+from ..const import DOMAIN, OPTIMISTIC_ACTION_TIMEOUT, SWITCH_CONFIRMATION_DELAY
 from .base import FluidraPoolSwitchEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,21 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 class FluidraPumpSwitch(FluidraPoolSwitchEntity):
     """Switch for controlling pool pumps (ON/OFF)."""
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str):
-        """Initialize the switch."""
-        super().__init__(coordinator, api, pool_id, device_id)
-
-    @property
-    def name(self) -> str:
-        """Return the name of the switch."""
-        pool_name = self.pool_data.get("name", "Pool")
-        device_name = self.device_data.get("name", "Pump")
-        return f"{pool_name} {device_name}"
-
-    @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "pump"
+    _attr_translation_key = "pump"
 
     @property
     def icon(self) -> str:
@@ -44,16 +30,16 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if the pump is on using optimistic UI or real-time reported value."""
-        if self._pending_state is not None:
-            if self._pending_state_expired(10):
-                self._clear_pending_state()
-            else:
-                return self._pending_state
-
         pump_reported = self.device_data.get("pump_reported")
-        if pump_reported is not None:
-            return bool(pump_reported)
-        return self.device_data.get("is_running", False)
+        actual = bool(pump_reported) if pump_reported is not None else self.device_data.get("is_running", False)
+        if self._pending_state is not None:
+            # Drop the optimistic state as soon as the poll confirms it (or it times
+            # out) so we never flip back to a stale value mid-confirmation.
+            if actual == self._pending_state or self._pending_state_expired(OPTIMISTIC_ACTION_TIMEOUT):
+                self._clear_pending_state()
+                return actual
+            return self._pending_state
+        return actual
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the pump on using discovered API with optimistic UI."""
@@ -62,9 +48,9 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
 
             success = await self._api.start_pump(self._device_id)
             if success:
+                # Keep the optimistic state; is_on clears it once the poll confirms.
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
-                self._clear_pending_state()
             else:
                 self._clear_pending_state()
         except (
@@ -88,7 +74,6 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             if success:
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
-                self._clear_pending_state()
             else:
                 self._clear_pending_state()
         except (
@@ -123,21 +108,7 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
 class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     """Switch for controlling pump auto mode (ON/OFF)."""
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str):
-        """Initialize the switch."""
-        super().__init__(coordinator, api, pool_id, device_id)
-
-    @property
-    def name(self) -> str:
-        """Return the name of the switch."""
-        pool_name = self.pool_data.get("name", "Pool")
-        device_name = self.device_data.get("name", "Pump")
-        return f"{pool_name} {device_name} Auto Mode"
-
-    @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "auto_mode"
+    _attr_translation_key = "auto_mode"
 
     @property
     def unique_id(self) -> str:
@@ -154,16 +125,14 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if auto mode is on using optimistic UI or real-time reported value."""
-        if self._pending_state is not None:
-            if self._pending_state_expired(10):
-                self._clear_pending_state()
-            else:
-                return self._pending_state
-
         auto_reported = self.device_data.get("auto_reported")
-        if auto_reported is not None:
-            return bool(auto_reported)
-        return self.device_data.get("auto_mode_enabled", False)
+        actual = bool(auto_reported) if auto_reported is not None else self.device_data.get("auto_mode_enabled", False)
+        if self._pending_state is not None:
+            if actual == self._pending_state or self._pending_state_expired(OPTIMISTIC_ACTION_TIMEOUT):
+                self._clear_pending_state()
+                return actual
+            return self._pending_state
+        return actual
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn auto mode on using discovered Component 10 with optimistic UI."""
@@ -174,7 +143,6 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             if success:
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
-                self._clear_pending_state()
             else:
                 self._clear_pending_state()
         except (
@@ -198,7 +166,6 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             if success:
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
-                self._clear_pending_state()
             else:
                 self._clear_pending_state()
         except (

@@ -189,8 +189,9 @@ class TestIdentifyDevice:
             "type": "pump",
         }
         config = DeviceIdentifier.identify_device(device)
-        assert config is not None
-        assert config.device_type == "pump"
+        # An unknown pump (type-only match) must fall through to the generic
+        # config, not a device-specific one (e.g. e30iq_pump) — see Issue #1.
+        assert config is DEVICE_CONFIGS["generic_pump"]
 
     def test_fallback_to_generic_heat_pump(self):
         device = {
@@ -201,8 +202,8 @@ class TestIdentifyDevice:
             "type": "heat_pump",
         }
         config = DeviceIdentifier.identify_device(device)
-        assert config is not None
-        assert config.device_type == "heat_pump"
+        # Must not resolve to lg_heat_pump (priority 100) on a bare type match.
+        assert config is DEVICE_CONFIGS["generic_heat_pump"]
 
     def test_fallback_to_generic_light(self):
         device = {

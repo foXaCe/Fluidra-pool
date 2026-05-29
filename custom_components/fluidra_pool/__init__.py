@@ -105,6 +105,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
 
     def _persist_refresh_token(new_token: str) -> None:
         """Persist the latest refresh token back into the config entry."""
+        if entry.data.get("refresh_token") == new_token:
+            return  # No-op write would needlessly touch the entry.
         hass.config_entries.async_update_entry(entry, data={**entry.data, "refresh_token": new_token})
 
     api = FluidraPoolAPI(
@@ -153,7 +155,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     coordinator = FluidraDataUpdateCoordinator(hass, api, entry)
 
     # 🏆 Utiliser runtime_data au lieu de hass.data (2024+)
-    entry.runtime_data = FluidraPoolRuntimeData(coordinator=coordinator)
+    entry.runtime_data = FluidraPoolRuntimeData(
+        coordinator=coordinator,
+        options_snapshot=dict(entry.options),
+    )
 
     # First refresh before platform setup so device_info has correct data
     await coordinator.async_config_entry_first_refresh()
@@ -197,10 +202,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: FluidraPoolConfigEntry) -> None:
-    """Handle options update - reload the integration.
+    """Handle entry updates — reload only when the *options* actually changed.
 
     🥇 Gold: Recharger l'intégration pour appliquer les nouvelles options.
+
+    HA fires update listeners on any entry change, including the token-persist
+    data write. Reloading on those would tear down the coordinator mid-operation
+    (and could recurse: reload → re-auth → persist → reload), so reload only when
+    the options differ from the snapshot captured at setup.
     """
+    runtime = getattr(entry, "runtime_data", None)
+    if runtime is not None and dict(entry.options) == runtime.options_snapshot:
+        return  # Data-only change (e.g. refresh_token persist) — do not reload.
     await hass.config_entries.async_reload(entry.entry_id)
 
 
@@ -358,7 +371,9 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         ]
 
         try:
-            success = await coordinator.api.set_schedule(device_id, fluidra_schedules)
+            success = await coordinator.api.set_schedule(
+                device_id, fluidra_schedules, component_id=_get_schedule_component(coordinator, device_id)
+            )
         except FluidraError as err:
             _LOGGER.exception("Service %s failed for device %s", SERVICE_SET_SCHEDULE, device_id)
             raise HomeAssistantError(
@@ -482,7 +497,9 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         ]
 
         try:
-            success = await coordinator.api.set_schedule(device_id, fluidra_schedules)
+            success = await coordinator.api.set_schedule(
+                device_id, fluidra_schedules, component_id=_get_schedule_component(coordinator, device_id)
+            )
         except FluidraError as err:
             _LOGGER.exception("Service %s failed for device %s", SERVICE_SET_PRESET_SCHEDULE, device_id)
             raise HomeAssistantError(

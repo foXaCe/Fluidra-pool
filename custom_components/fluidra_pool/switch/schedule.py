@@ -72,8 +72,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
 
     @property
     def available(self) -> bool:
-        """Return True if the schedule exists."""
-        return self._get_schedule_data() is not None
+        """Return True if the device/coordinator are healthy and the schedule exists."""
+        return super().available and self._get_schedule_data() is not None
 
     @property
     def is_on(self) -> bool:

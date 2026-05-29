@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import aiohttp
 
@@ -18,16 +18,14 @@ from ..api_resilience import (
     FluidraConnectionError,
 )
 from ..const import DEFAULT_TIMEOUT
+from ._base import FluidraAPIBase
 from ._constants import MAX_REFRESH_ATTEMPTS, RETRYABLE_STATUSES
 from ._helpers import parse_json, parse_retry_after
-
-if TYPE_CHECKING:
-    pass
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class SessionMixin:
+class SessionMixin(FluidraAPIBase):
     """Manages the aiohttp session and centralised HTTP request loop."""
 
     async def _get_session(self) -> aiohttp.ClientSession:
@@ -89,9 +87,13 @@ class SessionMixin:
         last_error: Exception | None = None
         backoff = INITIAL_BACKOFF
         refresh_attempts = 0
+        # Track transient (network / retryable-status) retries separately from auth
+        # refreshes so a token refresh on the final transient attempt still gets an
+        # iteration to re-send instead of falling through to a spurious failure.
+        transient_attempts = 0
         request_timeout = aiohttp.ClientTimeout(total=DEFAULT_TIMEOUT)
 
-        for attempt in range(MAX_RETRIES + 1):
+        for _attempt in range(MAX_RETRIES + 1 + MAX_REFRESH_ATTEMPTS):
             try:
                 async with session.request(
                     method.upper(),
@@ -113,7 +115,7 @@ class SessionMixin:
                         continue
                     return status, parse_json(raw_text), raw_text
 
-                if status in RETRYABLE_STATUSES and attempt < MAX_RETRIES:
+                if status in RETRYABLE_STATUSES and transient_attempts < MAX_RETRIES:
                     # Don't record_failure per-retry: a request that eventually
                     # succeeds shouldn't push the circuit breaker toward open
                     # state (Issue #64). Only the *final* failure counts.
@@ -122,11 +124,12 @@ class SessionMixin:
                     _LOGGER.debug(
                         "HTTP %d on attempt %d/%d, sleeping %.1fs",
                         status,
-                        attempt + 1,
+                        transient_attempts + 1,
                         MAX_RETRIES + 1,
                         sleep_for,
                     )
                     last_error = FluidraConnectionError(f"HTTP {status}")
+                    transient_attempts += 1
                     await asyncio.sleep(sleep_for)
                     backoff = min(backoff * BACKOFF_MULTIPLIER, MAX_BACKOFF)
                     continue
@@ -138,14 +141,15 @@ class SessionMixin:
 
             except (aiohttp.ClientError, TimeoutError) as err:
                 last_error = err
-                if attempt < MAX_RETRIES:
+                if transient_attempts < MAX_RETRIES:
                     _LOGGER.debug(
                         "Request failed (attempt %d/%d): %s, retrying in %.1fs",
-                        attempt + 1,
+                        transient_attempts + 1,
                         MAX_RETRIES + 1,
                         err,
                         backoff,
                     )
+                    transient_attempts += 1
                     await asyncio.sleep(backoff)
                     backoff = min(backoff * BACKOFF_MULTIPLIER, MAX_BACKOFF)
                 else:
@@ -154,6 +158,7 @@ class SessionMixin:
                         MAX_RETRIES + 1,
                         err,
                     )
+                    break
 
         # All retries exhausted — record exactly one failure for the circuit breaker.
         if not skip_circuit_breaker:

@@ -471,3 +471,12 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             component_states = await self._fetch_components_parallel(device_id, components_to_scan)
             for component_id, component_state in component_states.items():
                 self._process_component_state(device, pool_id, component_id, component_state)
+
+            # Recompute auto-mode pump speed AFTER the whole component scan: the
+            # speed (component 11) is processed before the schedule (component 20)
+            # in scan order, so the inline calculation at component 11 would read a
+            # stale/empty schedule_data. Redo it once schedule_data is populated.
+            if device.get("auto_mode_enabled", False):
+                device["speed_percent"] = (
+                    calculate_auto_speed_from_schedules(device) if device.get("is_running", False) else 0
+                )

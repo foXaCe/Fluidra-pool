@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import aiohttp
 
 from ..api_resilience import FluidraError
-from ..const import DOMAIN, SWITCH_CONFIRMATION_DELAY
+from ..const import DOMAIN, OPTIMISTIC_ACTION_TIMEOUT, SWITCH_CONFIRMATION_DELAY
 from ..device_registry import DeviceIdentifier
 from .base import FluidraPoolSwitchEntity
 
@@ -170,26 +170,12 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
 class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
     """Switch for controlling chlorinator ON/OFF (e.g., Zodiac EXO iQ)."""
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str):
-        """Initialize the switch."""
-        super().__init__(coordinator, api, pool_id, device_id)
+    _attr_translation_key = "chlorinator"
 
     @property
     def unique_id(self) -> str:
         """Return unique ID."""
         return f"{DOMAIN}_{self._pool_id}_{self._device_id}_chlorinator"
-
-    @property
-    def name(self) -> str:
-        """Return the name of the switch."""
-        pool_name = self.pool_data.get("name", "Pool")
-        device_name = self.device_data.get("name", "Chlorinator")
-        return f"{pool_name} {device_name}"
-
-    @property
-    def translation_key(self) -> str:
-        """Return the translation key."""
-        return "chlorinator"
 
     @property
     def icon(self) -> str:
@@ -198,15 +184,8 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
             return "mdi:flask"
         return "mdi:flask-outline"
 
-    @property
-    def is_on(self) -> bool:
-        """Return true if the chlorinator is on."""
-        if self._pending_state is not None:
-            if self._pending_state_expired(10):
-                self._clear_pending_state()
-            else:
-                return self._pending_state
-
+    def _actual_state(self) -> bool:
+        """Return the polled on/off state (component → pump_reported → is_running)."""
         on_off_component = DeviceIdentifier.get_feature(self.device_data, "on_off_component", 9)
         components = self.device_data.get("components", {})
         comp_data = components.get(str(on_off_component), {})
@@ -217,6 +196,17 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
         if pump_reported is not None:
             return bool(pump_reported)
         return self.device_data.get("is_running", False)
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if the chlorinator is on."""
+        actual = self._actual_state()
+        if self._pending_state is not None:
+            if actual == self._pending_state or self._pending_state_expired(OPTIMISTIC_ACTION_TIMEOUT):
+                self._clear_pending_state()
+                return actual
+            return self._pending_state
+        return actual
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the chlorinator on."""
@@ -229,7 +219,6 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
             if success:
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
-                self._clear_pending_state()
             else:
                 self._clear_pending_state()
         except (
@@ -255,7 +244,6 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
             if success:
                 await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
-                self._clear_pending_state()
             else:
                 self._clear_pending_state()
         except (

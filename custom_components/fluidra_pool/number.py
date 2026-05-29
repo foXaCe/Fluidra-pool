@@ -41,8 +41,9 @@ async def async_setup_entry(
             config = DeviceIdentifier.identify_device(device)
             device_type = config.device_type if config else device.get("type", "")
 
-            # Chlorinator chlorination level
-            if device_type == "chlorinator":
+            # Chlorinator chlorination level — skip read-only probes (e.g. Blue
+            # Connect) that declare no "number" entity and do not dose.
+            if device_type == "chlorinator" and DeviceIdentifier.should_create_entity(device, "number"):
                 entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool["id"], device_id))
                 # Only add pH/ORP setpoints if the device has these features
                 if DeviceIdentifier.get_feature(device, "ph_setpoint"):
@@ -79,9 +80,22 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
         self._attr_mode = NumberMode.SLIDER
         self._attr_native_min_value = 0
         self._attr_native_max_value = DeviceIdentifier.get_feature(self.device_data, "chlorination_max", 100)
-        self._attr_native_step = DeviceIdentifier.get_feature(self.device_data, "chlorination_step", 1)
+        # The advertised UI step must equal the rounding step applied on write,
+        # otherwise the user can pick a value the device silently quantizes
+        # (devices only accept multiples of the configured step, default 10).
+        self._chlorination_step = DeviceIdentifier.get_feature(self.device_data, "chlorination_step", 10)
+        self._attr_native_step = self._chlorination_step
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_device_class = NumberDeviceClass.POWER_FACTOR
+
+    def _level_components(self) -> tuple[Any, Any]:
+        """Resolve (read, write) components, supporting int or dict feature shapes."""
+        cfg = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", 10)
+        if isinstance(cfg, dict):
+            write_component = cfg.get("write", cfg.get("read", 10))
+            read_component = cfg.get("read", write_component)
+            return read_component, write_component
+        return cfg, cfg
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -91,25 +105,25 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
     @property
     def native_value(self) -> float | None:
         """Return the current chlorination level."""
-        # Get chlorination level component from device config (default to 10 for CC* devices)
-        chlorination_component = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", 10)
+        # Read component from device config (int or {"read","write"} dict; default 10).
+        read_component, _ = self._level_components()
 
         components = self.device_data.get("components", {})
-        component_data = components.get(str(chlorination_component), {})
+        component_data = components.get(str(read_component), {})
         value = component_data.get("desiredValue", component_data.get("reportedValue", 0))
 
         return float(value)
 
     async def async_set_native_value(self, value: float) -> None:
         """Set chlorination level."""
-        # Get chlorination level component from device config (default to 10 for CC* devices)
-        chlorination_component = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", 10)
+        # Write component from device config (int or {"read","write"} dict; default 10).
+        _, write_component = self._level_components()
 
-        # Round to nearest step value
-        step = DeviceIdentifier.get_feature(self.device_data, "chlorination_step", 10)
+        # Round to nearest step value (UI step matches this rounding).
+        step = self._chlorination_step
         int_value = round(value / step) * step
 
-        success = await self._api.control_device_component(self._device_id, chlorination_component, int_value)
+        success = await self._api.control_device_component(self._device_id, write_component, int_value)
         if success:
             await self.coordinator.async_request_refresh()
         else:
@@ -123,9 +137,10 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return state attributes."""
-        chlorination_component = DeviceIdentifier.get_feature(self.device_data, "chlorination_level", 10)
+        read_component, write_component = self._level_components()
         return {
-            "component": chlorination_component,
+            "read_component": read_component,
+            "write_component": write_component,
             "device_id": self._device_id,
         }
 

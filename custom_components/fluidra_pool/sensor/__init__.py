@@ -79,11 +79,7 @@ async def async_setup_entry(
                 entities.append(FluidraPumpSpeedSensor(coordinator, coordinator.api, pool["id"], device_id))
 
             if DeviceIdentifier.should_create_entity(device, "sensor_temperature"):
-                # Temperature sensors for heaters
-                if "current_temperature" in device:
-                    entities.append(
-                        FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "current")
-                    )
+                # Temperature sensors for heaters / heat pumps.
                 if "target_temperature" in device:
                     entities.append(
                         FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "target")
@@ -105,7 +101,7 @@ async def async_setup_entry(
                         FluidraTemperatureSensor(coordinator, coordinator.api, pool["id"], device_id, "air")
                     )
 
-            if DeviceIdentifier.should_create_entity(device, "sensor_brightness") and "brightness" in device:
+            if DeviceIdentifier.should_create_entity(device, "sensor_brightness"):
                 entities.append(FluidraLightBrightnessSensor(coordinator, coordinator.api, pool["id"], device_id))
 
             if DeviceIdentifier.should_create_entity(device, "sensor_running_hours"):
