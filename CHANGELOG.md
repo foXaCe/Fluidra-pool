@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.38.0] - 2026-05-29
+
+### Added
+- **Zodiac Blue Connect Silver water temperature** (Issue #69, confirmed against the Fluidra Pool app by @LykkeConsult)
+  - Component 12 is now mapped as the water-temperature sensor (direct °C) on the `WA*` / thingType `BC3` probe, completing the pH (13) / ORP (14) mapping. The component scan targets 12/13/14.
+
+### Changed
+- **API client typing** — the `fluidra_api` mixins now share a typed `FluidraAPIBase` declared under `TYPE_CHECKING`, clearing all 82 mypy errors at zero runtime cost (no MRO or `__slots__` impact).
+- **Entity naming aligned with Home Assistant conventions** — pump, auto-mode, chlorinator and heat-pump switches plus the climate entity now rely on `_attr_translation_key` instead of a custom `name` property. This fixes the duplicated device name in friendly names (e.g. "Heat Pump My Pool Heat Pump"); names now read as "{device} Heat Pump", "{device} Pump", etc. The bespoke "Eco Elyo" label is dropped in favour of the translated function name.
+
+### Fixed
+- **Full code-review pass — correctness issues across the integration:**
+  - **Device identification** — a pump/heat-pump matched only by its declared type no longer resolves to a wrong device-specific config (e.g. `e30iq_pump`, `lg_heat_pump`); it correctly falls through to the generic config (off-by-one fallback threshold).
+  - **Schedule services** — `set_schedule` / `set_preset_schedule` now target the device's real schedule component. DM24049704 chlorinator schedules were written to component 20 instead of 258 and skipped the required CRON→programs/slots conversion, so they silently failed to apply.
+  - **Chlorination level** — dict-form `chlorination_level` configs (generic bridged chlorinators) no longer crash on write (`TypeError`) and read from the correct component instead of always showing 0; the UI step now matches the value actually written. Read-only probes (Blue Connect) no longer get a phantom chlorination-level slider that returns HTTP 403.
+  - **Heat-pump switch** — no longer raises `IndexError` for generic heat-pump configs with empty identifier patterns.
+  - **Climate `hvac_action`** — Z260iQ and LG heat pumps in a cooling mode now report `COOLING` instead of always `HEATING`.
+  - **Reauth** — verifies the re-entered account matches the existing entry, preventing a silent rebind to a different Fluidra account.
+  - **Bridged pumps** — variable-speed pumps behind a bridge now expose their speed-select entity; `poll_device_status` accepts the `{"devices": [...]}` response envelope so per-device connectivity stays fresh.
+  - **Token refresh** — a 401 on the final HTTP retry now re-sends the refreshed request instead of failing with a misleading "after N attempts" error and wrongly tripping the circuit breaker.
+  - **Silent command failures** — failed light on/off, climate setpoint, and schedule-time writes now surface a localized error instead of silently reverting.
+  - **Optimistic state** — pump/auto/chlorinator switches and the light keep their optimistic value until the next poll confirms it (no more visible flip-back); light brightness/RGBW are no longer dropped before confirmation.
+  - **Auto-mode pump speed** — recomputed after the full component scan so it no longer reads stale/empty schedule data.
+  - **Schedule editing** — an in-progress inverted (start > end) edit no longer spuriously rejects as a ~24 h overnight overlap.
+  - **Config reload** — persisting a refreshed token no longer triggers a full integration self-reload (only genuine options changes reload now).
+  - **Diagnostics** — the OpenWeather `lon` coordinate is now redacted; the pool status sensor tolerates partial weather payloads without raising `KeyError`.
+  - **Availability** — schedule selects, switches and time entities go unavailable when the coordinator update fails or the device is offline, instead of serving stale values.
+  - Removed dead brightness / current-temperature sensor branches that never produced an entity.
+- **Hassfest placeholder formatting** — exception-message placeholders are no longer wrapped in single quotes.
+
 ## [2.37.0] - 2026-05-28
 
 ### Added
