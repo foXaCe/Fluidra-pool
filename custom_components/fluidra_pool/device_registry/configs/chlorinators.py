@@ -671,23 +671,24 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     ),
     "cc24000304_chlorinator": DeviceConfig(
         device_type="chlorinator",
-        # Basic Energy Connect tecnoLC2 without pH/ORP probes — Issue #52 (@Srekcah007).
-        # Matches both the bridge and the bridged child.
+        # Energy Connect tecnoLC2 without pH/ORP probes — Issue #52, corrected in #72
+        # by @Srekcah007 after testing: uses the standard tecnoLC2 layout, not the
+        # 164/185 variant first assumed. Matches both the bridge and the bridged child.
         identifier_patterns=["CC24000304*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
         features={
-            "chlorination_level": 164,
-            "boost_mode": 245,
+            "chlorination_level": 10,
+            "boost_mode": 103,
             "skip_mode_select": True,
-            "skip_ph_orp": True,
             "sensors": {
                 "temperature": 172,
-                "salinity": 185,
+                "salinity": 174,
             },
-            "specific_components": [164, 172, 185, 245],
+            # Keep 165/170 in scan in case the user adds pH/ORP probes later.
+            "specific_components": [10, 16, 20, 165, 170, 172, 174],
         },
         priority=88,
     ),
