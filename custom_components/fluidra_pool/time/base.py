@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def parse_schedule_time(time_value) -> time | None:
+def parse_schedule_time(time_value: time | int | float | str | None) -> time | None:
     """Parse schedule time - handles both numeric (minutes) and CRON format.
 
     Formats supported:
@@ -144,7 +144,7 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         """Handle updated data from the coordinator."""
         self.async_write_ha_state()
 
-    def _parse_cron_time(self, cron_time) -> time | None:
+    def _parse_cron_time(self, cron_time: time | int | float | str | None) -> time | None:
         """Parse cron time format or numeric minutes to time object."""
         return parse_schedule_time(cron_time)
 
@@ -288,7 +288,7 @@ class FluidraLightScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         """Handle updated data from the coordinator."""
         self.async_write_ha_state()
 
-    def _parse_cron_time(self, cron_time) -> time | None:
+    def _parse_cron_time(self, cron_time: time | int | float | str | None) -> time | None:
         """Parse cron time format or numeric minutes to time object."""
         return parse_schedule_time(cron_time)
 

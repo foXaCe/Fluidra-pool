@@ -61,7 +61,8 @@ SCHEDULE_SCHEMA = vol.Schema(
         vol.Required("start_time"): cv.string,
         vol.Required("end_time"): cv.string,
         vol.Required("mode"): vol.In(["0", "1", "2"]),  # 0=Faible, 1=Moyenne, 2=Élevée
-        vol.Optional("days", default=ALL_MOBILE_DAYS): [vol.Range(min=1, max=7)],  # 1=Monday, 7=Sunday
+        # Coerce to int so YAML floats (1.5) are rejected, keeping the 1=Monday..7=Sunday contract.
+        vol.Optional("days", default=ALL_MOBILE_DAYS): [vol.All(vol.Coerce(int), vol.Range(min=1, max=7))],
     }
 )
 
@@ -218,9 +219,19 @@ async def _async_options_updated(hass: HomeAssistant, entry: FluidraPoolConfigEn
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) -> bool:
-    """Unload a config entry."""
-    # runtime_data est nettoyé automatiquement
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    """Unload a config entry.
+
+    runtime_data is cleared automatically by HA. We still close the API client:
+    under HA it uses the shared aiohttp session (``close()`` is a no-op), so this
+    only matters for a privately-owned session (non-HA contexts / tests).
+    """
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        runtime = getattr(entry, "runtime_data", None)
+        coordinator = getattr(runtime, "coordinator", None)
+        if coordinator is not None:
+            await coordinator.api.close()
+    return unload_ok
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

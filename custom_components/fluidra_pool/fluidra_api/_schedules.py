@@ -18,7 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 class SchedulesMixin(FluidraAPIBase):
     """Schedule encoding (CRON ↔ programs/slots) + ``set_schedule`` / ``clear_schedule``."""
 
-    def _convert_schedules_to_dm24049704_format(self, schedules: list[dict[str, Any]]) -> dict:
+    def _convert_schedules_to_dm24049704_format(self, schedules: list[dict[str, Any]]) -> dict[str, Any]:
         """Convert CRON-format schedules to DM24049704 programs/slots format.
 
         Input format (CRON):

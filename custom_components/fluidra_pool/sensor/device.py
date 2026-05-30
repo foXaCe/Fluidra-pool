@@ -53,21 +53,6 @@ class FluidraTemperatureSensor(FluidraPoolSensorEntity):
         return None
 
     @property
-    def native_unit_of_measurement(self) -> str:
-        """Return the unit of measurement."""
-        return UnitOfTemperature.CELSIUS
-
-    @property
-    def device_class(self) -> SensorDeviceClass:
-        """Return the device class."""
-        return SensorDeviceClass.TEMPERATURE
-
-    @property
-    def state_class(self) -> SensorStateClass:
-        """Return the state class."""
-        return SensorStateClass.MEASUREMENT
-
-    @property
     def icon(self) -> str:
         """Return the icon of the sensor."""
         return "mdi:thermometer"
@@ -77,6 +62,8 @@ class FluidraLightBrightnessSensor(FluidraPoolSensorEntity):
     """Brightness sensor for pool lights."""
 
     _attr_translation_key = "brightness"
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
     def native_value(self) -> int | None:
@@ -98,16 +85,6 @@ class FluidraLightBrightnessSensor(FluidraPoolSensorEntity):
             return round(float(reported))
         except (TypeError, ValueError):
             return None
-
-    @property
-    def native_unit_of_measurement(self) -> str:
-        """Return the unit of measurement."""
-        return PERCENTAGE
-
-    @property
-    def state_class(self) -> SensorStateClass:
-        """Return the state class."""
-        return SensorStateClass.MEASUREMENT
 
     @property
     def icon(self) -> str:
