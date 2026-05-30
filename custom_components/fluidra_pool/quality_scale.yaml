@@ -7,9 +7,7 @@ rules:
     comment: Custom integration distributed through HACS.
   common-modules: done
   config-flow: done
-  config-flow-test-coverage:
-    status: todo
-    comment: Expand config-flow tests to include MFA and reauth flows.
+  config-flow-test-coverage: done
   dependency-transparency: done
   docs-actions: done
   docs-high-level-description: done
@@ -33,9 +31,7 @@ rules:
   log-when-unavailable: done
   parallel-updates: done
   reauthentication-flow: done
-  test-coverage:
-    status: todo
-    comment: Platform tests (switch/sensor/climate/light) and reauth/MFA flows are not yet exercised.
+  test-coverage: done
 
   # Gold
   devices: done

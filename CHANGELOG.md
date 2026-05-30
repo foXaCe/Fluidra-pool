@@ -9,12 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Localized error feedback for every device command** — heater / heat-pump / chlorinator / boost switches, pump-speed / chlorinator-mode / light-effect selects, the pH/ORP/chlorination/effect-speed numbers and the light brightness/colour now raise a translated `HomeAssistantError` when the Fluidra API call fails, instead of silently reverting or leaking a raw exception. New exception strings in all four languages (en/fr/es/pt): `pump_speed_set_failed`, `chlorinator_mode_set_failed`, `chlorinator_set_failed`, `boost_set_failed`, `heater_set_failed`, `heat_pump_set_failed`, `number_set_failed`.
-- **Exhaustive test suite** — coverage raised from 66% to 94% (587 → 1131 tests): end-to-end setup/unload/services, reauth/reconfigure/MFA and options flows, climate/sensor/number/light/select/switch/time entities, platform-setup paths and API error paths.
+- **Exhaustive test suite** — coverage raised from 66% to 94% (587 → 1160 tests): end-to-end setup/unload/services, reauth/reconfigure/MFA and options flows, climate/sensor/number/light/select/switch/time entities, platform-setup paths and API error paths.
+- **CI now runs tests and type-checking** — a `Tests` job runs the full suite with a 90% coverage gate and a `Typing (mypy)` job runs a baseline (non-strict) type check, both pinned via a new `requirements_test.txt`. Previously CI only ran ruff + HACS + hassfest, so coverage and typing were unenforced.
 
 ### Changed
 - **Config-flow credentials use modern selectors** — email renders an email keyboard and the password field is now masked (`TextSelector`) across the user, reauth and reconfigure steps.
 - **API client closed on unload** — `async_unload_entry` now closes the API client (a no-op for the shared HA session, tidy for an owned session).
 - **Coordinator typing** — `FluidraDataUpdateCoordinator` is now `DataUpdateCoordinator[dict[str, Any]]` with an explicit `_async_update_data` return type and precise generic annotations on internal helpers.
+- **Quality scale** — `config-flow-test-coverage` and `test-coverage` flipped to `done` now that reauth/MFA/reconfigure flows and every platform are exercised. `dynamic-devices`, `stale-devices` and `strict-typing` remain `todo`.
+- **Heat-pump & heater switches** clear their optimistic state as soon as a coordinator poll confirms it (matching the pump/chlorinator switches) and wait `SWITCH_CONFIRMATION_DELAY` before the post-command refresh, instead of pinning the UI for the full 10-second timeout.
+- **Climate target temperature** optimistic value now clears on a tolerant match (±0.05 °C, absorbing decidegree quantization) or after a 5-second fallback, so a never-confirmed setpoint (panel/app change, device clamping) no longer pins the UI indefinitely.
 
 ### Fixed
 - **Reconfigure with a changed email** now updates the config-entry `unique_id` to the new address (it previously kept the old one).
@@ -23,9 +27,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Light brightness/colour command failures** roll back the optimistic state and raise a localized error instead of leaving an unconfirmed UI state.
 - **Pump/chlorinator schedule time entities** catch CRON/parsing errors (`ValueError`/`TypeError`/`KeyError`/`AttributeError`) and surface a localized error.
 - **Chlorination-level number** dropped the misleading `POWER_FACTOR` device class (it is a dimensionless percentage).
+- **Circuit breaker now opens on sustained HTTP outages** — a persistent 5xx/429 (retries exhausted) records a breaker failure, so the breaker can fast-fail an HTTP-level outage instead of hammering the endpoint; previously only raw network/timeout errors counted.
+- **Auto-mode pump speed across midnight** — an overnight filtration schedule (e.g. 22:00→06:00) is now reported with its real speed instead of 0% for the whole night.
+- **Pump schedule-mode select** raises a localized `HomeAssistantError` on a failed/ rejected write instead of swallowing it silently.
+- **Light effect/scene select** surfaces a localized error on backend rejection, coerces string `reportedValue`s so the active scene resolves (no longer always “static color”), and the effect-speed number logs on a rejected write.
+- **Chlorinator schedule-speed select** clears its optimistic option on early returns, so it no longer sticks on an unconfirmed value indefinitely.
+- **Light `turn_on`** aggregates the brightness/colour sub-command results, so a non-exception backend rejection of a sub-command now rolls back and raises like the power command.
+- **Z550iQ+ HVAC mode change** rolls the power write back off when the subsequent mode write fails, avoiding a half-applied (powered-on, wrong-mode) device state.
+- **ORP setpoint** guards a non-numeric value (returns the default) instead of raising, matching the pH setpoint and chlorinator-sensor paths.
+- **Chlorination level** re-clamps to the configured maximum after rounding to the device step (round-to-step could exceed the advertised max).
+- **Device-registry cleanup** is now fully best-effort — a stray registry `KeyError` from a concurrently-removed device no longer fails the whole coordinator poll.
+- **Heat-pump component-15 reading** preserves a legitimate reported `0` instead of falling back to the desired value.
 
 ### Removed
 - Dead code: the unused `CannotConnect`/`InvalidAuth` config-flow exceptions, the never-called `_cleanup_schedule_sensor_if_empty` coordinator method, the unused discovery `confirm` step from `strings.json` and all four translations, and redundant sensor property overrides.
+- Dead device-config tokens: `binary_sensor_no_flow` on the Z260iQ heat pump (no binary_sensor platform exists; no-flow is surfaced on the climate entity) and `sensor_temperature` on the generic heater (never created — no temperature source).
 
 ## [2.39.0] - 2026-05-30
 

@@ -1,291 +1,285 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Community Forum](https://img.shields.io/badge/Home_Assistant-Community-blue?logo=home-assistant)](https://community.home-assistant.io/t/custom-component-ajax-systems/948939/2)
+[![Quality Scale](https://img.shields.io/badge/Quality_Scale-Silver-silver.svg)](https://developers.home-assistant.io/docs/core/integration-quality-scale/)
+[![GitHub release](https://img.shields.io/github/v/release/foXaCe/Fluidra-pool?sort=semver)](https://github.com/foXaCe/Fluidra-pool/releases)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/paypalme/foXaCe66)
 
 # Fluidra Pool Integration for Home Assistant 🏊‍♂️
 
-A Home Assistant integration for Fluidra pool equipment control.
+A Home Assistant integration for **Fluidra Connect** pool equipment — variable-speed pumps,
+heat pumps, salt chlorinators / electrolysers, water analysers and connected lighting.
+It talks to the Fluidra cloud (AWS Cognito auth) and exposes each device as native
+Home Assistant entities.
+
+> The integration was built by reverse-engineering the Fluidra Connect API. Most device
+> mappings were confirmed by the community against the official Fluidra Pool app — if your
+> model isn't recognised yet, [open an issue](#-adding-new-equipment) and help us add it.
 
 ---
 
 ## 💰 Support the Project
 
-If this integration is useful to you, you can support its development with a Bitcoin donation:
+If this integration is useful to you, you can support its development:
 
-**🪙 Bitcoin Address:** `bc1qhe4ge22x0anuyeg0fmts6rdmz3t735dnqwt3p7`
+- **PayPal:** [paypal.me/foXaCe66](https://www.paypal.com/paypalme/foXaCe66)
+- **🪙 Bitcoin:** `bc1qhe4ge22x0anuyeg0fmts6rdmz3t735dnqwt3p7`
 
-Your contributions help me continue improving this project and adding new features. Thank you! 🙏
+Your contributions help me keep improving this project and adding new equipment. Thank you! 🙏
 
 ---
 
-**🔬 Testing Status:**
-- ✅ **E30iQ Pump**: Fully tested and functional
-- ✅ **LumiPlus Connect**: RGBW lighting control tested
-- ⚠️ **Other equipment** (heaters, etc.): Code implemented but **requires user testing**
-
 ## ✨ Features
 
-### 🔄 **E30iQ Pump Control** ✅ **TESTED**
-- **Multiple speeds**: Low (45%), Medium (65%), High (100%)
-- **Automatic mode**: Smart management based on schedules
-- **Manual control**: Custom speed and on/off control
-- **Advanced scheduling**: Up to 8 time slots per day
+- **Cloud login with MFA** — email/password sign-in, multi-factor (OTP) challenge support,
+  automatic token refresh, plus **re-authentication** and **reconfigure** flows when your
+  credentials change or expire.
+- **Automatic device discovery** — pools and their equipment are discovered from your
+  account; each device is created with proper Home Assistant *device* grouping.
+- **Robust cloud client** — bounded timeouts, exponential-backoff retries on 429/5xx,
+  a circuit breaker for sustained outages, and a rate limiter.
+- **Localized UI** — English, French, Spanish and Portuguese translations; failed commands
+  surface a clear, translated error instead of silently doing nothing.
+- **Diagnostics** — downloadable diagnostics (with credentials redacted) for bug reports.
 
-### 📊 **Complete Sensors**
-- **Pump information** ✅: Speed, mode, operating status
-- **Schedules** ✅: Display of active and planned time slots
-- **Device information** ✅: Firmware, network signal, diagnostics
-- **Temperature** ⚠️: Sensors for heaters (current/target) - **NOT TESTED**
-- **Lighting** ⚠️: Brightness of LED equipment - **NOT TESTED**
+### 🧩 Entity platforms
 
-### ⚙️ **Home Assistant Entities**
-- `switch`: Pump on/off and automatic mode
-- `select`: Speed and operating mode selection
-- `number`: Custom speed (0-100%)
-- `time`: Schedule time configuration
-- `sensor`: Complete equipment monitoring
-- `light`: RGBW lighting control (LumiPlus Connect)
+| Platform | What it controls |
+|----------|------------------|
+| `switch` | Pump on/off, auto mode, heater, heat pump, chlorinator, boost, schedule slots |
+| `select` | Pump speed / mode, chlorinator mode, light effect/scene, per-slot schedule speed |
+| `number` | Custom pump speed (0–100%), chlorination level, pH & ORP setpoints, light effect speed |
+| `climate` | Heat-pump control (HVAC mode/action, target temperature, preset modes) |
+| `light`  | LumiPlus Connect RGBW (on/off, brightness, colour) |
+| `time`   | Schedule start/end time editing |
+| `sensor` | pH, ORP, free chlorine, salinity, temperatures, pump speed/mode, firmware, signal, status |
 
 ---
 
 ## 🔌 Supported Hardware
 
-### ✅ **Tested and Functional Equipment**
+Device recognition is data-driven and community-confirmed. Many models below were added and
+verified through GitHub issues. Anything not matched falls back to a sensible **generic**
+profile, so unknown equipment is usually still usable.
 
-#### **Variable Speed Pumps**
-- **E30iQ** - Variable speed pump
-  - 3-speed control (Low 45%, Medium 65%, High 100%)
-  - Automatic mode with schedules
-  - Custom speed control (0-100%)
-  - Management of 8 time slots/day
+### 💧 Variable-Speed Pumps
+- **E30iQ** (also matches `LE*` / `PUMP*` serials)
+  - 3 speeds: Low (45%), Medium (65%), High (100%)
+  - Automatic / scheduled mode
+  - Custom speed control (0–100%)
+  - Up to 8 daily schedule slots (per-slot speed + start/end time)
+- Generic variable-speed pump fallback
 
-#### **Salt Chlorinators / Electrolyzers**
-- **Fluidra Chlorinators** (via connected bridge)
-  - **Specific tested models**:
-    - CC24021110 ✅
-    - CC25113623 ✅
-    - LC24008313 (Blauswim - I.D. Electroquimica/Fluidra) ✅
-    - CC24033907 ✅
-  - **Features**:
-    - Chlorination level control (0-100%)
-    - **pH Control**: Adjustable setpoint (6.8-7.6)
-    - **ORP/Redox Control**: Adjustable setpoint (650-750 mV)
-    - Boost mode (on/off)
-    - Sensors: pH, ORP, free chlorine, water temperature, salinity
-  - **Note**: Other Fluidra chlorinator models likely compatible
+### 🔥 Heat Pumps
+- **LG Eco Elyo** — reversible: Smart Heating / Cooling, Boost, Silence presets; target temp; water-temp sensor
+- **Z250iQ / Z25iQ** — on/off, target temperature, current temperature
+- **Z260iQ** — HVAC modes (heat / cool / heat-cool), presets, no-flow alarm, water/air temperatures
+- **Z550iQ+** — HVAC modes (heat / cool / auto), presets, HVAC action (heating/cooling/idle/no-flow), water/air temperatures
+- Generic heat-pump fallback
 
-#### **Pool Lighting**
-- **LumiPlus Connect** (76290_RGBW) ✅
-  - On/off control
-  - Brightness adjustment (0-100%)
-  - RGBW color control
-  - White channel support
+### 🧂 Salt Chlorinators / Electrolysers
+- **tecnoLC2 family (30+ models)** — AstralPool Clear Connect / Clear Connect Evo / Scalable,
+  Blauswim, IrriPool iSalt, KLINWASS Mark Salt, Zodiac OE iQ, Gre, Energy Connect, and more
+  (`CC*` / `LC*` serials, including bridged `*.nn_*` devices)
+- **Zodiac EXO iQ** (e.g. iQ35 / NS25) — 0–100% chlorination in 5% steps, output schedules
+- **DM24049704** (Domotic S2) — program/slot schedule format
+- Typical capabilities (model-dependent): chlorination level (0–100%), **pH setpoint**,
+  **ORP/Redox setpoint**, boost mode, schedules, and sensors (pH, ORP, free chlorine,
+  salinity, water temperature)
 
-### ⚠️ **Implemented Equipment (User Testing Required)**
+### 🧪 Water Analysers
+- **Zodiac Blue Connect Silver** (`WA*`, BC3) — pH, ORP and water-temperature sensors (read-only)
 
-#### **Heat Pumps**
-- **LG Eco Elyo** - Reversible heat pump
-  - Modes: Smart Heating, Smart Cooling, Boost, Silence
-  - Temperature control (10-40°C)
-  - Water temperature sensor
+### 💡 Pool Lighting
+- **LumiPlus Connect** (RGBW) — on/off, brightness (0–100%), RGBW colour + white channel,
+  effect/scene selection and effect speed, light schedules
+- Generic LED light fallback
 
-- **Z250iQ / Z25iQ** - Fluidra heat pump
-  - On/off control
-  - Target temperature adjustment
-  - Current temperature sensor
+### ♨️ Heaters
+- Generic on/off heater (component-9) with optional temperature attributes
 
-#### **Heaters**
-- Generic support for pool heaters
-  - Temperature sensors (current/target)
-  - On/off control
+### 🆕 Adding New Equipment
 
-#### **Lighting**
-- Generic support for LED pool lighting
-  - On/off control
-  - Brightness adjustment (0-100%)
+Your equipment isn't listed or is only partially recognised? Help us add it:
 
-### 🆕 **Adding New Equipment**
-
-Your equipment is not listed? Help us add it!
-
-1. **Enable debug logs**:
+1. **Enable debug logs**
    ```yaml
    logger:
      logs:
        custom_components.fluidra_pool: debug
    ```
-
-2. **Create an Issue** with:
-   - Your equipment model
-   - Detection logs (device discovery)
-   - Features available in the Fluidra app
-
-3. **Test and share** your results
+2. **Open an [issue](https://github.com/foXaCe/Fluidra-pool/issues)** with:
+   - Your equipment model and serial prefix
+   - The device-discovery debug logs
+   - The features/values shown in the official Fluidra Pool app
+3. **Test and share** your results — most new models are added this way.
 
 ---
 
 ## 🚀 Installation
 
-### HACS Method (Recommended)
+### HACS (recommended)
 
-1. **Add the repository**
+1. Add this repository as a custom repository (category *Integration*):
    ```
    https://github.com/foXaCe/Fluidra-pool
    ```
+2. HACS → search **"Fluidra Pool"** → Download
+3. Restart Home Assistant
+4. Settings → Devices & Services → **Add Integration** → "Fluidra Pool"
 
-2. **Install the integration**
-   - HACS → Integrations → Explore & Download → "Fluidra Pool"
-   - Restart Home Assistant
+### Manual
 
-3. **Configuration**
-   - Configuration → Integrations → Add → "Fluidra Pool"
-   - Enter your Fluidra Connect credentials
+```bash
+git clone https://github.com/foXaCe/Fluidra-pool.git
+cp -r Fluidra-pool/custom_components/fluidra_pool /config/custom_components/
+```
+Then restart Home Assistant and add the integration from the UI.
 
-### Manual Installation
-
-1. **Download files**
-   ```bash
-   git clone https://github.com/foXaCe/Fluidra-pool.git
-   ```
-
-2. **Copy the integration**
-   ```bash
-   cp -r custom_components/fluidra_pool /config/custom_components/
-   ```
-
-3. **Restart Home Assistant**
+---
 
 ## ⚙️ Configuration
 
-### Required Credentials
-- **Email**: Your Fluidra Connect email
-- **Password**: Your Fluidra Connect password
+The integration is configured entirely from the UI (config flow):
 
-### Advanced Options
-- **Update interval**: 30 seconds (default)
-- **Timeout**: 10 seconds (default)
+- **Email** — your Fluidra Connect account email
+- **Password** — your Fluidra Connect password
+- **MFA** — if your account uses multi-factor authentication, you'll be prompted for the code
+- **Re-auth / Reconfigure** — Home Assistant prompts you to re-authenticate if the token is
+  rejected; you can also reconfigure (e.g. change the account email) from the integration menu
+
+### Options
+- **Update interval** — polling interval in seconds, configurable from **30 to 1800**
+  (default **30 s**). Change it via the integration's **Configure** button.
 
 ---
 
 ## 🎛️ Usage
 
-### Pump Control
+### Pump speed automation
 
 ```yaml
-# Automation example
 automation:
-  - alias: "Pool - Economy Mode"
-    trigger:
-      platform: time
-      at: "22:00:00"
-    action:
-      service: select.select_option
-      target:
-        entity_id: select.pool_e30iq_pump_speed
-      data:
-        option: "Low"
+  - alias: "Pool — economy mode at night"
+    triggers:
+      - trigger: time
+        at: "22:00:00"
+    actions:
+      - action: select.select_option
+        target:
+          entity_id: select.pool_pump_speed
+        data:
+          option: "low"
 ```
 
-### Advanced Scheduling
+### Services
+
+The integration registers three services for schedule management. The `device_id` is the
+Fluidra equipment serial (visible in the device's *Diagnostics* / *Device info*).
+
+**`fluidra_pool.set_schedule`** — replace the schedule of a device:
 
 ```yaml
-# Schedule configuration via service
-service: fluidra_pool.set_schedule
+action: fluidra_pool.set_schedule
 data:
   device_id: "LE24500883"
   schedules:
-    - id: 1
-      enabled: true
-      startTime: "30 08 * * 1,2,3,4,5,6,7"
-      endTime: "59 09 * * 1,2,3,4,5,6,7"
-      startActions:
-        operationName: "0"  # Low
+    - enabled: true
+      start_time: "08:00"
+      end_time: "12:00"
+      mode: "1"            # 0 = Low, 1 = Medium, 2 = High
+      days: [1, 2, 3, 4, 5]  # 1 = Monday … 7 = Sunday
+    - enabled: true
+      start_time: "18:00"
+      end_time: "20:00"
+      mode: "2"
+      days: [6, 7]
 ```
 
-### Lovelace Dashboard
+**`fluidra_pool.clear_schedule`** — remove all schedules of a device:
+
+```yaml
+action: fluidra_pool.clear_schedule
+data:
+  device_id: "LE24500883"
+```
+
+**`fluidra_pool.set_preset_schedule`** — apply a ready-made schedule preset:
+
+```yaml
+action: fluidra_pool.set_preset_schedule
+data:
+  device_id: "LE24500883"
+  preset: "standard"   # standard | intensive | eco | summer | winter
+```
+
+| Preset | Schedule |
+|--------|----------|
+| `standard` | 08:00–12:00 + 18:00–20:00 (Medium) |
+| `intensive` | 08:00–18:00 (High) |
+| `eco` | 10:00–14:00 (Low) |
+| `summer` | 06:00–10:00 + 16:00–22:00 (High) |
+| `winter` | 12:00–16:00 (Low) |
+
+### Lovelace dashboard
 
 ```yaml
 type: entities
 title: Pool Control
 entities:
-  - entity: switch.pool_e30iq_pump
-  - entity: select.pool_e30iq_pump_speed
-  - entity: sensor.pool_e30iq_pump_schedules
-  - entity: sensor.pool_e30iq_pump_information
+  - entity: switch.pool_pump
+  - entity: select.pool_pump_speed
+  - entity: number.pool_chlorination_level
+  - entity: climate.pool_heat_pump
+  - entity: light.pool_light
 ```
+
+> Entity IDs depend on your device names (entities use *has_entity_name*); the names above are
+> illustrative.
+
+---
 
 ## 🔧 Troubleshooting
 
-### Connection Issues
+1. **Authentication fails** — check the email/password, and complete the MFA prompt if shown.
+   If the token was rejected, Home Assistant starts a re-authentication flow automatically.
+2. **No pools found** — confirm your equipment appears in the official Fluidra Pool app.
+3. **Enable debug logs** (see [Adding New Equipment](#-adding-new-equipment)) and attach them
+   to any issue.
+4. **Download diagnostics** — from the integration's device page (credentials are redacted).
 
-1. **Check credentials**
-   - Correct email and password
-   - Active account on Fluidra Connect
+| Symptom | Likely cause / fix |
+|---------|--------------------|
+| `Authentication failed` | Wrong credentials or expired token → re-authenticate |
+| `No pools found` | Account has no equipment, or it's offline in the Fluidra app |
+| Device shows *unavailable* | The device reports itself offline to the Fluidra cloud |
+| Commands seem ignored | Check debug logs; transient cloud rejections now surface as errors |
 
-2. **Diagnostic logs**
-   ```yaml
-   logger:
-     logs:
-       custom_components.fluidra_pool: debug
-   ```
-
-3. **Reconnect integration**
-   - Remove integration
-   - Restart Home Assistant
-   - Reconfigure with new credentials
-
-### Common Errors
-
-| Error | Solution |
-|-------|----------|
-| `Authentication failed` | Check email/password |
-| `No pools found` | Check Fluidra Connect configuration |
-| `Device not responding` | Check equipment network connectivity |
-| `Token expired` | Restart integration |
-
-## 🧪 Testing and Contributing
-
-### Current Testing Status
-This integration was developed through **reverse engineering** of the Fluidra Connect API:
-
-**✅ Tested equipment:**
-- **E30iQ Pump**: Complete control (speeds, modes, scheduling)
-- **LumiPlus Connect**: RGBW lighting control (on/off, brightness, color)
-
-**⚠️ Untested equipment (help needed):**
-- **Heaters**: Temperature sensors implemented but not tested
-- **Other accessories**: Theoretical support only
-
-### Help Needed for Testing
-If you own other Fluidra equipment, your testing would be valuable!
-- Create an [Issue](https://github.com/foXaCe/Fluidra-pool/issues) with your results
-- Share debug logs
-- Suggest improvements
+---
 
 ## 🤝 Contributing
 
 1. **Fork** the repository
 2. **Create** a feature branch (`git checkout -b feature/AmazingFeature`)
-3. **Commit** your changes (`git commit -m 'Add AmazingFeature'`)
-4. **Push** to the branch (`git push origin feature/AmazingFeature`)
+3. **Run the checks** — `ruff check`, `ruff format`, `mypy`, and `pytest` (see `requirements_test.txt`)
+4. **Commit** your changes (Conventional Commits)
 5. **Open** a Pull Request
+
+CI runs Ruff, HACS validation, Hassfest, the pytest suite (with a coverage gate) and mypy.
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
 
 ## 🙏 Acknowledgments
 
-- **Fluidra** for their innovative equipment
-- **Home Assistant** for the amazing platform
-- **The community** for testing and feedback
+- **Fluidra** for their equipment
+- **Home Assistant** for the platform
+- **The community** for testing, device captures and feedback
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/foXaCe/Fluidra-pool/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/foXaCe/Fluidra-pool/discussions)
-- **Discord**: [Home Assistant Discord](https://discord.gg/home-assistant)
+- **Issues:** [GitHub Issues](https://github.com/foXaCe/Fluidra-pool/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/foXaCe/Fluidra-pool/discussions)
 
 ---
 
