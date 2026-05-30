@@ -78,7 +78,17 @@ class CommandsMixin(FluidraAPIBase):
         return await self.control_device_component(device_id, COMPONENT_PUMP_SPEED, speed_level)
 
     async def enable_auto_mode(self, device_id: str) -> bool:
-        """Enable auto mode."""
+        """Enable auto mode.
+
+        The pump only accepts (and reports) the auto-mode command once it is
+        powered on. A device in standby silently ignores the component-10 write —
+        the API returns 200 but reportedValue stays 0 and the toggle snaps back
+        off (the official app shows "equipment off, turn it on to start receiving
+        data"). So power the pump on first, then enable auto mode.
+        """
+        if not await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 1):
+            return False
+        await asyncio.sleep(PUMP_START_DELAY)
         return await self.control_device_component(device_id, COMPONENT_AUTO_MODE, 1)
 
     async def disable_auto_mode(self, device_id: str) -> bool:

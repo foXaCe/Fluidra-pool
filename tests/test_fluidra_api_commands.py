@@ -162,11 +162,28 @@ async def test_set_pump_speed_snaps_to_three_levels(incoming_percent, expected_l
 # --- enable/disable auto mode --------------------------------------------
 
 
-async def test_enable_auto_mode_writes_component_with_value_one() -> None:
-    """Auto-mode ON is component COMPONENT_AUTO_MODE = 1."""
+async def test_enable_auto_mode_powers_pump_on_then_writes_component_ten() -> None:
+    """Auto-mode ON powers the pump on (comp 9) before writing comp 10.
+
+    A standby pump silently ignores the auto-mode write, so the command must be
+    preceded by a power-on.
+    """
     api = _FakeAPI()
-    await api.enable_auto_mode("P1")
-    api.control_device_component.assert_awaited_once_with("P1", COMPONENT_AUTO_MODE, 1)
+    with patch("custom_components.fluidra_pool.fluidra_api._commands.asyncio.sleep", new=AsyncMock()):
+        result = await api.enable_auto_mode("P1")
+    assert result is True
+    assert api.control_device_component.await_args_list[0].args == ("P1", COMPONENT_PUMP_ONOFF, 1)
+    assert api.control_device_component.await_args_list[-1].args == ("P1", COMPONENT_AUTO_MODE, 1)
+
+
+async def test_enable_auto_mode_aborts_if_power_on_fails() -> None:
+    """If powering the pump on fails, auto mode is not written."""
+    api = _FakeAPI()
+    api.control_device_component = AsyncMock(return_value=False)
+    with patch("custom_components.fluidra_pool.fluidra_api._commands.asyncio.sleep", new=AsyncMock()):
+        result = await api.enable_auto_mode("P1")
+    assert result is False
+    api.control_device_component.assert_awaited_once_with("P1", COMPONENT_PUMP_ONOFF, 1)
 
 
 async def test_disable_auto_mode_writes_component_with_value_zero() -> None:
