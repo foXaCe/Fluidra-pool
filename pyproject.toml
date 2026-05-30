@@ -29,6 +29,15 @@ known-first-party = ["custom_components.fluidra_pool"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 
+[tool.mypy]
+# Baseline (non-strict) type checking enforced in CI. Full `--strict` compliance
+# is the Platinum `strict-typing` goal and is still tracked as todo in
+# quality_scale.yaml — do not assume strict here yet.
+# 3.13 matches the CI runtime and the Home Assistant 2026.x requirement (HA ships
+# PEP 696 syntax that mypy cannot parse under an older target).
+python_version = "3.13"
+ignore_missing_imports = true
+
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
 skips = ["B101", "B105", "B110"]  # B101: assert, B105: hardcoded password (false positive on const names), B110: try/except/pass (common in HA)
