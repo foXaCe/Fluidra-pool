@@ -66,7 +66,24 @@ class DevicesMixin(FluidraAPIBase):
         else:
             return []
 
-        result: list[dict[str, Any]] = []
+        # De-duplicate by device_id: the Fluidra tree endpoint can return the same
+        # physical device twice — an ``offline`` cloud-shadow entry and a live
+        # ``connected`` entry sharing one ``id`` (seen on WiFi/BLE units like the
+        # Blue Connect Silver, issue #69). Keeping both produced duplicate-unique_id
+        # warnings, double polling, and value lookups binding to the stale shadow.
+        result: dict[str, dict[str, Any]] = {}
+
+        def _add(raw_device_id: Any, built: dict[str, Any]) -> None:
+            """Insert a built device, preferring the ``connected`` entry on collision."""
+            # Devices without an id can't be de-duplicated; keep each under a
+            # synthetic key so none are dropped.
+            key = str(raw_device_id) if raw_device_id else f"__noid_{len(result)}"
+            existing = result.get(key)
+            if existing is None or (
+                built["connection_type"] == "connected" and existing["connection_type"] != "connected"
+            ):
+                result[key] = built
+
         for device in pool_devices:
             device_id = device.get("id")
             info = device.get("info", {})
@@ -90,7 +107,8 @@ class DevicesMixin(FluidraAPIBase):
                         child_device_type = classify_device_type(child_family, child_device_name)
                         child_is_pump = child_device_type == "pump"
 
-                        result.append(
+                        _add(
+                            child_device_id,
                             {
                                 "pool_id": pool_id,
                                 "device_id": child_device_id,
@@ -110,11 +128,12 @@ class DevicesMixin(FluidraAPIBase):
                                 # entity, gated on these keys by the select platform.
                                 "variable_speed": child_is_pump,
                                 "pump_type": "variable_speed" if child_is_pump else child_device_type,
-                            }
+                            },
                         )
                 continue
 
-            result.append(
+            _add(
+                device_id,
                 {
                     "pool_id": pool_id,
                     "device_id": device_id,
@@ -131,10 +150,10 @@ class DevicesMixin(FluidraAPIBase):
                     "speed_percent": 0,
                     "variable_speed": True,
                     "pump_type": "variable_speed",
-                }
+                },
             )
 
-        return result
+        return list(result.values())
 
     async def get_pools(self) -> list[dict[str, Any]]:
         """Return discovered pools with associated devices."""

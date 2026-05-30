@@ -210,6 +210,95 @@ async def test_discover_devices_marks_offline_when_connection_type_not_connected
     assert devices[0]["online"] is False
 
 
+# --- issue #69: de-duplicate offline/connected duplicate entries ---------
+
+
+async def test_discover_devices_dedupes_offline_and_connected_keeping_connected() -> None:
+    """The tree endpoint can return one device twice (offline shadow + live connected).
+
+    Both entries share a single ``id`` (seen on WiFi/BLE units like the Blue Connect
+    Silver, issue #69). They must collapse into a single device, keeping the connected
+    one so HA doesn't log duplicate-unique_id warnings, double-poll, or bind value
+    lookups to the stale shadow.
+    """
+    api = _FakeAPI()
+    api._request.return_value = (
+        200,
+        [
+            {
+                "id": "QX25005284",
+                "info": {"name": "Blue Connect Silver", "family": "Data collectors"},
+                "type": "offline",
+            },
+            {
+                "id": "QX25005284",
+                "info": {"name": "Blue Connect Silver", "family": "Data collectors"},
+                "type": "connected",
+            },
+        ],
+        "[]",
+    )
+
+    devices = await api._discover_devices_for_pool("pool_1", {})
+
+    assert len(devices) == 1
+    assert devices[0]["device_id"] == "QX25005284"
+    assert devices[0]["connection_type"] == "connected"
+    assert devices[0]["online"] is True
+
+
+async def test_discover_devices_dedupe_prefers_connected_regardless_of_order() -> None:
+    """The connected entry wins even when it appears before the offline shadow."""
+    api = _FakeAPI()
+    api._request.return_value = (
+        200,
+        [
+            {"id": "QX1", "info": {"name": "BC", "family": "Data collectors"}, "type": "connected"},
+            {"id": "QX1", "info": {"name": "BC", "family": "Data collectors"}, "type": "offline"},
+        ],
+        "[]",
+    )
+
+    devices = await api._discover_devices_for_pool("pool_1", {})
+
+    assert len(devices) == 1
+    assert devices[0]["connection_type"] == "connected"
+
+
+async def test_discover_devices_keeps_distinct_ids() -> None:
+    """Different ids are never merged by the de-duplication."""
+    api = _FakeAPI()
+    api._request.return_value = (
+        200,
+        [
+            {"id": "AAA", "info": {"name": "BC", "family": "Data collectors"}, "type": "connected"},
+            {"id": "BBB", "info": {"name": "BC", "family": "Data collectors"}, "type": "connected"},
+        ],
+        "[]",
+    )
+
+    devices = await api._discover_devices_for_pool("pool_1", {})
+
+    assert {d["device_id"] for d in devices} == {"AAA", "BBB"}
+
+
+async def test_discover_devices_keeps_entries_without_id() -> None:
+    """Entries lacking an id can't be de-duplicated and are all retained."""
+    api = _FakeAPI()
+    api._request.return_value = (
+        200,
+        [
+            {"info": {"name": "X", "family": "Data collectors"}, "type": "connected"},
+            {"info": {"name": "Y", "family": "Data collectors"}, "type": "offline"},
+        ],
+        "[]",
+    )
+
+    devices = await api._discover_devices_for_pool("pool_1", {})
+
+    assert len(devices) == 2
+
+
 # --- get_pools / cached_pools / get_*_by_id ------------------------------
 
 
