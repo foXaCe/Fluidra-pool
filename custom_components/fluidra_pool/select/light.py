@@ -87,6 +87,13 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
         components = self.device_data.get("components", {})
         component_data = components.get(str(self.EFFECT_COMPONENT), {})
         effect_value = component_data.get("reportedValue", component_data.get("desiredValue", 0))
+        # LumiPlus components can report values as strings (the light platform writes
+        # power as the string "1"); coerce so the int-keyed lookup doesn't silently
+        # fall back to "static_color" for a real scene.
+        try:
+            effect_value = int(effect_value)
+        except (ValueError, TypeError):
+            effect_value = 0
 
         return self._value_to_effect.get(effect_value, "static_color")
 
@@ -114,9 +121,13 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
 
             _LOGGER.debug("Light effect API call result: %s", success)
 
-            if success:
-                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
-                await self.coordinator.async_request_refresh()
+            if not success:
+                # Surface a rejected command instead of silently reverting, matching
+                # the LumiPlus light entity which raises light_set_failed on failure.
+                raise HomeAssistantError(translation_domain=DOMAIN, translation_key="light_set_failed")
+
+            await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
+            await self.coordinator.async_request_refresh()
 
         except (
             aiohttp.ClientError,

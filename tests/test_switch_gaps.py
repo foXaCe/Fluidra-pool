@@ -505,6 +505,16 @@ def test_heatpump_pending_state_clears_on_expiry() -> None:
     assert entity._pending_state is None
 
 
+def test_heatpump_pending_state_clears_when_actual_matches() -> None:
+    """Optimistic state clears as soon as the poll confirms it, not only on timeout (sensor_switch-1)."""
+    device = _heatpump_device(heat_pump_reported=1)
+    entity = _heatpump(device)
+    entity._set_pending_state(True)
+    assert entity.is_on is True
+    # Reconciled against the polled value instead of staying pinned for the 10s window.
+    assert entity._pending_state is None
+
+
 def test_heatpump_icon_reflects_state() -> None:
     """Icon toggles between heat-pump and heat-pump-outline."""
     on = _heatpump(_heatpump_device(heat_pump_reported=1))

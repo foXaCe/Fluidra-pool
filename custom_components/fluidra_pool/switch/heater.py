@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -9,7 +10,7 @@ import aiohttp
 from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
-from ..const import COMPONENT_PUMP_ONOFF, DOMAIN, OPTIMISTIC_ACTION_TIMEOUT
+from ..const import COMPONENT_PUMP_ONOFF, DOMAIN, OPTIMISTIC_ACTION_TIMEOUT, SWITCH_CONFIRMATION_DELAY
 from ..device_registry import DeviceIdentifier
 from .base import FluidraPoolSwitchEntity
 
@@ -31,12 +32,18 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if the heat pump is on using optimistic UI or real-time reported value."""
+        actual = self._actual_state()
         if self._pending_state is not None:
-            if self._pending_state_expired(10):
+            # Clear the optimistic state as soon as the poll confirms it (like the
+            # sibling switches) or once it expires — not only on the timeout.
+            if actual == self._pending_state or self._pending_state_expired(OPTIMISTIC_ACTION_TIMEOUT):
                 self._clear_pending_state()
-            else:
-                return self._pending_state
+                return actual
+            return self._pending_state
+        return actual
 
+    def _actual_state(self) -> bool:
+        """Return the heat-pump on/off state from the freshly polled device data."""
         heat_pump_reported = self.device_data.get("heat_pump_reported")
         if heat_pump_reported is not None:
             return bool(heat_pump_reported)
@@ -65,7 +72,8 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
                 success = await self._api.start_pump(self._device_id)
 
             if success:
-                # Keep optimistic state; the property auto-clears it after timeout.
+                # Keep optimistic state; is_on clears it once the poll confirms.
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
             else:
                 self._clear_pending_state()
@@ -90,6 +98,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
                 success = await self._api.stop_pump(self._device_id)
 
             if success:
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
             else:
                 self._clear_pending_state()
@@ -142,12 +151,14 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if the heater is on."""
+        actual = bool(self.device_data.get("is_heating") or self.device_data.get("is_running"))
         if self._pending_state is not None:
-            if self._pending_state_expired(OPTIMISTIC_ACTION_TIMEOUT):
+            # Clear the optimistic state as soon as the poll confirms it (or expiry).
+            if actual == self._pending_state or self._pending_state_expired(OPTIMISTIC_ACTION_TIMEOUT):
                 self._clear_pending_state()
-            else:
-                return self._pending_state
-        return bool(self.device_data.get("is_heating") or self.device_data.get("is_running"))
+                return actual
+            return self._pending_state
+        return actual
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the heater on (component 9 = generic ON/OFF)."""
@@ -159,6 +170,7 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
             self.async_write_ha_state()
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heater_set_failed") from err
         if success:
+            await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
             await self.coordinator.async_request_refresh()
         else:
             self._clear_pending_state()
@@ -173,6 +185,7 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
             self.async_write_ha_state()
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heater_set_failed") from err
         if success:
+            await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
             await self.coordinator.async_request_refresh()
         else:
             self._clear_pending_state()

@@ -8,10 +8,11 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.select import SelectEntity
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import EntityCategory
 
 from ..api_resilience import FluidraError
-from ..const import COMMAND_CONFIRMATION_DELAY, UI_UPDATE_DELAY
+from ..const import COMMAND_CONFIRMATION_DELAY, DOMAIN, UI_UPDATE_DELAY
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolControlEntity
 from ..utils import convert_cron_days
@@ -128,11 +129,31 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
                 )
 
             success = await self._api.set_schedule(self._device_id, updated_schedules)
-            if success:
-                await self.coordinator.async_request_refresh()
+            if not success:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="schedule_set_rejected",
+                    translation_placeholders={"device_id": self._device_id},
+                )
+            await self.coordinator.async_request_refresh()
 
-        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
-            _LOGGER.debug("Failed to update schedule mode for %s", self._device_id)
+        except HomeAssistantError:
+            raise
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
+            _LOGGER.error("Failed to update schedule mode for %s: %s", self._device_id, err)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_set_failed",
+                translation_placeholders={"device_id": self._device_id},
+            ) from err
 
     @property
     def icon(self) -> str:
@@ -257,10 +278,16 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
 
             device_data = self.device_data
             if "schedule_data" not in device_data:
+                # Reset the optimistic option so current_option falls back to
+                # coordinator data instead of sticking on the unconfirmed value.
+                self._optimistic_option = None
+                self.async_write_ha_state()
                 return
 
             current_schedules = device_data["schedule_data"]
             if not current_schedules:
+                self._optimistic_option = None
+                self.async_write_ha_state()
                 return
 
             schedule_component = DeviceIdentifier.get_feature(device_data, "schedule_component", 258)

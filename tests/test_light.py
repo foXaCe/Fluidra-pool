@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.components.light import ATTR_BRIGHTNESS, ATTR_RGBW_COLOR
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.fluidra_pool.const import (
@@ -116,6 +117,23 @@ async def test_async_turn_on_writes_power_brightness_color_and_requests_refresh(
     )
     light._api.set_component_string_value.assert_awaited_once_with(DEVICE_ID, LUMIPLUS_COMPONENT_POWER, "1")
     light.coordinator.async_request_refresh.assert_awaited_once()
+
+
+async def test_async_turn_on_raises_and_rolls_back_when_brightness_write_fails() -> None:
+    """A False return from the brightness sub-command must fail and roll back (climate_light_number-3).
+
+    Previously only the power write's result was checked, so a rejected brightness
+    or colour write left the optimistic overrides stuck on the card indefinitely.
+    """
+    light = _build_light()
+    light._api.set_component_value = AsyncMock(return_value=False)  # brightness rejected
+
+    with pytest.raises(HomeAssistantError):
+        await light.async_turn_on(**{ATTR_BRIGHTNESS: 255})
+
+    assert light._optimistic_is_on is None
+    assert light._optimistic_brightness is None
+    light.coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_async_turn_off_sets_power_to_zero() -> None:

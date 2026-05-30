@@ -164,6 +164,14 @@ def test_heater_is_on_uses_is_heating_flag() -> None:
     assert off.is_on is False
 
 
+def test_heater_pending_state_clears_when_actual_matches() -> None:
+    """Heater optimistic state clears once the poll confirms it, not only on timeout (sensor_switch-2)."""
+    heater = _heater({"is_heating": True})
+    heater._set_pending_state(True)
+    assert heater.is_on is True
+    assert heater._pending_state is None
+
+
 # --- FluidraAutoModeSwitch -----------------------------------------------
 
 

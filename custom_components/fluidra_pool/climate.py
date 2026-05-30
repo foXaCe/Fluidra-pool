@@ -124,11 +124,17 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         """Return the target temperature."""
         actual_temp = self.device_data.get("target_temperature")
 
-        # Return optimistic temperature while waiting for server confirmation
+        # Return the optimistic value while waiting for server confirmation, but
+        # clear it once the poll confirms the change (within a small tolerance to
+        # absorb the 0.1°C decidegree quantization) OR after a 5-second fallback
+        # so a never-confirmed value (panel/app change, device-side clamping or a
+        # non-step-aligned service call) can't pin the UI to a stale setpoint.
         if self._pending_temperature is not None:
-            # Clear optimistic state if server confirmed the change
-            if actual_temp == self._pending_temperature:
+            confirmed = actual_temp is not None and abs(actual_temp - self._pending_temperature) < 0.05
+            expired = self._last_action_time is not None and time.time() - self._last_action_time > 5
+            if confirmed or expired:
                 self._pending_temperature = None
+                self._last_action_time = None
             else:
                 return self._pending_temperature
 
@@ -412,12 +418,20 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                     success = await self._api.control_device_component(self._device_id, 21, 1)
                     if success:
                         # Set mode: component 16 (0=heating, 1=cooling, 2=auto)
+                        mode_value: int | None = None
                         if hvac_mode == HVACMode.HEAT:
-                            success = await self._api.control_device_component(self._device_id, 16, Z550_MODE_HEATING)
+                            mode_value = Z550_MODE_HEATING
                         elif hvac_mode == HVACMode.COOL:
-                            success = await self._api.control_device_component(self._device_id, 16, Z550_MODE_COOLING)
+                            mode_value = Z550_MODE_COOLING
                         elif hvac_mode == HVACMode.HEAT_COOL:
-                            success = await self._api.control_device_component(self._device_id, 16, Z550_MODE_AUTO)
+                            mode_value = Z550_MODE_AUTO
+                        if mode_value is not None:
+                            success = await self._api.control_device_component(self._device_id, 16, mode_value)
+                            if not success:
+                                # Power was just turned on but the mode write failed:
+                                # roll power back off so the physical device matches the
+                                # reverted optimistic UI instead of running in a stale mode.
+                                await self._api.control_device_component(self._device_id, 21, 0)
             elif DeviceIdentifier.has_feature(self.device_data, "z260iq_mode"):
                 # Z260iQ: ON/OFF via component 13, mode via component 14
                 if hvac_mode == HVACMode.OFF:

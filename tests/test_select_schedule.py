@@ -6,8 +6,10 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
+from custom_components.fluidra_pool.api_resilience import FluidraError
 from custom_components.fluidra_pool.select.schedule import (
     FluidraChlorinatorScheduleSpeedSelect,
     FluidraScheduleModeSelect,
@@ -207,6 +209,30 @@ async def test_schedule_mode_select_refreshes_coordinator_on_success() -> None:
     coord.async_request_refresh.assert_awaited_once()
 
 
+async def test_schedule_mode_select_raises_when_api_rejects() -> None:
+    """A False set_schedule surfaces as HomeAssistantError instead of being swallowed (select_time-3)."""
+    device = _pump_device([SCHEDULE])
+    api = _api()
+    api.set_schedule = AsyncMock(return_value=False)
+    select = FluidraScheduleModeSelect(_coord(device), api, POOL_ID, PUMP_ID, schedule_id="1")
+    _attach_ha(select)
+
+    with pytest.raises(HomeAssistantError):
+        await select.async_select_option("2")
+
+
+async def test_schedule_mode_select_wraps_api_error_as_home_assistant_error() -> None:
+    """A FluidraError during set_schedule is wrapped as HomeAssistantError (select_time-3)."""
+    device = _pump_device([SCHEDULE])
+    api = _api()
+    api.set_schedule = AsyncMock(side_effect=FluidraError("boom"))
+    select = FluidraScheduleModeSelect(_coord(device), api, POOL_ID, PUMP_ID, schedule_id="1")
+    _attach_ha(select)
+
+    with pytest.raises(HomeAssistantError):
+        await select.async_select_option("2")
+
+
 # --- FluidraChlorinatorScheduleSpeedSelect -------------------------------
 
 
@@ -248,6 +274,23 @@ def test_chlor_schedule_speed_uses_output_options_for_exo() -> None:
     select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), _api(), POOL_ID, CHLOR_ID, schedule_id="1")
     _attach_ha(select)
     assert select.options == ["pump", "aux1", "aux2"]
+
+
+async def test_chlor_schedule_speed_resets_optimistic_on_early_return() -> None:
+    """An early return (no schedule to update) clears the optimistic option (select_time-1).
+
+    Without the reset, current_option short-circuits on the stale optimistic value
+    forever because this class has no _handle_coordinator_update to clear it.
+    """
+    device = _chlor_device(schedule_data=[])  # empty → early return after the optimistic write
+    api = _api()
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), api, POOL_ID, CHLOR_ID, schedule_id="1")
+    _attach_ha(select)
+
+    await select.async_select_option("s1")
+
+    assert select._optimistic_option is None
+    api.set_schedule.assert_not_called()
 
 
 def test_chlor_schedule_speed_current_option_reads_operation_name() -> None:

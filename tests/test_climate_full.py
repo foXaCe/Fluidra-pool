@@ -159,6 +159,30 @@ def test_target_temperature_optimistic_then_confirmed() -> None:
     assert climate._pending_temperature is None
 
 
+def test_target_temperature_clears_within_tolerance() -> None:
+    """A reported value within the 0.05 tolerance confirms the pending value (climate_light_number-4)."""
+    climate = _make(_pin(target_temperature=28.0))
+    climate._pending_temperature = 28.04  # decidegree quantization noise vs the requested 28.0
+    climate._last_action_time = None
+    assert climate.target_temperature == 28.0  # confirmed within tolerance → actual shown
+    assert climate._pending_temperature is None
+
+
+async def test_target_temperature_optimistic_expires_after_timeout() -> None:
+    """A never-confirmed optimistic temperature clears after the 5s fallback (climate_light_number-4)."""
+    api = _api()
+    climate = _make(_pin(target_temperature=29.0), api)
+    with patch(TIME_MOD) as mock_time:
+        mock_time.time.return_value = 1000.0
+        await climate.async_set_temperature(**{ATTR_TEMPERATURE: 31.0})
+        # Device keeps reporting 29 (clamped / changed elsewhere) → optimistic value shown.
+        assert climate.target_temperature == 31.0
+        # 6 seconds later the fallback expiry releases the stale optimistic value.
+        mock_time.time.return_value = 1006.0
+        assert climate.target_temperature == 29.0
+        assert climate._pending_temperature is None
+
+
 # --- min/max/step ------------------------------------------------------
 
 
@@ -622,6 +646,23 @@ async def test_set_hvac_mode_z550_heat_cool_sets_auto_mode() -> None:
     climate = _make(_pin(features={"z550_mode": True}), api)
     await climate.async_set_hvac_mode(HVACMode.HEAT_COOL)
     assert api.control_device_component.await_args_list[1].args == (DEVICE_ID, 16, Z550_MODE_AUTO)
+
+
+async def test_set_hvac_mode_z550_rolls_back_power_when_mode_write_fails() -> None:
+    """If power-on succeeds but the mode write fails, power is rolled back off (climate_light_number-5)."""
+    api = _api()
+    # power-on (21,1) -> True, mode write (16) -> False, rollback (21,0) -> True
+    api.control_device_component = AsyncMock(side_effect=[True, False, True])
+    climate = _make(_pin(features={"z550_mode": True}), api)
+
+    with pytest.raises(HomeAssistantError):
+        await climate.async_set_hvac_mode(HVACMode.HEAT)
+
+    calls = [c.args for c in api.control_device_component.await_args_list]
+    assert calls[0] == (DEVICE_ID, 21, 1)  # power on
+    assert calls[1] == (DEVICE_ID, 16, Z550_MODE_HEATING)  # mode write (rejected)
+    assert calls[2] == (DEVICE_ID, 21, 0)  # rollback: power back off
+    assert climate._pending_hvac_mode is None  # optimistic state reverted
 
 
 async def test_set_hvac_mode_z260_off_uses_component_13() -> None:

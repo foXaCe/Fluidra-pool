@@ -175,21 +175,33 @@ class FluidraLight(FluidraPoolControlEntity, LightEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on, optionally setting brightness/colour."""
         self._optimistic_is_on = True
+        # Aggregate every sub-command's result: a False from brightness or colour
+        # must fail (and roll back) just like a failed power command, otherwise a
+        # silent partial failure leaves the optimistic UI permanently out of sync.
+        success = True
 
         try:
             if ATTR_BRIGHTNESS in kwargs:
                 brightness_255 = int(kwargs[ATTR_BRIGHTNESS])
                 brightness_100 = round(brightness_255 * 100 / 255)
                 self._optimistic_brightness = brightness_255
-                await self._api.set_component_value(self._device_id, LUMIPLUS_COMPONENT_BRIGHTNESS, brightness_100)
+                success = (
+                    await self._api.set_component_value(self._device_id, LUMIPLUS_COMPONENT_BRIGHTNESS, brightness_100)
+                    and success
+                )
 
             if ATTR_RGBW_COLOR in kwargs:
                 r, g, b, w = kwargs[ATTR_RGBW_COLOR]
                 color_value = {"r": int(r), "g": int(g), "b": int(b), "k": 5000, "extra": {"w": int(w)}}
                 self._optimistic_rgbw = (int(r), int(g), int(b), int(w))
-                await self._api.set_component_json_value(self._device_id, LUMIPLUS_COMPONENT_COLOR, color_value)
+                success = (
+                    await self._api.set_component_json_value(self._device_id, LUMIPLUS_COMPONENT_COLOR, color_value)
+                    and success
+                )
 
-            success = await self._api.set_component_string_value(self._device_id, LUMIPLUS_COMPONENT_POWER, "1")
+            success = (
+                await self._api.set_component_string_value(self._device_id, LUMIPLUS_COMPONENT_POWER, "1") and success
+            )
         except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
             # Any failed sub-command (brightness/colour/power) must roll back the
             # optimistic overrides so the UI doesn't get stuck on an unconfirmed state.

@@ -136,6 +136,21 @@ async def test_chlorination_async_set_dict_component_writes_to_write_component()
     api.control_device_component.assert_awaited_once_with(DEVICE_ID, 4, 70)
 
 
+async def test_chlorination_async_set_clamps_to_max_when_step_overshoots() -> None:
+    """round-to-step must not push the value above the advertised max (climate_light_number-2)."""
+    device = _chlorinator_device(
+        components={"10": {"reportedValue": 30}},
+        features={"chlorination_level": 10, "chlorination_step": 10, "chlorination_max": 95},
+    )
+    api = _api()
+    number = FluidraChlorinatorLevelNumber(_coord_with(device), api, POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    # 95 → round(95/10)*10 = 100, which exceeds the max of 95 → re-clamped to 95.
+    await number.async_set_native_value(95.0)
+    api.control_device_component.assert_awaited_once_with(DEVICE_ID, 10, 95)
+
+
 # --- FluidraChlorinatorPhSetpoint ----------------------------------------
 
 
@@ -218,6 +233,17 @@ async def test_orp_setpoint_async_set_writes_integer_value() -> None:
     api.control_device_component.assert_awaited_once_with(DEVICE_ID, 11, 720)
 
 
+def test_orp_setpoint_native_value_guards_non_numeric() -> None:
+    """A non-numeric ORP value returns the 700.0 default instead of raising (climate_light_number-7)."""
+    device = _chlorinator_device(
+        components={"177": {"reportedValue": "n/a"}},
+        features={"orp_setpoint": {"write": 11, "read": 177}},
+    )
+    number = FluidraChlorinatorOrpSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+    assert number.native_value == 700.0
+
+
 # --- FluidraLightEffectSpeed ---------------------------------------------
 
 
@@ -269,3 +295,20 @@ async def test_light_effect_speed_async_set_truncates_to_int(incoming: float) ->
 
     await number.async_set_native_value(incoming)
     api.set_component_value.assert_awaited_once_with("LP24-001", 20, int(incoming))
+
+
+async def test_light_effect_speed_logs_and_skips_refresh_on_failure(caplog: pytest.LogCaptureFixture) -> None:
+    """A rejected effect-speed write logs a debug line and does not refresh (climate_light_number-1)."""
+    import logging
+
+    coord = _coord_with(_light_device(1))
+    coord.data[POOL_ID]["devices"][0]["device_id"] = "LP24-001"
+    api = SimpleNamespace(set_component_value=AsyncMock(return_value=False))
+    number = FluidraLightEffectSpeed(coord, api, POOL_ID, "LP24-001")
+    _attach_ha(number)
+
+    with caplog.at_level(logging.DEBUG, logger="custom_components.fluidra_pool.number"):
+        await number.async_set_native_value(5)  # Must not raise on a False return.
+
+    assert "Failed to set effect speed" in caplog.text
+    coord.async_request_refresh.assert_not_awaited()

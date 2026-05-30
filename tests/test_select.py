@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.fluidra_pool.select import (
@@ -228,3 +229,22 @@ async def test_light_effect_async_select_ignores_unknown_option() -> None:
     select = _light_effect(0)
     await select.async_select_option("scene_99")
     select._api.control_device_component.assert_not_called()
+
+
+def test_light_effect_decodes_string_reported_value() -> None:
+    """A string reportedValue is coerced so the scene resolves instead of falling back (select_time-2)."""
+    select = _light_effect("3")  # type: ignore[arg-type]  # the backend can report a string
+    assert select.current_option == "scene_3"
+
+
+async def test_light_effect_async_select_raises_on_api_rejection() -> None:
+    """A False return from the backend surfaces as HomeAssistantError (select_time-4)."""
+    select = _light_effect(0)
+    select._api.control_device_component = AsyncMock(return_value=False)
+
+    with pytest.raises(HomeAssistantError):
+        await select.async_select_option("scene_5")
+
+    # The finally block still clears the optimistic option on the way out.
+    assert select._optimistic_option is None
+    select.coordinator.async_request_refresh.assert_not_awaited()

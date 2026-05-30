@@ -127,6 +127,9 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
         # Round to nearest step value (UI step matches this rounding).
         step = self._chlorination_step
         int_value = round(value / step) * step
+        # Re-clamp after rounding: round-to-step can push a value above the
+        # advertised max when the max is not an exact multiple of the step.
+        int_value = max(self._attr_native_min_value, min(int_value, self._attr_native_max_value))
 
         try:
             success = await self._api.control_device_component(self._device_id, write_component, int_value)
@@ -311,7 +314,13 @@ class FluidraChlorinatorOrpSetpoint(FluidraPoolControlEntity, NumberEntity):
         # Use desiredValue preferentially to show immediate UI feedback
         raw_value = component_data.get("desiredValue", component_data.get("reportedValue"))
 
-        return float(raw_value) if raw_value is not None else 700.0
+        if raw_value is None:
+            return 700.0
+        try:
+            return float(raw_value)
+        except (ValueError, TypeError):
+            _LOGGER.debug("Failed to parse ORP setpoint value %s for %s", raw_value, self._device_id)
+            return 700.0
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the ORP setpoint."""
@@ -407,6 +416,8 @@ class FluidraLightEffectSpeed(FluidraPoolControlEntity, NumberEntity):
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="number_set_failed") from err
         if success:
             await self.coordinator.async_request_refresh()
+        else:
+            _LOGGER.debug("Failed to set effect speed for %s", self._device_id)
 
     @property
     def icon(self) -> str:
