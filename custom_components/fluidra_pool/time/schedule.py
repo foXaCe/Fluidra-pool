@@ -161,7 +161,15 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             self._optimistic_value = None
             self.async_write_ha_state()
             raise
-        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.error("Failed to set schedule start time for %s: %s", self._device_id, err)
             self._optimistic_value = None
             self.async_write_ha_state()
@@ -310,7 +318,15 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             self._optimistic_value = None
             self.async_write_ha_state()
             raise
-        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
             _LOGGER.error("Failed to set schedule end time for %s: %s", self._device_id, err)
             self._optimistic_value = None
             self.async_write_ha_state()

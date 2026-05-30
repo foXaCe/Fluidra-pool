@@ -13,10 +13,6 @@
       "unknown": "Erro inesperado"
     },
     "step": {
-      "confirm": {
-        "description": "Encontramos um dispositivo Fluidra Pool. Deseja adicioná-lo?",
-        "title": "Fluidra Pool descoberto"
-      },
       "mfa": {
         "data": {
           "mfa_code": "Código de verificação"
@@ -278,6 +274,15 @@
     "auth_failed": {
       "message": "Falha na autenticação, por favor re-autentique-se"
     },
+    "boost_set_failed": {
+      "message": "Falha ao ativar o modo boost"
+    },
+    "chlorinator_mode_set_failed": {
+      "message": "Falha ao definir o modo do clorador"
+    },
+    "chlorinator_set_failed": {
+      "message": "Falha ao controlar o clorador"
+    },
     "device_not_found": {
       "message": "O dispositivo Fluidra {device_id} não foi encontrado em nenhuma entrada de configuração carregada"
     },
@@ -286,6 +291,12 @@
     },
     "heat_pump_control_failed": {
       "message": "Erro de controlo da bomba de calor ({error_type})"
+    },
+    "heat_pump_set_failed": {
+      "message": "Falha ao controlar a bomba de calor"
+    },
+    "heater_set_failed": {
+      "message": "Falha ao controlar o aquecedor"
     },
     "hvac_mode_set_failed": {
       "message": "Não foi possível definir o modo da bomba de calor para {hvac_mode}"
@@ -302,6 +313,9 @@
     "mfa_required": {
       "message": "É necessária autenticação de dois fatores para iniciar sessão no Fluidra Pool"
     },
+    "number_set_failed": {
+      "message": "Falha ao definir o valor no dispositivo"
+    },
     "preset_mode_control_failed": {
       "message": "Erro de controlo da predefinição ({error_type})"
     },
@@ -313,6 +327,9 @@
     },
     "preset_schedule_set_rejected": {
       "message": "A API Fluidra rejeitou a atualização da predefinição para {device_id}"
+    },
+    "pump_speed_set_failed": {
+      "message": "Falha ao definir a velocidade da bomba"
     },
     "schedule_clear_failed": {
       "message": "A chamada à API Fluidra falhou ao limpar o programa para {device_id}"

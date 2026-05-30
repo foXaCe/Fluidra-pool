@@ -6,6 +6,7 @@ import logging
 from typing import Any
 
 import aiohttp
+from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
 from ..const import COMPONENT_PUMP_ONOFF, DOMAIN, OPTIMISTIC_ACTION_TIMEOUT
@@ -73,6 +74,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
             _LOGGER.error("Error turning on heat pump %s: %s", self._device_id, e)
             self._clear_pending_state()
             self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heat_pump_set_failed") from e
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the heat pump off using discovered API with optimistic UI."""
@@ -96,6 +98,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
             _LOGGER.error("Error turning off heat pump %s: %s", self._device_id, e)
             self._clear_pending_state()
             self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heat_pump_set_failed") from e
 
     @property
     def extra_state_attributes(self) -> dict:
@@ -149,7 +152,12 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the heater on (component 9 = generic ON/OFF)."""
         self._set_pending_state(True)
-        success = await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 1)
+        try:
+            success = await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 1)
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            self._clear_pending_state()
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heater_set_failed") from err
         if success:
             await self.coordinator.async_request_refresh()
         else:
@@ -158,7 +166,12 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the heater off (component 9 = generic ON/OFF)."""
         self._set_pending_state(False)
-        success = await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 0)
+        try:
+            success = await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 0)
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            self._clear_pending_state()
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heater_set_failed") from err
         if success:
             await self.coordinator.async_request_refresh()
         else:

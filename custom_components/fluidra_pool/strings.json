@@ -31,10 +31,6 @@
         "data": {
           "mfa_code": "Verification code"
         }
-      },
-      "confirm": {
-        "title": "Discovered Fluidra Pool",
-        "description": "We found a Fluidra Pool device. Would you like to add it?"
       }
     },
     "error": {
@@ -291,6 +287,27 @@
     },
     "light_set_failed": {
       "message": "Failed to set the LumiPlus light state"
+    },
+    "pump_speed_set_failed": {
+      "message": "Failed to set the pump speed"
+    },
+    "chlorinator_mode_set_failed": {
+      "message": "Failed to set the chlorinator mode"
+    },
+    "chlorinator_set_failed": {
+      "message": "Failed to switch the chlorinator"
+    },
+    "boost_set_failed": {
+      "message": "Failed to set boost mode"
+    },
+    "heater_set_failed": {
+      "message": "Failed to switch the heater"
+    },
+    "heat_pump_set_failed": {
+      "message": "Failed to switch the heat pump"
+    },
+    "number_set_failed": {
+      "message": "Failed to set the value on the device"
     },
     "light_schedule_set_failed": {
       "message": "Failed to set the light schedule {schedule_id} time"

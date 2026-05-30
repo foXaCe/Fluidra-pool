@@ -13,10 +13,6 @@
       "unknown": "Error inesperado"
     },
     "step": {
-      "confirm": {
-        "description": "Hemos encontrado un dispositivo Fluidra Pool. ¿Quieres añadirlo?",
-        "title": "Fluidra Pool descubierto"
-      },
       "mfa": {
         "data": {
           "mfa_code": "Código de verificación"
@@ -278,6 +274,15 @@
     "auth_failed": {
       "message": "Error de autenticación, por favor re-autentícate"
     },
+    "boost_set_failed": {
+      "message": "No se pudo activar el modo boost"
+    },
+    "chlorinator_mode_set_failed": {
+      "message": "No se pudo ajustar el modo del clorador"
+    },
+    "chlorinator_set_failed": {
+      "message": "No se pudo controlar el clorador"
+    },
     "device_not_found": {
       "message": "No se encontró el dispositivo Fluidra {device_id} en ninguna entrada de configuración cargada"
     },
@@ -286,6 +291,12 @@
     },
     "heat_pump_control_failed": {
       "message": "Error de control de la bomba de calor ({error_type})"
+    },
+    "heat_pump_set_failed": {
+      "message": "No se pudo controlar la bomba de calor"
+    },
+    "heater_set_failed": {
+      "message": "No se pudo controlar el calentador"
     },
     "hvac_mode_set_failed": {
       "message": "No se pudo establecer el modo de la bomba de calor en {hvac_mode}"
@@ -302,6 +313,9 @@
     "mfa_required": {
       "message": "Se requiere autenticación de dos factores para iniciar sesión en Fluidra Pool"
     },
+    "number_set_failed": {
+      "message": "No se pudo ajustar el valor en el dispositivo"
+    },
     "preset_mode_control_failed": {
       "message": "Error de control del modo predefinido ({error_type})"
     },
@@ -313,6 +327,9 @@
     },
     "preset_schedule_set_rejected": {
       "message": "La API de Fluidra rechazó la actualización del horario predefinido para {device_id}"
+    },
+    "pump_speed_set_failed": {
+      "message": "No se pudo ajustar la velocidad de la bomba"
     },
     "schedule_clear_failed": {
       "message": "La llamada a la API de Fluidra falló al borrar el horario para {device_id}"

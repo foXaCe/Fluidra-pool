@@ -7,9 +7,13 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
+import aiohttp
 from homeassistant.components.select import SelectEntity
+from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 
-from ..const import UI_UPDATE_DELAY
+from ..api_resilience import FluidraError
+from ..const import DOMAIN, UI_UPDATE_DELAY
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolControlEntity
 
@@ -67,21 +71,29 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
             mode_value = 0
         return self._value_to_mode.get(mode_value, "off")
 
+    def _optimistic_expired(self) -> bool:
+        """Return True once the optimistic value has outlived its timeout."""
+        return time.time() - self._optimistic_time > self.OPTIMISTIC_TIMEOUT
+
     @property
     def current_option(self) -> str | None:
-        """Return the current mode option."""
-        if self._optimistic_option is not None:
-            api_mode = self._get_api_mode()
-            if api_mode == self._optimistic_option:
-                # Server caught up — drop the optimistic value.
-                self._optimistic_option = None
-                return api_mode
-            if time.time() - self._optimistic_time > self.OPTIMISTIC_TIMEOUT:
-                self._optimistic_option = None
-                return api_mode
-            return self._optimistic_option
+        """Return the current mode option (optimistic until the API confirms).
 
+        This is a pure getter: the optimistic value is dropped in
+        ``_handle_coordinator_update`` (or once it expires), never here.
+        """
+        if self._optimistic_option is not None and not self._optimistic_expired():
+            return self._optimistic_option
         return self._get_api_mode()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Drop the optimistic value once the backend confirms it (or it expires)."""
+        if self._optimistic_option is not None and (
+            self._get_api_mode() == self._optimistic_option or self._optimistic_expired()
+        ):
+            self._optimistic_option = None
+        super()._handle_coordinator_update()
 
     async def async_select_option(self, option: str) -> None:
         """Select new mode option."""
@@ -97,7 +109,12 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
 
         await asyncio.sleep(UI_UPDATE_DELAY)
 
-        success = await self._api.control_device_component(self._device_id, mode_comp, mode_value)
+        try:
+            success = await self._api.control_device_component(self._device_id, mode_comp, mode_value)
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            self._optimistic_option = None
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="chlorinator_mode_set_failed") from err
 
         if success:
             await self.coordinator.async_request_refresh()

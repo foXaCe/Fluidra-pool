@@ -13,10 +13,6 @@
       "unknown": "Erreur inattendue"
     },
     "step": {
-      "confirm": {
-        "description": "Nous avons trouvé un équipement Fluidra Pool. Voulez-vous l'ajouter ?",
-        "title": "Piscine Fluidra découverte"
-      },
       "mfa": {
         "data": {
           "mfa_code": "Code de vérification"
@@ -278,6 +274,15 @@
     "auth_failed": {
       "message": "Échec d'authentification, veuillez vous ré-authentifier"
     },
+    "boost_set_failed": {
+      "message": "Échec de l'activation du mode boost"
+    },
+    "chlorinator_mode_set_failed": {
+      "message": "Échec du réglage du mode de l'électrolyseur"
+    },
+    "chlorinator_set_failed": {
+      "message": "Échec de la commande de l'électrolyseur"
+    },
     "device_not_found": {
       "message": "L'appareil Fluidra « {device_id} » n'a été trouvé dans aucune entrée de configuration chargée"
     },
@@ -286,6 +291,12 @@
     },
     "heat_pump_control_failed": {
       "message": "Échec du contrôle de la pompe à chaleur ({error_type})"
+    },
+    "heat_pump_set_failed": {
+      "message": "Échec de la commande de la pompe à chaleur"
+    },
+    "heater_set_failed": {
+      "message": "Échec de la commande du chauffage"
     },
     "hvac_mode_set_failed": {
       "message": "Impossible de régler le mode de la pompe à chaleur sur {hvac_mode}"
@@ -302,6 +313,9 @@
     "mfa_required": {
       "message": "L'authentification à deux facteurs est requise pour se connecter à Fluidra Pool"
     },
+    "number_set_failed": {
+      "message": "Échec du réglage de la valeur sur l'appareil"
+    },
     "preset_mode_control_failed": {
       "message": "Échec du contrôle du préréglage ({error_type})"
     },
@@ -313,6 +327,9 @@
     },
     "preset_schedule_set_rejected": {
       "message": "L'API Fluidra a refusé la mise à jour du programme prédéfini pour {device_id}"
+    },
+    "pump_speed_set_failed": {
+      "message": "Échec du réglage de la vitesse de la pompe"
     },
     "schedule_clear_failed": {
       "message": "L'appel à l'API Fluidra a échoué lors de l'effacement du programme pour {device_id}"

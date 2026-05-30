@@ -8,9 +8,10 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.select import SelectEntity
+from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
-from ..const import COMMAND_CONFIRMATION_DELAY, UI_UPDATE_DELAY
+from ..const import COMMAND_CONFIRMATION_DELAY, DOMAIN, UI_UPDATE_DELAY
 from ..entity import FluidraPoolControlEntity
 
 if TYPE_CHECKING:
@@ -127,7 +128,7 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
             AttributeError,
         ) as err:
             _LOGGER.error("Failed to set light effect: %s", err)
-            raise
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="light_set_failed") from err
         finally:
             self._optimistic_option = None
             self.async_write_ha_state()

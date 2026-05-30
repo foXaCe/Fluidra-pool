@@ -9,12 +9,14 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.select import SelectEntity
+from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
 from ..const import (
     COMMAND_CONFIRMATION_DELAY,
     COMPONENT_PUMP_ONOFF,
     COMPONENT_PUMP_SPEED,
+    DOMAIN,
     UI_UPDATE_DELAY,
 )
 from ..entity import FluidraPoolControlEntity
@@ -127,6 +129,8 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
                 await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
 
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="pump_speed_set_failed") from err
         finally:
             self._optimistic_option = None
             self.async_write_ha_state()

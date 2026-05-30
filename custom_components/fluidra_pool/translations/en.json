@@ -13,10 +13,6 @@
       "unknown": "Unexpected error"
     },
     "step": {
-      "confirm": {
-        "description": "We found a Fluidra Pool device. Would you like to add it?",
-        "title": "Discovered Fluidra Pool"
-      },
       "mfa": {
         "data": {
           "mfa_code": "Verification code"
@@ -278,6 +274,15 @@
     "auth_failed": {
       "message": "Authentication failed, please re-authenticate"
     },
+    "boost_set_failed": {
+      "message": "Failed to set boost mode"
+    },
+    "chlorinator_mode_set_failed": {
+      "message": "Failed to set the chlorinator mode"
+    },
+    "chlorinator_set_failed": {
+      "message": "Failed to switch the chlorinator"
+    },
     "device_not_found": {
       "message": "Fluidra device {device_id} was not found in any loaded config entry"
     },
@@ -286,6 +291,12 @@
     },
     "heat_pump_control_failed": {
       "message": "Heat-pump control failed ({error_type})"
+    },
+    "heat_pump_set_failed": {
+      "message": "Failed to switch the heat pump"
+    },
+    "heater_set_failed": {
+      "message": "Failed to switch the heater"
     },
     "hvac_mode_set_failed": {
       "message": "Failed to set heat-pump mode to {hvac_mode}"
@@ -302,6 +313,9 @@
     "mfa_required": {
       "message": "Multi-factor authentication is required to sign in to Fluidra Pool"
     },
+    "number_set_failed": {
+      "message": "Failed to set the value on the device"
+    },
     "preset_mode_control_failed": {
       "message": "Preset mode control failed ({error_type})"
     },
@@ -313,6 +327,9 @@
     },
     "preset_schedule_set_rejected": {
       "message": "Fluidra API rejected the preset schedule update for {device_id}"
+    },
+    "pump_speed_set_failed": {
+      "message": "Failed to set the pump speed"
     },
     "schedule_clear_failed": {
       "message": "Fluidra API call failed while clearing the schedule for {device_id}"

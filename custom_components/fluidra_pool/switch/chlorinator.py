@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
+from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
 from ..const import DOMAIN, OPTIMISTIC_ACTION_TIMEOUT, SWITCH_CONFIRMATION_DELAY
@@ -124,7 +125,8 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
         ) as err:
             _LOGGER.debug("Failed to enable boost mode: %s", err)
             self._clear_pending_state()
-            raise
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="boost_set_failed") from err
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn boost mode off with optimistic UI."""
@@ -152,7 +154,8 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
         ) as err:
             _LOGGER.debug("Failed to disable boost mode: %s", err)
             self._clear_pending_state()
-            raise
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="boost_set_failed") from err
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -232,6 +235,8 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
         ) as err:
             _LOGGER.debug("Failed to turn on chlorinator: %s", err)
             self._clear_pending_state()
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="chlorinator_set_failed") from err
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the chlorinator off."""
@@ -257,6 +262,8 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
         ) as err:
             _LOGGER.debug("Failed to turn off chlorinator: %s", err)
             self._clear_pending_state()
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="chlorinator_set_failed") from err
 
     @property
     def extra_state_attributes(self) -> dict:

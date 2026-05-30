@@ -5,12 +5,15 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import aiohttp
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DEVICE_TYPE_PUMP, FluidraPoolConfigEntry
+from .api_resilience import FluidraError
+from .const import DEVICE_TYPE_PUMP, DOMAIN, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolControlEntity
@@ -86,7 +89,9 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
         self._chlorination_step = DeviceIdentifier.get_feature(self.device_data, "chlorination_step", 10)
         self._attr_native_step = self._chlorination_step
         self._attr_native_unit_of_measurement = PERCENTAGE
-        self._attr_device_class = NumberDeviceClass.POWER_FACTOR
+        # Chlorination level is a dimensionless dosage percentage — no standard
+        # device_class fits (POWER_FACTOR is electrical and misleads the frontend).
+        self._attr_device_class = None
 
     def _level_components(self) -> tuple[Any, Any]:
         """Resolve (read, write) components, supporting int or dict feature shapes."""
@@ -123,7 +128,10 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
         step = self._chlorination_step
         int_value = round(value / step) * step
 
-        success = await self._api.control_device_component(self._device_id, write_component, int_value)
+        try:
+            success = await self._api.control_device_component(self._device_id, write_component, int_value)
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="number_set_failed") from err
         if success:
             await self.coordinator.async_request_refresh()
         else:
@@ -212,7 +220,10 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
         else:
             write_component = ph_config
 
-        success = await self._api.control_device_component(self._device_id, write_component, int_value)
+        try:
+            success = await self._api.control_device_component(self._device_id, write_component, int_value)
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="number_set_failed") from err
         if success:
             await self.coordinator.async_request_refresh()
         else:
@@ -315,7 +326,10 @@ class FluidraChlorinatorOrpSetpoint(FluidraPoolControlEntity, NumberEntity):
         else:
             write_component = orp_config
 
-        success = await self._api.control_device_component(self._device_id, write_component, int_value)
+        try:
+            success = await self._api.control_device_component(self._device_id, write_component, int_value)
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="number_set_failed") from err
         if success:
             await self.coordinator.async_request_refresh()
         else:
@@ -387,7 +401,10 @@ class FluidraLightEffectSpeed(FluidraPoolControlEntity, NumberEntity):
         """Set effect speed to component 20."""
         int_value = int(value)
 
-        success = await self._api.set_component_value(self._device_id, 20, int_value)
+        try:
+            success = await self._api.set_component_value(self._device_id, 20, int_value)
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="number_set_failed") from err
         if success:
             await self.coordinator.async_request_refresh()
 
