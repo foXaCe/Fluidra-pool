@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.39.0] - 2026-05-30
+
+### Added
+- **Gre SWGA chlorinator** support (PR #71 by @Manuvilla233)
+  - New `LC25050627*` config (tecnoLC2 family): chlorination level (10), pH setpoint (16), boost (103), and pH/temperature/salinity sensors (165/172/174). Mapping confirmed against the official Fluidra Pool app.
+
+### Fixed
+- **Pump auto mode now activates from standby** — a variable-speed pump in standby silently ignored the auto-mode command (the API returned 200 but the toggle snapped back off, mirroring the official app's "equipment off, turn it on to start receiving data"). `enable_auto_mode` now powers the pump on first, then enables auto mode.
+- **Blue Connect device-id / signal-strength swap** (Issue #69) — the BC3 probe reorders its info components (0 = RSSI, 1 = serial, 2 = hardware UID) versus the Fluidra standard layout, which made Device Info show the signal value as the device id and vice versa. A new per-family `info_layout` flag remaps the slots for `WA*` / BC3 devices; all other devices keep the default layout.
+- **Duplicate offline/connected device entries** (Issue #69) — the device-tree endpoint can return the same WiFi/BLE unit twice (an offline cloud-shadow plus a live connected entry sharing one id). Discovery now de-duplicates by device id, keeping the connected entry.
+
 ## [2.38.0] - 2026-05-29
 
 ### Added
