@@ -31,7 +31,10 @@ GENERIC_CONFIGS: dict[str, DeviceConfig] = {
     "generic_heater": DeviceConfig(
         device_type="heater",
         components_range=25,
-        entities=["switch", "sensor_temperature"],
+        # A generic heater never satisfies the temperature-sensor conditions
+        # (no target_temperature, no z550/z260 feature), so "sensor_temperature"
+        # was a dead declaration that created no entity.
+        entities=["switch"],
         features={},
         priority=20,
     ),

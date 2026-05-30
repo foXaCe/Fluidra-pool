@@ -56,7 +56,9 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             "sensor_info",
             "sensor_temperature",
             "sensor_running_hours",
-            "binary_sensor_no_flow",
+            # No-flow is surfaced on the climate entity (no_flow_alarm attribute /
+            # hvac_action "no_flow"), not as a separate binary_sensor: there is no
+            # binary_sensor platform, so "binary_sensor_no_flow" was a dead token.
         ],
         features={
             "z260iq_mode": True,  # Flag for Z260iQ-specific handling.

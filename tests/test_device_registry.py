@@ -72,6 +72,16 @@ class TestDeviceConfigRegistry:
         assert "orp" in sensors
         assert "temperature" in sensors
 
+    def test_z260iq_config_drops_dead_binary_sensor_token(self):
+        """No binary_sensor platform exists, so the token must not be declared (device_registry-1)."""
+        config = DEVICE_CONFIGS["z260iq_heat_pump"]
+        assert "binary_sensor_no_flow" not in config.entities
+
+    def test_generic_heater_config_drops_dead_temperature_token(self):
+        """A generic heater never creates a temperature sensor; the token was dead (device_registry-3)."""
+        config = DEVICE_CONFIGS["generic_heater"]
+        assert config.entities == ["switch"]
+
 
 class TestMatchesPattern:
     """Test DeviceIdentifier._matches_pattern."""
