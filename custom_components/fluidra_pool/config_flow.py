@@ -14,6 +14,11 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, CONF_SCAN_INTERVAL
 from homeassistant.core import callback
+from homeassistant.helpers.selector import (
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 import voluptuous as vol
 
 from .api_resilience import (
@@ -28,10 +33,14 @@ from .utils import mask_email
 
 _LOGGER = logging.getLogger(__name__)
 
+# Modern HA selectors: render an email keyboard and a masked password field.
+_EMAIL_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.EMAIL, autocomplete="username"))
+_PASSWORD_SELECTOR = TextSelector(TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password"))
+
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_EMAIL): str,
-        vol.Required(CONF_PASSWORD): str,
+        vol.Required(CONF_EMAIL): _EMAIL_SELECTOR,
+        vol.Required(CONF_PASSWORD): _PASSWORD_SELECTOR,
     }
 )
 
@@ -131,6 +140,7 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
                         self._abort_if_unique_id_configured()
                     return self.async_update_reload_and_abort(
                         reconfigure_entry,
+                        unique_id=self._pending_email.lower(),
                         data=entry_data,
                         reason="reconfigure_successful",
                     )
@@ -196,8 +206,8 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_EMAIL, default=existing_email): str,
-                    vol.Required(CONF_PASSWORD): str,
+                    vol.Required(CONF_EMAIL, default=existing_email): _EMAIL_SELECTOR,
+                    vol.Required(CONF_PASSWORD): _PASSWORD_SELECTOR,
                 }
             ),
             errors=errors,
@@ -235,6 +245,7 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
 
                 return self.async_update_reload_and_abort(
                     reconfigure_entry,
+                    unique_id=email.lower(),
                     data={
                         CONF_EMAIL: email,
                         CONF_PASSWORD: password,
@@ -249,8 +260,8 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="reconfigure",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_EMAIL, default=existing_email): str,
-                    vol.Required(CONF_PASSWORD): str,
+                    vol.Required(CONF_EMAIL, default=existing_email): _EMAIL_SELECTOR,
+                    vol.Required(CONF_PASSWORD): _PASSWORD_SELECTOR,
                 }
             ),
             errors=errors,
@@ -362,11 +373,3 @@ class FluidraPoolOptionsFlowHandler(OptionsFlow):
                 }
             ),
         )
-
-
-class CannotConnect(Exception):
-    """Error to indicate we cannot connect."""
-
-
-class InvalidAuth(Exception):
-    """Error to indicate there is invalid auth."""
