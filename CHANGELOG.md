@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.39.1] - 2026-05-30
+
 ### Added
 - **Localized error feedback for every device command** — heater / heat-pump / chlorinator / boost switches, pump-speed / chlorinator-mode / light-effect selects, the pH/ORP/chlorination/effect-speed numbers and the light brightness/colour now raise a translated `HomeAssistantError` when the Fluidra API call fails, instead of silently reverting or leaking a raw exception. New exception strings in all four languages (en/fr/es/pt): `pump_speed_set_failed`, `chlorinator_mode_set_failed`, `chlorinator_set_failed`, `boost_set_failed`, `heater_set_failed`, `heat_pump_set_failed`, `number_set_failed`.
 - **Exhaustive test suite** — coverage raised from 66% to 94% (587 → 1160 tests): end-to-end setup/unload/services, reauth/reconfigure/MFA and options flows, climate/sensor/number/light/select/switch/time entities, platform-setup paths and API error paths.
