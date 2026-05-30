@@ -740,6 +740,37 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=92,
     ),
+    "lc25050627_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # LC25050627 — bridged chlorinator (tecnoLC2 family).
+        # Mapping confirmed by full component scan (Issue #XX).
+        # c0   = ON/OFF switch.
+        # c10  = chlorination level (0-100%).
+        # c16  = pH setpoint (÷100).
+        # c165 = pH measured (÷100) — e.g. 720 = 7.20 pH.
+        # c172 = temperature (°C × 10) — e.g. 284 = 28.4°C.
+        # c174 = salinity (g/L × 100) — e.g. 536 = 5.36 g/L.
+        # No ORP probe on this model (c20/c170 are None).
+        identifier_patterns=["LC25050627*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "on_off_component": 0,
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "boost_mode": 103,
+            "skip_mode_select": True,
+            "sensors": {
+                "ph": 165,
+                "temperature": 172,
+                "salinity": 174,
+            },
+            "specific_components": [0, 10, 16, 103, 165, 172, 174],
+        },
+        priority=90,
+    ),
     "ns25_exo_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["NS*"],
