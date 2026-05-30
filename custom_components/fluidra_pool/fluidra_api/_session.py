@@ -134,8 +134,17 @@ class SessionMixin(FluidraAPIBase):
                     backoff = min(backoff * BACKOFF_MULTIPLIER, MAX_BACKOFF)
                     continue
 
-                if 200 <= status < 300 and not skip_circuit_breaker:
-                    self._circuit_breaker.record_success()
+                if not skip_circuit_breaker:
+                    if 200 <= status < 300:
+                        self._circuit_breaker.record_success()
+                    elif status in RETRYABLE_STATUSES:
+                        # Retries exhausted on a persistent 5xx/429: count exactly
+                        # one failure so the breaker can open for sustained
+                        # HTTP-level outages, not only raw network/timeout errors.
+                        # Reaching here with a retryable status means
+                        # transient_attempts >= MAX_RETRIES (the retry branch above
+                        # would otherwise have continued).
+                        self._circuit_breaker.record_failure()
 
                 return status, parse_json(raw_text), raw_text
 
