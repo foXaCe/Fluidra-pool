@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Localized error feedback for every device command** — heater / heat-pump / chlorinator / boost switches, pump-speed / chlorinator-mode / light-effect selects, the pH/ORP/chlorination/effect-speed numbers and the light brightness/colour now raise a translated `HomeAssistantError` when the Fluidra API call fails, instead of silently reverting or leaking a raw exception. New exception strings in all four languages (en/fr/es/pt): `pump_speed_set_failed`, `chlorinator_mode_set_failed`, `chlorinator_set_failed`, `boost_set_failed`, `heater_set_failed`, `heat_pump_set_failed`, `number_set_failed`.
+- **Exhaustive test suite** — coverage raised from 66% to 94% (587 → 1131 tests): end-to-end setup/unload/services, reauth/reconfigure/MFA and options flows, climate/sensor/number/light/select/switch/time entities, platform-setup paths and API error paths.
+
+### Changed
+- **Config-flow credentials use modern selectors** — email renders an email keyboard and the password field is now masked (`TextSelector`) across the user, reauth and reconfigure steps.
+- **API client closed on unload** — `async_unload_entry` now closes the API client (a no-op for the shared HA session, tidy for an owned session).
+- **Coordinator typing** — `FluidraDataUpdateCoordinator` is now `DataUpdateCoordinator[dict[str, Any]]` with an explicit `_async_update_data` return type and precise generic annotations on internal helpers.
+
+### Fixed
+- **Reconfigure with a changed email** now updates the config-entry `unique_id` to the new address (it previously kept the old one).
+- **Malformed pool without an id** no longer crashes the coordinator's update (which sent the entry to retry); such pools are skipped with a warning.
+- **`select.chlorinator` mode getter** no longer mutates state — the optimistic value is cleared in the coordinator-update callback, keeping `current_option` a pure read.
+- **Light brightness/colour command failures** roll back the optimistic state and raise a localized error instead of leaving an unconfirmed UI state.
+- **Pump/chlorinator schedule time entities** catch CRON/parsing errors (`ValueError`/`TypeError`/`KeyError`/`AttributeError`) and surface a localized error.
+- **Chlorination-level number** dropped the misleading `POWER_FACTOR` device class (it is a dimensionless percentage).
+
+### Removed
+- Dead code: the unused `CannotConnect`/`InvalidAuth` config-flow exceptions, the never-called `_cleanup_schedule_sensor_if_empty` coordinator method, the unused discovery `confirm` step from `strings.json` and all four translations, and redundant sensor property overrides.
+
 ## [2.39.0] - 2026-05-30
 
 ### Added
