@@ -11,7 +11,7 @@ from typing import Any
 import aiohttp
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.debounce import Debouncer
@@ -103,7 +103,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
                     device_registry.async_remove_device(device_entry.id)
 
-        except HomeAssistantError as err:
+        except Exception as err:  # best-effort cleanup must never fail the poll
+            # async_remove_device can raise a bare KeyError when a device is
+            # removed concurrently (the device registry has no guard, unlike the
+            # entity registry). A best-effort cleanup must never propagate and
+            # fail the whole poll, so catch broadly and only log.
             _LOGGER.debug("Failed to cleanup removed devices: %s", err)
 
     # Kept as a thin wrapper so existing callers (and tests) keep working.
@@ -229,9 +233,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 except (ValueError, TypeError):
                     pass
         elif component_id == 15:
-            device["component_15_speed"] = reported_value or component_state.get("desiredValue") or 0
-            temp_raw = reported_value or component_state.get("desiredValue")
-            if device.get("type", "").lower() == "heat_pump" and temp_raw:
+            desired_value = component_state.get("desiredValue")
+            # Use `is not None` (not `or`) so a legitimate reported 0 is preserved
+            # instead of silently falling back to desiredValue.
+            raw_value = reported_value if reported_value is not None else desired_value
+            device["component_15_speed"] = raw_value if raw_value is not None else 0
+            temp_raw = raw_value
+            if device.get("type", "").lower() == "heat_pump" and temp_raw is not None:
                 try:
                     temp_value = float(temp_raw) / 10.0
                     if 10.0 <= temp_value <= 50.0:
@@ -398,7 +406,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         pool.get("id"),
                         err,
                     )
-                    prev_pool = previous_data.get(pool.get("id"))
+                    prev_pool = previous_data.get(pool["id"])
                     if prev_pool:
                         pool.update(prev_pool)
 

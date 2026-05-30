@@ -297,3 +297,50 @@ def test_auto_speed_compares_clock_time_inclusively() -> None:
 
     # Reference the unused symbol so it's actually used (it's part of the test).
     assert isinstance(time(12, 0), time)
+
+
+@pytest.mark.parametrize("hour", [22, 23, 2, 5])
+def test_auto_speed_active_during_overnight_window(hour) -> None:
+    """An overnight schedule (22:00→06:00, start > end) is active before and after midnight.
+
+    Regression for the wrap-around bug: the old same-day-only comparison
+    `start <= current <= end` was False for every clock time when start > end,
+    so an overnight pump cycle was reported as stopped (0%) all night.
+    """
+    device = _device_with_schedules(
+        [
+            {
+                "enabled": True,
+                "startTime": "0 22 * * *",  # 22:00 every day.
+                "endTime": "0 6 * * *",  # 06:00 the next morning.
+                "startActions": {"operationName": "1"},
+            }
+        ]
+    )
+    fake_now = datetime(2026, 5, 27, hour, 0, tzinfo=UTC)
+    with patch(
+        "custom_components.fluidra_pool.coordinator._parsers.dt_util.now",
+        return_value=fake_now,
+    ):
+        assert calculate_auto_speed_from_schedules(device) == 65
+
+
+@pytest.mark.parametrize("hour", [7, 12, 21])
+def test_auto_speed_inactive_outside_overnight_window(hour) -> None:
+    """The same overnight schedule reports 0% during the daytime gap (06:00→22:00)."""
+    device = _device_with_schedules(
+        [
+            {
+                "enabled": True,
+                "startTime": "0 22 * * *",
+                "endTime": "0 6 * * *",
+                "startActions": {"operationName": "1"},
+            }
+        ]
+    )
+    fake_now = datetime(2026, 5, 27, hour, 0, tzinfo=UTC)
+    with patch(
+        "custom_components.fluidra_pool.coordinator._parsers.dt_util.now",
+        return_value=fake_now,
+    ):
+        assert calculate_auto_speed_from_schedules(device) == 0

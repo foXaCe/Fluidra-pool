@@ -178,12 +178,18 @@ def calculate_auto_speed_from_schedules(device: dict) -> int:
             end_time_obj = _parse_cron_time(schedule.get("endTime", ""))
             schedule_days = _parse_cron_days(schedule.get("startTime", ""))
 
-            if (
-                start_time_obj
-                and end_time_obj
-                and current_weekday in schedule_days
-                and start_time_obj <= current_time <= end_time_obj
-            ):
+            if not (start_time_obj and end_time_obj and current_weekday in schedule_days):
+                continue
+
+            # Wrap-aware window: an overnight schedule (start > end, e.g. 22:00→06:00)
+            # is active when the current time is after the start OR before the end.
+            # Mirrors the midnight-wrapping logic in time/base._minute_intervals.
+            if start_time_obj <= end_time_obj:
+                in_window = start_time_obj <= current_time <= end_time_obj
+            else:
+                in_window = current_time >= start_time_obj or current_time <= end_time_obj
+
+            if in_window:
                 operation = schedule.get("startActions", {}).get("operationName", "0")
                 return _OPERATION_TO_PERCENT.get(operation, 0)
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -135,6 +135,23 @@ class TestProcessComponentState:
         coordinator._process_component_state(device, "pool_001", 15, {"reportedValue": 5})
         assert "target_temperature" not in device
 
+    async def test_component_15_preserves_reported_zero(self, coordinator: FluidraDataUpdateCoordinator):
+        """A legitimate reported 0 must be kept, not replaced by desiredValue (coordinator-2)."""
+        device = {"device_id": "test", "type": "heat_pump", "components": {}}
+        coordinator._process_component_state(device, "pool_001", 15, {"reportedValue": 0, "desiredValue": 290})
+        assert device["component_15_speed"] == 0
+        # 0 is out of the 10-50 valid range, so no target_temperature is derived.
+        assert "target_temperature" not in device
+
+    async def test_component_15_falls_back_to_desired_when_reported_missing(
+        self, coordinator: FluidraDataUpdateCoordinator
+    ):
+        """When reportedValue is absent, desiredValue is still used."""
+        device = {"device_id": "test", "type": "heat_pump", "components": {}}
+        coordinator._process_component_state(device, "pool_001", 15, {"desiredValue": 290})
+        assert device["component_15_speed"] == 290
+        assert device["target_temperature"] == 29.0
+
     async def test_component_20_chlorinator_mode(self, coordinator: FluidraDataUpdateCoordinator):
         device = {"device_id": "test", "type": "chlorinator", "components": {}}
         coordinator._process_component_state(device, "pool_001", 20, {"reportedValue": 2})
@@ -145,6 +162,45 @@ class TestProcessComponentState:
         device = {"device_id": "test", "type": "pump", "components": {}}
         coordinator._process_component_state(device, "pool_001", 20, {"reportedValue": schedule})
         assert device["schedule_data"] == schedule
+
+
+class TestCleanupRemovedDevices:
+    """Test _cleanup_removed_devices best-effort behaviour."""
+
+    async def test_cleanup_swallows_registry_keyerror(self, hass: HomeAssistant, mock_api: AsyncMock):
+        """A KeyError from async_remove_device must not propagate / fail the poll (coordinator-4).
+
+        The device registry's async_remove_device raises a bare KeyError when a
+        device was removed concurrently; the best-effort cleanup must absorb it.
+        """
+        entry = MagicMock()
+        entry.entry_id = "entry_1"
+        entry.options = {}  # Keep the default scan interval (avoid a MagicMock timedelta).
+        coord = FluidraDataUpdateCoordinator(hass, mock_api, config_entry=entry)
+        # The base DataUpdateCoordinator overwrites config_entry from a ContextVar that
+        # isn't set in tests; pin it back so cleanup runs instead of early-returning.
+        coord.config_entry = entry
+
+        device_entry = MagicMock()
+        device_entry.id = "dev_reg_1"
+        device_entry.model = "Pump"  # Not a "Pool" parent, so it is eligible for removal.
+        device_entry.identifiers = {("fluidra_pool", "serial_gone")}
+
+        dev_reg = MagicMock()
+        dev_reg.async_remove_device.side_effect = KeyError("already removed")
+        ent_reg = MagicMock()
+
+        module = "custom_components.fluidra_pool.coordinator.coordinator"
+        with (
+            patch(f"{module}.dr.async_get", return_value=dev_reg),
+            patch(f"{module}.dr.async_entries_for_config_entry", return_value=[device_entry]),
+            patch(f"{module}.er.async_get", return_value=ent_reg),
+            patch(f"{module}.er.async_entries_for_device", return_value=[]),
+        ):
+            # "serial_gone" is absent from the current set → removal is attempted and raises.
+            await coord._cleanup_removed_devices(current_device_ids={"still_here"})
+
+        dev_reg.async_remove_device.assert_called_once_with("dev_reg_1")
 
 
 class TestParseDM24049704Schedule:
