@@ -26,7 +26,7 @@ from ._parsers import calculate_auto_speed_from_schedules, parse_dm24049704_sche
 _LOGGER = logging.getLogger(__name__)
 
 
-class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
+class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Class to manage fetching data from the Fluidra Pool API."""
 
     def __init__(
@@ -68,7 +68,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
             return []
         return [{"id": pool_id, **pool_data} for pool_id, pool_data in self.data.items()]
 
-    async def _cleanup_removed_devices(self, current_device_ids: set):
+    async def _cleanup_removed_devices(self, current_device_ids: set[str]) -> None:
         """Remove devices and entities that no longer exist in Fluidra API."""
         if not self.config_entry:
             return
@@ -106,25 +106,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         except HomeAssistantError as err:
             _LOGGER.debug("Failed to cleanup removed devices: %s", err)
 
-    async def _cleanup_schedule_sensor_if_empty(self, pool_id: str, device_id: str, schedule_data: list):
-        """Clean up schedule sensor entity if no schedules remain."""
-        try:
-            if len(schedule_data) == 0:
-                entity_registry = er.async_get(self.hass)
-
-                # Unique-id format for the schedule sensor.
-                expected_unique_id = f"fluidra_pool_{pool_id}_{device_id}_sensor_schedules"
-
-                for entity_id, entry in entity_registry.entities.items():
-                    if entry.platform == "fluidra_pool" and entry.unique_id == expected_unique_id:
-                        entity_registry.async_remove(entity_id)
-                        break
-
-        except HomeAssistantError as err:
-            _LOGGER.debug("Failed to cleanup schedule sensor: %s", err)
-
     # Kept as a thin wrapper so existing callers (and tests) keep working.
-    def _parse_dm24049704_schedule_format(self, reported_value: dict) -> list:
+    def _parse_dm24049704_schedule_format(self, reported_value: dict) -> list[dict]:
         """Parse DM24049704 chlorinator schedule format (programs/slots) to standard format."""
         return parse_dm24049704_schedule_format(reported_value)
 
@@ -150,10 +133,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
 
         component_states: dict[int, dict] = {}
         for result in results:
-            if isinstance(result, tuple):
-                cid, state = result
-                if state and isinstance(state, dict):
-                    component_states[cid] = state
+            if isinstance(result, BaseException):
+                # Keep a diagnostic trace instead of silently dropping the failure.
+                _LOGGER.debug("Component fetch failed for device %s: %s", device_id, result)
+                continue
+            cid, state = result
+            if state and isinstance(state, dict):
+                component_states[cid] = state
         return component_states
 
     def _process_component_state(self, device: dict, pool_id: str, component_id: int, component_state: dict) -> None:
@@ -362,13 +348,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                 self._track_schedule_count(pool_id, device_id, schedule_data)
             device[f"component_{component_id}_data"] = component_state
 
-    def _track_schedule_count(self, pool_id: str, device_id: str, schedule_data: list) -> None:
+    def _track_schedule_count(self, pool_id: str, device_id: str, schedule_data: list[dict]) -> None:
         """Track schedule count changes for cleanup."""
         device_key = f"{pool_id}_{device_id}"
         # Cleanup happens asynchronously in a separate task to avoid blocking.
         self._previous_schedule_entities[device_key] = len(schedule_data)
 
-    async def _async_update_data(self):
+    async def _async_update_data(self) -> dict[str, Any]:
         """Update data via library using optimized parallel polling."""
         try:
             if not await self.api.ensure_valid_token():
@@ -385,6 +371,14 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
                 )
 
             pools = await self.api.get_pools()
+
+            # Defensively drop malformed pools without an id so a single bad entry
+            # can't crash the whole update with a KeyError (it would otherwise send
+            # the entry to SETUP_RETRY instead of degrading gracefully).
+            valid_pools = [pool for pool in pools if pool.get("id") is not None]
+            if len(valid_pools) != len(pools):
+                _LOGGER.warning("Ignoring %d Fluidra pool(s) without an id", len(pools) - len(valid_pools))
+            pools = valid_pools
 
             # Fast startup: minimal data on first update.
             if self._first_update:
