@@ -355,3 +355,45 @@ async def test_chlorinator_schedule_on_component_20_tracked(coordinator: Fluidra
     schedule = [{"id": 1}, {"id": 2}]
     coordinator._process_component_state(device, "pool_001", 20, {"reportedValue": schedule})
     assert coordinator._previous_schedule_entities["pool_001_TEST-1"] == 2
+
+
+# --- Blue Connect info-component layout (Issue #69) ----------------------
+
+
+async def test_blue_connect_component_0_is_signal_not_device_id(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """With the Blue Connect layout, component 0 is the RSSI, not the device id."""
+    device = _pinned_device(features={"info_layout": "blue_connect"})
+    coordinator._process_component_state(device, "pool_001", 0, {"reportedValue": -44})
+    assert device["signal_strength_component"] == -44
+    assert "device_id_component" not in device
+
+
+async def test_blue_connect_component_1_is_device_id(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """With the Blue Connect layout, component 1 holds the serial / device id."""
+    device = _pinned_device(features={"info_layout": "blue_connect"})
+    coordinator._process_component_state(device, "pool_001", 1, {"reportedValue": "QX25002362"})
+    assert device["device_id_component"] == "QX25002362"
+    assert "part_numbers_component" not in device
+
+
+async def test_blue_connect_component_2_is_hardware_uid_not_signal(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """With the Blue Connect layout, component 2 is the hardware UID, not RSSI."""
+    device = _pinned_device(features={"info_layout": "blue_connect"})
+    coordinator._process_component_state(device, "pool_001", 2, {"reportedValue": "AXR080700451258659"})
+    assert device["part_numbers_component"] == "AXR080700451258659"
+    assert "signal_strength_component" not in device
+
+
+async def test_standard_layout_unchanged_without_info_layout(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """Devices without info_layout keep the default slot mapping."""
+    device = _pinned_device()
+    coordinator._process_component_state(device, "pool_001", 0, {"reportedValue": "DEV-ID"})
+    coordinator._process_component_state(device, "pool_001", 2, {"reportedValue": -65})
+    assert device["device_id_component"] == "DEV-ID"
+    assert device["signal_strength_component"] == -65

@@ -29,6 +29,9 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
         features={
             # No mode select (probe-only device).
             "skip_mode_select": True,
+            # Blue Connect reorders the info components vs the Fluidra standard:
+            # comp 0 = RSSI, comp 1 = serial, comp 2 = hardware UID (Issue #69).
+            "info_layout": "blue_connect",
             # No chlorination_level — probe doesn't dose.
             "sensors": {
                 "temperature": 12,  # Water temperature (direct °C).

@@ -168,17 +168,35 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator):
         # Store ALL component data.
         device["components"][str(component_id)] = component_state
 
+        # Info-component layout. Fluidra's standard slots are 0=device-id,
+        # 1=part-numbers, 2=signal/RSSI, 3=firmware. The Blue Connect (BC3)
+        # reorders them — 0=RSSI, 1=serial, 2=hardware-UID — which made the
+        # device-info sensor show the signal as the device id and vice versa
+        # (Issue #69). "info_layout" lets a family override the mapping while
+        # everyone else keeps the default.
+        bc_info_layout = DeviceIdentifier.get_feature(device, "info_layout") == "blue_connect"
+
         if component_id == 0:
-            device["device_id_component"] = reported_value
+            if bc_info_layout:
+                if not DeviceIdentifier.has_feature(device, "skip_signal"):
+                    device["signal_strength_component"] = reported_value
+            else:
+                device["device_id_component"] = reported_value
             if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
                 try:
                     device["running_hours"] = int(reported_value)
                 except (ValueError, TypeError):
                     pass
         elif component_id == 1:
-            device["part_numbers_component"] = reported_value
+            if bc_info_layout:
+                device["device_id_component"] = reported_value
+            else:
+                device["part_numbers_component"] = reported_value
         elif component_id == 2:
-            if not DeviceIdentifier.has_feature(device, "skip_signal"):
+            if bc_info_layout:
+                # Hardware UID on Blue Connect — not an RSSI value.
+                device["part_numbers_component"] = reported_value
+            elif not DeviceIdentifier.has_feature(device, "skip_signal"):
                 device["signal_strength_component"] = reported_value
         elif component_id == 3:
             if not DeviceIdentifier.has_feature(device, "skip_firmware"):
