@@ -56,6 +56,17 @@ class TestAsyncUpdateData:
         assert "pool_001" in result
         assert coordinator._first_update is False
 
+    async def test_pools_without_id_are_dropped(self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock):
+        """A malformed pool without an id must be skipped, not crash the update."""
+        mock_api.ensure_valid_token.return_value = True
+        mock_api.get_pools.return_value = [
+            {"id": "pool_001", "name": "Good", "devices": []},
+            {"name": "No id", "devices": []},
+        ]
+        result = await coordinator._async_update_data()
+        assert "pool_001" in result
+        assert len(result) == 1
+
     async def test_second_update_fetches_components(
         self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
     ):
