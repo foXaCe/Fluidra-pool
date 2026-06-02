@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.39.2] - 2026-06-01
+
+### Fixed
+- **Zodiac GenSalt OE iQ pH 12 Evo chlorinator** (`CC25052635`, Issue #73) — the generic profile read component 172 as pH, but on this Zodiac OE iQ (tecnoLC2) model component 172 is the water temperature, so pH showed ~2.9 and temperature/salinity stayed empty. A dedicated profile now maps pH (c165), temperature (c172), salinity (c174) and ORP (c177) and scans the correct components.
+
 ## [2.39.1] - 2026-05-30
 
 ### Added
