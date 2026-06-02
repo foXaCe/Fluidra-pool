@@ -94,18 +94,23 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
 
     def test_cc25052635_identifies_over_generic_chlorinator(self):
-        """A CC25052635.nn_1 device matches its dedicated config, not the generic *.nn_* one (Issue #73)."""
-        device = {
-            "device_id": "CC25052635.nn_1",
-            "name": "Chlorinator",
-            "family": "Chlorinators",
-            "type": "chlorinator",
-            "model": "Chlorinator",
-            "components": {"172": {"reportedValue": 290}},
-        }
-        config = DeviceIdentifier.identify_device(device)
-        assert config is DEVICE_CONFIGS["cc25052635_chlorinator"]
-        assert config.features["sensors"]["temperature"] == 172
+        """GenSalt OE iQ units match their dedicated config, not the generic *.nn_* one (Issue #73).
+
+        Different units carry different cloud serials for the same model, so both
+        reported serials must resolve to the dedicated profile.
+        """
+        for serial in ("CC25052635.nn_1", "CC25046312.nn_1"):
+            device = {
+                "device_id": serial,
+                "name": "Chlorinator",
+                "family": "Chlorinators",
+                "type": "chlorinator",
+                "model": "Chlorinator",
+                "components": {"172": {"reportedValue": 290}},
+            }
+            config = DeviceIdentifier.identify_device(device)
+            assert config is DEVICE_CONFIGS["cc25052635_chlorinator"], serial
+            assert config.features["sensors"]["temperature"] == 172
 
 
 class TestMatchesPattern:

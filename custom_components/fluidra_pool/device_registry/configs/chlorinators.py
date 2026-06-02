@@ -36,15 +36,15 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     ),
     "cc25052635_chlorinator": DeviceConfig(
         device_type="chlorinator",
-        # Zodiac GenSalt OE iQ pH 12 Evo — Issue #73.
-        # Cloud id CC25052635.nn_1, unit serial 2600000811569.
-        # Same Zodiac OE iQ tecnoLC2 layout as lc25050627 (c10 level, c16 pH
-        # setpoint, c165 pH, c172 temperature ×10, c174 salinity ×100) — confirmed
-        # here by the reporter's diagnostics: c172 = 290 = 29.0°C (the generic
-        # config wrongly read c172 as pH → 2.9). This Evo variant additionally
-        # exposes ORP: the app setpoint 690 mV matches c20; the measured value is
-        # mapped to c177 (755 in the dump) and c170 is also scanned, to confirm.
-        identifier_patterns=["CC25052635*"],
+        # Zodiac GenSalt OE iQ pH 12 Evo (tecnoLC2) — Issue #73.
+        # The Fluidra API exposes no model field (name/family/model are all the
+        # generic "Chlorinator"/"Chlorinators" and comp7 is empty), so units are
+        # matched by their cloud serial. Add new ones here as they are reported.
+        # Mapping confirmed by two users (CC25052635 + CC25046312): c172 = water
+        # temperature (×10, 290/296 = 29.0/29.6 °C — the generic config wrongly
+        # read c172 as pH → 2.9), c165 = pH, c174 = salinity, c177 = ORP measured
+        # (755 mV with an ORP probe vs ~2 without one), c20 = ORP setpoint.
+        identifier_patterns=["CC25052635*", "CC25046312*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
@@ -57,8 +57,8 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "skip_mode_select": True,
             "sensors": {
                 "ph": 165,  # pH measured (÷100).
-                "orp": 177,  # ORP measured (mV) — to confirm vs c170.
-                "temperature": 172,  # Water temperature (°C × 10) — confirmed 290 = 29.0°C.
+                "orp": 177,  # ORP measured (mV) — confirmed: 755 with probe vs ~2 without.
+                "temperature": 172,  # Water temperature (°C × 10) — confirmed 290/296.
                 "salinity": 174,  # Salinity (g/L × 100).
             },
             "specific_components": [0, 10, 16, 20, 103, 165, 170, 172, 174, 177],
