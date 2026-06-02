@@ -82,6 +82,31 @@ class TestDeviceConfigRegistry:
         config = DEVICE_CONFIGS["generic_heater"]
         assert config.entities == ["switch"]
 
+    def test_cc25052635_zodiac_gensalt_oe_iq_uses_teclc2_layout(self):
+        """Zodiac GenSalt OE iQ pH 12 Evo (CC25052635) maps sensors on the tecnoLC2 layout (Issue #73)."""
+        config = DEVICE_CONFIGS["cc25052635_chlorinator"]
+        assert config.device_type == "chlorinator"
+        assert "CC25052635*" in config.identifier_patterns
+        sensors = config.features["sensors"]
+        # c172 is temperature here (confirmed 290 = 29.0°C), not pH as the generic config assumed.
+        assert sensors["temperature"] == 172
+        assert sensors["ph"] == 165
+        assert sensors["salinity"] == 174
+
+    def test_cc25052635_identifies_over_generic_chlorinator(self):
+        """A CC25052635.nn_1 device matches its dedicated config, not the generic *.nn_* one (Issue #73)."""
+        device = {
+            "device_id": "CC25052635.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 290}},
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is DEVICE_CONFIGS["cc25052635_chlorinator"]
+        assert config.features["sensors"]["temperature"] == 172
+
 
 class TestMatchesPattern:
     """Test DeviceIdentifier._matches_pattern."""
