@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.39.3] - 2026-06-02
+
+### Fixed
+- **Second Zodiac GenSalt OE iQ pH 12 Evo unit** (`CC25046312`, Issue #73) — the same model carries a different cloud serial per unit, so a second reported serial is now matched to the dedicated profile. The c172 = temperature / c165 = pH / c174 = salinity / c177 = ORP mapping is confirmed by two independent device dumps.
+
 ## [2.39.2] - 2026-06-01
 
 ### Fixed
