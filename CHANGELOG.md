@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.1] - 2026-06-03
+
+### Fixed
+- **Blue Connect Gold salinity** (Issue #75) — the salinity sensor now reads the correct component (c16, ~5.1 g/L), instead of the conductivity raw value that the v2.40.0 best guess (c15) was showing.
+
 ## [2.40.0] - 2026-06-03
 
 ### Added
