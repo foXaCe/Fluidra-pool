@@ -128,6 +128,33 @@ class TestDeviceConfigRegistry:
             }
             assert DeviceIdentifier.identify_device(device) is config, serial
 
+    def test_blue_connect_gold_distinguished_from_silver_by_name(self):
+        """Blue Connect Gold gets its own salinity-aware profile, matched by product name (Issue #75)."""
+        gold_config = DEVICE_CONFIGS["blue_connect_gold"]
+        assert "salinity" in gold_config.features["sensors"]
+        gold = {
+            "device_id": "QX25004412",  # QX serial, not WA — matched by name instead.
+            "name": "Blue Connect Gold",
+            "family": "Data collectors",
+            "type": "unknown",
+            "model": "Blue Connect Gold",
+            "components": {"12": {"reportedValue": 21.7}},
+        }
+        assert DeviceIdentifier.identify_device(gold) is gold_config
+
+        # A Silver (WA*, not named Gold) keeps the Silver profile, which has no salinity.
+        silver = {
+            "device_id": "WA000099",
+            "name": "Chlorinator",
+            "family": "Data collectors",
+            "type": "unknown",
+            "model": "Chlorinator",
+            "components": {},
+        }
+        silver_config = DeviceIdentifier.identify_device(silver)
+        assert silver_config is DEVICE_CONFIGS["blue_connect_silver"]
+        assert "salinity" not in silver_config.features["sensors"]
+
 
 class TestMatchesPattern:
     """Test DeviceIdentifier._matches_pattern."""
