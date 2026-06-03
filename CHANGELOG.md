@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.0] - 2026-06-03
+
+### Added
+- **Zodiac Blue Connect Gold** water analyser (Issue #75) — a dedicated profile that adds a **salinity** sensor on top of the shared Blue Connect pH / ORP / temperature mapping. The Gold is matched by its product name (it shares the `BC3` thingType with the Silver but uses a `QX…` serial).
+
+### Fixed
+- **Gre SWGA40 chlorinator** (`LC24076417`, Issue #76) — mapped to the Gre SWGA (tecnoLC2, no-ORP) profile so pH / temperature / salinity / chlorination level read correctly and the spurious ORP entities are dropped (the generic profile was reading the water temperature as pH → 2.18).
+
 ## [2.39.3] - 2026-06-02
 
 ### Fixed
