@@ -68,11 +68,9 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
                 "temperature": 12,  # Direct °C.
                 "ph": 13,  # Direct decimal pH.
                 "orp": 14,  # Direct mV.
-                # Salinity isn't scanned by the Silver profile, so its component
-                # is still unconfirmed: mapped to c15 (direct g/L) as a best guess.
-                # The widened scan below captures 15-19 so a fresh diagnostics can
-                # pin down the real component if c15 is wrong.
-                "salinity": 15,
+                # Salinity confirmed on c16 (direct g/L) — 5.14 ≈ the app's 5.1 g/L
+                # (Issue #75 fresh diagnostics; c15 holds conductivity ≈ 8461, not salinity).
+                "salinity": 16,
             },
             "sensor_divisors": {
                 "temperature": 1,
@@ -80,7 +78,7 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
                 "orp": 1,
                 "salinity": 1,
             },
-            "specific_components": [12, 13, 14, 15, 16, 17, 18, 19],
+            "specific_components": [12, 13, 14, 16],
         },
         priority=90,  # Above blue_connect_silver (88) for Gold units.
     ),
