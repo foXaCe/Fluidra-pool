@@ -774,16 +774,17 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     ),
     "lc25050627_chlorinator": DeviceConfig(
         device_type="chlorinator",
-        # LC25050627 — bridged chlorinator (tecnoLC2 family).
-        # Mapping confirmed by full component scan (Issue #XX).
+        # Gre SWGA chlorinator (tecnoLC2, no ORP probe) — PR #71 + Issue #76.
+        # The same model carries a different cloud serial per unit (LC25050627,
+        # LC24076417 / SWGA40, ...); add new ones here as they are reported.
         # c0   = ON/OFF switch.
         # c10  = chlorination level (0-100%).
         # c16  = pH setpoint (÷100).
         # c165 = pH measured (÷100) — e.g. 720 = 7.20 pH.
-        # c172 = temperature (°C × 10) — e.g. 284 = 28.4°C.
+        # c172 = temperature (°C × 10) — e.g. 284 = 28.4°C (SWGA40: 218 = 21.8°C).
         # c174 = salinity (g/L × 100) — e.g. 536 = 5.36 g/L.
-        # No ORP probe on this model (c20/c170 are None).
-        identifier_patterns=["LC25050627*"],
+        # No ORP probe on this model (c20/c170/c177 are None/0).
+        identifier_patterns=["LC25050627*", "LC24076417*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],

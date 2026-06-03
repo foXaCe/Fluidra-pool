@@ -112,6 +112,22 @@ class TestDeviceConfigRegistry:
             assert config is DEVICE_CONFIGS["cc25052635_chlorinator"], serial
             assert config.features["sensors"]["temperature"] == 172
 
+    def test_gre_swga_config_has_salinity_and_no_orp(self):
+        """Gre SWGA chlorinators (incl. SWGA40) expose salinity, no ORP, matched per-serial (Issue #76)."""
+        config = DEVICE_CONFIGS["lc25050627_chlorinator"]
+        # No ORP probe on this model — salinity present, orp absent.
+        assert config.features["sensors"] == {"ph": 165, "temperature": 172, "salinity": 174}
+        for serial in ("LC25050627.nn_1", "LC24076417.nn_1"):
+            device = {
+                "device_id": serial,
+                "name": "Chlorinator",
+                "family": "Chlorinators",
+                "type": "chlorinator",
+                "model": "Chlorinator",
+                "components": {"172": {"reportedValue": 218}},
+            }
+            assert DeviceIdentifier.identify_device(device) is config, serial
+
 
 class TestMatchesPattern:
     """Test DeviceIdentifier._matches_pattern."""
