@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.2] - 2026-06-04
+
+### Fixed
+- **GenSalt OE iQ / Astralpool Clear Connect Evo ORP** (Issue #73) — ORP is now read from c170 (matching the Fluidra app) instead of the uncalibrated raw value on c177 (~50 mV off). Also adds the Astralpool Clear Connect Evo 12 serial `CC25066724` to the same profile.
+
 ## [2.40.1] - 2026-06-03
 
 ### Fixed
