@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.3] - 2026-06-04
+
+### Fixed
+- **Astralpool Clear Connect Evo 12** (`CC25066724`, Issue #73) — moved to the Clear Connect Evo profile it actually uses, instead of the Zodiac GenSalt OE iQ profile it was mistakenly added to in v2.40.2.
+
 ## [2.40.2] - 2026-06-04
 
 ### Fixed
