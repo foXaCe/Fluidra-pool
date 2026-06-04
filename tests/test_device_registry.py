@@ -92,6 +92,7 @@ class TestDeviceConfigRegistry:
         assert sensors["temperature"] == 172
         assert sensors["ph"] == 165
         assert sensors["salinity"] == 174
+        assert sensors["orp"] == 170  # ORP is c170 (matches the app), not the raw c177
 
     def test_cc25052635_identifies_over_generic_chlorinator(self):
         """GenSalt OE iQ units match their dedicated config, not the generic *.nn_* one (Issue #73).
@@ -99,7 +100,7 @@ class TestDeviceConfigRegistry:
         Different units carry different cloud serials for the same model, so both
         reported serials must resolve to the dedicated profile.
         """
-        for serial in ("CC25052635.nn_1", "CC25046312.nn_1"):
+        for serial in ("CC25052635.nn_1", "CC25046312.nn_1", "CC25066724.nn_1"):
             device = {
                 "device_id": serial,
                 "name": "Chlorinator",
