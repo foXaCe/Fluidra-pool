@@ -36,8 +36,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     ),
     "cc25052635_chlorinator": DeviceConfig(
         device_type="chlorinator",
-        # Zodiac GenSalt OE iQ pH 12 Evo / Astralpool Clear Connect Evo 12
-        # (same tecnoLC2 "OE iQ" layout — Fluidra rebadges) — Issue #73.
+        # Zodiac GenSalt OE iQ pH 12 Evo (tecnoLC2) — Issue #73.
         # The Fluidra API exposes no model field (name/family/model are all the
         # generic "Chlorinator"/"Chlorinators" and comp7 is empty), so units are
         # matched by their cloud serial. Add new ones here as they are reported.
@@ -45,7 +44,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # (×10 — the generic config wrongly read c172 as pH → 2.9), c174 = salinity,
         # c170 = ORP measured (matches the app; c177 is a close but uncalibrated raw
         # value, ~50 mV off), c20 = ORP setpoint.
-        identifier_patterns=["CC25052635*", "CC25046312*", "CC25066724*"],
+        identifier_patterns=["CC25052635*", "CC25046312*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
@@ -234,9 +233,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     ),
     "cc25102423_chlorinator": DeviceConfig(
         device_type="chlorinator",
-        # Astralpool Clear Connect Evo21 (tecnoLC2) — Issue #63 (analysis by @baracouda57).
+        # Astralpool Clear Connect Evo (Evo21 / Evo12, tecnoLC2) — Issues #63, #73.
         # Mapping matches the tecnoLC2 family (LC25000122 / LC24026011 / CC24009711).
-        identifier_patterns=["CC25102423.nn_*"],
+        # CC25066724 (Evo12) confirmed to use this exact layout by @valentinval90.
+        identifier_patterns=["CC25102423.nn_*", "CC25066724*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],

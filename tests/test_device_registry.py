@@ -100,7 +100,7 @@ class TestDeviceConfigRegistry:
         Different units carry different cloud serials for the same model, so both
         reported serials must resolve to the dedicated profile.
         """
-        for serial in ("CC25052635.nn_1", "CC25046312.nn_1", "CC25066724.nn_1"):
+        for serial in ("CC25052635.nn_1", "CC25046312.nn_1"):
             device = {
                 "device_id": serial,
                 "name": "Chlorinator",
@@ -112,6 +112,20 @@ class TestDeviceConfigRegistry:
             config = DeviceIdentifier.identify_device(device)
             assert config is DEVICE_CONFIGS["cc25052635_chlorinator"], serial
             assert config.features["sensors"]["temperature"] == 172
+
+    def test_cc25066724_astralpool_evo_uses_evo21_profile(self):
+        """The Astralpool Clear Connect Evo 12 (CC25066724) uses the Evo21 profile, not GenSalt (Issue #73)."""
+        device = {
+            "device_id": "CC25066724.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 176}},
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is DEVICE_CONFIGS["cc25102423_chlorinator"]
+        assert config is not DEVICE_CONFIGS["cc25052635_chlorinator"]
 
     def test_gre_swga_config_has_salinity_and_no_orp(self):
         """Gre SWGA chlorinators (incl. SWGA40) expose salinity, no ORP, matched per-serial (Issue #76)."""
