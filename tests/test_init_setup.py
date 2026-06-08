@@ -123,14 +123,19 @@ async def test_setup_entry_registers_devices(hass: HomeAssistant, mock_api: Asyn
     assert pump_device.model == "Pump"
 
 
-async def test_setup_entry_no_pools_still_loads(hass: HomeAssistant, mock_api: AsyncMock) -> None:
-    """An account with zero pools should still finish setup (LOADED)."""
+async def test_setup_entry_no_pools_retries(hass: HomeAssistant, mock_api: AsyncMock) -> None:
+    """An empty pool list right after a restart is transient → ConfigEntryNotReady (retry).
+
+    The Fluidra cloud frequently answers with no pools just after a HA restart;
+    finishing setup empty would leave the integration with no entities until the
+    user restarts again, so HA must retry the setup instead of loading empty.
+    """
     _prepare_api(mock_api)
     mock_api.get_pools = AsyncMock(return_value=[])
     mock_api.cached_pools = []
     entry = await _setup(hass, mock_api)
 
-    assert entry.state is ConfigEntryState.LOADED
+    assert entry.state is ConfigEntryState.SETUP_RETRY
 
 
 async def test_setup_entry_device_without_id_skipped(hass: HomeAssistant, mock_api: AsyncMock) -> None:

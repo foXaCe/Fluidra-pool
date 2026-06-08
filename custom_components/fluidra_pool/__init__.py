@@ -122,7 +122,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
         # Test connection and authentication
         await api.authenticate()
         pools = await api.get_pools()
-        # Continue setup even if no pools found - user may add equipment later
 
     except FluidraMFARequired as err:
         _LOGGER.warning("MFA required for %s, triggering reauth flow", mask_email(email))
@@ -133,6 +132,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     except (FluidraError, TimeoutError, OSError) as err:
         _LOGGER.error("Unable to connect to Fluidra Pool API: %s", err)
         raise ConfigEntryNotReady from err
+
+    # The Fluidra cloud is frequently not ready right after a Home Assistant
+    # restart and answers with an empty pool list. Entities are built once, from
+    # this snapshot, so setting up now would leave the integration empty until the
+    # user restarts again. Treat an empty result as "not ready" so HA retries the
+    # setup automatically instead.
+    if not pools:
+        _LOGGER.debug("No pools returned yet (cloud not ready after restart); retrying setup")
+        raise ConfigEntryNotReady("Fluidra returned no pools yet; Home Assistant will retry")
 
     # Create devices for each pool
     device_registry = dr.async_get(hass)

@@ -419,7 +419,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     if device_id:
                         current_device_ids.add(device_id)
 
-            await self._cleanup_removed_devices(current_device_ids)
+            # Only reconcile the registry when the fetch actually returned pools. A
+            # transient empty response would otherwise purge every device+entity
+            # (and their history) on a single cloud hiccup, until the next restart.
+            if pools:
+                await self._cleanup_removed_devices(current_device_ids)
 
             return {pool["id"]: pool for pool in pools}
 

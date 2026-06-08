@@ -95,6 +95,21 @@ class TestAsyncUpdateData:
         with pytest.raises(UpdateFailed, match="Error communicating with API"):
             await coordinator._async_update_data()
 
+    async def test_empty_pools_does_not_purge_devices(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """A transient empty get_pools must not run registry cleanup (devices vanish on restart)."""
+        mock_api.ensure_valid_token.return_value = True
+        # First (minimal) update clears the _first_update flag.
+        await coordinator._async_update_data()
+        # A later poll returns an empty pool list (transient cloud hiccup).
+        mock_api.get_pools.return_value = []
+        with patch.object(coordinator, "_cleanup_removed_devices", new=AsyncMock()) as cleanup:
+            result = await coordinator._async_update_data()
+
+        cleanup.assert_not_called()
+        assert result == {}
+
 
 class TestProcessComponentState:
     """Test _process_component_state method."""
