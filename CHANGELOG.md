@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.4] - 2026-06-07
+
+### Fixed
+- **Spurious "circuit breaker opened" warnings** (Issue #64) — returned HTTP 5xx/429 responses no longer count as circuit-breaker failures, so a transient burst during parallel component polling no longer trips the breaker. It now opens only on real connection failures, and the warning is logged once per open instead of once per failed request in the batch.
+
 ## [2.40.3] - 2026-06-04
 
 ### Fixed
