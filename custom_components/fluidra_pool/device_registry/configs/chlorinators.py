@@ -235,8 +235,9 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         device_type="chlorinator",
         # Astralpool Clear Connect Evo (Evo21 / Evo12, tecnoLC2) — Issues #63, #73.
         # Mapping matches the tecnoLC2 family (LC25000122 / LC24026011 / CC24009711).
-        # CC25066724 (Evo12) confirmed to use this exact layout by @valentinval90.
-        identifier_patterns=["CC25102423.nn_*", "CC25066724*"],
+        # Confirmed by users: CC25066724 (Evo12, @valentinval90), CC25106623
+        # (Evo21, @DarkSuperT). The API exposes no model field, so add serials here.
+        identifier_patterns=["CC25102423.nn_*", "CC25066724*", "CC25106623*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
