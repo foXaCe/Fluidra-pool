@@ -91,6 +91,20 @@ class TestCircuitBreaker:
         cb.record_failure()
         assert cb.state == CircuitState.OPEN
 
+    def test_opened_warning_logged_once_even_with_extra_failures(self, caplog):
+        """A parallel batch that fails past the threshold logs "opened" only once (Issue #64)."""
+        import logging
+
+        cb = CircuitBreaker(failure_threshold=3)
+        with caplog.at_level(logging.WARNING, logger="custom_components.fluidra_pool.api_resilience"):
+            for _ in range(8):  # whole poll cycle of failures, well past the threshold
+                cb.record_failure()
+
+        assert cb.state == CircuitState.OPEN
+        assert cb.failure_count == 8  # the count still climbs…
+        opened = [r for r in caplog.records if "Circuit breaker opened" in r.getMessage()]
+        assert len(opened) == 1  # …but the warning is emitted only on the closed→open edge
+
     def test_blocks_execution_when_open(self):
         cb = CircuitBreaker(failure_threshold=2)
         cb.record_failure()

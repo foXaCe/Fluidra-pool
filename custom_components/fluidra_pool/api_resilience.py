@@ -118,7 +118,10 @@ class CircuitBreaker:
         if self.state == CircuitState.HALF_OPEN:
             self.state = CircuitState.OPEN
             _LOGGER.warning("Circuit breaker re-opened after failed recovery attempt")
-        elif self.failure_count >= self.failure_threshold:
+        elif self.state != CircuitState.OPEN and self.failure_count >= self.failure_threshold:
+            # Log/transition only once, on the closed→open edge. In-flight parallel
+            # requests that fail after the breaker is already open keep incrementing
+            # the count, but must not re-log "opened after N failures" each time.
             self.state = CircuitState.OPEN
             _LOGGER.warning(
                 "Circuit breaker opened after %d failures",

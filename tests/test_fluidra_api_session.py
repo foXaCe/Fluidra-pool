@@ -10,8 +10,8 @@ import aiohttp
 import pytest
 
 from custom_components.fluidra_pool.api_resilience import (
-    CIRCUIT_BREAKER_FAILURES,
     CircuitBreaker,
+    CircuitState,
     FluidraCircuitBreakerError,
     FluidraConnectionError,
     RateLimiter,
@@ -186,47 +186,23 @@ async def test_request_returns_last_http_error_when_retries_exhausted() -> None:
     assert raw == "boom"
 
 
-async def test_request_records_circuit_breaker_failure_on_persistent_5xx() -> None:
-    """A persistent 5xx (retries exhausted, returned not raised) records ONE breaker failure.
+async def test_persistent_5xx_does_not_trip_circuit_breaker() -> None:
+    """A *returned* HTTP 5xx/429 must NOT count as a breaker failure (Issue #64).
 
-    Regression for api-1: previously a returned (non-raised) 5xx/429 fell through
-    the success check without ever calling record_failure, so the breaker stayed
-    closed through an HTTP-level outage and never fast-failed.
+    Counting returned HTTP errors tripped the breaker on transient bursts during
+    parallel polling (and spammed "opened after N failures"). The breaker only
+    opens on raw connection failures (see the network-exhaustion test below).
     """
-    responses = [_mock_response(status=503, text="down") for _ in range(10)]
+    responses = [_mock_response(status=503, text="down") for _ in range(50)]
     api = _FakeAPI(session=_mock_session(responses))
     api._circuit_breaker.record_failure = MagicMock(wraps=api._circuit_breaker.record_failure)
 
-    status, _, _ = await api._request("GET", "https://example.com")
-
-    assert status == 503
-    api._circuit_breaker.record_failure.assert_called_once()
-
-
-async def test_request_skip_circuit_breaker_ignores_persistent_5xx() -> None:
-    """skip_circuit_breaker=True must not record a failure even on a persistent 5xx."""
-    responses = [_mock_response(status=503, text="down") for _ in range(10)]
-    api = _FakeAPI(session=_mock_session(responses))
-    api._circuit_breaker.record_failure = MagicMock(wraps=api._circuit_breaker.record_failure)
-
-    await api._request("GET", "https://example.com", skip_circuit_breaker=True)
+    for _ in range(10):
+        status, _, _ = await api._request("GET", "https://example.com")
+        assert status == 503
 
     api._circuit_breaker.record_failure.assert_not_called()
-
-
-async def test_persistent_5xx_eventually_opens_circuit_breaker() -> None:
-    """Enough persistent-5xx requests trip the breaker so later calls fast-fail (api-1)."""
-    responses = [_mock_response(status=500, text="boom") for _ in range(400)]
-    api = _FakeAPI(session=_mock_session(responses))
-
-    opened = False
-    for _ in range(CIRCUIT_BREAKER_FAILURES + 2):
-        try:
-            await api._request("GET", "https://example.com")
-        except FluidraCircuitBreakerError:
-            opened = True
-            break
-    assert opened, "circuit breaker never opened despite persistent 5xx"
+    assert api._circuit_breaker.state is CircuitState.CLOSED
 
 
 async def test_request_raises_connection_error_when_network_keeps_failing() -> None:
