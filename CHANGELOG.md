@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.5] - 2026-06-07
+
+### Fixed
+- **Devices/entities disappearing after a restart** — the integration now retries setup when the Fluidra cloud returns no pools (it is often not ready right after a Home Assistant restart) instead of loading empty, and the coordinator no longer purges the device registry on a transient empty poll. Previously a restart could lose the pump/devices and require a second reboot.
+- **Astralpool Clear Connect Evo 21** (`CC25106623`, Issue #73) — mapped to the Clear Connect Evo profile so pH / ORP / salinity / temperature read correctly.
+
 ## [2.40.4] - 2026-06-07
 
 ### Fixed
