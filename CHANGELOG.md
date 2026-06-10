@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.6] - 2026-06-09
+
+### Fixed
+- **IBASEL Evoflex 30 chlorinator** (`LC26033146`, Issue #73) — mapped to the tecnoLC2 "Evo" profile so pH / ORP / salinity / temperature / chlorination level and the pH/ORP setpoints read correctly (the generic profile was reading the water temperature as pH).
+
 ## [2.40.5] - 2026-06-07
 
 ### Fixed
