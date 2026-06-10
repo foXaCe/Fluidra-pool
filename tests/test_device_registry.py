@@ -114,8 +114,8 @@ class TestDeviceConfigRegistry:
             assert config.features["sensors"]["temperature"] == 172
 
     def test_astralpool_clear_connect_evo_serials_use_evo21_profile(self):
-        """Astralpool Clear Connect Evo units use the Evo21 profile, not GenSalt (Issue #73)."""
-        for serial in ("CC25066724.nn_1", "CC25106623.nn_1"):
+        """tecnoLC2 "Evo" units (Clear Connect Evo, IBASEL Evoflex) use the Evo profile (Issue #73)."""
+        for serial in ("CC25066724.nn_1", "CC25106623.nn_1", "LC26033146.nn_1"):
             device = {
                 "device_id": serial,
                 "name": "Chlorinator",
