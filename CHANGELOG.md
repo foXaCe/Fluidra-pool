@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.7] - 2026-06-11
+
+### Fixed
+- **Zodiac GenSalt OE iQ pH 25 IVO** (`CC25051112`, Issue #80) — this tecnoLC2 variant was falling back to the generic legacy profile, which read the water temperature as pH and left chlorination / temperature / salinity at 0. It now maps to a dedicated profile (pH c165, ORP c170, temperature c172, salinity c174, chlorination c10) including the ORP setpoint on c20 that this variant exposes.
+- **Astralpool Clear Connect 12** (`CC25009932`, Issue #81) — added to the Clear Connect 12 profile so ORP reads from the calibrated c170 and pH / temperature / salinity read correctly (the generic profile was reading the uncalibrated ORP and the water temperature as pH).
+
 ## [2.40.6] - 2026-06-09
 
 ### Fixed
