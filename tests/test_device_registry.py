@@ -128,6 +128,20 @@ class TestDeviceConfigRegistry:
             assert config is DEVICE_CONFIGS["cc25102423_chlorinator"], serial
             assert config is not DEVICE_CONFIGS["cc25052635_chlorinator"], serial
 
+    def test_cc25009932_clear_connect_12_uses_g_h_profile(self):
+        """Astralpool Clear Connect 12 (CC25009932) matches the Clear Connect 12 profile (Issue #81)."""
+        config = DEVICE_CONFIGS["cc25019224_chlorinator"]
+        assert config.features["sensors"]["orp"] == 170  # calibrated ORP (c170), not the raw c177
+        device = {
+            "device_id": "CC25009932.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 241}},
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+
     def test_gre_swga_config_has_salinity_and_no_orp(self):
         """Gre SWGA chlorinators (incl. SWGA40) expose salinity, no ORP, matched per-serial (Issue #76)."""
         config = DEVICE_CONFIGS["lc25050627_chlorinator"]
