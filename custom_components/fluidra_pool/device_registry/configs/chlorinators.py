@@ -65,6 +65,37 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=90,
     ),
+    "cc25051112_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Zodiac GenSalt OE iQ pH 25 IVO (tecnoLC2) — Issue #80 (@lolo31370).
+        # Same tecnoLC2 layout as the GenSalt OE iQ pH 12 Evo (cc25052635), but this
+        # variant also exposes an ORP setpoint on c20 (diagnostics show c20 = 750,
+        # matching the app's 750 mV target). c172 = water temperature (×10, 21.3 °C —
+        # the generic config wrongly read c172 as pH 2.13); c165 = pH (7.5); c170 = ORP
+        # measured (663 mV, matches the app — c177 = 725 is the uncalibrated raw value);
+        # c174 = salinity (3.7 g/L); c10 = chlorination level (100 %).
+        identifier_patterns=["CC25051112*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "on_off_component": 0,
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "orp_setpoint": 20,
+            "boost_mode": 103,
+            "skip_mode_select": True,
+            "sensors": {
+                "ph": 165,  # pH measured (÷100).
+                "orp": 170,  # ORP measured (mV) — matches the app (c177 is uncalibrated).
+                "temperature": 172,  # Water temperature (°C × 10).
+                "salinity": 174,  # Salinity (g/L × 100).
+            },
+            "specific_components": [0, 10, 16, 20, 103, 165, 170, 172, 174],
+        },
+        priority=90,
+    ),
     "cc24033907_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24033907*"],

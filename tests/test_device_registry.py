@@ -113,6 +113,25 @@ class TestDeviceConfigRegistry:
             assert config is DEVICE_CONFIGS["cc25052635_chlorinator"], serial
             assert config.features["sensors"]["temperature"] == 172
 
+    def test_cc25051112_gensalt_oe_iq_ph25_ivo_uses_teclc2_layout(self):
+        """Zodiac GenSalt OE iQ pH 25 IVO (CC25051112) maps on tecnoLC2 + ORP setpoint (Issue #80)."""
+        config = DEVICE_CONFIGS["cc25051112_chlorinator"]
+        device = {
+            "device_id": "CC25051112.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 213}},
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        sensors = config.features["sensors"]
+        assert sensors["ph"] == 165  # c172 (=21.3°C) is temperature, not pH as the generic config read
+        assert sensors["orp"] == 170  # calibrated ORP (663 mV), not the raw c177 (725)
+        assert sensors["temperature"] == 172
+        assert sensors["salinity"] == 174
+        assert config.features["orp_setpoint"] == 20  # this variant exposes the ORP setpoint (c20 = 750)
+
     def test_astralpool_clear_connect_evo_serials_use_evo21_profile(self):
         """tecnoLC2 "Evo" units (Clear Connect Evo, IBASEL Evoflex) use the Evo profile (Issue #73)."""
         for serial in ("CC25066724.nn_1", "CC25106623.nn_1", "LC26033146.nn_1"):
