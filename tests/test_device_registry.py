@@ -132,6 +132,27 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["orp_setpoint"] == 20  # this variant exposes the ORP setpoint (c20 = 750)
 
+    def test_lc24009904_klinwass_uses_teclc2_layout(self):
+        """KLINWASS chlorinator (LC24009904) maps on the tecnoLC2 layout, no sensor==setpoint (Issue #82)."""
+        config = DEVICE_CONFIGS["lc24009904_chlorinator"]
+        device = {
+            "device_id": "LC24009904.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 427}},
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        sensors = config.features["sensors"]
+        assert sensors["ph"] == 165  # c172 (=42.7°C) is temperature, not pH (generic read it as pH 4.27)
+        assert sensors["orp"] == 170
+        assert sensors["temperature"] == 172
+        assert sensors["salinity"] == 174
+        # The generic config's bug was sensor and setpoint sharing one component; they must differ here.
+        assert sensors["ph"] != config.features["ph_setpoint"]
+        assert sensors["orp"] != config.features["orp_setpoint"]  # c20 = ORP setpoint (600, matches the app)
+
     def test_astralpool_clear_connect_evo_serials_use_evo21_profile(self):
         """tecnoLC2 "Evo" units (Clear Connect Evo, IBASEL Evoflex) use the Evo profile (Issue #73)."""
         for serial in ("CC25066724.nn_1", "CC25106623.nn_1", "LC26033146.nn_1"):
