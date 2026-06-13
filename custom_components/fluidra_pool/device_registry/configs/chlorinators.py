@@ -337,6 +337,35 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=87,
     ),
+    "lc24009904_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # KLINWASS (tecnoLC2 with pH + ORP probes) — Issue #82.
+        # Was falling back to the generic config, which read c172 (water
+        # temperature ×10) as pH ÷100 → wrong pH 4.27, and showed each sensor
+        # equal to its setpoint. Diagnostics confirm the standard tecnoLC2
+        # layout: c20 = ORP setpoint (600, matches the app), c172 = water
+        # temperature ×10 (42.7 °C, matches status_data 41.7 °C). Same mapping
+        # as cc25019007 / lc24026011 / lc25000122.
+        identifier_patterns=["LC24009904.nn_*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "orp_setpoint": 20,
+            "skip_mode_select": True,
+            "sensors": {
+                "ph": 165,  # pH measured (÷100).
+                "orp": 170,  # ORP measured (mV) — c177 is uncalibrated raw.
+                "temperature": 172,  # Water temperature (°C × 10).
+                "salinity": 174,  # Salinity (g/L × 100).
+            },
+            "specific_components": [10, 16, 20, 165, 170, 172, 174],
+        },
+        priority=87,
+    ),
     "cc25019007_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # Zodiac OE iQ 12 (tecnoLC2) — Issue #55 follow-up.
