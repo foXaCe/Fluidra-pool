@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.8] - 2026-06-13
+
+### Fixed
+- **KLINWASS chlorinator** (`LC24009904`, Issue #82, PR #83 by @Pep190272) — this tecnoLC2 unit was falling back to the generic legacy profile, which read the water temperature as pH (4.27) and mapped each sensor to its own setpoint (sensor == setpoint). It now maps to a dedicated tecnoLC2 profile (pH c165, ORP c170, temperature c172, salinity c174, chlorination c10) with distinct pH/ORP setpoints (c16 / c20).
+
 ## [2.40.7] - 2026-06-11
 
 ### Fixed
