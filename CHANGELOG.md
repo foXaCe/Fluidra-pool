@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.40.9] - 2026-06-14
+
+### Fixed
+- **Zodiac Ei2 iQ chlorinator** (`CC25016001`, Issue #84) — this salt-only tecnoLC2 unit was falling back to the generic legacy profile, which read chlorination from c164 (0 instead of the real 70 % on c4) and exposed phantom pH / ORP / free-chlorine sensors (the pH was the water temperature, c172 = 28.9 °C, read as pH 2.89). It now maps to a dedicated profile: chlorination level on c4, water temperature on c172, salinity on c185, and no pH / ORP / free-chlorine sensors, setpoints, boost or mode controls. The salinity component and write path will be confirmed from a pump-running capture.
+
 ## [2.40.8] - 2026-06-13
 
 ### Fixed
