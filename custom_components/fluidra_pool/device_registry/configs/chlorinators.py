@@ -96,6 +96,32 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=90,
     ),
+    "cc25016001_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Zodiac Ei2 iQ (tecnoLC2, salt-only — no pH/ORP probe) — Issue #84 (@Felix62-byte).
+        # Uses the legacy component layout (164/172/177/178/183/185), NOT the newer
+        # tecnoLC2 one (no c10/c165/c170/c174), so the generic profile mis-read it:
+        #   - chlorination level is c4 (= 70 %), not c164 (= 0);
+        #   - c172 (= 289) is water temperature 28.9 °C, not pH — this unit has no pH probe;
+        #   - it has no pH / ORP / free-chlorine probes, so those phantom sensors are dropped.
+        # The salinity component (185) and the write path are still to be confirmed from a
+        # capture taken with the pump running (the reported dump was idle → every probe 0).
+        identifier_patterns=["CC25016001.nn_*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["number", "sensor_info"],
+        features={
+            "chlorination_level": {"write": 4, "read": 4},  # c4 = current level (70 %).
+            "skip_mode_select": True,  # The OFF/ON/AUTO mode select does not drive this unit.
+            "sensors": {
+                "temperature": 172,  # Water temperature (°C × 10) — was mis-read as pH.
+                "salinity": 185,  # Salinity (g/L × 100) — reads 0 while the pump is off.
+            },
+            "specific_components": [4, 172, 185],
+        },
+        priority=85,
+    ),
     "cc24033907_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24033907*"],

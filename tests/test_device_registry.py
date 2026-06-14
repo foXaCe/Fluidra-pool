@@ -132,6 +132,35 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["orp_setpoint"] == 20  # this variant exposes the ORP setpoint (c20 = 750)
 
+    def test_cc25016001_ei2_iq_salt_only_no_phantom_sensors(self):
+        """Zodiac Ei2 iQ (CC25016001) — salt-only legacy layout, no pH/ORP phantoms (Issue #84)."""
+        config = DEVICE_CONFIGS["cc25016001_chlorinator"]
+        device = {
+            "device_id": "CC25016001.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"4": {"reportedValue": 70}, "172": {"reportedValue": 289}},
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        # This unit has no pH/ORP probe → those sensors and setpoints must not exist.
+        sensors = config.features["sensors"]
+        assert "ph" not in sensors
+        assert "orp" not in sensors
+        assert "free_chlorine" not in sensors
+        assert "ph_setpoint" not in config.features
+        assert "orp_setpoint" not in config.features
+        # Chlorination level reads c4 (= 70 %), not the generic c164 (= 0).
+        assert config.features["chlorination_level"] == {"write": 4, "read": 4}
+        # c172 is water temperature (28.9 °C), not pH.
+        assert sensors["temperature"] == 172
+        assert sensors["salinity"] == 185
+        # No mode select / boost on this salt-only unit (they had no effect).
+        assert config.features.get("skip_mode_select") is True
+        assert "boost_mode" not in config.features
+        assert "select" not in config.entities
+
     def test_lc24009904_klinwass_uses_teclc2_layout(self):
         """KLINWASS chlorinator (LC24009904) maps on the tecnoLC2 layout, no sensor==setpoint (Issue #82)."""
         config = DEVICE_CONFIGS["lc24009904_chlorinator"]
