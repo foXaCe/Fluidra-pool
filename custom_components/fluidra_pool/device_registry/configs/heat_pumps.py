@@ -94,12 +94,13 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         family_patterns=["heat pump"],
         components_range=5,
         required_components=[0, 1, 2, 3],
-        entities=["climate", "switch", "sensor_info", "sensor_temperature"],
+        entities=["climate", "switch", "sensor_info", "sensor_temperature", "sensor_running_hours"],
         features={
             "temperature_control": True,
-            # preset_modes disabled: the real preset component is unknown. Writing
-            # component 17 returns HTTP 403 (Issue #56). Re-enable once diagnostics
-            # from a real Z550iQ+ identify the correct component and value scheme.
+            # preset_modes stay disabled: component 17 is a read-only status whose
+            # values (0/1/8 seen in polling) don't match a silence/smart/boost scheme
+            # and writes return HTTP 403 (Issues #56, #88). The climate entity no
+            # longer advertises or writes presets for this unit.
             "hvac_modes": ["off", "heat", "cool", "auto"],
             "skip_auto_mode": True,
             "skip_schedules": True,
@@ -108,9 +109,11 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             # - 21: ON/OFF (0=OFF, 1=ON)
             # - 15: Temperature setpoint (decidegrees, 290=29.0°C)
             # - 16: Mode (0=heating, 1=cooling, 2=auto)
-            # - 17: Read-only status of some kind (value 6 reported; writes return 403)
+            # - 17: Read-only status (writes return 403) — not a preset.
+            # - 18: Water-flow indicator (raw exposed as an attribute; values TBC — #88)
             # - 37: Water temperature (decidegrees)
             # - 40: Air temperature (decidegrees)
+            # - 60: Total running hours (raw integer h, matches status.totalRunningHours)
             # - 61: State (0=idle, 2=heating, 3=cooling, 11=no flow)
             "on_off_component": 21,
             "setpoint_component": 15,
@@ -118,7 +121,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             "water_temp_component": 37,
             "air_temp_component": 40,
             "state_component": 61,
-            "specific_components": [15, 16, 17, 21, 37, 40, 61],
+            "specific_components": [15, 16, 17, 18, 21, 37, 40, 60, 61],
         },
         priority=96,  # Higher than z250iq.
     ),

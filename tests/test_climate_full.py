@@ -40,11 +40,10 @@ from custom_components.fluidra_pool.const import (
     Z550_MODE_COOLING,
     Z550_MODE_HEATING,
     Z550_PRESET_BOOST,
-    Z550_PRESET_SILENCE,
-    Z550_PRESET_SMART,
     Z550_STATE_COOLING,
     Z550_STATE_HEATING,
     Z550_STATE_IDLE,
+    Z550_STATE_NO_FLOW,
 )
 
 POOL_ID = "pool-1"
@@ -235,9 +234,9 @@ def test_hvac_modes_z260() -> None:
     assert modes == [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL]
 
 
-def test_preset_modes_z550() -> None:
-    presets = _make(_pin(features={"z550_mode": True})).preset_modes
-    assert presets == [Z550_PRESET_SILENCE, Z550_PRESET_SMART, Z550_PRESET_BOOST]
+def test_preset_modes_z550_empty() -> None:
+    # Z550iQ+ exposes no controllable preset: component 17 is read-only (Issue #88).
+    assert _make(_pin(features={"z550_mode": True})).preset_modes == []
 
 
 def test_preset_modes_lg() -> None:
@@ -253,24 +252,10 @@ def test_preset_modes_empty_default() -> None:
 # --- preset_mode -------------------------------------------------------
 
 
-def test_preset_mode_z550_from_reported_field() -> None:
-    climate = _make(_pin(features={"z550_mode": True}, z550_preset_reported=2))
-    assert climate.preset_mode == Z550_PRESET_BOOST
-
-
-def test_preset_mode_z550_unknown_reported_falls_back_to_smart() -> None:
-    climate = _make(_pin(features={"z550_mode": True}, z550_preset_reported=99))
-    assert climate.preset_mode == Z550_PRESET_SMART
-
-
-def test_preset_mode_z550_from_component_17() -> None:
-    climate = _make(_pin(features={"z550_mode": True}, components={"17": {"reportedValue": 0}}))
-    assert climate.preset_mode == Z550_PRESET_SILENCE
-
-
-def test_preset_mode_z550_default_smart_no_data() -> None:
-    climate = _make(_pin(features={"z550_mode": True}))
-    assert climate.preset_mode == Z550_PRESET_SMART
+def test_preset_mode_z550_none() -> None:
+    # Z550iQ+ has no controllable preset (Issue #88): always None regardless of c17.
+    climate = _make(_pin(features={"z550_mode": True}, z550_preset_reported=2, components={"17": {"reportedValue": 0}}))
+    assert climate.preset_mode is None
 
 
 def test_preset_mode_lg_from_component_14() -> None:
@@ -307,8 +292,8 @@ def test_preset_mode_pending_optimistic_expires() -> None:
     climate._pending_preset_mode = Z550_PRESET_BOOST
     with patch(TIME_MOD) as mock_time:
         climate._last_preset_action_time = 1000.0
-        mock_time.time.return_value = 1010.0  # > 5s -> expire, fall through to reported
-        assert climate.preset_mode == Z550_PRESET_SILENCE  # reported 0 -> silence
+        mock_time.time.return_value = 1010.0  # > 5s -> expire, fall through
+        assert climate.preset_mode is None  # Z550 has no controllable preset (Issue #88)
     assert climate._pending_preset_mode is None
     assert climate._last_preset_action_time is None
 
@@ -442,7 +427,7 @@ def test_hvac_mode_lg_fallback_off() -> None:
         (Z550_STATE_HEATING, HVACAction.HEATING),
         (Z550_STATE_COOLING, HVACAction.COOLING),
         (Z550_STATE_IDLE, HVACAction.IDLE),
-        (11, HVACAction.OFF),  # no flow / unknown
+        (Z550_STATE_NO_FLOW, HVACAction.IDLE),  # no flow -> idle (on but blocked, Issue #88)
     ],
 )
 def test_hvac_action_z550(state, expected) -> None:
@@ -764,12 +749,13 @@ async def test_set_hvac_mode_api_exception_wrapped() -> None:
 # --- async_set_preset_mode ---------------------------------------------
 
 
-async def test_set_preset_mode_z550_valid() -> None:
+async def test_set_preset_mode_z550_noop() -> None:
+    # Z550iQ+ has no controllable preset — set_preset_mode must not write (Issue #88).
     api = _api()
     climate = _make(_pin(features={"z550_mode": True}), api)
     await climate.async_set_preset_mode(Z550_PRESET_BOOST)
-    api.control_device_component.assert_awaited_once_with(DEVICE_ID, 17, 2)
-    climate.coordinator.async_request_refresh.assert_awaited_once()
+    api.control_device_component.assert_not_called()
+    assert climate._pending_preset_mode is None
 
 
 async def test_set_preset_mode_z550_unknown_noop() -> None:
@@ -806,9 +792,9 @@ async def test_set_preset_mode_unsupported_device_noop() -> None:
 async def test_set_preset_mode_api_returns_false_raises() -> None:
     api = _api()
     api.control_device_component = AsyncMock(return_value=False)
-    climate = _make(_pin(features={"z550_mode": True}), api)
+    climate = _make(_pin(features={"preset_modes": True}), api)
     with pytest.raises(HomeAssistantError):
-        await climate.async_set_preset_mode(Z550_PRESET_BOOST)
+        await climate.async_set_preset_mode(LG_PRESET_SMART_HEATING)
     assert climate._pending_preset_mode is None
 
 
@@ -831,9 +817,13 @@ def test_extra_state_attributes_z550_branch() -> None:
             water_temperature=25.0,
             air_temperature=30.0,
             z550_mode_reported=1,
-            z550_state_reported=2,
-            z550_preset_reported=2,
-            components={"21": {"reportedValue": 1}},
+            z550_state_reported=11,  # no flow
+            running_hours=1234,
+            components={
+                "21": {"reportedValue": 1},
+                "18": {"reportedValue": 1},
+                "60": {"reportedValue": 1234},
+            },
         )
     )
     attrs = climate.extra_state_attributes
@@ -841,8 +831,12 @@ def test_extra_state_attributes_z550_branch() -> None:
     assert attrs["water_temperature"] == 25.0
     assert attrs["air_temperature"] == 30.0
     assert attrs["z550_mode"] == "cooling"
-    assert attrs["z550_state"] == "heating"
-    assert attrs["z550_preset"] == "boost"
+    assert attrs["z550_state"] == "no_flow"
+    assert attrs["no_flow"] is True  # Issue #88
+    assert attrs["running_hours"] == 1234  # component 60
+    assert attrs["component_18_raw"] == 1
+    assert attrs["component_60_raw"] == 1234
+    assert "z550_preset" not in attrs  # presets removed (Issue #88)
     assert attrs["component_21_raw"] == 1
 
 

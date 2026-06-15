@@ -396,6 +396,16 @@ class TestIdentifyDevice:
         assert config.device_type == "heat_pump"
         assert config.features.get("z550_mode") is True
 
+    def test_z550_heat_pump_exposes_running_hours_and_flow_scan(self):
+        """Z550iQ+ scans the running-hours (60) and flow (18) components and exposes a running-hours sensor (Issue #88)."""
+        config = DEVICE_CONFIGS["z550iq_heat_pump"]
+        assert "sensor_running_hours" in config.entities
+        specific = config.features["specific_components"]
+        assert 60 in specific  # total running hours
+        assert 18 in specific  # water-flow indicator
+        # Presets stay disabled for this unit (component 17 is read-only).
+        assert config.features.get("preset_modes") is not True
+
     def test_skip_bridge_devices(self):
         device = {
             "device_id": "BR123",

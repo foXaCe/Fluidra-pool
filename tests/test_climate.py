@@ -18,7 +18,6 @@ from custom_components.fluidra_pool.climate import FluidraHeatPumpClimate
 from custom_components.fluidra_pool.const import (
     LG_PRESET_BOOST_HEATING,
     LG_PRESET_SMART_HEATING,
-    Z550_PRESET_SMART,
 )
 
 POOL_ID = "pool-1"
@@ -181,8 +180,8 @@ def test_preset_modes_empty_when_not_supported() -> None:
     assert climate.preset_modes == []
 
 
-def test_preset_mode_z550_reads_component_17_when_present() -> None:
-    """Z550iQ+ preset_mode falls back to component 17 when z550_preset_reported is missing."""
+def test_preset_mode_z550_is_none() -> None:
+    """Z550iQ+ has no controllable preset: component 17 is read-only (Issue #88)."""
     device = _pin(
         DEVICE_ID,
         features={"z550_mode": True},
@@ -190,16 +189,8 @@ def test_preset_mode_z550_reads_component_17_when_present() -> None:
     )
     climate = FluidraHeatPumpClimate(_coord(device), _api(), POOL_ID, DEVICE_ID)
     _attach_ha(climate)
-    # 0 maps to 'silence' in Z550_VALUE_TO_PRESET.
-    assert climate.preset_mode == "silence"
-
-
-def test_preset_mode_z550_defaults_when_no_reading() -> None:
-    """Without any component data the Z550 preset defaults to smart."""
-    device = _pin(DEVICE_ID, features={"z550_mode": True})
-    climate = FluidraHeatPumpClimate(_coord(device), _api(), POOL_ID, DEVICE_ID)
-    _attach_ha(climate)
-    assert climate.preset_mode == Z550_PRESET_SMART
+    assert climate.preset_mode is None
+    assert climate.preset_modes == []
 
 
 def test_preset_mode_lg_reads_component_14() -> None:

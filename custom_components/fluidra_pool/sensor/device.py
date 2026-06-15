@@ -93,7 +93,7 @@ class FluidraLightBrightnessSensor(FluidraPoolSensorEntity):
 
 
 class FluidraRunningHoursSensor(FluidraPoolSensorEntity):
-    """Running hours sensor for Z260iQ heat pumps (component 0)."""
+    """Running hours sensor for heat pumps (Z260iQ component 0 / Z550iQ+ component 60)."""
 
     _attr_translation_key = "running_hours"
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
@@ -106,7 +106,7 @@ class FluidraRunningHoursSensor(FluidraPoolSensorEntity):
 
     @property
     def native_value(self) -> int | None:
-        """Return the running hours from component 0."""
+        """Return the running hours (populated by the coordinator from the model's component)."""
         return self.device_data.get("running_hours")
 
 

@@ -140,6 +140,31 @@ class TestProcessComponentState:
         coordinator._process_component_state(device, "pool_001", 13, {"reportedValue": 1})
         assert device["is_heating"] is True
 
+    async def test_component_60_z550_running_hours(self, coordinator: FluidraDataUpdateCoordinator):
+        """Z550iQ+ total running hours come from component 60 (Issue #88)."""
+        device = {
+            "device_id": "LD12345",
+            "name": "Z550iQ",
+            "family": "heat pump",
+            "type": "heat_pump",
+            "components": {},
+        }
+        coordinator._process_component_state(device, "pool_001", 60, {"reportedValue": 4321})
+        assert device["running_hours"] == 4321
+
+    async def test_component_61_z550_no_flow(self, coordinator: FluidraDataUpdateCoordinator):
+        """Z550iQ+ component 61 = 11 marks the no-flow state (Issue #88)."""
+        device = {
+            "device_id": "LD12345",
+            "name": "Z550iQ",
+            "family": "heat pump",
+            "type": "heat_pump",
+            "components": {},
+        }
+        coordinator._process_component_state(device, "pool_001", 61, {"reportedValue": 11})
+        assert device["z550_state_reported"] == 11
+        assert device["hvac_action"] == "no_flow"
+
     async def test_component_15_temperature(self, coordinator: FluidraDataUpdateCoordinator):
         device = {"device_id": "test", "type": "heat_pump", "components": {}}
         coordinator._process_component_state(device, "pool_001", 15, {"reportedValue": 290})

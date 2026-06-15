@@ -35,14 +35,11 @@ from .const import (
     Z550_MODE_AUTO,
     Z550_MODE_COOLING,
     Z550_MODE_HEATING,
-    Z550_PRESET_MODES,
-    Z550_PRESET_SMART,
-    Z550_PRESET_TO_VALUE,
     Z550_STATE_COOLING,
     Z550_STATE_HEATING,
     Z550_STATE_IDLE,
+    Z550_STATE_NO_FLOW,
     Z550_TEMP_STEP,
-    Z550_VALUE_TO_PRESET,
     FluidraPoolConfigEntry,
 )
 from .device_registry import DeviceIdentifier
@@ -195,8 +192,8 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
     @property
     def preset_modes(self) -> list[str]:
         """Return available preset modes for heat pumps with this feature."""
-        if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
-            return Z550_PRESET_MODES
+        # Z550iQ+ has no controllable preset: component 17 is read-only and its
+        # values don't match a silence/smart/boost scheme (Issue #88).
         if DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
             return LG_PRESET_MODES
         return []
@@ -215,20 +212,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             else:
                 return self._pending_preset_mode
 
-        # Z550iQ+ preset modes from component 17
-        if DeviceIdentifier.has_feature(device_data, "z550_mode"):
-            z550_preset = device_data.get("z550_preset_reported")
-            if z550_preset is not None:
-                return Z550_VALUE_TO_PRESET.get(z550_preset, Z550_PRESET_SMART)
-            # Try to get from components
-            components = device_data.get("components", {})
-            if isinstance(components, dict) and "17" in components:
-                reported_value = components["17"].get("reportedValue")
-                if reported_value is not None:
-                    return Z550_VALUE_TO_PRESET.get(reported_value, Z550_PRESET_SMART)
-            return Z550_PRESET_SMART
-
-        # LG preset modes
+        # LG preset modes (Z550iQ+ has no controllable preset — see preset_modes).
         if not DeviceIdentifier.has_feature(device_data, "preset_modes"):
             return None
 
@@ -347,9 +331,13 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                 return HVACAction.HEATING
             if z550_state == Z550_STATE_COOLING:
                 return HVACAction.COOLING
+            # No flow: the unit is powered but circulation is blocked (typically an
+            # external pump is off). Report IDLE — like the Z260 no-flow alarm — so
+            # it doesn't read as switched off (Issue #88).
+            if z550_state == Z550_STATE_NO_FLOW:
+                return HVACAction.IDLE
             if z550_state == Z550_STATE_IDLE:
                 return HVACAction.IDLE
-            # No flow or unknown state = OFF
             return HVACAction.OFF
 
         # Z260iQ: derive the action from ON/OFF + mode direction (component 14),
@@ -580,16 +568,8 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
 
             success = False
 
-            # Z550iQ+ uses component 17 for preset modes
-            if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
-                if preset_mode not in Z550_PRESET_TO_VALUE:
-                    self._pending_preset_mode = None
-                    self._last_preset_action_time = None
-                    return
-                mode_value = Z550_PRESET_TO_VALUE[preset_mode]
-                success = await self._api.control_device_component(self._device_id, 17, mode_value)
-            elif DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
-                # LG heat pumps use component 14
+            if DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
+                # LG heat pumps use component 14 (Z550iQ+ has no controllable preset).
                 if preset_mode not in LG_MODE_TO_VALUE:
                     self._pending_preset_mode = None
                     self._last_preset_action_time = None
@@ -694,20 +674,23 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                 state_names = {0: "idle", 2: "heating", 3: "cooling", 11: "no_flow"}
                 attrs["z550_state"] = state_names.get(z550_state, f"unknown ({z550_state})")
                 attrs["z550_state_raw"] = z550_state
+                # Explicit no-flow flag for external-pump setups (Issue #88).
+                attrs["no_flow"] = z550_state == Z550_STATE_NO_FLOW
 
-            # Preset mode (0=silence, 1=smart, 2=boost)
-            z550_preset = device_data.get("z550_preset_reported")
-            if z550_preset is not None:
-                preset_names = {0: "silence", 1: "smart", 2: "boost"}
-                attrs["z550_preset"] = preset_names.get(z550_preset, f"unknown ({z550_preset})")
-                attrs["z550_preset_raw"] = z550_preset
+            # Total running hours (component 60).
+            running_hours = device_data.get("running_hours")
+            if running_hours is not None:
+                attrs["running_hours"] = running_hours
 
-            # Raw component values for debugging
+            # Raw component values for debugging (18 = water-flow indicator, values
+            # to be confirmed; 60 = total running hours).
             attrs["component_21_raw"] = device_data.get("components", {}).get("21", {}).get("reportedValue")
             attrs["component_16_raw"] = device_data.get("components", {}).get("16", {}).get("reportedValue")
             attrs["component_17_raw"] = device_data.get("components", {}).get("17", {}).get("reportedValue")
+            attrs["component_18_raw"] = device_data.get("components", {}).get("18", {}).get("reportedValue")
             attrs["component_37_raw"] = device_data.get("components", {}).get("37", {}).get("reportedValue")
             attrs["component_40_raw"] = device_data.get("components", {}).get("40", {}).get("reportedValue")
+            attrs["component_60_raw"] = device_data.get("components", {}).get("60", {}).get("reportedValue")
             attrs["component_61_raw"] = device_data.get("components", {}).get("61", {}).get("reportedValue")
 
         # Z260iQ specific attributes

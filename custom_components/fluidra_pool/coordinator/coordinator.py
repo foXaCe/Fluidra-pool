@@ -306,6 +306,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     schedule_data = reported_value if isinstance(reported_value, list) else []
                     device["schedule_data"] = schedule_data
                     self._track_schedule_count(pool_id, device_id, schedule_data)
+        elif component_id == 60:
+            device["component_60_data"] = component_state
+            # Z550iQ+ total running hours (raw integer h, matches
+            # status.totalRunningHours) — surfaced as a sensor (Issue #88).
+            if DeviceIdentifier.has_feature(device, "z550_mode") and reported_value is not None:
+                try:
+                    device["running_hours"] = int(reported_value)
+                except (ValueError, TypeError):
+                    pass
         elif component_id == 61:
             device["component_61_data"] = component_state
             if DeviceIdentifier.has_feature(device, "z550_mode"):
