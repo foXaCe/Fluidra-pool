@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.41.2] - 2026-06-15
+
+### Fixed
+- **Irrijardin iSalt chlorinator** (`LC24004804`, Issue #87) — added a dedicated tecnoLC2 profile (chlorination c10, pH setpoint c16, pH c165, temperature c172, salinity c174, ORP c170, boost c103) so it stops falling back to the generic config (which read the water temperature as pH). Same iSalt OEM cell as the Irripool iSALT; mapping verified by the reporter.
+
 ## [2.41.1] - 2026-06-15
 
 ### Fixed
