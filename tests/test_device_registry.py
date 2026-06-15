@@ -133,17 +133,18 @@ class TestDeviceConfigRegistry:
         assert config.features["orp_setpoint"] == 20  # this variant exposes the ORP setpoint (c20 = 750)
 
     def test_cc24047102_energy_connect_uses_teclc2_layout(self):
-        """AstralPool Energy Connect (CC24047102) maps on the tecnoLC2 layout (Issue #85)."""
+        """AstralPool Energy Connect serials map on the tecnoLC2 layout (Issue #85)."""
         config = DEVICE_CONFIGS["cc24047102_chlorinator"]
-        device = {
-            "device_id": "CC24047102.nn_1",
-            "name": "Chlorinator",
-            "family": "Chlorinators",
-            "type": "chlorinator",
-            "model": "Chlorinator",
-            "components": {"172": {"reportedValue": 246}},
-        }
-        assert DeviceIdentifier.identify_device(device) is config
+        for serial in ("CC24047102.nn_1", "CC25010924.nn_1"):
+            device = {
+                "device_id": serial,
+                "name": "Chlorinator",
+                "family": "Chlorinators",
+                "type": "chlorinator",
+                "model": "Chlorinator",
+                "components": {"172": {"reportedValue": 246}},
+            }
+            assert DeviceIdentifier.identify_device(device) is config, serial
         sensors = config.features["sensors"]
         assert sensors["ph"] == 165  # c172 (=24.6°C) is temperature, not pH (generic read it as pH 2.46)
         assert sensors["orp"] == 170
