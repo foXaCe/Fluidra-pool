@@ -122,6 +122,34 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=85,
     ),
+    "cc24047102_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # AstralPool Energy Connect (tecnoLC2) — Issue #85 (@Goetz67).
+        # Standard tecnoLC2 layout, validated against the Fluidra app with the pump
+        # running: c172 = water temperature (×10, 24.6 °C — the generic config wrongly
+        # read it as pH 2.46), c165 = pH, c170 = ORP, c174 = salinity. chlorination /
+        # boost / salinity only report while the unit is running.
+        identifier_patterns=["CC24047102*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "orp_setpoint": 20,
+            "boost_mode": 103,
+            "skip_mode_select": True,
+            "sensors": {
+                "ph": 165,  # pH measured (÷100).
+                "orp": 170,  # ORP measured (mV).
+                "temperature": 172,  # Water temperature (°C × 10).
+                "salinity": 174,  # Salinity (g/L × 100).
+            },
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
+        },
+        priority=88,
+    ),
     "cc24033907_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24033907*"],

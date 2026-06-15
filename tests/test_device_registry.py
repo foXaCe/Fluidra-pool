@@ -132,6 +132,26 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["orp_setpoint"] == 20  # this variant exposes the ORP setpoint (c20 = 750)
 
+    def test_cc24047102_energy_connect_uses_teclc2_layout(self):
+        """AstralPool Energy Connect (CC24047102) maps on the tecnoLC2 layout (Issue #85)."""
+        config = DEVICE_CONFIGS["cc24047102_chlorinator"]
+        device = {
+            "device_id": "CC24047102.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 246}},
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        sensors = config.features["sensors"]
+        assert sensors["ph"] == 165  # c172 (=24.6°C) is temperature, not pH (generic read it as pH 2.46)
+        assert sensors["orp"] == 170
+        assert sensors["temperature"] == 172
+        assert sensors["salinity"] == 174
+        assert config.features["orp_setpoint"] == 20
+        assert config.features["boost_mode"] == 103
+
     def test_cc25016001_ei2_iq_salt_only_no_phantom_sensors(self):
         """Zodiac Ei2 iQ (CC25016001) — salt-only legacy layout, no pH/ORP phantoms (Issue #84)."""
         config = DEVICE_CONFIGS["cc25016001_chlorinator"]
