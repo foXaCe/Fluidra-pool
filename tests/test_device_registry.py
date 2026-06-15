@@ -132,6 +132,27 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["orp_setpoint"] == 20  # this variant exposes the ORP setpoint (c20 = 750)
 
+    def test_lc24004804_irrijardin_isalt_uses_teclc2_layout(self):
+        """Irrijardin iSalt (LC24004804) maps on the tecnoLC2 layout, like the Irripool iSALT (Issue #87)."""
+        config = DEVICE_CONFIGS["lc24004804_chlorinator"]
+        device = {
+            "device_id": "LC24004804.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 215}},
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        sensors = config.features["sensors"]
+        assert sensors["ph"] == 165  # c172 is temperature, not pH (the generic bug)
+        assert sensors["temperature"] == 172
+        assert sensors["salinity"] == 174
+        assert config.features["chlorination_level"] == 10
+        assert config.features["ph_setpoint"] == 16
+        # Same layout as the sibling Irripool iSALT profile.
+        assert config.features["sensors"] == DEVICE_CONFIGS["lc24013306_chlorinator"].features["sensors"]
+
     def test_cc24047102_energy_connect_uses_teclc2_layout(self):
         """AstralPool Energy Connect serials map on the tecnoLC2 layout (Issue #85)."""
         config = DEVICE_CONFIGS["cc24047102_chlorinator"]

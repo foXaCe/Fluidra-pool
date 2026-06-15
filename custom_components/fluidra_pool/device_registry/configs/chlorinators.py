@@ -245,6 +245,35 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=86,
     ),
+    "lc24004804_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Irrijardin iSalt — Issue #87 (@Math43). Same iSalt OEM cell as the Irripool
+        # iSALT (lc24013306), rebadged by a different retailer, so it uses the standard
+        # tecnoLC2 layout. Mapping verified by the reporter against his own integration:
+        # c10 chlorination, c16 pH setpoint, c165 pH, c172 water temperature, c174 salinity.
+        # ORP (c170) is kept to match the sibling iSalt profiles; if this unit has no ORP
+        # probe it will simply read 0 — drop "orp"/"orp_setpoint" if the reporter confirms.
+        identifier_patterns=["LC24004804*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "orp_setpoint": 20,
+            "boost_mode": 103,
+            "skip_mode_select": True,
+            "sensors": {
+                "ph": 165,  # pH measured (÷100).
+                "orp": 170,  # ORP measured (mV) — unconfirmed on this unit.
+                "temperature": 172,  # Water temperature (°C × 10).
+                "salinity": 174,  # Salinity (g/L × 100).
+            },
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
+        },
+        priority=86,
+    ),
     "cc25024927_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # AstralPool Clear Connect Escalable (model 77020) — Issue #70 (@VICTOR28N).
