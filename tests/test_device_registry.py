@@ -171,11 +171,14 @@ class TestDeviceConfigRegistry:
         assert "free_chlorine" not in sensors
         assert "ph_setpoint" not in config.features
         assert "orp_setpoint" not in config.features
-        # Chlorination level reads c4 (= 70 %), not the generic c164 (= 0).
-        assert config.features["chlorination_level"] == {"write": 4, "read": 4}
-        # c172 is water temperature (28.9 °C), not pH.
+        # Standard tecnoLC2 chlorination on c10 (c4 was a stale 70 %, not the live level).
+        assert config.features["chlorination_level"] == 10
+        # c172 is water temperature (29.0 °C), not pH.
         assert sensors["temperature"] == 172
-        assert sensors["salinity"] == 185
+        assert sensors["salinity"] == 174  # standard tecnoLC2 salinity (c185 read 0 while running)
+        # The scan must include the components where salinity/chlorination actually live.
+        assert 174 in config.features["specific_components"]
+        assert 10 in config.features["specific_components"]
         # No mode select / boost on this salt-only unit (they had no effect).
         assert config.features.get("skip_mode_select") is True
         assert "boost_mode" not in config.features

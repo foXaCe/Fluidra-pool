@@ -99,26 +99,28 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "cc25016001_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # Zodiac Ei2 iQ (tecnoLC2, salt-only — no pH/ORP probe) — Issue #84 (@Felix62-byte).
-        # Uses the legacy component layout (164/172/177/178/183/185), NOT the newer
-        # tecnoLC2 one (no c10/c165/c170/c174), so the generic profile mis-read it:
-        #   - chlorination level is c4 (= 70 %), not c164 (= 0);
-        #   - c172 (= 289) is water temperature 28.9 °C, not pH — this unit has no pH probe;
-        #   - it has no pH / ORP / free-chlorine probes, so those phantom sensors are dropped.
-        # The salinity component (185) and the write path are still to be confirmed from a
-        # capture taken with the pump running (the reported dump was idle → every probe 0).
+        # Pump-running diagnostics disproved the early legacy-layout guess: c185 stays 0
+        # while the app shows 4.4 g/L, and c4 stays 70 while the app shows 60 % — so
+        # neither is salinity/chlorination. As a tecnoLC2 unit it almost certainly uses
+        # the standard layout (chlorination c10, salinity c174 ×100), which no profile had
+        # ever fetched. c172 = water temperature is confirmed (290 → 29.0 °C). The scan is
+        # widened this round so the next capture reveals the real components if c10/c174
+        # turn out empty. No pH/ORP probes on this salt-only cell.
         identifier_patterns=["CC25016001.nn_*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["number", "sensor_info"],
         features={
-            "chlorination_level": {"write": 4, "read": 4},  # c4 = current level (70 %).
+            "chlorination_level": 10,  # Standard tecnoLC2 — to confirm (c4 was a stale 70 %).
             "skip_mode_select": True,  # The OFF/ON/AUTO mode select does not drive this unit.
             "sensors": {
-                "temperature": 172,  # Water temperature (°C × 10) — was mis-read as pH.
-                "salinity": 185,  # Salinity (g/L × 100) — reads 0 while the pump is off.
+                "temperature": 172,  # Water temperature (°C × 10) — confirmed (29.0 °C).
+                "salinity": 174,  # Standard tecnoLC2 salinity (g/L × 100) — to confirm (c185 was 0).
             },
-            "specific_components": [4, 172, 185],
+            # Widened for diagnosis: standard tecnoLC2 set + the legacy candidates, so the
+            # next pump-running capture pinpoints salinity/chlorination if c10/c174 are empty.
+            "specific_components": [4, 10, 16, 20, 103, 164, 165, 170, 172, 174, 177, 178, 183, 185],
         },
         priority=85,
     ),
