@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.41.1] - 2026-06-15
+
+### Fixed
+- **AstralPool Energy Connect** second serial (`CC25010924`, Issue #85) — added to the existing Energy Connect tecnoLC2 profile so this pH + ORP unit stops falling back to the generic config (same model as `CC24047102`).
+
 ## [2.41.0] - 2026-06-15
 
 ### Added
