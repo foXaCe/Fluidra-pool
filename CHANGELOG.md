@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.41.0] - 2026-06-15
+
+### Added
+- **AstralPool Energy Connect** (`CC24047102`, Issue #85) — dedicated tecnoLC2 profile (pH c165, ORP c170, temperature c172, salinity c174, chlorination c10, pH/ORP setpoints c16/c20, boost c103), validated by @Goetz67 against the Fluidra app with the pump running. The generic profile was reading the water temperature (c172) as pH.
+
+### Fixed
+- **Zodiac Ei2 iQ chlorinator** (`CC25016001`, Issue #84) — pump-running diagnostics showed the v2.40.9 mapping was wrong (c185 stayed 0 while the app showed salinity, c4 stayed 70 while the app showed 60 % chlorination) and that the narrowed component scan stopped fetching the relevant components. Salinity is now read from c174 and chlorination from c10 (standard tecnoLC2), temperature stays on the confirmed c172, and the scan is widened again.
+
 ## [2.40.9] - 2026-06-14
 
 ### Fixed
