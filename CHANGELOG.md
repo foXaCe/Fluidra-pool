@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.42.0] - 2026-06-15
+
+### Added
+- **Z550iQ+ running-hours sensor** (Issue #88) — total running hours are now exposed as a sensor, read from component 60 (matches `status.totalRunningHours`).
+
+### Fixed
+- **Z550iQ+ no-flow now reads as IDLE, not OFF** (Issue #88) — when the heat pump is powered but circulation is blocked (component 61 = 11, typically an external pump is off), the climate entity reports `idle` with an explicit `no_flow` attribute instead of looking switched off.
+- **Z550iQ+ preset writes no longer fail** (Issues #56, #88) — component 17 is a read-only status (its values don't match a silence/smart/boost scheme and writes return HTTP 403), so the climate entity no longer offers or writes presets for this unit. The water-flow component (18) is exposed as a diagnostic attribute pending value confirmation.
+
 ## [2.41.2] - 2026-06-15
 
 ### Fixed
