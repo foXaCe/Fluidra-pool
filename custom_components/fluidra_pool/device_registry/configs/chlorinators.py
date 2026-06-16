@@ -224,7 +224,11 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     ),
     "lc24013306_chlorinator": DeviceConfig(
         device_type="chlorinator",
-        identifier_patterns=["LC24013306*"],  # Irripool iSALT — Issue #31.
+        # Irripool iSALT (tecnoLC2) — Issues #31, #73.
+        # LC24009805 (@guilhem069) is the same Irripool iSalt; it fell back to the
+        # generic profile, which read the water temperature (c172 = 32.2 °C) as pH and
+        # the temperature from c183 (= 0 °C). Same standard tecnoLC2 layout below.
+        identifier_patterns=["LC24013306*", "LC24009805*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
