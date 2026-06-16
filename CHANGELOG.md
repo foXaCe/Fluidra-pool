@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.42.1] - 2026-06-16
+
+### Fixed
+- **Irripool iSalt** second serial (`LC24009805`, Issue #73) — this unit reports as `LC24009805` (not `LC24013306`), so it fell back to the generic profile: it read the water temperature (c172) as pH and the temperature from c183 (= 0 °C). Added to the Irripool iSALT tecnoLC2 profile so temperature, pH, ORP, salinity and the setpoints read from the correct components.
+
 ## [2.42.0] - 2026-06-15
 
 ### Added
