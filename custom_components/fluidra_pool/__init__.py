@@ -350,20 +350,20 @@ def _service_schedule_to_fluidra(schedule: dict[str, Any], schedule_id: int) -> 
         )
     days_str = ",".join(str(day) for day in days)
 
+    # Shape captured from the official Fluidra Connect app's PUT body (Issue #89):
+    # an integer id/groupId per slot and a single startActions.operationName. The
+    # previous payload (string "schedule_N" id, no groupId, a spurious
+    # componentToChange, plus synthesised endActions and state) was rejected by the
+    # server-side JSONata transform ("invalid scheduleUser").
     return {
-        "id": f"schedule_{schedule_id}",
+        "id": schedule_id,
+        "groupId": schedule_id,
         "enabled": schedule["enabled"],
         "startTime": f"{start_minute:02d} {start_hour:02d} * * {days_str}",
         "endTime": f"{end_minute:02d} {end_hour:02d} * * {days_str}",
         "startActions": {
-            "componentToChange": 11,  # Speed component
             "operationName": schedule["mode"],
         },
-        "endActions": {
-            "componentToChange": 9,  # Pump component
-            "operationName": "0",  # Turn off
-        },
-        "state": "IDLE",
     }
 
 

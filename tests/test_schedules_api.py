@@ -239,14 +239,17 @@ async def test_set_schedule_dm24049704_component_converts_payload() -> None:
     assert desired["programs"][0]["slots"][0] == {"id": 0, "start": 1280, "end": 1536, "mode": 2}
 
 
-async def test_set_schedule_non_200_returns_false() -> None:
-    """A non-200 status logs the body and returns False."""
-    api = _make_api(status=409, raw_text="conflict-body")
+async def test_set_schedule_non_200_warns_and_returns_false(caplog) -> None:
+    """A non-200 status surfaces the rejection body at WARNING and returns False (Issue #89)."""
+    api = _make_api(status=409, raw_text="invalid scheduleUser")
 
-    result = await api.set_schedule("DEV-1", [])
+    with caplog.at_level("WARNING"):
+        result = await api.set_schedule("DEV-1", [])
 
     assert result is False
     api._request.assert_awaited_once()
+    assert "invalid scheduleUser" in caplog.text
+    assert "409" in caplog.text
 
 
 async def test_set_schedule_request_error_is_caught_returns_false() -> None:

@@ -369,14 +369,17 @@ def test_service_schedule_to_fluidra_valid() -> None:
     }
     result = _service_schedule_to_fluidra(schedule, schedule_id=4)
 
-    assert result["id"] == "schedule_4"
+    # Payload must match the official app's PUT body (Issue #89): integer id/groupId,
+    # a single startActions.operationName, and no componentToChange/endActions/state.
+    assert result["id"] == 4
+    assert result["groupId"] == 4
     assert result["enabled"] is True
     assert result["startTime"] == "00 08 * * 1,2,3"
     assert result["endTime"] == "30 12 * * 1,2,3"
-    assert result["startActions"]["operationName"] == "2"
-    assert result["startActions"]["componentToChange"] == 11
-    assert result["endActions"]["componentToChange"] == 9
-    assert result["state"] == "IDLE"
+    assert result["startActions"] == {"operationName": "2"}
+    assert "componentToChange" not in result["startActions"]
+    assert "endActions" not in result
+    assert "state" not in result
 
 
 def test_service_schedule_to_fluidra_invalid_time() -> None:

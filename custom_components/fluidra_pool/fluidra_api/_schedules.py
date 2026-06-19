@@ -128,7 +128,10 @@ class SchedulesMixin(FluidraAPIBase):
             return False
 
         if status != 200:
-            _LOGGER.debug("set_schedule body: %s", raw_text[:500])
+            # Surface the rejection reason at WARNING so it reaches HA's system log
+            # (the system_log buffer only retains WARNING+, so a DEBUG line was
+            # invisible and a failed write gave no diagnostic info — Issue #89).
+            _LOGGER.warning("set_schedule rejected by Fluidra (HTTP %s): %s", status, raw_text[:500])
         return status == 200
 
     async def get_default_schedule(self) -> list[dict[str, Any]]:
