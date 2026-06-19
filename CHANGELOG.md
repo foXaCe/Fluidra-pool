@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.42.2] - 2026-06-19
+
+### Fixed
+- **`fluidra_pool.set_schedule` was always rejected by the Fluidra API** (Issue #89, thanks @ihadx) — the write payload didn't match the schema the official app uses. It now sends an integer `id`/`groupId` per slot and a single `startActions.operationName`, and drops the `componentToChange`, `endActions` and `state` fields the API rejected (server-side "invalid scheduleUser"). A rejected schedule write is now logged at WARNING with the HTTP status and response body, so the reason is visible in the system log by default.
+
 ## [2.42.1] - 2026-06-16
 
 ### Fixed
