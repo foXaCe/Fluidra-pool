@@ -31,9 +31,9 @@ asyncio_mode = "auto"
 
 [tool.mypy]
 # Strict type checking enforced in CI (Platinum `strict-typing`).
-# 3.13 matches the CI runtime and the Home Assistant 2026.x requirement (HA ships
+# 3.14 matches the CI runtime and the Home Assistant 2026.x requirement (HA ships
 # PEP 696 syntax that mypy cannot parse under an older target).
-python_version = "3.13"
+python_version = "3.14"
 strict = true
 ignore_missing_imports = true
 
