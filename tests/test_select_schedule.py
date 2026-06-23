@@ -425,3 +425,216 @@ def test_format_cron_time_keeps_explicit_days() -> None:
     select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), _api(), POOL_ID, CHLOR_ID, schedule_id="1")
     _attach_ha(select)
     assert select._format_cron_time("30 14 * * 1,3,5") == "30 14 * * 1,3,5"
+
+
+def test_format_cron_time_returns_input_when_too_few_parts() -> None:
+    """A malformed CRON string with fewer than 5 fields is returned unchanged."""
+    device = _chlor_device(schedule_data=[SCHEDULE])
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), _api(), POOL_ID, CHLOR_ID, schedule_id="1")
+    _attach_ha(select)
+    assert select._format_cron_time("5 8") == "5 8"
+
+
+# --- coverage gaps: schedule mode (pump) -------------------------------
+
+
+def test_schedule_mode_get_schedule_data_swallows_malformed_schedule() -> None:
+    """A non-dict entry in schedule_data triggers the guarded except → None."""
+    device = _pump_device(["not-a-dict"])  # schedule.get(...) raises AttributeError
+    select = FluidraScheduleModeSelect(_coord(device), _api(), POOL_ID, PUMP_ID, schedule_id="1")
+    _attach_ha(select)
+    assert select._get_schedule_data() is None
+    # available combines super().available with the (now None) schedule lookup.
+    assert select.available is False
+
+
+def test_schedule_mode_extra_state_attributes_with_schedule() -> None:
+    """When the schedule exists, attrs expose start/end time, enabled and state."""
+    schedule = {
+        **SCHEDULE,
+        "startTime": "0 8 * * 1,2,3,4,5",
+        "endTime": "0 10 * * 1,2,3,4,5",
+        "enabled": True,
+        "state": "RUNNING",
+    }
+    device = _pump_device([schedule])
+    select = FluidraScheduleModeSelect(_coord(device), _api(), POOL_ID, PUMP_ID, schedule_id="1")
+    _attach_ha(select)
+    attrs = select.extra_state_attributes
+    assert attrs["schedule_id"] == "1"
+    assert attrs["device_id"] == PUMP_ID
+    assert attrs["available_modes"] == ["0", "1", "2"]
+    assert attrs["start_time"] == "0 8 * * 1,2,3,4,5"
+    assert attrs["end_time"] == "0 10 * * 1,2,3,4,5"
+    assert attrs["enabled"] is True
+    assert attrs["state"] == "RUNNING"
+
+
+def test_schedule_mode_extra_state_attributes_without_schedule() -> None:
+    """Without a matching schedule, only the static keys are present."""
+    device = _pump_device([SCHEDULE])
+    select = FluidraScheduleModeSelect(_coord(device), _api(), POOL_ID, PUMP_ID, schedule_id="99")
+    _attach_ha(select)
+    attrs = select.extra_state_attributes
+    assert attrs == {
+        "schedule_id": "99",
+        "device_id": PUMP_ID,
+        "available_modes": ["0", "1", "2"],
+    }
+    assert "start_time" not in attrs
+
+
+# --- coverage gaps: chlorinator schedule speed -------------------------
+
+
+def test_chlor_schedule_speed_get_schedule_data_swallows_malformed_schedule() -> None:
+    """A non-dict schedule entry hits the guarded except → None (so unavailable)."""
+    device = _chlor_device(schedule_data=[None])  # schedule.get(...) raises AttributeError
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), _api(), POOL_ID, CHLOR_ID, schedule_id="1")
+    _attach_ha(select)
+    assert select._get_schedule_data() is None
+    assert select.available is False
+
+
+def test_chlor_schedule_speed_current_option_defaults_when_no_schedule() -> None:
+    """No matching schedule and no optimistic value → first option (s1)."""
+    device = _chlor_device(schedule_data=[SCHEDULE])
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), _api(), POOL_ID, CHLOR_ID, schedule_id="404")
+    _attach_ha(select)
+    assert select._optimistic_option is None
+    assert select.current_option == "s1"
+
+
+async def test_chlor_schedule_speed_select_no_op_without_schedule_data() -> None:
+    """No schedule_data key → optimistic write is rolled back and no API call."""
+    device = _chlor_device(schedule_data=[SCHEDULE])
+    # Remove schedule_data so async_select_option hits the early-return branch.
+    del device["schedule_data"]
+    api = _api()
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), api, POOL_ID, CHLOR_ID, schedule_id="1")
+    _attach_ha(select)
+
+    await select.async_select_option("s1")
+
+    assert select._optimistic_option is None
+    api.set_schedule.assert_not_called()
+
+
+async def test_chlor_schedule_speed_exo_preserves_other_component_actions() -> None:
+    """EXO update reads componentActions of the untouched schedule (loop else-branch)."""
+    schedules = [
+        {**SCHEDULE, "id": 1, "startActions": {"componentActions": [{"id": 0, "reportedValue": 3}]}},
+        {**SCHEDULE, "id": 2, "startActions": {"componentActions": [{"id": 0, "reportedValue": 1}]}},
+    ]
+    device = _chlor_device(schedule_data=schedules, output_type="output")
+    api = _api()
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), api, POOL_ID, CHLOR_ID, schedule_id="2")
+    _attach_ha(select)
+
+    await select.async_select_option("pump")  # → reportedValue 1 for schedule 2
+
+    sent = api.set_schedule.call_args.args[1]
+    by_id = {s["id"]: s["startActions"]["componentActions"][0]["reportedValue"] for s in sent}
+    assert by_id[2] == 1  # New value for the target.
+    assert by_id[1] == 3  # Untouched schedule keeps its existing reportedValue.
+
+
+def _chlor_device_generic_component(*, schedule_data: list[dict], schedule_component: int) -> dict:
+    """Speed-mode chlorinator with a non-258 schedule_component (generic else-branch)."""
+    return {
+        "device_id": CHLOR_ID,
+        "name": "Chlorinator",
+        "family": "",
+        "model": "",
+        "type": "chlorinator",
+        "online": True,
+        "components": {},
+        "schedule_data": schedule_data,
+        "_identify_cache": {
+            "key": (CHLOR_ID, "", "", "chlorinator", ""),
+            "config": SimpleNamespace(
+                device_type="chlorinator",
+                features={"schedule_output_type": "speed", "schedule_component": schedule_component},
+                components_range=25,
+                required_components=[0, 1, 2, 3],
+                entities=[],
+            ),
+        },
+    }
+
+
+async def test_chlor_schedule_speed_generic_branch_for_non_258_component() -> None:
+    """speed output + schedule_component != 258 takes the generic scheduler branch (line 335)."""
+    schedules = [{**SCHEDULE, "id": 1, "enabled": True, "startActions": {"operationName": "1"}}]
+    device = _chlor_device_generic_component(schedule_data=schedules, schedule_component=259)
+    api = _api()
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), api, POOL_ID, CHLOR_ID, schedule_id="1")
+    _attach_ha(select)
+
+    await select.async_select_option("s3")
+
+    api.set_schedule.assert_awaited_once()
+    assert api.set_schedule.call_args.kwargs["component_id"] == 259
+    sent = api.set_schedule.call_args.args[1]
+    # Generic branch keeps the original groupId == id and raw start/end times (no CRON padding).
+    assert sent[0]["groupId"] == sent[0]["id"]
+    assert sent[0]["startActions"]["operationName"] == "3"
+    assert sent[0]["startTime"] == "0 8 * * 1,2,3,4,5"
+
+
+async def test_chlor_schedule_speed_wraps_api_error_and_clears_optimistic() -> None:
+    """A FluidraError raised by set_schedule is swallowed and optimistic state cleared (355-366)."""
+    device = _chlor_device(schedule_data=[SCHEDULE])
+    api = SimpleNamespace(set_schedule=AsyncMock(side_effect=FluidraError("boom")))
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), api, POOL_ID, CHLOR_ID, schedule_id="1")
+    _attach_ha(select)
+
+    # The handler logs and recovers (no raise), leaving optimistic state cleared.
+    await select.async_select_option("s2")
+
+    assert select._optimistic_option is None
+
+
+def test_chlor_schedule_speed_icon_per_option() -> None:
+    """Icon reflects the current speed: s1 slow, s2 medium, else default."""
+    for op_name, expected in (("1", "mdi:speedometer-slow"), ("2", "mdi:speedometer-medium"), ("3", "mdi:speedometer")):
+        device = _chlor_device(schedule_data=[{**SCHEDULE, "startActions": {"operationName": op_name}}])
+        select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), _api(), POOL_ID, CHLOR_ID, schedule_id="1")
+        _attach_ha(select)
+        assert select.icon == expected
+
+
+def test_chlor_schedule_speed_extra_state_attributes_with_schedule() -> None:
+    """With a schedule, attrs expose times, enabled and state."""
+    schedule = {
+        **SCHEDULE,
+        "startTime": "0 8 * * 1,2,3,4,5",
+        "endTime": "0 10 * * 1,2,3,4,5",
+        "enabled": True,
+        "state": "RUNNING",
+    }
+    device = _chlor_device(schedule_data=[schedule])
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), _api(), POOL_ID, CHLOR_ID, schedule_id="1")
+    _attach_ha(select)
+    attrs = select.extra_state_attributes
+    assert attrs["schedule_id"] == "1"
+    assert attrs["device_id"] == CHLOR_ID
+    assert attrs["available_speeds"] == ["s1", "s2", "s3"]
+    assert attrs["start_time"] == "0 8 * * 1,2,3,4,5"
+    assert attrs["end_time"] == "0 10 * * 1,2,3,4,5"
+    assert attrs["enabled"] is True
+    assert attrs["state"] == "RUNNING"
+
+
+def test_chlor_schedule_speed_extra_state_attributes_without_schedule() -> None:
+    """Without a matching schedule, only static keys are present."""
+    device = _chlor_device(schedule_data=[SCHEDULE])
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), _api(), POOL_ID, CHLOR_ID, schedule_id="404")
+    _attach_ha(select)
+    attrs = select.extra_state_attributes
+    assert attrs == {
+        "schedule_id": "404",
+        "device_id": CHLOR_ID,
+        "available_speeds": ["s1", "s2", "s3"],
+    }
+    assert "start_time" not in attrs

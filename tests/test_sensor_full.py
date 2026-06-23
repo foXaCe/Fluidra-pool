@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from custom_components.fluidra_pool.const import DOMAIN
 from custom_components.fluidra_pool.sensor import (
     FluidraChlorinatorSensor,
     FluidraDeviceInfoSensor,
@@ -1089,6 +1090,113 @@ async def test_setup_chlorinator_creates_measurement_sensors() -> None:
     added = await _run_setup(coordinator)
     chlor = [e for e in added if isinstance(e, FluidraChlorinatorSensor)]
     assert len(chlor) == 3
+
+
+# --------------------------------------------------------------------------- #
+# FluidraChlorinatorSensor — divisor override, device_data, device_info, attrs #
+# --------------------------------------------------------------------------- #
+
+
+def test_chlorinator_custom_divisor_overrides_default() -> None:
+    """A `sensor_divisors` feature overrides the per-type default divisor (line 112)."""
+    # Default ph divisor is 100; override it to 50 via the device registry feature.
+    device = _pinned_device(
+        DEVICE_ID,
+        device_type="chlorinator",
+        features={"sensor_divisors": {"ph": 50}},
+        components={"165": {"reportedValue": 360}},
+    )
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 165)
+    assert sensor._divisor == 50
+    # 360 / 50 = 7.2 (would be 3.6 with the default divisor of 100).
+    assert sensor.native_value == pytest.approx(7.2)
+
+
+def test_chlorinator_custom_divisor_ignored_for_other_types() -> None:
+    """A `sensor_divisors` map that doesn't list this type leaves the default in place."""
+    device = _pinned_device(
+        DEVICE_ID,
+        device_type="chlorinator",
+        features={"sensor_divisors": {"orp": 2}},
+        components={"165": {"reportedValue": 731}},
+    )
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 165)
+    # ph not in the override map -> keeps default divisor 100.
+    assert sensor._divisor == 100
+    assert sensor.native_value == pytest.approx(7.31)
+
+
+def test_chlorinator_device_data_empty_when_coordinator_data_none() -> None:
+    """device_data degrades to {} when coordinator.data is None (line 118)."""
+    coord = MagicMock()
+    coord.data = None
+    coord.last_update_success = True
+    sensor = FluidraChlorinatorSensor(coord, SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 165)
+    assert sensor.device_data == {}
+    assert sensor.native_value is None
+    assert sensor.available is False
+
+
+def test_chlorinator_device_data_empty_when_device_not_found() -> None:
+    """device_data returns {} when the pool exists but the device_id isn't present (line 125)."""
+    other = _pinned_device("OTHER-DEV", device_type="chlorinator", components={"165": {"reportedValue": 720}})
+    sensor = FluidraChlorinatorSensor(_coord([other]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 165)
+    assert sensor.device_data == {}
+    assert sensor.native_value is None
+
+
+def test_chlorinator_device_info_uses_device_name_and_manufacturer() -> None:
+    """device_info pulls the device name + manufacturer from the payload (lines 130-131)."""
+    device = _pinned_device(
+        DEVICE_ID,
+        device_type="chlorinator",
+        components={"165": {"reportedValue": 720}},
+        name="Salt Cell",
+        manufacturer="Hayward",
+    )
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 165)
+    info = sensor.device_info
+    assert info["name"] == "Salt Cell"
+    assert info["manufacturer"] == "Hayward"
+    assert info["model"] == "Chlorinator"
+    assert (DOMAIN, DEVICE_ID) in info["identifiers"]
+    assert info["via_device"] == (DOMAIN, POOL_ID)
+
+
+def test_chlorinator_device_info_falls_back_to_generated_name() -> None:
+    """A device without a name falls back to 'Chlorinator <id>' and the default manufacturer."""
+    device = _pinned_device(DEVICE_ID, device_type="chlorinator", components={"165": {"reportedValue": 720}})
+    device.pop("name", None)
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 165)
+    info = sensor.device_info
+    assert info["name"] == f"Chlorinator {DEVICE_ID}"
+    assert info["manufacturer"] == "Fluidra"
+
+
+def test_chlorinator_extra_state_attributes() -> None:
+    """extra_state_attributes exposes component id, type, raw value and divisor (lines 171-174)."""
+    device = _pinned_device(
+        DEVICE_ID,
+        device_type="chlorinator",
+        components={"170": {"reportedValue": 654}},
+    )
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "orp", 170)
+    attrs = sensor.extra_state_attributes
+    assert attrs["component_id"] == 170
+    assert attrs["sensor_type"] == "orp"
+    assert attrs["raw_value"] == 654
+    assert attrs["divisor"] == 1
+    assert attrs["device_id"] == DEVICE_ID
+
+
+def test_chlorinator_extra_state_attributes_raw_value_none_when_missing() -> None:
+    """When the component is absent, raw_value is None but the other keys still populate."""
+    device = _pinned_device(DEVICE_ID, device_type="chlorinator", components={})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 165)
+    attrs = sensor.extra_state_attributes
+    assert attrs["raw_value"] is None
+    assert attrs["component_id"] == 165
+    assert attrs["divisor"] == 100
 
 
 async def test_setup_falls_back_to_get_pools_when_no_cache() -> None:

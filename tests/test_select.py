@@ -248,3 +248,49 @@ async def test_light_effect_async_select_raises_on_api_rejection() -> None:
     # The finally block still clears the optimistic option on the way out.
     assert select._optimistic_option is None
     select.coordinator.async_request_refresh.assert_not_awaited()
+
+
+def test_light_effect_optimistic_option_takes_precedence() -> None:
+    """A pending optimistic option overrides the reported component value."""
+    select = _light_effect(0)  # device reports static_color
+    select._optimistic_option = "scene_7"
+    assert select.current_option == "scene_7"
+
+
+def test_light_effect_uncoercible_value_falls_back_to_static_color() -> None:
+    """A non-numeric reportedValue can't be int()-coerced → static_color (lines 96-97)."""
+    select = _light_effect("not-a-number")  # type: ignore[arg-type]
+    assert select.current_option == "static_color"
+
+
+def test_light_effect_icon_is_palette() -> None:
+    """The light effect select always uses the palette icon."""
+    select = _light_effect(0)
+    assert select.icon == "mdi:palette"
+
+
+def test_light_effect_extra_state_attributes() -> None:
+    """Attributes expose device_id, effect component, reported/desired values and optimistic option."""
+    device = _pinned_device(
+        LIGHT_ID,
+        features={"effect_select": 18},
+        components={"18": {"reportedValue": 3, "desiredValue": 5}},
+    )
+    select = FluidraLightEffectSelect(_coord_with(device), _api(), POOL_ID, LIGHT_ID)
+    _attach_ha(select)
+    select._optimistic_option = "scene_2"
+    attrs = select.extra_state_attributes
+    assert attrs["device_id"] == LIGHT_ID
+    assert attrs["effect_component"] == FluidraLightEffectSelect.EFFECT_COMPONENT
+    assert attrs["reported_value"] == 3
+    assert attrs["desired_value"] == 5
+    assert attrs["optimistic_option"] == "scene_2"
+
+
+def test_light_effect_extra_state_attributes_missing_component() -> None:
+    """With no component data, reported/desired values are None."""
+    select = _light_effect(None)  # no component 18 in the device
+    attrs = select.extra_state_attributes
+    assert attrs["reported_value"] is None
+    assert attrs["desired_value"] is None
+    assert attrs["optimistic_option"] is None

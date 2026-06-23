@@ -155,3 +155,160 @@ def test_handle_coordinator_update_clears_optimistic_when_backend_caught_up(
     light._optimistic_is_on = True
     light._handle_coordinator_update()
     assert (light._optimistic_is_on is True) is expected_keeps_optimistic
+
+
+# --- brightness / rgbw_color guarded parse paths -------------------------
+
+
+def test_brightness_returns_none_on_non_numeric_reported_value() -> None:
+    """A non-numeric brightness reportedValue hits the guarded except -> None (lines 127-128)."""
+    light = _build_light({str(LUMIPLUS_COMPONENT_BRIGHTNESS): {"reportedValue": "bright"}})
+    assert light.brightness is None
+
+
+def test_rgbw_color_returns_none_on_non_numeric_channel() -> None:
+    """A non-numeric colour channel triggers the guarded except -> None (lines 143-144)."""
+    light = _build_light(
+        {str(LUMIPLUS_COMPONENT_COLOR): {"reportedValue": {"r": "x", "g": 0, "b": 0, "extra": {"w": 0}}}}
+    )
+    assert light.rgbw_color is None
+
+
+# --- _handle_coordinator_update: brightness + rgbw clearing & guards -------
+
+
+def test_handle_coordinator_update_power_bad_reported_value_swallowed() -> None:
+    """A non-numeric reported power while optimistic ON hits the guarded pass (lines 155-156)."""
+    light = _build_light({str(LUMIPLUS_COMPONENT_POWER): {"reportedValue": "garbage"}})
+    light._optimistic_is_on = True
+    light._handle_coordinator_update()
+    # The except path is a no-op, so the optimistic flag is preserved.
+    assert light._optimistic_is_on is True
+
+
+def test_handle_coordinator_update_clears_brightness_once_backend_matches() -> None:
+    """Optimistic brightness drops when the device echoes the matching 0-100 value (lines 161-165)."""
+    # 128/255*100 ≈ 50.2 -> round() == 50; device reports 50 -> match -> clear.
+    light = _build_light({str(LUMIPLUS_COMPONENT_BRIGHTNESS): {"reportedValue": 50}})
+    light._optimistic_brightness = 128
+    light._handle_coordinator_update()
+    assert light._optimistic_brightness is None
+
+
+def test_handle_coordinator_update_keeps_brightness_until_backend_matches() -> None:
+    """Optimistic brightness stays put while the device still reports the old value."""
+    light = _build_light({str(LUMIPLUS_COMPONENT_BRIGHTNESS): {"reportedValue": 10}})
+    light._optimistic_brightness = 255  # expects ~100 on the wire
+    light._handle_coordinator_update()
+    assert light._optimistic_brightness == 255
+
+
+def test_handle_coordinator_update_brightness_bad_reported_value_swallowed() -> None:
+    """A non-numeric reported brightness hits the guarded except (lines 166-167) and is kept."""
+    light = _build_light({str(LUMIPLUS_COMPONENT_BRIGHTNESS): {"reportedValue": "nope"}})
+    light._optimistic_brightness = 200
+    light._handle_coordinator_update()
+    assert light._optimistic_brightness == 200
+
+
+def test_handle_coordinator_update_clears_rgbw_once_backend_matches() -> None:
+    """Optimistic RGBW drops on an exact tuple match from the backend (lines 171-179)."""
+    light = _build_light(
+        {str(LUMIPLUS_COMPONENT_COLOR): {"reportedValue": {"r": 10, "g": 20, "b": 30, "extra": {"w": 40}}}}
+    )
+    light._optimistic_rgbw = (10, 20, 30, 40)
+    light._handle_coordinator_update()
+    assert light._optimistic_rgbw is None
+
+
+def test_handle_coordinator_update_keeps_rgbw_until_backend_matches() -> None:
+    """Optimistic RGBW stays put while the backend still reports a different colour."""
+    light = _build_light(
+        {str(LUMIPLUS_COMPONENT_COLOR): {"reportedValue": {"r": 0, "g": 0, "b": 0, "extra": {"w": 0}}}}
+    )
+    light._optimistic_rgbw = (10, 20, 30, 40)
+    light._handle_coordinator_update()
+    assert light._optimistic_rgbw == (10, 20, 30, 40)
+
+
+def test_handle_coordinator_update_rgbw_bad_channel_swallowed() -> None:
+    """A non-numeric colour channel during reconciliation hits the guarded except (lines 180-181)."""
+    light = _build_light(
+        {str(LUMIPLUS_COMPONENT_COLOR): {"reportedValue": {"r": "bad", "g": 0, "b": 0, "extra": {"w": 0}}}}
+    )
+    light._optimistic_rgbw = (10, 20, 30, 40)
+    light._handle_coordinator_update()
+    # Parse failed -> kept (not cleared).
+    assert light._optimistic_rgbw == (10, 20, 30, 40)
+
+
+# --- async_turn_on / async_turn_off failure paths -------------------------
+
+
+async def test_async_turn_on_color_path_and_optimistic_state() -> None:
+    """turn_on with only RGBW_COLOR drives the colour write and exposes the optimistic colour."""
+    light = _build_light()
+    await light.async_turn_on(**{ATTR_RGBW_COLOR: (1, 2, 3, 4)})
+
+    assert light.is_on is True
+    assert light.rgbw_color == (1, 2, 3, 4)
+    light._api.set_component_json_value.assert_awaited_once_with(
+        DEVICE_ID,
+        LUMIPLUS_COMPONENT_COLOR,
+        {"r": 1, "g": 2, "b": 3, "k": 5000, "extra": {"w": 4}},
+    )
+    light.coordinator.async_request_refresh.assert_awaited_once()
+
+
+async def test_async_turn_on_raises_when_power_write_fails() -> None:
+    """A False from the power write rolls back every optimistic override and raises."""
+    light = _build_light()
+    light._api.set_component_string_value = AsyncMock(return_value=False)
+
+    with pytest.raises(HomeAssistantError):
+        await light.async_turn_on(**{ATTR_BRIGHTNESS: 128, ATTR_RGBW_COLOR: (1, 2, 3, 4)})
+
+    assert light._optimistic_is_on is None
+    assert light._optimistic_brightness is None
+    assert light._optimistic_rgbw is None
+    light.coordinator.async_request_refresh.assert_not_awaited()
+
+
+async def test_async_turn_on_raises_and_rolls_back_on_api_exception() -> None:
+    """A raised TimeoutError mid-write rolls back optimistics and surfaces HomeAssistantError."""
+    light = _build_light()
+    light._api.set_component_value = AsyncMock(side_effect=TimeoutError)
+
+    with pytest.raises(HomeAssistantError):
+        await light.async_turn_on(**{ATTR_BRIGHTNESS: 200})
+
+    assert light._optimistic_is_on is None
+    assert light._optimistic_brightness is None
+    light.async_write_ha_state.assert_called()
+    light.coordinator.async_request_refresh.assert_not_awaited()
+
+
+async def test_async_turn_off_raises_when_power_write_fails() -> None:
+    """A False from the power-off write rolls back the optimistic flag and raises."""
+    light = _build_light()
+    light._api.set_component_string_value = AsyncMock(return_value=False)
+
+    with pytest.raises(HomeAssistantError):
+        await light.async_turn_off()
+
+    assert light._optimistic_is_on is None
+    light.coordinator.async_request_refresh.assert_not_awaited()
+
+
+async def test_async_turn_off_raises_and_rolls_back_on_api_exception() -> None:
+    """A raised ClientError on turn_off rolls back and raises HomeAssistantError."""
+    import aiohttp
+
+    light = _build_light()
+    light._api.set_component_string_value = AsyncMock(side_effect=aiohttp.ClientError)
+
+    with pytest.raises(HomeAssistantError):
+        await light.async_turn_off()
+
+    assert light._optimistic_is_on is None
+    light.coordinator.async_request_refresh.assert_not_awaited()

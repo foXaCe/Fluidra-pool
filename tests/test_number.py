@@ -151,6 +151,55 @@ async def test_chlorination_async_set_clamps_to_max_when_step_overshoots() -> No
     api.control_device_component.assert_awaited_once_with(DEVICE_ID, 10, 95)
 
 
+def test_chlorination_handle_coordinator_update_writes_state() -> None:
+    """Coordinator updates push a fresh HA state for the level entity."""
+    device = _chlorinator_device(
+        components={"10": {"reportedValue": 30}},
+        features={"chlorination_level": 10},
+    )
+    number = FluidraChlorinatorLevelNumber(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    number._handle_coordinator_update()
+    number.async_write_ha_state.assert_called_once()
+
+
+def test_chlorination_icon_is_water_percent() -> None:
+    """The level slider uses the water-percent icon."""
+    device = _chlorinator_device(features={"chlorination_level": 10})
+    number = FluidraChlorinatorLevelNumber(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+    assert number.icon == "mdi:water-percent"
+
+
+def test_chlorination_extra_state_attributes_simple_int() -> None:
+    """A plain-int chlorination_level reports read==write in its attributes."""
+    device = _chlorinator_device(
+        components={"10": {"reportedValue": 30}},
+        features={"chlorination_level": 10},
+    )
+    number = FluidraChlorinatorLevelNumber(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    attrs = number.extra_state_attributes
+    assert attrs == {"read_component": 10, "write_component": 10, "device_id": DEVICE_ID}
+
+
+def test_chlorination_extra_state_attributes_dict_component() -> None:
+    """A dict-form chlorination_level exposes distinct read/write components."""
+    device = _chlorinator_device(
+        components={"164": {"reportedValue": 60}},
+        features={"chlorination_level": {"write": 4, "read": 164}},
+    )
+    number = FluidraChlorinatorLevelNumber(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    attrs = number.extra_state_attributes
+    assert attrs["read_component"] == 164
+    assert attrs["write_component"] == 4
+    assert attrs["device_id"] == DEVICE_ID
+
+
 # --- FluidraChlorinatorPhSetpoint ----------------------------------------
 
 
@@ -205,6 +254,101 @@ async def test_ph_setpoint_async_set_supports_simple_int_feature() -> None:
     api.control_device_component.assert_awaited_once_with(DEVICE_ID, 16, 720)
 
 
+def test_ph_setpoint_native_value_simple_int_reads_same_component() -> None:
+    """A plain-int ph_setpoint reads the value from that single component."""
+    device = _chlorinator_device(
+        components={"16": {"reportedValue": 730}},
+        features={"ph_setpoint": 16, "ph_setpoint_divisor": 100},
+    )
+    number = FluidraChlorinatorPhSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+    assert number.native_value == 7.3
+
+
+def test_ph_setpoint_native_value_guards_non_numeric() -> None:
+    """A non-numeric pH reading falls back to the 7.2 default instead of raising."""
+    device = _chlorinator_device(
+        components={"172": {"reportedValue": "bad"}},
+        features={"ph_setpoint": {"write": 8, "read": 172}},
+    )
+    number = FluidraChlorinatorPhSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+    assert number.native_value == 7.2
+
+
+def test_ph_setpoint_icon_is_ph() -> None:
+    """The pH setpoint uses the pH icon."""
+    device = _chlorinator_device(features={"ph_setpoint": {"write": 8, "read": 172}})
+    number = FluidraChlorinatorPhSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+    assert number.icon == "mdi:ph"
+
+
+def test_ph_setpoint_extra_state_attributes_dict_with_reading() -> None:
+    """Dict-form pH exposes read/write and a divided current reading."""
+    device = _chlorinator_device(
+        components={"172": {"reportedValue": 715}},
+        features={"ph_setpoint": {"write": 8, "read": 172}, "ph_setpoint_divisor": 100},
+    )
+    number = FluidraChlorinatorPhSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    attrs = number.extra_state_attributes
+    assert attrs["read_component"] == 172
+    assert attrs["write_component"] == 8
+    assert attrs["current_ph_reading"] == 7.15
+    assert attrs["device_id"] == DEVICE_ID
+    assert attrs["ph_range"] == "6.8-7.6"
+
+
+def test_ph_setpoint_extra_state_attributes_simple_int() -> None:
+    """Plain-int pH reports read==write in its attributes."""
+    device = _chlorinator_device(
+        components={"16": {"reportedValue": 700}},
+        features={"ph_setpoint": 16, "ph_setpoint_divisor": 100},
+    )
+    number = FluidraChlorinatorPhSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    attrs = number.extra_state_attributes
+    assert attrs["read_component"] == 16
+    assert attrs["write_component"] == 16
+    assert attrs["current_ph_reading"] == 7.0
+
+
+def test_ph_setpoint_extra_state_attributes_no_reading() -> None:
+    """With no reading, current_ph_reading stays None (the parse block is skipped)."""
+    device = _chlorinator_device(
+        components={},
+        features={"ph_setpoint": {"write": 8, "read": 172}},
+    )
+    number = FluidraChlorinatorPhSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    attrs = number.extra_state_attributes
+    assert attrs["current_ph_reading"] is None
+
+
+def test_ph_setpoint_extra_state_attributes_non_numeric_reading_logs(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A non-numeric reading leaves current_ph_reading None and logs a debug line."""
+    import logging
+
+    device = _chlorinator_device(
+        components={"172": {"reportedValue": "oops"}},
+        features={"ph_setpoint": {"write": 8, "read": 172}},
+    )
+    number = FluidraChlorinatorPhSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    with caplog.at_level(logging.DEBUG, logger="custom_components.fluidra_pool.number"):
+        attrs = number.extra_state_attributes
+
+    assert attrs["current_ph_reading"] is None
+    assert "Failed to parse pH reading" in caplog.text
+
+
 # --- FluidraChlorinatorOrpSetpoint ---------------------------------------
 
 
@@ -242,6 +386,68 @@ def test_orp_setpoint_native_value_guards_non_numeric() -> None:
     number = FluidraChlorinatorOrpSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
     _attach_ha(number)
     assert number.native_value == 700.0
+
+
+def test_orp_setpoint_native_value_simple_int_reads_same_component() -> None:
+    """A plain-int orp_setpoint reads its raw mV value from that single component."""
+    device = _chlorinator_device(
+        components={"11": {"reportedValue": 680}},
+        features={"orp_setpoint": 11},
+    )
+    number = FluidraChlorinatorOrpSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+    assert number.native_value == 680.0
+
+
+def test_orp_setpoint_native_value_default_when_no_reading() -> None:
+    """Missing ORP reading falls back to 700.0 rather than returning None."""
+    device = _chlorinator_device(
+        components={},
+        features={"orp_setpoint": {"write": 11, "read": 177}},
+    )
+    number = FluidraChlorinatorOrpSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+    assert number.native_value == 700.0
+
+
+def test_orp_setpoint_icon_is_lightning_bolt() -> None:
+    """The ORP setpoint uses the lightning-bolt icon."""
+    device = _chlorinator_device(features={"orp_setpoint": {"write": 11, "read": 177}})
+    number = FluidraChlorinatorOrpSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+    assert number.icon == "mdi:lightning-bolt"
+
+
+def test_orp_setpoint_extra_state_attributes_dict_with_reading() -> None:
+    """Dict-form ORP exposes read/write and the raw current reading."""
+    device = _chlorinator_device(
+        components={"177": {"reportedValue": 690}},
+        features={"orp_setpoint": {"write": 11, "read": 177}},
+    )
+    number = FluidraChlorinatorOrpSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    attrs = number.extra_state_attributes
+    assert attrs["read_component"] == 177
+    assert attrs["write_component"] == 11
+    assert attrs["current_orp_reading"] == 690
+    assert attrs["device_id"] == DEVICE_ID
+    assert attrs["orp_range"] == "650-750 mV"
+
+
+def test_orp_setpoint_extra_state_attributes_simple_int() -> None:
+    """Plain-int ORP reports read==write in its attributes."""
+    device = _chlorinator_device(
+        components={"11": {"reportedValue": 700}},
+        features={"orp_setpoint": 11},
+    )
+    number = FluidraChlorinatorOrpSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+    _attach_ha(number)
+
+    attrs = number.extra_state_attributes
+    assert attrs["read_component"] == 11
+    assert attrs["write_component"] == 11
+    assert attrs["current_orp_reading"] == 700
 
 
 # --- FluidraLightEffectSpeed ---------------------------------------------
@@ -312,3 +518,30 @@ async def test_light_effect_speed_logs_and_skips_refresh_on_failure(caplog: pyte
 
     assert "Failed to set effect speed" in caplog.text
     coord.async_request_refresh.assert_not_awaited()
+
+
+def test_light_effect_speed_icon_is_speedometer() -> None:
+    """The effect-speed slider uses the speedometer icon."""
+    coord = _coord_with(_light_device(1))
+    coord.data[POOL_ID]["devices"][0]["device_id"] = "LP24-001"
+    number = FluidraLightEffectSpeed(
+        coord, SimpleNamespace(set_component_value=AsyncMock(return_value=True)), POOL_ID, "LP24-001"
+    )
+    _attach_ha(number)
+    assert number.icon == "mdi:speedometer"
+
+
+def test_light_effect_speed_extra_state_attributes() -> None:
+    """Effect-speed attributes expose component 20, the device id and the 1-8 range."""
+    coord = _coord_with(_light_device(4))
+    coord.data[POOL_ID]["devices"][0]["device_id"] = "LP24-001"
+    number = FluidraLightEffectSpeed(
+        coord, SimpleNamespace(set_component_value=AsyncMock(return_value=True)), POOL_ID, "LP24-001"
+    )
+    _attach_ha(number)
+
+    assert number.extra_state_attributes == {
+        "component": 20,
+        "device_id": "LP24-001",
+        "speed_range": "1-8",
+    }
