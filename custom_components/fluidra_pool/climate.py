@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
-from homeassistant.components.climate import (
-    ClimateEntity,
+from homeassistant.components.climate import ClimateEntity
+from homeassistant.components.climate.const import (
     ClimateEntityFeature,
     HVACAction,
     HVACMode,
@@ -16,7 +16,7 @@ from homeassistant.components.climate import (
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
 from .const import (
@@ -46,6 +46,10 @@ from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolControlEntity
 from .utils import mask_device_id
 
+if TYPE_CHECKING:
+    from .coordinator import FluidraDataUpdateCoordinator
+    from .fluidra_api import FluidraPoolAPI
+
 _LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 0  # Coordinator handles all updates
@@ -54,7 +58,7 @@ PARALLEL_UPDATES = 0  # Coordinator handles all updates
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: FluidraPoolConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Fluidra Pool climate entities."""
     coordinator = config_entry.runtime_data.coordinator
@@ -87,7 +91,13 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         "_pending_temperature",
     )
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str):
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
         """Initialize the climate entity."""
         super().__init__(coordinator, api, pool_id, device_id)
         self._pending_temperature: float | None = None
@@ -606,7 +616,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             ) from err
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         device_data = self.device_data
         attrs = {

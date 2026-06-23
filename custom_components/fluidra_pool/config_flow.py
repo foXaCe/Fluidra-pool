@@ -282,7 +282,7 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
             raise RuntimeError("Reconfigure config entry not found")
         return entry
 
-    async def _test_credentials(self, email: str, password: str) -> tuple[str | None, dict | None]:
+    async def _test_credentials(self, email: str, password: str) -> tuple[str | None, dict[str, Any] | None]:
         """Test credentials and return (error_key, mfa_info) tuple.
 
         Only tests Cognito authentication, not pool discovery.

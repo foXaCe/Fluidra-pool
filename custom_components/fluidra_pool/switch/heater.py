@@ -55,7 +55,8 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
         if self.device_data.get("is_running", False):
             return True
 
-        return self.device_data.get("is_heating", False)
+        value: bool = self.device_data.get("is_heating", False)
+        return value
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the heat pump on using discovered API with optimistic UI."""
@@ -110,9 +111,9 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heat_pump_set_failed") from e
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
-        attrs = {
+        attrs: dict[str, Any] = {
             "component_id": 9,
             "operation": "heat_pump_control",
             "device_type": "heat_pump",
@@ -191,7 +192,7 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
             self._clear_pending_state()
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         attrs: dict[str, Any] = {}
         if "current_temperature" in self.device_data:

@@ -89,7 +89,7 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
             self._clear_pending_state()
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         return {
             "component_id": 9,
@@ -181,7 +181,7 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
             self._clear_pending_state()
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         return {
             "component_id": 10,

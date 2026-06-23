@@ -16,6 +16,7 @@ from .base import FluidraPoolSensorEntity
 
 if TYPE_CHECKING:
     from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,7 +24,14 @@ _LOGGER = logging.getLogger(__name__)
 class FluidraTemperatureSensor(FluidraPoolSensorEntity):
     """Temperature sensor for pool heaters and heat pumps."""
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str, sensor_type: str):
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        sensor_type: str,
+    ) -> None:
         """Initialize temperature sensor."""
         super().__init__(coordinator, api, pool_id, device_id, sensor_type)
         self._attr_device_class = SensorDeviceClass.TEMPERATURE
@@ -100,7 +108,13 @@ class FluidraRunningHoursSensor(FluidraPoolSensorEntity):
     _attr_native_unit_of_measurement = "h"
     _attr_icon = "mdi:clock-outline"
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str):
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
         """Initialize running hours sensor."""
         super().__init__(coordinator, api, pool_id, device_id, "running_hours")
 
@@ -120,7 +134,7 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
     ) -> None:
@@ -162,7 +176,7 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         return self._get_speed_mode()
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         is_running = self.device_data.get("is_running", False)
         pump_reported = self.device_data.get("pump_reported")
@@ -198,7 +212,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
     ) -> None:
@@ -223,7 +237,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
             pass
         return None
 
-    def _format_schedule_time(self, schedule: dict) -> str:
+    def _format_schedule_time(self, schedule: dict[str, Any]) -> str:
         """Format schedule time range for display."""
         start_time = self._parse_cron_time(schedule.get("startTime", ""))
         end_time = self._parse_cron_time(schedule.get("endTime", ""))
@@ -237,7 +251,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
         speed_map = {"0": "low (45%)", "1": "medium (65%)", "2": "high (100%)"}
         return speed_map.get(operation, "low (45%)")
 
-    def _get_current_schedule(self, schedules: list[dict]) -> dict | None:
+    def _get_current_schedule(self, schedules: list[dict[str, Any]]) -> dict[str, Any] | None:
         """Get currently active schedule based on current time."""
         now = datetime.now().time()
 
@@ -252,12 +266,13 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
                 return schedule
         return None
 
-    def _get_schedules_data(self) -> list[dict]:
+    def _get_schedules_data(self) -> list[dict[str, Any]]:
         """Get schedules data from device data."""
         device_data = self.device_data
 
         if "schedule_data" in device_data:
-            return device_data["schedule_data"]
+            schedule_data: list[dict[str, Any]] = device_data["schedule_data"]
+            return schedule_data
         return []
 
     @property
@@ -320,7 +335,7 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
     ) -> None:

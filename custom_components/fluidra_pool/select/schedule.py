@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.select import SelectEntity
+from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.entity import EntityCategory
 
 from ..api_resilience import FluidraError
 from ..const import COMMAND_CONFIRMATION_DELAY, DOMAIN, UI_UPDATE_DELAY
@@ -19,6 +19,7 @@ from ..utils import convert_cron_days
 
 if TYPE_CHECKING:
     from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
         schedule_id: str,
@@ -48,7 +49,7 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
         # Speed options for schedules (using translation keys from schedule_mode.state).
         self._attr_options = ["0", "1", "2"]
 
-    def _get_schedule_data(self) -> dict | None:
+    def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
             device_data = self.device_data
@@ -59,7 +60,8 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
                 for schedule in schedules:
                     schedule_id = schedule.get("id")
                     if str(schedule_id) == str(self._schedule_id):
-                        return schedule
+                        schedule_data: dict[str, Any] = schedule
+                        return schedule_data
 
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
@@ -196,7 +198,7 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
         schedule_id: str,
@@ -226,7 +228,7 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
         self._attr_unique_id = f"fluidra_{self._device_id}_schedule_{schedule_id}_speed"
         self._attr_entity_category = EntityCategory.CONFIG
 
-    def _get_schedule_data(self) -> dict | None:
+    def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
             device_data = self.device_data
@@ -235,7 +237,8 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
                 for schedule in schedules:
                     schedule_id = schedule.get("id")
                     if str(schedule_id) == str(self._schedule_id):
-                        return schedule
+                        schedule_data: dict[str, Any] = schedule
+                        return schedule_data
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None

@@ -59,7 +59,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ),
         )
 
-    def get_pools_from_data(self) -> list[dict]:
+    def get_pools_from_data(self) -> list[dict[str, Any]]:
         """Get pools list from coordinator data (no API call).
 
         Use this in platform setup instead of api.get_pools() for faster startup.
@@ -111,15 +111,17 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.debug("Failed to cleanup removed devices: %s", err)
 
     # Kept as a thin wrapper so existing callers (and tests) keep working.
-    def _parse_dm24049704_schedule_format(self, reported_value: dict) -> list[dict]:
+    def _parse_dm24049704_schedule_format(self, reported_value: dict[str, Any]) -> list[dict[str, Any]]:
         """Parse DM24049704 chlorinator schedule format (programs/slots) to standard format."""
         return parse_dm24049704_schedule_format(reported_value)
 
-    def _calculate_auto_speed_from_schedules(self, device: dict) -> int:
+    def _calculate_auto_speed_from_schedules(self, device: dict[str, Any]) -> int:
         """Calculate current speed based on active schedules in auto mode."""
         return calculate_auto_speed_from_schedules(device)
 
-    async def _fetch_components_parallel(self, device_id: str, components_to_scan: list[int]) -> dict[int, dict]:
+    async def _fetch_components_parallel(
+        self, device_id: str, components_to_scan: list[int]
+    ) -> dict[int, dict[str, Any]]:
         """Fetch multiple component states in parallel for a device.
 
         Returns a dict mapping component_id to component_state.
@@ -127,7 +129,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Cap concurrency so we don't trip rate limits or exhaust the connector.
         semaphore = asyncio.Semaphore(10)
 
-        async def fetch_one(component_id: int) -> tuple[int, dict | None]:
+        async def fetch_one(component_id: int) -> tuple[int, dict[str, Any] | None]:
             async with semaphore:
                 state = await self.api.get_component_state(device_id, component_id)
                 return (component_id, state)
@@ -135,7 +137,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         tasks = [fetch_one(cid) for cid in components_to_scan]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        component_states: dict[int, dict] = {}
+        component_states: dict[int, dict[str, Any]] = {}
         for result in results:
             if isinstance(result, BaseException):
                 # Keep a diagnostic trace instead of silently dropping the failure.
@@ -146,7 +148,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 component_states[cid] = state
         return component_states
 
-    def _process_component_state(self, device: dict, pool_id: str, component_id: int, component_state: dict) -> None:
+    def _process_component_state(
+        self, device: dict[str, Any], pool_id: str, component_id: int, component_state: dict[str, Any]
+    ) -> None:
         """Process a single component state and update device data.
 
         Extracted from _async_update_data to reduce code duplication.
@@ -365,7 +369,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._track_schedule_count(pool_id, device_id, schedule_data)
             device[f"component_{component_id}_data"] = component_state
 
-    def _track_schedule_count(self, pool_id: str, device_id: str, schedule_data: list[dict]) -> None:
+    def _track_schedule_count(self, pool_id: str, device_id: str, schedule_data: list[dict[str, Any]]) -> None:
         """Track schedule count changes for cleanup."""
         device_key = f"{pool_id}_{device_id}"
         # Cleanup happens asynchronously in a separate task to avoid blocking.
@@ -442,7 +446,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.exception("Error updating Fluidra Pool data")
             raise UpdateFailed(f"Error communicating with API: {type(err).__name__}") from err
 
-    async def _refresh_pool(self, pool: dict, previous_data: dict) -> None:
+    async def _refresh_pool(self, pool: dict[str, Any], previous_data: dict[str, Any]) -> None:
         """Refresh a single pool and its devices."""
         pool_id = pool["id"]
         prev_pool = previous_data.get(pool_id, {})

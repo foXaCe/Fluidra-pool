@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Platinum `strict-typing` reached** — the integration now passes `mypy --strict` (120 type issues resolved across 29 modules), and CI enforces it via `[tool.mypy] strict = true`. Type annotations only; no runtime behaviour change.
+- **Test coverage raised 94% → 97%** (1171 → 1259 tests); every module is now ≥ 90%. Previously thin modules (`switch/pump`, `switch/schedule`, `number`, `light`, `select/schedule`, `select/light`, `sensor/chlorinator`) are now fully covered.
+
 ## [2.42.2] - 2026-06-19
 
 ### Fixed

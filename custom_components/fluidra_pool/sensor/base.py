@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ..const import DOMAIN
 from ..device_registry import DeviceIdentifier
+
+if TYPE_CHECKING:
+    from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
 
 
 class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
@@ -17,7 +23,14 @@ class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str, sensor_type: str = ""):
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        sensor_type: str = "",
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._api = api
@@ -26,23 +39,27 @@ class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
         self._sensor_type = sensor_type
 
     @property
-    def device_data(self) -> dict:
+    def device_data(self) -> dict[str, Any]:
         """Get device data from coordinator."""
-        if self.coordinator.data is None:
+        data = self.coordinator.data
+        if data is None:
             return {}
-        pool = self.coordinator.data.get(self._pool_id)
+        pool: dict[str, Any] | None = data.get(self._pool_id)
         if pool:
-            for device in pool.get("devices", []):
+            devices: list[dict[str, Any]] = pool.get("devices", [])
+            for device in devices:
                 if device.get("device_id") == self._device_id:
                     return device
         return {}
 
     @property
-    def pool_data(self) -> dict:
+    def pool_data(self) -> dict[str, Any]:
         """Get pool data from coordinator."""
-        if self.coordinator.data is None:
+        data = self.coordinator.data
+        if data is None:
             return {}
-        return self.coordinator.data.get(self._pool_id, {})
+        pool: dict[str, Any] = data.get(self._pool_id, {})
+        return pool
 
     @property
     def unique_id(self) -> str:
@@ -85,7 +102,13 @@ class FluidraPoolSensorBase(CoordinatorEntity, SensorEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator, api, pool_id: str, sensor_type: str = ""):
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        sensor_type: str = "",
+    ) -> None:
         """Initialize the pool sensor."""
         super().__init__(coordinator)
         self._api = api
@@ -93,11 +116,13 @@ class FluidraPoolSensorBase(CoordinatorEntity, SensorEntity):
         self._sensor_type = sensor_type
 
     @property
-    def pool_data(self) -> dict:
+    def pool_data(self) -> dict[str, Any]:
         """Get pool data from coordinator."""
-        if self.coordinator.data is None:
+        data = self.coordinator.data
+        if data is None:
             return {}
-        return self.coordinator.data.get(self._pool_id, {})
+        pool: dict[str, Any] = data.get(self._pool_id, {})
+        return pool
 
     @property
     def unique_id(self) -> str:

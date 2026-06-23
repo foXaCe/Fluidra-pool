@@ -19,6 +19,7 @@ from ..entity import FluidraPoolControlEntity
 
 if TYPE_CHECKING:
     from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
     ) -> None:
@@ -69,7 +70,8 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
             mode_value = int(mode_value)
         except (ValueError, TypeError):
             mode_value = 0
-        return self._value_to_mode.get(mode_value, "off")
+        mode: str = self._value_to_mode.get(mode_value, "off")
+        return mode
 
     def _optimistic_expired(self) -> bool:
         """Return True once the optimistic value has outlived its timeout."""

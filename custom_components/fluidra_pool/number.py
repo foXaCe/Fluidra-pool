@@ -3,20 +3,23 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
 from .const import DEVICE_TYPE_PUMP, DOMAIN, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolControlEntity
+
+if TYPE_CHECKING:
+    from .fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +29,7 @@ PARALLEL_UPDATES = 0  # Coordinator handles all updates
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: FluidraPoolConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Fluidra Pool number entities."""
     coordinator = config_entry.runtime_data.coordinator
@@ -71,7 +74,7 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
     ) -> None:
@@ -162,7 +165,7 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
     ) -> None:
@@ -204,9 +207,10 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
         divisor = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint_divisor", 100)
 
         try:
-            return float(raw_value) / divisor
+            value: float = float(raw_value) / divisor
         except (ValueError, TypeError):
             return 7.2
+        return value
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the pH setpoint."""
@@ -279,7 +283,7 @@ class FluidraChlorinatorOrpSetpoint(FluidraPoolControlEntity, NumberEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
     ) -> None:
@@ -383,7 +387,7 @@ class FluidraLightEffectSpeed(FluidraPoolControlEntity, NumberEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
     ) -> None:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.repairs import ConfirmRepairFlow, RepairsFlow
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
@@ -65,7 +67,7 @@ def async_delete_connection_issue(hass: HomeAssistant) -> None:
 async def async_create_fix_flow(
     hass: HomeAssistant,
     issue_id: str,
-    data: dict | None,
+    data: dict[str, Any] | None,
 ) -> RepairsFlow:
     """Create a repair flow for a fixable issue.
 

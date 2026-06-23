@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfTemperature
 
 from .base import FluidraPoolSensorBase
 
+if TYPE_CHECKING:
+    from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
+
 
 class FluidraPoolWeatherSensor(FluidraPoolSensorBase):
     """Sensor for weather temperature at pool location."""
 
-    def __init__(self, coordinator, api, pool_id: str):
+    def __init__(self, coordinator: FluidraDataUpdateCoordinator, api: FluidraPoolAPI, pool_id: str) -> None:
         """Initialize the pool weather sensor."""
         super().__init__(coordinator, api, pool_id, "weather")
         self._attr_translation_key = "weather_temperature"
@@ -30,7 +36,8 @@ class FluidraPoolWeatherSensor(FluidraPoolSensorBase):
                 if isinstance(current, dict) and "main" in current and "temp" in current["main"]:
                     # Convert Kelvin → Celsius (rounded to 1 decimal).
                     temp_kelvin = current["main"]["temp"]
-                    return round(temp_kelvin - 273.15, 1)
+                    value: float = round(temp_kelvin - 273.15, 1)
+                    return value
 
         return None
 
@@ -61,7 +68,7 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = ["using", "maintenance", "offline", "winterized", "connected", "unknown_state"]
 
-    def __init__(self, coordinator, api, pool_id: str):
+    def __init__(self, coordinator: FluidraDataUpdateCoordinator, api: FluidraPoolAPI, pool_id: str) -> None:
         """Initialize the pool status sensor."""
         super().__init__(coordinator, api, pool_id, "status")
         self._attr_translation_key = "pool_status"
@@ -102,7 +109,7 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
         return "mdi:help-circle"
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         pool_data = self.pool_data
         attrs = {}
@@ -165,7 +172,7 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
 class FluidraPoolLocationSensor(FluidraPoolSensorBase):
     """Sensor for pool location and geographic information."""
 
-    def __init__(self, coordinator, api, pool_id: str):
+    def __init__(self, coordinator: FluidraDataUpdateCoordinator, api: FluidraPoolAPI, pool_id: str) -> None:
         """Initialize the pool location sensor."""
         super().__init__(coordinator, api, pool_id, "location")
         self._attr_translation_key = "pool_location"
@@ -177,8 +184,8 @@ class FluidraPoolLocationSensor(FluidraPoolSensorBase):
 
         geolocation = pool_data.get("geolocation", {})
         if geolocation:
-            locality = geolocation.get("locality")
-            country_code = geolocation.get("countryCode")
+            locality: str | None = geolocation.get("locality")
+            country_code: str | None = geolocation.get("countryCode")
 
             if locality and country_code:
                 return f"{locality}, {country_code}"
@@ -195,7 +202,7 @@ class FluidraPoolLocationSensor(FluidraPoolSensorBase):
         return "mdi:map-marker"
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         pool_data = self.pool_data
         attrs = {}
@@ -226,7 +233,7 @@ class FluidraPoolWaterQualitySensor(FluidraPoolSensorBase):
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = ["auto", "manual", "not_configured"]
 
-    def __init__(self, coordinator, api, pool_id: str):
+    def __init__(self, coordinator: FluidraDataUpdateCoordinator, api: FluidraPoolAPI, pool_id: str) -> None:
         """Initialize the pool water quality sensor."""
         super().__init__(coordinator, api, pool_id, "water_quality")
         self._attr_translation_key = "water_quality"
@@ -252,7 +259,7 @@ class FluidraPoolWaterQualitySensor(FluidraPoolSensorBase):
         return "mdi:water-check"
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         pool_data = self.pool_data
         attrs = {}
