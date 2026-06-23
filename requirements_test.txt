@@ -2,5 +2,5 @@
 # pytest-homeassistant-custom-component pins a compatible Home Assistant,
 # pytest and pytest-asyncio as transitive dependencies.
 pytest-homeassistant-custom-component==0.13.316
-pytest-cov==7.0.0
+pytest-cov==7.1.0
 mypy==2.1.0
