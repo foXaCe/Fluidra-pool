@@ -16,6 +16,7 @@ from ..entity import FluidraPoolControlEntity
 
 if TYPE_CHECKING:
     from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
     ) -> None:

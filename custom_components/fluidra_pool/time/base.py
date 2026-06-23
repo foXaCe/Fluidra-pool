@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import time
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.time import TimeEntity
@@ -18,7 +18,8 @@ from ..entity import FluidraPoolControlEntity
 from ..utils import extract_cron_days
 
 if TYPE_CHECKING:
-    pass
+    from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,7 +75,15 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
 
     __slots__ = ("_optimistic_value", "_schedule_id", "_time_type")
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str, schedule_id: str, time_type: str):
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        schedule_id: str,
+        time_type: str,
+    ) -> None:
         """Initialize the time entity."""
         super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
@@ -85,7 +94,7 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         """Get the correct schedule component ID for this device."""
         device_data = self.device_data
         # Per-device override (e.g. 258 for DM24049704 chlorinator).
-        schedule_comp = DeviceIdentifier.get_feature(device_data, "schedule_component")
+        schedule_comp: int = DeviceIdentifier.get_feature(device_data, "schedule_component")
         if schedule_comp:
             return schedule_comp
         # Default to component 20 (pumps).
@@ -114,7 +123,7 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
             "via_device": (DOMAIN, self._pool_id),
         }
 
-    def _get_schedule_data(self) -> dict | None:
+    def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
             device_data = self.device_data
@@ -128,7 +137,8 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
                 for schedule in schedules:
                     schedule_id = schedule.get("id")
                     if str(schedule_id) == str(self._schedule_id):
-                        return schedule
+                        result: dict[str, Any] = schedule
+                        return result
 
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
@@ -155,7 +165,7 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         days_str = ",".join(map(str, days))
         return f"{time_obj.minute} {time_obj.hour} * * {days_str}"
 
-    def _get_schedule_days(self, schedule: dict | None) -> set[int]:
+    def _get_schedule_days(self, schedule: dict[str, Any] | None) -> set[int]:
         """Return the active days for a schedule."""
         if not schedule:
             return set(range(1, 8))
@@ -243,7 +253,15 @@ class FluidraLightScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
 
     SCHEDULE_COMPONENT = 40  # LumiPlus light schedules live on component 40.
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str, schedule_id: str, time_type: str):
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        schedule_id: str,
+        time_type: str,
+    ) -> None:
         """Initialize the time entity."""
         super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
@@ -261,7 +279,7 @@ class FluidraLightScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
             "via_device": (DOMAIN, self._pool_id),
         }
 
-    def _get_schedule_data(self) -> dict | None:
+    def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
             device_data = self.device_data
@@ -273,7 +291,8 @@ class FluidraLightScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
                 for schedule in schedules:
                     schedule_id = schedule.get("id")
                     if str(schedule_id) == str(self._schedule_id):
-                        return schedule
+                        result: dict[str, Any] = schedule
+                        return result
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
         return None

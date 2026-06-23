@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_RGBW_COLOR,
-    ColorMode,
     LightEntity,
 )
+from homeassistant.components.light.const import ColorMode
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
 from .const import (
@@ -26,6 +26,10 @@ from .const import (
 )
 from .entity import FluidraPoolControlEntity
 
+if TYPE_CHECKING:
+    from .coordinator import FluidraDataUpdateCoordinator
+    from .fluidra_api import FluidraPoolAPI
+
 _LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 0
@@ -34,7 +38,7 @@ PARALLEL_UPDATES = 0
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: FluidraPoolConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Fluidra Pool light entities."""
     coordinator = entry.runtime_data.coordinator
@@ -71,7 +75,13 @@ class FluidraLight(FluidraPoolControlEntity, LightEntity):
     _attr_color_mode = ColorMode.RGBW
     _attr_supported_color_modes = {ColorMode.RGBW}
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str) -> None:
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
         """Initialize the light."""
         super().__init__(coordinator, api, pool_id, device_id)
         self._attr_unique_id = f"{DOMAIN}_{pool_id}_{device_id}_light"

@@ -4,14 +4,19 @@ from __future__ import annotations
 
 from datetime import time
 import logging
+from typing import TYPE_CHECKING
 
 import aiohttp
+from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.entity import EntityCategory
 
 from ..api_resilience import FluidraError
 from ..const import DOMAIN
 from .base import FluidraLightScheduleTimeEntity
+
+if TYPE_CHECKING:
+    from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +24,14 @@ _LOGGER = logging.getLogger(__name__)
 class FluidraLightScheduleStartTimeEntity(FluidraLightScheduleTimeEntity):
     """Time entity for LumiPlus Connect light schedule start time."""
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str, schedule_id: str):
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        schedule_id: str,
+    ) -> None:
         """Initialize the start time entity."""
         super().__init__(coordinator, api, pool_id, device_id, schedule_id, "start")
 
@@ -110,7 +122,14 @@ class FluidraLightScheduleStartTimeEntity(FluidraLightScheduleTimeEntity):
 class FluidraLightScheduleEndTimeEntity(FluidraLightScheduleTimeEntity):
     """Time entity for LumiPlus Connect light schedule end time."""
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str, schedule_id: str):
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        schedule_id: str,
+    ) -> None:
         """Initialize the end time entity."""
         super().__init__(coordinator, api, pool_id, device_id, schedule_id, "end")
 

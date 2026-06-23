@@ -19,6 +19,7 @@ from ..device_registry import DeviceIdentifier
 
 if TYPE_CHECKING:
     from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
         sensor_type: str,
@@ -111,13 +112,14 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
             self._divisor = custom_divisors[sensor_type]
 
     @property
-    def device_data(self) -> dict:
+    def device_data(self) -> dict[str, Any]:
         """Get device data from coordinator."""
         if self.coordinator.data is None:
             return {}
-        pool = self.coordinator.data.get(self._pool_id)
+        pool: dict[str, Any] | None = self.coordinator.data.get(self._pool_id)
         if pool:
-            for device in pool.get("devices", []):
+            devices: list[dict[str, Any]] = pool.get("devices", [])
+            for device in devices:
                 if device.get("device_id") == self._device_id:
                     return device
         return {}
@@ -157,7 +159,8 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
             return None
 
         try:
-            return float(raw_value) / self._divisor
+            value: float = float(raw_value) / self._divisor
+            return value
         except (ValueError, TypeError):
             _LOGGER.debug("Failed to parse sensor value %s for component %s", raw_value, self._component_id)
             return None

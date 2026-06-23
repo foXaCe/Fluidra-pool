@@ -272,7 +272,8 @@ def _get_device_data(coordinator: FluidraDataUpdateCoordinator, device_id: str) 
         return None
 
     for pool_data in coordinator.data.values():
-        for device in pool_data.get("devices", []):
+        devices: list[dict[str, Any]] = pool_data.get("devices", [])
+        for device in devices:
             if device.get("device_id") == device_id:
                 return device
     return None
@@ -290,7 +291,8 @@ def _get_schedule_component(coordinator: FluidraDataUpdateCoordinator, device_id
     device = _get_device_data(coordinator, device_id)
     if device is None:
         return COMPONENT_SCHEDULE
-    return DeviceIdentifier.get_feature(device, "schedule_component", COMPONENT_SCHEDULE)
+    component: int = DeviceIdentifier.get_feature(device, "schedule_component", COMPONENT_SCHEDULE)
+    return component
 
 
 def _get_coordinator_for_device(hass: HomeAssistant, device_id: str) -> FluidraDataUpdateCoordinator:
@@ -298,7 +300,7 @@ def _get_coordinator_for_device(hass: HomeAssistant, device_id: str) -> FluidraD
     coordinators: list[FluidraDataUpdateCoordinator] = []
     for entry in hass.config_entries.async_loaded_entries(DOMAIN):
         runtime_data = getattr(entry, "runtime_data", None)
-        coordinator = getattr(runtime_data, "coordinator", None)
+        coordinator: FluidraDataUpdateCoordinator | None = getattr(runtime_data, "coordinator", None)
         if coordinator is None:
             continue
 
@@ -453,7 +455,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         coordinator = _get_coordinator_for_device(hass, device_id)
 
         # Define presets
-        presets: dict[str, list[dict]] = {
+        presets: dict[str, list[dict[str, Any]]] = {
             "standard": [
                 {"enabled": True, "start_time": "08:00", "end_time": "12:00", "mode": "1", "days": [1, 2, 3, 4, 5]},
                 {"enabled": True, "start_time": "18:00", "end_time": "20:00", "mode": "1", "days": [1, 2, 3, 4, 5]},

@@ -113,7 +113,7 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: Fluidra
     }
 
 
-def _redact_pools_data(pools_data: dict) -> dict:
+def _redact_pools_data(pools_data: dict[str, Any]) -> dict[str, Any]:
     """Redact sensitive information from pools data."""
     if not pools_data:
         return {}
@@ -145,12 +145,12 @@ def _redact_pools_data(pools_data: dict) -> dict:
     return redacted
 
 
-def _redact_devices_data(devices: list) -> list:
+def _redact_devices_data(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Redact sensitive information from devices data."""
     if not devices:
         return []
 
-    redacted_devices = []
+    redacted_devices: list[dict[str, Any]] = []
     for i, device in enumerate(devices):
         if isinstance(device, dict):
             redacted_device: dict[str, Any] = {}
@@ -181,7 +181,7 @@ def _redact_devices_data(devices: list) -> list:
     return redacted_devices
 
 
-def _redact_component_data(component_id: Any, component: dict) -> dict:
+def _redact_component_data(component_id: Any, component: dict[str, Any]) -> dict[str, Any]:
     """Redact a component dict.
 
     Telemetry components (pH, ORP, temperature, speed, schedules, …) are NOT

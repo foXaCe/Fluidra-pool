@@ -120,7 +120,7 @@ class DeviceIdentifier:
         return False
 
     @staticmethod
-    def _check_component_signature(device: dict, component_id: int, value_patterns: list[str]) -> bool:
+    def _check_component_signature(device: dict[str, Any], component_id: int, value_patterns: list[str]) -> bool:
         """Check if a specific component contains expected values."""
         try:
             components = device.get("components", {})
@@ -133,7 +133,7 @@ class DeviceIdentifier:
         return False
 
     @staticmethod
-    def identify_device(device: dict) -> DeviceConfig | None:
+    def identify_device(device: dict[str, Any]) -> DeviceConfig | None:
         """Identify device type and return its configuration.
 
         Returns the best matching DeviceConfig based on priority and matching criteria.
@@ -177,7 +177,7 @@ class DeviceIdentifier:
         return result
 
     @staticmethod
-    def should_create_entity(device: dict, entity_type: str) -> bool:
+    def should_create_entity(device: dict[str, Any], entity_type: str) -> bool:
         """Check if a specific entity type should be created for this device."""
         config = DeviceIdentifier.identify_device(device)
         if not config:
@@ -185,7 +185,7 @@ class DeviceIdentifier:
         return entity_type in config.entities
 
     @staticmethod
-    def get_components_range(device: dict) -> int:
+    def get_components_range(device: dict[str, Any]) -> int:
         """Get the component scan range for this device."""
         config = DeviceIdentifier.identify_device(device)
         if not config:
@@ -193,15 +193,16 @@ class DeviceIdentifier:
         return config.components_range
 
     @staticmethod
-    def has_feature(device: dict, feature_name: str) -> bool:
+    def has_feature(device: dict[str, Any], feature_name: str) -> bool:
         """Check if device supports a specific feature."""
         config = DeviceIdentifier.identify_device(device)
         if not config:
             return False
-        return config.features.get(feature_name, False)
+        feature: bool = config.features.get(feature_name, False)
+        return feature
 
     @staticmethod
-    def get_feature(device: dict, feature_name: str, default: Any = None) -> Any:
+    def get_feature(device: dict[str, Any], feature_name: str, default: Any = None) -> Any:
         """Get a feature value for this device."""
         config = DeviceIdentifier.identify_device(device)
         if not config:

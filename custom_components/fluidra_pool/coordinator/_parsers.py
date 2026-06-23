@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import time
 import logging
+from typing import Any
 
 from homeassistant.util import dt as dt_util
 
@@ -31,7 +32,7 @@ _OPERATION_TO_PERCENT: dict[str, int] = {
 }
 
 
-def parse_dm24049704_schedule_format(reported_value: dict) -> list[dict]:
+def parse_dm24049704_schedule_format(reported_value: dict[str, Any]) -> list[dict[str, Any]]:
     """Parse DM24049704 chlorinator schedule format (programs/slots) to standard format.
 
     The API returns component 258 in this format::
@@ -73,7 +74,7 @@ def parse_dm24049704_schedule_format(reported_value: dict) -> list[dict]:
         for days in program_days.values():
             days.sort()
 
-        result: list[dict] = []
+        result: list[dict[str, Any]] = []
         schedule_id = 1  # DM24049704 uses IDs starting at 1.
 
         for program in programs:
@@ -159,7 +160,7 @@ def _parse_cron_days(cron_time: str) -> list[int]:
     return []
 
 
-def calculate_auto_speed_from_schedules(device: dict) -> int:
+def calculate_auto_speed_from_schedules(device: dict[str, Any]) -> int:
     """Calculate current speed based on active schedules in auto mode."""
     try:
         schedule_data = device.get("schedule_data", [])

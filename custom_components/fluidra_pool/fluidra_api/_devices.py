@@ -188,7 +188,8 @@ class DevicesMixin(FluidraAPIBase):
     def get_device_by_id(self, device_id: str) -> dict[str, Any] | None:
         """Return a specific device by ID across all pools."""
         for pool in self._pools:
-            for device in pool["devices"]:
+            devices: list[dict[str, Any]] = pool["devices"]
+            for device in devices:
                 if device.get("device_id") == device_id:
                     return device
         return None
@@ -223,12 +224,14 @@ class DevicesMixin(FluidraAPIBase):
         if not isinstance(data, list):
             return None
 
-        for device in data:
+        device_list: list[dict[str, Any]] = data
+        for device in device_list:
             if device.get("id") == device_id:
                 return device
             children = device.get("devices")
             if isinstance(children, list):
-                for child in children:
+                child_list: list[dict[str, Any]] = children
+                for child in child_list:
                     if child.get("id") == device_id:
                         return child
         return None

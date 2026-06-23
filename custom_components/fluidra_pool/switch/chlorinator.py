@@ -16,6 +16,7 @@ from .base import FluidraPoolSwitchEntity
 
 if TYPE_CHECKING:
     from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
-        api,
+        api: FluidraPoolAPI,
         pool_id: str,
         device_id: str,
     ) -> None:
@@ -198,7 +199,8 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
         pump_reported = self.device_data.get("pump_reported")
         if pump_reported is not None:
             return bool(pump_reported)
-        return self.device_data.get("is_running", False)
+        value: bool = self.device_data.get("is_running", False)
+        return value
 
     @property
     def is_on(self) -> bool:
@@ -266,7 +268,7 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="chlorinator_set_failed") from err
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         on_off_component = DeviceIdentifier.get_feature(self.device_data, "on_off_component", 9)
         return {

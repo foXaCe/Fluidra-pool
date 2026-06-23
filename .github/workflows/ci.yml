@@ -80,7 +80,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements_test.txt
 
-      # Baseline (non-strict) type check. Full --strict is the Platinum goal,
-      # still tracked as todo in quality_scale.yaml.
-      - name: Run mypy
+      # Strict type check (Platinum strict-typing). Config lives in pyproject.toml
+      # ([tool.mypy] strict = true).
+      - name: Run mypy (strict)
         run: mypy custom_components/fluidra_pool/

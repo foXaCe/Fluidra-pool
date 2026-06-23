@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
 from homeassistant.components.switch import SwitchEntity
 
 from ..const import DOMAIN
 from ..entity import FluidraPoolControlEntity
+
+if TYPE_CHECKING:
+    from ..coordinator import FluidraDataUpdateCoordinator
+    from ..fluidra_api import FluidraPoolAPI
 
 
 class FluidraPoolSwitchEntity(FluidraPoolControlEntity, SwitchEntity):
@@ -15,7 +20,13 @@ class FluidraPoolSwitchEntity(FluidraPoolControlEntity, SwitchEntity):
 
     __slots__ = ("_last_action_time", "_pending_state")
 
-    def __init__(self, coordinator, api, pool_id: str, device_id: str):
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
         """Initialize the switch."""
         super().__init__(coordinator, api, pool_id, device_id)
         self._pending_state: bool | None = None

@@ -35,11 +35,13 @@ class FluidraPoolEntity(CoordinatorEntity):
     @property
     def device_data(self) -> dict[str, Any]:
         """Get device data from coordinator."""
-        if self.coordinator.data is None:
+        data = self.coordinator.data
+        if data is None:
             return {}
-        pool = self.coordinator.data.get(self._pool_id)
+        pool: dict[str, Any] | None = data.get(self._pool_id)
         if pool:
-            for device in pool.get("devices", []):
+            devices: list[dict[str, Any]] = pool.get("devices", [])
+            for device in devices:
                 if device.get("device_id") == self._device_id:
                     return device
         return {}
@@ -47,9 +49,11 @@ class FluidraPoolEntity(CoordinatorEntity):
     @property
     def pool_data(self) -> dict[str, Any]:
         """Get pool data from coordinator."""
-        if self.coordinator.data is None:
+        data = self.coordinator.data
+        if data is None:
             return {}
-        return self.coordinator.data.get(self._pool_id, {})
+        pool: dict[str, Any] = data.get(self._pool_id, {})
+        return pool
 
     @property
     def device_info(self) -> DeviceInfo:
