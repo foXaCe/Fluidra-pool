@@ -31,7 +31,6 @@ from custom_components.fluidra_pool import (
     _service_schedule_to_fluidra,
     async_migrate_entry,
     async_setup_entry,
-    async_unload_entry,
 )
 from custom_components.fluidra_pool.api_resilience import FluidraError, FluidraMFARequired
 from custom_components.fluidra_pool.const import DOMAIN
@@ -182,7 +181,8 @@ async def test_unload_entry_no_runtime_data(hass: HomeAssistant, mock_api: Async
     # Simulate runtime_data already torn down.
     entry.runtime_data = None
 
-    assert await async_unload_entry(hass, entry) is True
+    # Unload through HA so async_on_unload callbacks (coordinator listeners) fire.
+    assert await hass.config_entries.async_unload(entry.entry_id) is True
 
 
 # --------------------------------------------------------------------------- #

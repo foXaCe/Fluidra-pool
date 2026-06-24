@@ -49,9 +49,7 @@ rules:
   docs-supported-functions: done
   docs-troubleshooting: done
   docs-use-cases: done
-  dynamic-devices:
-    status: todo
-    comment: Newly-added pool devices require a reload; dynamic add/remove not yet implemented.
+  dynamic-devices: done
   entity-category: done
   entity-device-class: done
   entity-disabled-by-default: done
@@ -60,9 +58,7 @@ rules:
   icon-translations: done
   reconfiguration-flow: done
   repair-issues: done
-  stale-devices:
-    status: todo
-    comment: Removed pool devices are not automatically purged from the device registry.
+  stale-devices: done
 
   # Platinum
   async-dependency: done

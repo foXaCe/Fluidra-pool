@@ -40,26 +40,51 @@ async def async_setup_entry(
     entry: FluidraPoolConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Fluidra Pool light entities."""
+    """Set up Fluidra Pool light entities, including devices added later."""
     coordinator = entry.runtime_data.coordinator
 
     if not coordinator.data:
         await coordinator.async_config_entry_first_refresh()
 
-    entities: list[FluidraLight] = []
-    if coordinator.data:
-        for pool_id, pool in coordinator.data.items():
+    known_devices: set[str] = set()
+
+    @callback
+    def _add_entities(pools: list[dict[str, Any]]) -> None:
+        """Create light entities for any device not seen yet (dynamic-devices)."""
+        entities: list[FluidraLight] = []
+
+        for pool in pools:
+            pool_id = pool["id"]
+
             for device in pool.get("devices", []):
+                device_id = device.get("device_id")
+                if not device_id:
+                    continue
+
+                key = f"{pool_id}_{device_id}"
+                if key in known_devices:
+                    continue
+                known_devices.add(key)
+
                 device_type = device.get("type", "")
                 family = device.get("family", "").lower()
 
                 if device_type == "light" or "light" in family:
-                    device_id = device.get("device_id")
-                    if not device_id:
-                        continue
                     entities.append(FluidraLight(coordinator, coordinator.api, pool_id, device_id))
 
-    async_add_entities(entities)
+        if entities:
+            async_add_entities(entities)
+
+    # Initial setup from the cached discovery (consistent with the other platforms).
+    pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
+    _add_entities(pools)
+
+    # Add entities for devices that appear on later polls, without a reload.
+    @callback
+    def _on_coordinator_update() -> None:
+        _add_entities(coordinator.get_pools_from_data())
+
+    entry.async_on_unload(coordinator.async_add_listener(_on_coordinator_update))
 
 
 class FluidraLight(FluidraPoolControlEntity, LightEntity):

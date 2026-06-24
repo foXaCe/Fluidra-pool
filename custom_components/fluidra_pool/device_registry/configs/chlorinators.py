@@ -278,6 +278,34 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=86,
     ),
+    "lc25024524_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # tecnoLC2 chlorinator — Issue #73 (@Ausstriken). LC25024524.nn_1 fell back to the
+        # generic profile, which read c172 (water temperature) as pH (÷100 → 3.16). Standard
+        # tecnoLC2 layout (same as the LC iSALT siblings), confirmed against the Fluidra app:
+        # c165 = pH (7.3), c170 = ORP (659 mV — c177 is the uncalibrated raw value),
+        # c172 = water temperature (×10, 31.6 °C), c174 = salinity (5.4 g/L).
+        identifier_patterns=["LC25024524*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "orp_setpoint": 20,
+            "boost_mode": 103,
+            "skip_mode_select": True,
+            "sensors": {
+                "ph": 165,  # pH measured (÷100).
+                "orp": 170,  # ORP measured (mV) — matches the app (c177 is uncalibrated).
+                "temperature": 172,  # Water temperature (°C × 10).
+                "salinity": 174,  # Salinity (g/L × 100).
+            },
+            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
+        },
+        priority=86,
+    ),
     "cc25024927_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # AstralPool Clear Connect Escalable (model 77020) — Issue #70 (@VICTOR28N).

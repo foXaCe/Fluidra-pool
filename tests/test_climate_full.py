@@ -892,7 +892,10 @@ async def test_async_setup_entry_creates_climate_for_heat_pump() -> None:
         cached_pools=[{"id": POOL_ID, "devices": [hp, other]}],
         get_pools=AsyncMock(return_value=[]),
     )
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(coordinator=coordinator))
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(coordinator=coordinator),
+        async_on_unload=lambda _unsub: None,
+    )
 
     added: list = []
 
@@ -914,7 +917,10 @@ async def test_async_setup_entry_falls_back_to_get_pools() -> None:
         cached_pools=[],
         get_pools=AsyncMock(return_value=[{"id": POOL_ID, "devices": [hp]}]),
     )
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(coordinator=coordinator))
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(coordinator=coordinator),
+        async_on_unload=lambda _unsub: None,
+    )
 
     added: list = []
     async_add = MagicMock(side_effect=lambda e, *a, **k: added.extend(list(e)))
@@ -932,9 +938,44 @@ async def test_async_setup_entry_no_climate_entities() -> None:
         cached_pools=[{"id": POOL_ID, "devices": [pump]}],
         get_pools=AsyncMock(return_value=[]),
     )
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(coordinator=coordinator))
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(coordinator=coordinator),
+        async_on_unload=lambda _unsub: None,
+    )
 
     added: list = []
     async_add = MagicMock(side_effect=lambda e, *a, **k: added.extend(list(e)))
     await async_setup_entry(MagicMock(), entry, async_add)
     assert added == []
+
+
+async def test_setup_adds_new_device_dynamically() -> None:
+    """dynamic-devices: a heat pump appearing on a later poll is wired without a reload."""
+    hp1 = _pin("HP-DYN-1", entities=["climate"])
+    pool = {"id": POOL_ID, "devices": [hp1]}
+    coordinator = MagicMock()
+    coordinator.api = SimpleNamespace(cached_pools=[pool], get_pools=AsyncMock(return_value=[pool]))
+    coordinator.get_pools_from_data = lambda: [{"id": POOL_ID, "devices": pool["devices"]}]
+    listeners: list[Any] = []
+    coordinator.async_add_listener = lambda cb: listeners.append(cb) or (lambda: None)
+
+    added: list = []
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(coordinator=coordinator),
+        async_on_unload=lambda _unsub: None,
+    )
+    async_add = MagicMock(side_effect=lambda e, *a, **k: added.extend(list(e)))
+    await async_setup_entry(MagicMock(), entry, async_add)
+
+    uids_after_setup = {e.unique_id for e in added}
+    assert any("HP-DYN-1" in u for u in uids_after_setup)
+    assert not any("HP-DYN-2" in u for u in uids_after_setup)
+    assert listeners, "a coordinator update listener must be registered for dynamic devices"
+
+    # A new heat pump shows up on a later poll; firing the listener must wire it.
+    pool["devices"].append(_pin("HP-DYN-2", entities=["climate"]))
+    listeners[0]()
+
+    new_uids = {e.unique_id for e in added} - uids_after_setup
+    assert new_uids, "new device entities should be added without a reload"
+    assert all("HP-DYN-2" in u for u in new_uids), "only the newly-added device's entities are created"

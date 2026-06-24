@@ -38,6 +38,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# Configured only via config entries (UI) and services — no YAML schema.
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 PLATFORMS: Final = [
     Platform.SWITCH,
     Platform.SENSOR,

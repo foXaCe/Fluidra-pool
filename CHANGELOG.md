@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Dynamic device discovery (`dynamic-devices`)** — pool devices added in the Fluidra app now appear in Home Assistant automatically on the next poll, with no reload required. Every platform (sensor, switch, select, number, time, climate, light) wires up newly-discovered devices through a coordinator listener.
+
 ### Changed
-- **Platinum `strict-typing` reached** — the integration now passes `mypy --strict` (120 type issues resolved across 29 modules), and CI enforces it via `[tool.mypy] strict = true`. Type annotations only; no runtime behaviour change.
-- **Test coverage raised 94% → 97%** (1171 → 1259 tests); every module is now ≥ 90%. Previously thin modules (`switch/pump`, `switch/schedule`, `number`, `light`, `select/schedule`, `select/light`, `sensor/chlorinator`) are now fully covered.
+- **Reached Platinum quality scale** — with `dynamic-devices` and `stale-devices` now done (and `strict-typing` already enforced), the integration meets every Bronze→Platinum rule; `quality_scale` is bumped to `platinum`.
+- **Safer stale-device cleanup (`stale-devices`)** — a removed device is purged from the registry only after it has been absent from several consecutive successful polls, so a transient partial cloud response can no longer wipe devices, entities and their history on a single hiccup.
+- **Platinum `strict-typing`** — the integration passes `mypy --strict` (120 type issues resolved across 29 modules); CI enforces it via `[tool.mypy] strict = true`. Type annotations only; no runtime behaviour change.
+- **Test coverage raised 94% → 97%** (1171 → 1268 tests); every module is ≥ 90%.
+- Declared an explicit config-entry-only `CONFIG_SCHEMA`, silencing the hassfest configuration-schema warning.
+
+### Fixed
+- **Chlorinator `LC25024524` read wrong sensor values** (Issue #73, @Ausstriken) — this tecnoLC2 unit fell back to the generic profile, which read component 172 (water temperature) as pH (÷100 → 3.16). A dedicated profile now reads pH (c165), ORP (c170), temperature (c172) and salinity (c174) correctly — confirmed against the Fluidra app.
 
 ## [2.42.2] - 2026-06-19
 

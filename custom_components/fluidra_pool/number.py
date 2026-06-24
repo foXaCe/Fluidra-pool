@@ -31,41 +31,62 @@ async def async_setup_entry(
     config_entry: FluidraPoolConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up Fluidra Pool number entities."""
+    """Set up Fluidra Pool number entities, including devices added later."""
     coordinator = config_entry.runtime_data.coordinator
+    known_devices: set[str] = set()
 
-    entities: list[NumberEntity] = []
+    @callback
+    def _add_entities(pools: list[dict[str, Any]]) -> None:
+        """Create number entities for any device not seen yet (dynamic-devices)."""
+        entities: list[NumberEntity] = []
 
-    # Use cached pools data instead of API call for faster startup
+        for pool in pools:
+            pool_id = pool["id"]
+
+            for device in pool.get("devices", []):
+                device_id = device.get("device_id")
+                if not device_id:
+                    continue
+
+                key = f"{pool_id}_{device_id}"
+                if key in known_devices:
+                    continue
+                known_devices.add(key)
+
+                config = DeviceIdentifier.identify_device(device)
+                device_type = config.device_type if config else device.get("type", "")
+
+                # Chlorinator chlorination level — skip read-only probes (e.g. Blue
+                # Connect) that declare no "number" entity and do not dose.
+                if device_type == "chlorinator" and DeviceIdentifier.should_create_entity(device, "number"):
+                    entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool_id, device_id))
+                    # Only add pH/ORP setpoints if the device has these features
+                    if DeviceIdentifier.get_feature(device, "ph_setpoint"):
+                        entities.append(FluidraChlorinatorPhSetpoint(coordinator, coordinator.api, pool_id, device_id))
+                    if DeviceIdentifier.get_feature(device, "orp_setpoint"):
+                        entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool_id, device_id))
+
+                if device_type == DEVICE_TYPE_PUMP:
+                    # Groupe Réglages - Contrôles de vitesse temporairement désactivés
+                    pass
+
+                # LumiPlus Connect effect speed control
+                if device_type == "light":
+                    entities.append(FluidraLightEffectSpeed(coordinator, coordinator.api, pool_id, device_id))
+
+        if entities:
+            async_add_entities(entities)
+
+    # Initial setup from the cached discovery (fast startup, unchanged behaviour).
     pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
-    for pool in pools:
-        for device in pool["devices"]:
-            device_id = device.get("device_id")
-            if not device_id:
-                continue
+    _add_entities(pools)
 
-            config = DeviceIdentifier.identify_device(device)
-            device_type = config.device_type if config else device.get("type", "")
+    # Add entities for devices that appear on later polls, without a reload.
+    @callback
+    def _on_coordinator_update() -> None:
+        _add_entities(coordinator.get_pools_from_data())
 
-            # Chlorinator chlorination level — skip read-only probes (e.g. Blue
-            # Connect) that declare no "number" entity and do not dose.
-            if device_type == "chlorinator" and DeviceIdentifier.should_create_entity(device, "number"):
-                entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool["id"], device_id))
-                # Only add pH/ORP setpoints if the device has these features
-                if DeviceIdentifier.get_feature(device, "ph_setpoint"):
-                    entities.append(FluidraChlorinatorPhSetpoint(coordinator, coordinator.api, pool["id"], device_id))
-                if DeviceIdentifier.get_feature(device, "orp_setpoint"):
-                    entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool["id"], device_id))
-
-            if device_type == DEVICE_TYPE_PUMP:
-                # Groupe Réglages - Contrôles de vitesse temporairement désactivés
-                pass
-
-            # LumiPlus Connect effect speed control
-            if device_type == "light":
-                entities.append(FluidraLightEffectSpeed(coordinator, coordinator.api, pool["id"], device_id))
-
-    async_add_entities(entities)
+    config_entry.async_on_unload(coordinator.async_add_listener(_on_coordinator_update))
 
 
 class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):

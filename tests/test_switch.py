@@ -13,6 +13,7 @@ from custom_components.fluidra_pool.switch import (
     FluidraHeaterSwitch,
     FluidraPumpSwitch,
     FluidraScheduleEnableSwitch,
+    async_setup_entry,
 )
 
 POOL_ID = "pool-1"
@@ -305,3 +306,63 @@ async def test_schedule_switch_turn_off_keeps_optimistic_until_server_confirms()
     assert switch._pending_state is False
     switch._api.set_schedule.assert_awaited_once()
     switch.coordinator.async_request_refresh.assert_awaited_once()
+
+
+# --- async_setup_entry: dynamic-devices ----------------------------------
+
+
+def _pinned_pump(device_id: str) -> dict:
+    """A device pinned to a pump config so the platform creates a FluidraPumpSwitch."""
+    return {
+        "device_id": device_id,
+        "name": "Pump",
+        "family": "",
+        "type": "",
+        "model": "",
+        "online": True,
+        "components": {},
+        "_identify_cache": {
+            "key": (device_id, "", "", "", ""),
+            "config": SimpleNamespace(
+                device_type="pump",
+                features={},
+                entities=["switch"],
+                components_range=25,
+                required_components=[0, 1, 2, 3],
+            ),
+        },
+    }
+
+
+async def test_setup_adds_new_device_dynamically() -> None:
+    """dynamic-devices: a device appearing on a later poll is wired without a reload."""
+    dev1 = _pinned_pump("dev1")
+    pool = {"id": POOL_ID, "name": "Pool", "devices": [dev1]}
+    coordinator = MagicMock()
+    coordinator.data = {POOL_ID: pool}
+    coordinator.last_update_success = True
+    coordinator.api = SimpleNamespace(cached_pools=[pool], get_pools=AsyncMock(return_value=[pool]))
+    coordinator.get_pools_from_data = lambda: [{"id": POOL_ID, **coordinator.data[POOL_ID]}]
+    listeners: list[Any] = []
+    coordinator.async_add_listener = lambda cb: listeners.append(cb) or (lambda: None)
+
+    added: list[Any] = []
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(coordinator=coordinator),
+        async_on_unload=lambda _unsub: None,
+    )
+    async_add = MagicMock(side_effect=lambda ents, *a, **k: added.extend(list(ents)))
+    await async_setup_entry(MagicMock(), entry, async_add)
+
+    uids_after_setup = {e.unique_id for e in added}
+    assert any("dev1" in u for u in uids_after_setup)
+    assert not any("dev2" in u for u in uids_after_setup)
+    assert listeners, "a coordinator update listener must be registered for dynamic devices"
+
+    # A new device shows up on a later poll; firing the listener must wire it.
+    pool["devices"].append(_pinned_pump("dev2"))
+    listeners[0]()
+
+    new_uids = {e.unique_id for e in added} - uids_after_setup
+    assert new_uids, "new device entities should be added without a reload"
+    assert all("dev2" in u for u in new_uids), "only the newly-added device's entities are created"

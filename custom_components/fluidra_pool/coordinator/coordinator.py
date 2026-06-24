@@ -18,7 +18,7 @@ from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from ..api_resilience import FluidraError
-from ..const import DEFAULT_SCAN_INTERVAL, DOMAIN, FluidraPoolConfigEntry
+from ..const import DEFAULT_SCAN_INTERVAL, DOMAIN, STALE_DEVICE_THRESHOLD, FluidraPoolConfigEntry
 from ..device_registry import DeviceIdentifier
 from ..fluidra_api import FluidraPoolAPI
 from ._parsers import calculate_auto_speed_from_schedules, parse_dm24049704_schedule_format
@@ -37,6 +37,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.config_entry = config_entry  # Used for HA device cleanup.
         # Track scheduler entities per device for cleanup.
         self._previous_schedule_entities: dict[str, int] = {}
+        # Consecutive polls each registry device has been missing (stale-devices).
+        self._missing_device_counts: dict[str, int] = {}
         # Skip heavy polling on first update for faster startup.
         self._first_update = True
 
@@ -69,7 +71,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return [{"id": pool_id, **pool_data} for pool_id, pool_data in self.data.items()]
 
     async def _cleanup_removed_devices(self, current_device_ids: set[str]) -> None:
-        """Remove devices and entities that no longer exist in Fluidra API."""
+        """Purge devices/entities that have disappeared from the Fluidra API.
+
+        A device is only removed once it has been absent from
+        STALE_DEVICE_THRESHOLD consecutive successful polls, so a transient
+        partial cloud response cannot wipe devices, entities and their history
+        on a single hiccup.
+        """
         if not self.config_entry:
             return
 
@@ -78,6 +86,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             entity_registry = er.async_get(self.hass)
 
             devices_to_check = dr.async_entries_for_config_entry(device_registry, self.config_entry.entry_id)
+            seen_ids: set[str] = set()
 
             for device_entry in devices_to_check:
                 device_id = None
@@ -93,15 +102,32 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if device_entry.model == "Pool":
                     continue
 
-                if device_id not in current_device_ids:
-                    entities_to_remove = er.async_entries_for_device(
-                        entity_registry, device_entry.id, include_disabled_entities=True
-                    )
+                seen_ids.add(device_id)
 
-                    for entity_entry in entities_to_remove:
-                        entity_registry.async_remove(entity_entry.entity_id)
+                if device_id in current_device_ids:
+                    # Device present again — clear any pending strike.
+                    self._missing_device_counts.pop(device_id, None)
+                    continue
 
-                    device_registry.async_remove_device(device_entry.id)
+                # Absent this poll: count consecutive misses and purge only once
+                # the device has been gone long enough to rule out a transient gap.
+                misses = self._missing_device_counts.get(device_id, 0) + 1
+                if misses < STALE_DEVICE_THRESHOLD:
+                    self._missing_device_counts[device_id] = misses
+                    continue
+
+                self._missing_device_counts.pop(device_id, None)
+                entities_to_remove = er.async_entries_for_device(
+                    entity_registry, device_entry.id, include_disabled_entities=True
+                )
+                for entity_entry in entities_to_remove:
+                    entity_registry.async_remove(entity_entry.entity_id)
+                device_registry.async_remove_device(device_entry.id)
+
+            # Drop strike counters for devices no longer in the registry.
+            self._missing_device_counts = {
+                did: count for did, count in self._missing_device_counts.items() if did in seen_ids
+            }
 
         except Exception as err:  # best-effort cleanup must never fail the poll
             # async_remove_device can raise a bare KeyError when a device is

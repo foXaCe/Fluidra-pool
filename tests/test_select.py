@@ -13,6 +13,7 @@ from custom_components.fluidra_pool.select import (
     FluidraChlorinatorModeSelect,
     FluidraLightEffectSelect,
     FluidraPumpSpeedSelect,
+    async_setup_entry,
 )
 
 POOL_ID = "pool-1"
@@ -294,3 +295,54 @@ def test_light_effect_extra_state_attributes_missing_component() -> None:
     assert attrs["reported_value"] is None
     assert attrs["desired_value"] is None
     assert attrs["optimistic_option"] is None
+
+
+# --- async_setup_entry — dynamic-devices wiring ------------------------------
+
+
+def _pinned_pump(device_id: str) -> dict:
+    """Build a variable-speed pump device that yields a FluidraPumpSpeedSelect."""
+    device = _pinned_device(
+        device_id,
+        device_type="pump",
+        entities=["select"],
+        variable_speed=True,
+    )
+    # _pinned_device pins device_type="generic"/entities=[]; override the cache.
+    device["_identify_cache"]["config"].device_type = "pump"
+    device["_identify_cache"]["config"].entities = ["select"]
+    return device
+
+
+async def test_setup_adds_new_device_dynamically() -> None:
+    """dynamic-devices: a device appearing on a later poll is wired without a reload."""
+    dev1 = _pinned_pump("dev1")
+    pool = {"id": POOL_ID, "name": "Pool", "devices": [dev1]}
+    coordinator = MagicMock()
+    coordinator.data = {POOL_ID: pool}
+    coordinator.last_update_success = True
+    coordinator.api = SimpleNamespace(cached_pools=[pool], get_pools=AsyncMock(return_value=[pool]))
+    coordinator.get_pools_from_data = lambda: [{"id": POOL_ID, **coordinator.data[POOL_ID]}]
+    listeners: list[Any] = []
+    coordinator.async_add_listener = lambda cb: listeners.append(cb) or (lambda: None)
+
+    added: list[Any] = []
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(coordinator=coordinator),
+        async_on_unload=lambda _unsub: None,
+    )
+    async_add = MagicMock(side_effect=lambda ents, *a, **k: added.extend(list(ents)))
+    await async_setup_entry(MagicMock(), entry, async_add)
+
+    uids_after_setup = {e.unique_id for e in added}
+    assert any("dev1" in u for u in uids_after_setup)
+    assert not any("dev2" in u for u in uids_after_setup)
+    assert listeners, "a coordinator update listener must be registered for dynamic devices"
+
+    # A new device shows up on a later poll; firing the listener must wire it.
+    pool["devices"].append(_pinned_pump("dev2"))
+    listeners[0]()
+
+    new_uids = {e.unique_id for e in added} - uids_after_setup
+    assert new_uids, "new device entities should be added without a reload"
+    assert all("dev2" in u for u in new_uids), "only the newly-added device's entities are created"
