@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test coverage raised 94% → 97%** (1171 → 1268 tests); every module is ≥ 90%.
 - Declared an explicit config-entry-only `CONFIG_SCHEMA`, silencing the hassfest configuration-schema warning.
 
+### Fixed
+- **Chlorinator `LC25024524` read wrong sensor values** (Issue #73, @Ausstriken) — this tecnoLC2 unit fell back to the generic profile, which read component 172 (water temperature) as pH (÷100 → 3.16). A dedicated profile now reads pH (c165), ORP (c170), temperature (c172) and salinity (c174) correctly — confirmed against the Fluidra app.
+
 ## [2.42.2] - 2026-06-19
 
 ### Fixed

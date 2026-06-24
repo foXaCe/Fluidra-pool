@@ -165,6 +165,25 @@ class TestDeviceConfigRegistry:
         assert sensors["temperature"] == 172
         assert sensors["salinity"] == 174
         assert config.features["chlorination_level"] == 10
+
+    def test_lc25024524_uses_teclc2_layout(self):
+        """tecnoLC2 chlorinator LC25024524 maps on the tecnoLC2 layout, not the generic profile (Issue #73)."""
+        config = DEVICE_CONFIGS["lc25024524_chlorinator"]
+        device = {
+            "device_id": "LC25024524.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 316}},
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        sensors = config.features["sensors"]
+        # c172 (=31.6°C) is temperature, not pH as the generic config read (÷100 → 3.16).
+        assert sensors["ph"] == 165
+        assert sensors["orp"] == 170  # calibrated ORP (659 mV), not the raw c177 (720)
+        assert sensors["temperature"] == 172
+        assert sensors["salinity"] == 174
         assert config.features["ph_setpoint"] == 16
         # Same layout as the sibling Irripool iSALT profile.
         assert config.features["sensors"] == DEVICE_CONFIGS["lc24013306_chlorinator"].features["sensors"]
