@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.43.1] - 2026-06-24
+
 ### Added
 - **Gre HPGIC heat pump** (Issue #92, @sterubbg) — dedicated device profile so it's recognised on its own instead of matching the LG Eco Elyo by serial coincidence (its cloud serial is LG-prefixed). ON/OFF, mode and target temperature read from the correct components, and the component scan is widened to surface the remaining sensors.
 
