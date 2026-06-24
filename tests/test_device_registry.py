@@ -382,6 +382,21 @@ class TestIdentifyDevice:
         assert config is not None
         assert config.device_type == "heat_pump"
 
+    def test_hpgic_gre_identified_over_lg_eco_elyo(self):
+        """Gre HPGIC heat pump (LG-prefixed serial) matches its own profile, not LG Eco Elyo (Issue #92)."""
+        device = {
+            "device_id": "LG25363734.nn_1",  # LG-prefixed → would score 60 on lg_heat_pump
+            "name": "HPGIC GRE",
+            "family": "Heat Pumps",
+            "model": "HPGIC GRE",
+            "type": "heat_pump",
+            "components": {"7": {"reportedValue": "CXWAB0103544325004"}},  # LG Eco Elyo is BXWAA
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is DEVICE_CONFIGS["hpgic_gre_heat_pump"]
+        # Confirmed mapping (c13/c14/c15/c19) + widened scan to surface the current-temp component.
+        assert config.features["specific_components"] == [7, 13, 14, 15, 17, 19, 28, 67, 81, 82]
+
     def test_identify_pump_by_id(self):
         device = {
             "device_id": "E30-12345",
