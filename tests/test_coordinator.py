@@ -10,6 +10,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
 
 from custom_components.fluidra_pool.api_resilience import FluidraConnectionError
+from custom_components.fluidra_pool.const import STALE_DEVICE_THRESHOLD
 from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordinator
 
 
@@ -205,14 +206,10 @@ class TestProcessComponentState:
 
 
 class TestCleanupRemovedDevices:
-    """Test _cleanup_removed_devices best-effort behaviour."""
+    """Test _cleanup_removed_devices confirmation-based purge (stale-devices)."""
 
-    async def test_cleanup_swallows_registry_keyerror(self, hass: HomeAssistant, mock_api: AsyncMock):
-        """A KeyError from async_remove_device must not propagate / fail the poll (coordinator-4).
-
-        The device registry's async_remove_device raises a bare KeyError when a
-        device was removed concurrently; the best-effort cleanup must absorb it.
-        """
+    @staticmethod
+    def _coord(hass: HomeAssistant, mock_api: AsyncMock) -> FluidraDataUpdateCoordinator:
         entry = MagicMock()
         entry.entry_id = "entry_1"
         entry.options = {}  # Keep the default scan interval (avoid a MagicMock timedelta).
@@ -220,16 +217,25 @@ class TestCleanupRemovedDevices:
         # The base DataUpdateCoordinator overwrites config_entry from a ContextVar that
         # isn't set in tests; pin it back so cleanup runs instead of early-returning.
         coord.config_entry = entry
+        return coord
 
+    @staticmethod
+    def _device_entry() -> MagicMock:
         device_entry = MagicMock()
         device_entry.id = "dev_reg_1"
         device_entry.model = "Pump"  # Not a "Pool" parent, so it is eligible for removal.
         device_entry.identifiers = {("fluidra_pool", "serial_gone")}
+        return device_entry
 
-        dev_reg = MagicMock()
-        dev_reg.async_remove_device.side_effect = KeyError("already removed")
-        ent_reg = MagicMock()
-
+    @staticmethod
+    async def _run(
+        coord: FluidraDataUpdateCoordinator,
+        current_device_ids: set[str],
+        *,
+        device_entry: MagicMock,
+        dev_reg: MagicMock,
+        ent_reg: MagicMock,
+    ) -> None:
         module = "custom_components.fluidra_pool.coordinator.coordinator"
         with (
             patch(f"{module}.dr.async_get", return_value=dev_reg),
@@ -237,8 +243,52 @@ class TestCleanupRemovedDevices:
             patch(f"{module}.er.async_get", return_value=ent_reg),
             patch(f"{module}.er.async_entries_for_device", return_value=[]),
         ):
-            # "serial_gone" is absent from the current set → removal is attempted and raises.
-            await coord._cleanup_removed_devices(current_device_ids={"still_here"})
+            await coord._cleanup_removed_devices(current_device_ids=current_device_ids)
+
+    async def test_cleanup_waits_for_threshold_before_purge(self, hass: HomeAssistant, mock_api: AsyncMock):
+        """A device must be absent for STALE_DEVICE_THRESHOLD polls before it is purged."""
+        coord = self._coord(hass, mock_api)
+        device_entry = self._device_entry()
+        dev_reg, ent_reg = MagicMock(), MagicMock()
+
+        # Absent for THRESHOLD-1 consecutive polls → not purged yet.
+        for _ in range(STALE_DEVICE_THRESHOLD - 1):
+            await self._run(coord, {"still_here"}, device_entry=device_entry, dev_reg=dev_reg, ent_reg=ent_reg)
+        dev_reg.async_remove_device.assert_not_called()
+
+        # The THRESHOLD-th consecutive absence triggers the purge.
+        await self._run(coord, {"still_here"}, device_entry=device_entry, dev_reg=dev_reg, ent_reg=ent_reg)
+        dev_reg.async_remove_device.assert_called_once_with("dev_reg_1")
+
+    async def test_cleanup_resets_strikes_when_device_returns(self, hass: HomeAssistant, mock_api: AsyncMock):
+        """A device that reappears clears its strike count and is not purged."""
+        coord = self._coord(hass, mock_api)
+        device_entry = self._device_entry()
+        dev_reg, ent_reg = MagicMock(), MagicMock()
+
+        for _ in range(STALE_DEVICE_THRESHOLD - 1):
+            await self._run(coord, {"still_here"}, device_entry=device_entry, dev_reg=dev_reg, ent_reg=ent_reg)
+        # Device is present again → strike count resets.
+        await self._run(coord, {"serial_gone"}, device_entry=device_entry, dev_reg=dev_reg, ent_reg=ent_reg)
+        # A fresh absence is only the first strike again → still not purged.
+        await self._run(coord, {"still_here"}, device_entry=device_entry, dev_reg=dev_reg, ent_reg=ent_reg)
+
+        dev_reg.async_remove_device.assert_not_called()
+
+    async def test_cleanup_swallows_registry_keyerror(self, hass: HomeAssistant, mock_api: AsyncMock):
+        """A KeyError from async_remove_device must not propagate / fail the poll (coordinator-4).
+
+        The device registry's async_remove_device raises a bare KeyError when a
+        device was removed concurrently; the best-effort cleanup must absorb it.
+        """
+        coord = self._coord(hass, mock_api)
+        device_entry = self._device_entry()
+        dev_reg, ent_reg = MagicMock(), MagicMock()
+        dev_reg.async_remove_device.side_effect = KeyError("already removed")
+        # Pre-age the device to the brink so a single poll triggers the removal.
+        coord._missing_device_counts["serial_gone"] = STALE_DEVICE_THRESHOLD - 1
+
+        await self._run(coord, {"still_here"}, device_entry=device_entry, dev_reg=dev_reg, ent_reg=ent_reg)
 
         dev_reg.async_remove_device.assert_called_once_with("dev_reg_1")
 

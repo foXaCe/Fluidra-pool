@@ -987,7 +987,10 @@ def _setup_coordinator(devices: list[dict]) -> Any:
 
 
 async def _run_setup(coordinator: Any) -> list[Any]:
-    entry = SimpleNamespace(runtime_data=SimpleNamespace(coordinator=coordinator))
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(coordinator=coordinator),
+        async_on_unload=lambda _unsub: None,
+    )
     added: list[Any] = []
 
     def _add(entities, *a, **k):
@@ -996,6 +999,40 @@ async def _run_setup(coordinator: Any) -> list[Any]:
     async_add = MagicMock(side_effect=_add)
     await async_setup_entry(MagicMock(), entry, async_add)
     return added
+
+
+async def test_setup_adds_new_device_dynamically() -> None:
+    """dynamic-devices: a device appearing on a later poll is wired without a reload."""
+    dev1 = _pinned_device("dev1", entities=["sensor_info"], device_type="pump")
+    pool = {"id": POOL_ID, "name": "Pool", "devices": [dev1]}
+    coordinator = MagicMock()
+    coordinator.data = {POOL_ID: pool}
+    coordinator.last_update_success = True
+    coordinator.api = SimpleNamespace(cached_pools=[pool], get_pools=AsyncMock(return_value=[pool]))
+    coordinator.get_pools_from_data = lambda: [{"id": POOL_ID, **coordinator.data[POOL_ID]}]
+    listeners: list[Any] = []
+    coordinator.async_add_listener = lambda cb: listeners.append(cb) or (lambda: None)
+
+    added: list[Any] = []
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(coordinator=coordinator),
+        async_on_unload=lambda _unsub: None,
+    )
+    async_add = MagicMock(side_effect=lambda ents, *a, **k: added.extend(list(ents)))
+    await async_setup_entry(MagicMock(), entry, async_add)
+
+    uids_after_setup = {e.unique_id for e in added}
+    assert any("dev1" in u for u in uids_after_setup)
+    assert not any("dev2" in u for u in uids_after_setup)
+    assert listeners, "a coordinator update listener must be registered for dynamic devices"
+
+    # A new device shows up on a later poll; firing the listener must wire it.
+    pool["devices"].append(_pinned_device("dev2", entities=["sensor_info"], device_type="pump"))
+    listeners[0]()
+
+    new_uids = {e.unique_id for e in added} - uids_after_setup
+    assert new_uids, "new device entities should be added without a reload"
+    assert all("dev2" in u for u in new_uids), "only the newly-added device's entities are created"
 
 
 async def test_setup_creates_pool_level_sensors_always() -> None:

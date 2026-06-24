@@ -37,6 +37,11 @@ DEVICE_TYPE_LIGHT = "light"
 DEVICE_TYPE_SENSOR = "sensor"
 DEVICE_TYPE_CHLORINATOR = "chlorinator"
 
+# Stale-device reconciliation: a device must be absent from this many consecutive
+# successful polls before it is purged from the registry, so a transient partial
+# cloud response cannot wipe devices, entities and their history on one hiccup.
+STALE_DEVICE_THRESHOLD: Final = 3
+
 # Attributes
 ATTR_DEVICE_ID = "device_id"
 ATTR_POOL_ID = "pool_id"
