@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.43.0] - 2026-06-24
+
 ### Added
 - **Dynamic device discovery (`dynamic-devices`)** — pool devices added in the Fluidra app now appear in Home Assistant automatically on the next poll, with no reload required. Every platform (sensor, switch, select, number, time, climate, light) wires up newly-discovered devices through a coordinator listener.
 
@@ -14,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Reached Platinum quality scale** — with `dynamic-devices` and `stale-devices` now done (and `strict-typing` already enforced), the integration meets every Bronze→Platinum rule; `quality_scale` is bumped to `platinum`.
 - **Safer stale-device cleanup (`stale-devices`)** — a removed device is purged from the registry only after it has been absent from several consecutive successful polls, so a transient partial cloud response can no longer wipe devices, entities and their history on a single hiccup.
 - **Platinum `strict-typing`** — the integration passes `mypy --strict` (120 type issues resolved across 29 modules); CI enforces it via `[tool.mypy] strict = true`. Type annotations only; no runtime behaviour change.
+- Test/CI stack updated to Python 3.14 and Home Assistant 2026.6.x.
 - **Test coverage raised 94% → 97%** (1171 → 1268 tests); every module is ≥ 90%.
 - Declared an explicit config-entry-only `CONFIG_SCHEMA`, silencing the hassfest configuration-schema warning.
 
