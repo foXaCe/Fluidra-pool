@@ -125,4 +125,32 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=96,  # Higher than z250iq.
     ),
+    "hpgic_gre_heat_pump": DeviceConfig(
+        device_type="heat_pump",
+        # Gre HPGIC full-inverter heat pump — Issue #92 (@sterubbg). Its cloud
+        # serial is LG-prefixed (e.g. LG25363734), so it was matching the LG Eco
+        # Elyo profile by coincidence (LG* → priority 100). Match it by model/name
+        # instead and win the tie with a higher priority. No family_patterns: a
+        # bare "heat pump" match would steal genuinely-unknown heat pumps from the
+        # generic fallback. comp7 here is CXWAB (the LG Eco Elyo signature is
+        # BXWAA). Confirmed layout from the reporter's diagnostics: c13 ON/OFF
+        # (1=ON), c14 mode (0=Smart Heating), c15 target temperature (×10,
+        # 300=30.0°C), c19 water temperature (×10). The scan is widened beyond the
+        # narrow LG set to surface the remaining components — the app's "current
+        # temperature" sits on one the LG scan never read.
+        name_patterns=["hpgic"],
+        model_patterns=["hpgic"],
+        components_range=5,
+        required_components=[0, 1, 2, 3],
+        entities=["climate", "switch", "sensor_info"],
+        features={
+            "preset_modes": True,
+            "temperature_control": True,
+            "hvac_modes": ["off", "heat"],
+            "skip_auto_mode": True,
+            "skip_schedules": True,
+            "specific_components": [7, 13, 14, 15, 17, 19, 28, 67, 81, 82],
+        },
+        priority=101,
+    ),
 }
