@@ -223,12 +223,38 @@ async def test_start_time_set_value_updates_only_target_schedule() -> None:
 
     api.set_schedule.assert_awaited_once()
     sent = api.set_schedule.call_args.args[1]
-    assert len(sent) == 8  # Padded for pumps.
+    assert len(sent) == 2  # only the configured slots, no padding (Issue #105)
     start_by_id = {s["id"]: s["startTime"] for s in sent}
     # Slot 1 keeps its 8:30 start (re-formatted but same time).
     assert "30 8" in start_by_id[1] or "8 30" in start_by_id[1]
     # Slot 2 now starts at 13:00.
     assert start_by_id[2].startswith("0 13")
+
+
+async def test_pump_schedule_write_not_padded_with_overlapping_placeholders() -> None:
+    """Issue #105: fewer than 8 pump schedules must not be padded with identical
+    00:00-00:01 placeholder windows — Fluidra rejects those as "OVERLAP in sched"."""
+    schedules = [
+        {
+            "id": i,
+            "enabled": True,
+            "startTime": f"0 {6 + i} * * 1,2,3,4,5",
+            "endTime": f"0 {7 + i} * * 1,2,3,4,5",
+            "startActions": {"operationName": "1"},
+        }
+        for i in range(1, 4)  # three configured slots, fewer than eight
+    ]
+    device = _pump_device(schedules)
+    api = _api()
+    entity = FluidraScheduleStartTimeEntity(_coord(device), api, POOL_ID, PUMP_ID, schedule_id="1")
+    _attach_ha(entity)
+
+    await entity.async_set_value(time(5, 0))
+
+    sent = api.set_schedule.call_args.args[1]
+    assert len(sent) == 3  # no padding to eight slots
+    windows = [(s["startTime"], s["endTime"]) for s in sent]
+    assert len(set(windows)) == len(windows)  # every window distinct → no overlap-inducing padding
 
 
 async def test_end_time_set_value_updates_only_target_schedule() -> None:

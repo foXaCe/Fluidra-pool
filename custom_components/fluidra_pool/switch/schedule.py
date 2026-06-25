@@ -134,20 +134,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 }
                 updated_schedules.append(scheduler)
 
-            # Pad pump schedules to exactly 8 slots — mobile app convention.
-            while schedule_component == 20 and len(updated_schedules) < 8:
-                missing_id = len(updated_schedules) + 1
-                updated_schedules.append(
-                    {
-                        "id": missing_id,
-                        "groupId": missing_id,
-                        "enabled": missing_id == int(self._schedule_id),
-                        "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                        "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                        "startActions": {"operationName": "0"},
-                    }
-                )
-
+            # No padding — Fluidra fills the remaining slots; padding to 8 with
+            # identical placeholder windows is rejected as "OVERLAP in sched" (Issue #105).
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
             if success:
                 # Keep optimistic state until is_on observes server confirmation
@@ -198,19 +186,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 }
                 updated_schedules.append(scheduler)
 
-            while schedule_component == 20 and len(updated_schedules) < 8:
-                missing_id = len(updated_schedules) + 1
-                updated_schedules.append(
-                    {
-                        "id": missing_id,
-                        "groupId": missing_id,
-                        "enabled": False,
-                        "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                        "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                        "startActions": {"operationName": "0"},
-                    }
-                )
-
+            # No padding — see the OVERLAP-in-sched note in async_turn_on (Issue #105).
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
             if success:
                 await self.coordinator.async_request_refresh()

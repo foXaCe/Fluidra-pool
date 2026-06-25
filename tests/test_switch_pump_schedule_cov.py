@@ -361,8 +361,8 @@ async def test_schedule_turn_off_sets_only_target_disabled() -> None:
     assert args[0] == DEVICE_ID
     sent = args[1]
     assert kwargs["component_id"] == 20
-    assert len(sent) == 8  # padded to 8 slots for pump component 20
-    # id=4 disabled, ids 1-3 still enabled, padded 5-8 disabled.
+    assert len(sent) == 4  # only the configured slots, no padding (Issue #105)
+    # id=4 disabled, ids 1-3 still enabled.
     by_id = {s["id"]: s["enabled"] for s in sent}
     assert by_id[4] is False
     assert by_id[1] is True

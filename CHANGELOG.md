@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Editing a pump schedule from its entity page** (time / switch / select) no longer fails with `OVERLAP in sched` (Issue #105, @ihadx) — the schedule write no longer pads pump schedules to 8 slots with identical placeholder windows; it now sends only the configured schedules, matching the `fluidra_pool.set_schedule` service and the official app.
+
 ## [2.43.1] - 2026-06-24
 
 ### Added

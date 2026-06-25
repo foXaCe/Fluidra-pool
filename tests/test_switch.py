@@ -274,13 +274,13 @@ async def test_schedule_switch_turn_on_sets_only_target_schedule_enabled() -> No
     switch = _schedule_switch(schedules)
     await switch.async_turn_on()
 
-    # Single PUT to the schedule component with the same 8-slot shape.
+    # Single PUT to the schedule component — only the configured slots, no padding.
     switch._api.set_schedule.assert_awaited_once()
     args, kwargs = switch._api.set_schedule.call_args
     assert args[0] == DEVICE_ID
     sent_schedules = args[1]
     assert kwargs["component_id"] == 20
-    assert len(sent_schedules) == 8  # padded to 8 for pump component 20
+    assert len(sent_schedules) == 4  # only the configured slots, no padding (Issue #105)
     # Only id=4 should now be enabled.
     enabled_ids = {s["id"] for s in sent_schedules if s["enabled"]}
     assert enabled_ids == {1, 4}
