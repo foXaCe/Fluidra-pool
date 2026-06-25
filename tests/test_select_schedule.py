@@ -175,15 +175,15 @@ async def test_schedule_mode_select_updates_only_target_schedule() -> None:
 
     api.set_schedule.assert_awaited_once()
     sent_schedules = api.set_schedule.call_args.args[1]
-    # Padded to 8 slots for pumps.
-    assert len(sent_schedules) == 8
+    # No padding — only the configured schedules are sent (Issue #105).
+    assert len(sent_schedules) == 2
     op_by_id = {s["id"]: s["startActions"]["operationName"] for s in sent_schedules}
     assert op_by_id[1] == "0"  # Untouched.
     assert op_by_id[2] == "2"  # New mode.
 
 
-async def test_schedule_mode_select_pads_to_eight_slots() -> None:
-    """Pump schedules are always sent as exactly 8 slots."""
+async def test_schedule_mode_select_sends_only_configured_slots() -> None:
+    """Only the configured schedules are sent — no padding to 8 (Issue #105)."""
     device = _pump_device([{**SCHEDULE, "id": 1}])
     api = _api()
     select = FluidraScheduleModeSelect(_coord(device), api, POOL_ID, PUMP_ID, schedule_id="1")
@@ -192,8 +192,8 @@ async def test_schedule_mode_select_pads_to_eight_slots() -> None:
     await select.async_select_option("1")
 
     sent = api.set_schedule.call_args.args[1]
-    assert len(sent) == 8
-    assert {s["id"] for s in sent} == {1, 2, 3, 4, 5, 6, 7, 8}
+    assert len(sent) == 1
+    assert {s["id"] for s in sent} == {1}
 
 
 async def test_schedule_mode_select_refreshes_coordinator_on_success() -> None:

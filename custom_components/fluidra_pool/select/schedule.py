@@ -116,20 +116,8 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
                 }
                 updated_schedules.append(scheduler)
 
-            # Pump conventions require 8 slots — pad with safe defaults.
-            while len(updated_schedules) < 8:
-                missing_id = len(updated_schedules) + 1
-                updated_schedules.append(
-                    {
-                        "id": missing_id,
-                        "groupId": missing_id,
-                        "enabled": False,
-                        "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                        "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                        "startActions": {"operationName": "0"},
-                    }
-                )
-
+            # No padding — Fluidra fills the remaining slots; padding to 8 with
+            # identical placeholder windows is rejected as "OVERLAP in sched" (Issue #105).
             success = await self._api.set_schedule(self._device_id, updated_schedules)
             if not success:
                 raise HomeAssistantError(

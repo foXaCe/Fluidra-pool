@@ -140,21 +140,10 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
 
             component_id = self._get_schedule_component()
 
-            # Pumps expect exactly 8 schedulers — pad with safe defaults.
-            if component_id == 20:
-                while len(updated_schedules) < 8:
-                    missing_id = len(updated_schedules) + 1
-                    updated_schedules.append(
-                        {
-                            "id": missing_id,
-                            "groupId": missing_id,
-                            "enabled": False,
-                            "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                            "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                            "startActions": {"operationName": "0"},
-                        }
-                    )
-
+            # Send only the configured schedules — no padding. Fluidra fills the
+            # remaining device slots itself; padding to 8 with identical placeholder
+            # windows is rejected as "OVERLAP in sched" (Issue #105), and a packet
+            # capture of the official app confirms it sends only the real entries.
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
             if not success:
                 self._optimistic_value = None
@@ -305,20 +294,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
 
             component_id = self._get_schedule_component()
 
-            if component_id == 20:
-                while len(updated_schedules) < 8:
-                    missing_id = len(updated_schedules) + 1
-                    updated_schedules.append(
-                        {
-                            "id": missing_id,
-                            "groupId": missing_id,
-                            "enabled": False,
-                            "startTime": "00 00 * * 1,2,3,4,5,6,7",
-                            "endTime": "00 01 * * 1,2,3,4,5,6,7",
-                            "startActions": {"operationName": "0"},
-                        }
-                    )
-
+            # No padding — see the OVERLAP-in-sched note in the slot editor above (Issue #105).
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
             if not success:
                 self._optimistic_value = None
