@@ -132,6 +132,24 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["orp_setpoint"] == 20  # this variant exposes the ORP setpoint (c20 = 750)
 
+    def test_cc25021136_zodiac_ei2_iq_evo_uses_teclc2_layout(self):
+        """Zodiac Ei2 iQ Evo (CC25021136) maps to the tecnoLC2 Evo profile, not the generic one (Issue #104)."""
+        config = DEVICE_CONFIGS["cc25102423_chlorinator"]
+        device = {
+            "device_id": "CC25021136.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"165": {"reportedValue": 684}, "170": {"reportedValue": 652}},
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        sensors = config.features["sensors"]
+        assert sensors["ph"] == 165  # 6.8, confirmed against the app
+        assert sensors["orp"] == 170  # 652 mV
+        assert sensors["temperature"] == 172  # 28.1 °C
+        assert sensors["salinity"] == 174  # 5.0 g/L
+
     def test_lc24009805_irripool_isalt_uses_teclc2_layout(self):
         """Irripool iSalt LC24009805 maps to the Irripool iSALT tecnoLC2 profile (Issue #73)."""
         config = DEVICE_CONFIGS["lc24013306_chlorinator"]

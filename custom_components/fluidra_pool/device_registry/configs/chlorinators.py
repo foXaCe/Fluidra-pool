@@ -382,13 +382,14 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     ),
     "cc25102423_chlorinator": DeviceConfig(
         device_type="chlorinator",
-        # tecnoLC2 "Evo" profile, with ORP + ORP setpoint — Issues #63, #73.
+        # tecnoLC2 "Evo" profile, with ORP + ORP setpoint — Issues #63, #73, #104.
         # The same layout ships under several rebadged names; the API exposes no
         # model field, so add serials as users confirm them:
         #   CC25102423 / CC25106623 — Astralpool Clear Connect Evo21 (@DarkSuperT)
         #   CC25066724              — Astralpool Clear Connect Evo12 (@valentinval90)
         #   LC26033146              — IBASEL Evoflex 30 7g/H (@FoxP)
-        identifier_patterns=["CC25102423.nn_*", "CC25066724*", "CC25106623*", "LC26033146*"],
+        #   CC25021136              — Zodiac Ei2 iQ Evo (@crdo78) — confirmed c165/170/172/174
+        identifier_patterns=["CC25102423.nn_*", "CC25066724*", "CC25106623*", "LC26033146*", "CC25021136*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
