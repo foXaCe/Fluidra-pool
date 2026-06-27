@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.43.3] - 2026-06-27
+
 ### Fixed
 - **Zodiac Ei2 iQ Evo chlorinator** (Issue #104, @crdo78) — the `CC25021136` Evo unit fell back to the generic profile, leaving pH and ORP "Unavailable". Added to the tecnoLC2 Evo profile so pH (c165), ORP (c170), temperature (c172) and salinity (c174) all read correctly.
 
