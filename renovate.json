@@ -3,6 +3,7 @@
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
+    "docker:pinDigests",
     ":dependencyDashboard",
     ":semanticCommits"
   ],
@@ -10,6 +11,7 @@
   "schedule": ["before 6am on monday"],
   "labels": ["dependencies"],
   "prHourlyLimit": 4,
+  "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "labels": ["dependencies", "security"],
     "schedule": ["at any time"]
@@ -48,6 +50,19 @@
       "matchFileNames": ["custom_components/fluidra_pool/manifest.json"],
       "rangeStrategy": "bump",
       "automerge": false
+    },
+    {
+      "description": "Devcontainer image floats on :latest — only the pinned digest changes; automerge it",
+      "matchManagers": ["devcontainer", "docker-compose", "dockerfile"],
+      "groupName": "devcontainer",
+      "matchUpdateTypes": ["digest", "pin", "pinDigest", "patch", "minor"],
+      "automerge": true
+    },
+    {
+      "description": "Python and Home Assistant floors are deliberate; never auto-raise them (manual, dashboard-only)",
+      "matchDepNames": ["python", "homeassistant", "ghcr.io/home-assistant/devcontainer"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
     }
   ]
 }
