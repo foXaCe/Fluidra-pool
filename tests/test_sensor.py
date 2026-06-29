@@ -254,3 +254,28 @@ def test_chlorinator_sensor_unavailable_when_no_components() -> None:
     device = _pinned_device(DEVICE_ID, components={})
     sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 165)
     assert sensor.available is False
+
+
+def test_chlorinator_orp_zero_reads_unknown() -> None:
+    """A flat 0 mV ORP means no probe is connected (eXO iQ LS) — Issue #111.
+
+    An immersed redox probe never reads exactly 0 mV, so the sensor reports
+    None ("unknown") instead of a misleading 0.
+    """
+    device = _pinned_device(DEVICE_ID, components={"63": {"reportedValue": 0}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "orp", 63)
+    assert sensor.native_value is None
+
+
+def test_chlorinator_orp_nonzero_reads_value() -> None:
+    """A real ORP reading is still reported unchanged (regression guard for #111)."""
+    device = _pinned_device(DEVICE_ID, components={"63": {"reportedValue": 738}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "orp", 63)
+    assert sensor.native_value == pytest.approx(738.0)
+
+
+def test_chlorinator_zero_non_orp_sensor_still_reads_zero() -> None:
+    """The zero-suppression is ORP-only: other sensors keep a legitimate 0 reading."""
+    device = _pinned_device(DEVICE_ID, components={"178": {"reportedValue": 0}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "free_chlorine", 178)
+    assert sensor.native_value == pytest.approx(0.0)

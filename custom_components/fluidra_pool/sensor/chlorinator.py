@@ -160,10 +160,19 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
 
         try:
             value: float = float(raw_value) / self._divisor
-            return value
         except (ValueError, TypeError):
             _LOGGER.debug("Failed to parse sensor value %s for component %s", raw_value, self._component_id)
             return None
+
+        # An ORP (redox) probe immersed in water always reads a non-zero mV
+        # potential, so a flat 0 means no probe is connected — e.g. the Zodiac
+        # eXO iQ LS, where the ORP probe is an optional Dual Link add-on (Issue
+        # #111). Report "unknown" instead of a misleading 0 mV; the entity
+        # surfaces a real value automatically if a probe is added later.
+        if self._sensor_type == "orp" and value == 0:
+            return None
+
+        return value
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
