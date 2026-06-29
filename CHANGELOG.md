@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.43.4] - 2026-06-29
+
 ### Fixed
 - **Zodiac eXO iQ LS ORP always 0** (Issue #111, @felisida) — the eXO iQ LS ships without an ORP probe (an optional Dual Link add-on), so component 63 stays a flat `0`. An immersed redox probe never reads exactly 0 mV, so the ORP sensor now reports "unknown" instead of a misleading `0 mV`, and surfaces a real value automatically if a probe is added later. pH, temperature and salinity are unaffected.
 
