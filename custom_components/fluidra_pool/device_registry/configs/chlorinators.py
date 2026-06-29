@@ -44,7 +44,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # (×10 — the generic config wrongly read c172 as pH → 2.9), c174 = salinity,
         # c170 = ORP measured (matches the app; c177 is a close but uncalibrated raw
         # value, ~50 mV off), c20 = ORP setpoint.
-        identifier_patterns=["CC25052635*", "CC25046312*"],
+        # CC26028741 (Issue #116, @elefantomas) is the same GenSalt OE iQ pH 12 Evo that
+        # fell back to the generic profile (read c172 water temperature as pH → 3.07, and
+        # missed c165/c170/c174 so salinity/temperature showed 0).
+        identifier_patterns=["CC25052635*", "CC25046312*", "CC26028741*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],

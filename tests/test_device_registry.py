@@ -100,7 +100,7 @@ class TestDeviceConfigRegistry:
         Different units carry different cloud serials for the same model, so both
         reported serials must resolve to the dedicated profile.
         """
-        for serial in ("CC25052635.nn_1", "CC25046312.nn_1"):
+        for serial in ("CC25052635.nn_1", "CC25046312.nn_1", "CC26028741.nn_1"):
             device = {
                 "device_id": serial,
                 "name": "Chlorinator",

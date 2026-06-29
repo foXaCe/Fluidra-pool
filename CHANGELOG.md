@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Zodiac GenSalt OE iQ pH 12 Evo chlorinator** (Issue #116, @elefantomas) — the `CC26028741` unit fell back to the generic profile, which read the water temperature (c172) as pH (3.07 instead of 30.7 °C) and missed salinity/ORP. Added to the GenSalt OE iQ profile so pH (c165), ORP (c170), temperature (c172) and salinity (c174) all match the Fluidra app.
+
 ## [2.43.4] - 2026-06-29
 
 ### Fixed
