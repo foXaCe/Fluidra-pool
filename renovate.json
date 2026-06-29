@@ -1,6 +1,53 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":dependencyDashboard",
+    ":semanticCommits"
+  ],
+  "timezone": "Europe/Paris",
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "prHourlyLimit": 4,
+  "vulnerabilityAlerts": {
+    "labels": ["dependencies", "security"],
+    "schedule": ["at any time"]
+  },
+  "customManagers": [
+    {
+      "description": "Track the requirements pinned in the Home Assistant manifest (e.g. aiohttp)",
+      "customType": "regex",
+      "managerFilePatterns": ["/^custom_components/fluidra_pool/manifest\\.json$/"],
+      "matchStrings": [
+        "\"(?<depName>[A-Za-z0-9._-]+)(?<currentValue>(?:>=|==|<=|~=|!=|>|<)[0-9][0-9A-Za-z.\\-]*)\""
+      ],
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "pep440"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Group GitHub Actions and automerge them once CI is green",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions",
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "automerge": true
+    },
+    {
+      "description": "Group test/CI dependencies; automerge non-major bumps (CI is the guardrail)",
+      "matchManagers": ["pip_requirements"],
+      "matchFileNames": ["requirements_test.txt"],
+      "groupName": "test dependencies",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Bump the floor of HA manifest requirements; keep these as reviewed PRs (no automerge)",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["custom_components/fluidra_pool/manifest.json"],
+      "rangeStrategy": "bump",
+      "automerge": false
+    }
   ]
 }
