@@ -135,7 +135,11 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # read it as pH 2.46), c165 = pH, c170 = ORP, c174 = salinity. chlorination /
         # boost / salinity only report while the unit is running.
         # CC25010924 — same Energy Connect (pH + ORP), pending @pitch110's confirmation.
-        identifier_patterns=["CC24047102*", "CC25010924*"],
+        # CC25008731 (Issue #117, @yannickuhrig1) — same standard tecnoLC2 layout: the
+        # generic profile read c172 (28.8 °C) as pH 2.88 and left pH/ORP equal to their
+        # setpoints. Confirmed against the app: c172 = water temperature, c165 = pH (7.1),
+        # c170 = calibrated ORP (743 mV — c177 = 765 is the uncalibrated raw value).
+        identifier_patterns=["CC24047102*", "CC25010924*", "CC25008731*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
