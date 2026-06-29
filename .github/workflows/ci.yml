@@ -10,6 +10,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege GITHUB_TOKEN: every CI job only reads the checked-out repo.
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint
