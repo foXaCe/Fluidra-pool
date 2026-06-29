@@ -44,7 +44,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # (×10 — the generic config wrongly read c172 as pH → 2.9), c174 = salinity,
         # c170 = ORP measured (matches the app; c177 is a close but uncalibrated raw
         # value, ~50 mV off), c20 = ORP setpoint.
-        identifier_patterns=["CC25052635*", "CC25046312*"],
+        # CC26028741 (Issue #116, @elefantomas) is the same GenSalt OE iQ pH 12 Evo that
+        # fell back to the generic profile (read c172 water temperature as pH → 3.07, and
+        # missed c165/c170/c174 so salinity/temperature showed 0).
+        identifier_patterns=["CC25052635*", "CC25046312*", "CC26028741*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
@@ -132,7 +135,11 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # read it as pH 2.46), c165 = pH, c170 = ORP, c174 = salinity. chlorination /
         # boost / salinity only report while the unit is running.
         # CC25010924 — same Energy Connect (pH + ORP), pending @pitch110's confirmation.
-        identifier_patterns=["CC24047102*", "CC25010924*"],
+        # CC25008731 (Issue #117, @yannickuhrig1) — same standard tecnoLC2 layout: the
+        # generic profile read c172 (28.8 °C) as pH 2.88 and left pH/ORP equal to their
+        # setpoints. Confirmed against the app: c172 = water temperature, c165 = pH (7.1),
+        # c170 = calibrated ORP (743 mV — c177 = 765 is the uncalibrated raw value).
+        identifier_patterns=["CC24047102*", "CC25010924*", "CC25008731*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
@@ -430,7 +437,13 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "temperature": 172,  # 260 = 26.0°C.
                 "salinity": 174,  # 627 = 6.27 g/L.
             },
-            "specific_components": [10, 16, 20, 165, 170, 172, 174],
+            # c9/c103/c154 widen the scan to hunt the cell production state for a
+            # future binary_sensor (Issue #109): the resting/producing captures show
+            # no 0/1 flip among the mapped components (c10 only goes 50→100, never 0),
+            # and c154 — the actual-production register on sibling tecnoLC2 units — is
+            # not polled yet, so it never reached the diagnostics. Keeping them in the
+            # scan surfaces the real flip in the next producing/resting capture pair.
+            "specific_components": [9, 10, 16, 20, 103, 154, 165, 170, 172, 174],
         },
         priority=87,
     ),

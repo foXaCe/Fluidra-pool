@@ -100,7 +100,7 @@ class TestDeviceConfigRegistry:
         Different units carry different cloud serials for the same model, so both
         reported serials must resolve to the dedicated profile.
         """
-        for serial in ("CC25052635.nn_1", "CC25046312.nn_1"):
+        for serial in ("CC25052635.nn_1", "CC25046312.nn_1", "CC26028741.nn_1"):
             device = {
                 "device_id": serial,
                 "name": "Chlorinator",
@@ -207,9 +207,10 @@ class TestDeviceConfigRegistry:
         assert config.features["sensors"] == DEVICE_CONFIGS["lc24013306_chlorinator"].features["sensors"]
 
     def test_cc24047102_energy_connect_uses_teclc2_layout(self):
-        """AstralPool Energy Connect serials map on the tecnoLC2 layout (Issue #85)."""
+        """AstralPool Energy Connect serials map on the tecnoLC2 layout (Issues #85, #117)."""
         config = DEVICE_CONFIGS["cc24047102_chlorinator"]
-        for serial in ("CC24047102.nn_1", "CC25010924.nn_1"):
+        # CC25008731 (#117) is the same layout — c172 = 28.8°C, not pH 2.88 as the generic read.
+        for serial in ("CC24047102.nn_1", "CC25010924.nn_1", "CC25008731.nn_1"):
             device = {
                 "device_id": serial,
                 "name": "Chlorinator",
@@ -308,6 +309,20 @@ class TestDeviceConfigRegistry:
             "components": {"172": {"reportedValue": 241}},
         }
         assert DeviceIdentifier.identify_device(device) is config
+
+    def test_cc25019224_scans_production_state_candidates(self):
+        """The Clear Connect 12 profile scans the cell-production candidates (Issue #109).
+
+        The resting/producing diagnostics showed no 0/1 flip among the mapped
+        components, so c9/c103/c154 are added to the scan to surface the real
+        production register in the next capture pair (without creating entities).
+        """
+        config = DEVICE_CONFIGS["cc25019224_chlorinator"]
+        specific = config.features["specific_components"]
+        for candidate in (9, 103, 154):
+            assert candidate in specific, candidate
+        # No sensor/binary_sensor is mapped to them yet — scan only.
+        assert "chlorination_actual" not in config.features["sensors"]
 
     def test_gre_swga_config_has_salinity_and_no_orp(self):
         """Gre SWGA chlorinators (incl. SWGA40) expose salinity, no ORP, matched per-serial (Issue #76)."""

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.43.5] - 2026-06-29
+
+### Changed
+- **Clear Connect 12 component scan widened** (Issue #109, @christian123125) — the `CC25019224`/`CC25009932` profile now also scans c9/c103/c154 to locate the cell production-state register for a future `binary_sensor`. The resting/producing diagnostics showed no on/off flip among the currently-mapped components (c10 only ranges 50→100), so the actual-production register — not polled until now — needs to appear in a fresh capture pair before the sensor can be mapped reliably. No new entity yet.
+
+### Fixed
+- **AstralPool Energy Connect chlorinator `CC25008731`** (Issue #117, @yannickuhrig1) — the unit fell back to the generic profile, which read the water temperature (c172) as pH (2.88 instead of 28.8 °C) and left measured pH/ORP equal to their setpoints. Added to the Energy Connect tecnoLC2 profile so pH (c165), ORP (c170, calibrated), temperature (c172) and salinity (c174) all match the Fluidra app.
+- **Zodiac GenSalt OE iQ pH 12 Evo chlorinator** (Issue #116, @elefantomas) — the `CC26028741` unit fell back to the generic profile, which read the water temperature (c172) as pH (3.07 instead of 30.7 °C) and missed salinity/ORP. Added to the GenSalt OE iQ profile so pH (c165), ORP (c170), temperature (c172) and salinity (c174) all match the Fluidra app.
+
 ## [2.43.4] - 2026-06-29
 
 ### Fixed
