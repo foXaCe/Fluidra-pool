@@ -437,7 +437,13 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "temperature": 172,  # 260 = 26.0°C.
                 "salinity": 174,  # 627 = 6.27 g/L.
             },
-            "specific_components": [10, 16, 20, 165, 170, 172, 174],
+            # c9/c103/c154 widen the scan to hunt the cell production state for a
+            # future binary_sensor (Issue #109): the resting/producing captures show
+            # no 0/1 flip among the mapped components (c10 only goes 50→100, never 0),
+            # and c154 — the actual-production register on sibling tecnoLC2 units — is
+            # not polled yet, so it never reached the diagnostics. Keeping them in the
+            # scan surfaces the real flip in the next producing/resting capture pair.
+            "specific_components": [9, 10, 16, 20, 103, 154, 165, 170, 172, 174],
         },
         priority=87,
     ),
