@@ -445,12 +445,12 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "temperature": 172,  # 260 = 26.0°C.
                 "salinity": 174,  # 627 = 6.27 g/L.
             },
-            # c9/c103/c154 widen the scan to hunt the cell production state for a
-            # future binary_sensor (Issue #109): the resting/producing captures show
-            # no 0/1 flip among the mapped components (c10 only goes 50→100, never 0),
-            # and c154 — the actual-production register on sibling tecnoLC2 units — is
-            # not polled yet, so it never reached the diagnostics. Keeping them in the
-            # scan surfaces the real flip in the next producing/resting capture pair.
+            # c154 is the cell's actual-production register (Issue #109): a
+            # resting/producing capture pair confirmed it flips 0 (idle) → 100
+            # (producing) with the ORP hysteresis, while c10 stays at the
+            # configured level (100 %) and c9/c103 don't move. Exposed as the
+            # `binary_sensor.chlorinator_producing` running state.
+            "cell_production_state": 154,
             "specific_components": [9, 10, 16, 20, 103, 154, 165, 170, 172, 174],
         },
         priority=87,

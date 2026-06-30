@@ -1,5 +1,13 @@
 {
   "entity": {
+    "binary_sensor": {
+      "chlorinator_producing": {
+        "default": "mdi:flash-off",
+        "state": {
+          "on": "mdi:flash"
+        }
+      }
+    },
     "climate": {
       "heat_pump": {
         "default": "mdi:heat-pump-outline",

@@ -47,6 +47,11 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "chlorinator_producing": {
+        "name": "Producing"
+      }
+    },
     "climate": {
       "heat_pump": {
         "name": "Heat Pump",
