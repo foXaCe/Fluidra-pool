@@ -139,7 +139,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # generic profile read c172 (28.8 °C) as pH 2.88 and left pH/ORP equal to their
         # setpoints. Confirmed against the app: c172 = water temperature, c165 = pH (7.1),
         # c170 = calibrated ORP (743 mV — c177 = 765 is the uncalibrated raw value).
-        identifier_patterns=["CC24047102*", "CC25010924*", "CC25008731*"],
+        # CC25017029 (Issue #121, @luiscosta1979) — same generic fallback: diagnostics
+        # show c172 = 254 read as pH 2.54, while the API status_data.waterTemperature
+        # confirms 25.4 °C, and c183 (generic temperature slot) reads 0. Same layout.
+        identifier_patterns=["CC24047102*", "CC25010924*", "CC25008731*", "CC25017029*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
