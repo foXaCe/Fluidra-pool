@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.44.0] - 2026-06-30
+
 ### Added
 - **Chlorinator "Producing" binary sensor** (Issue #109, @christian123125) — a new `binary_sensor.chlorinator_producing` reports whether the cell is actively producing chlorine. A resting/producing capture pair on the Clear Connect Evo 12 (`CC25019224`/`CC25009932`) confirmed component 154 is the real production register: it flips 0 (idle) → 100 (producing) with the ORP hysteresis, while the configured chlorination level (c10) stays at 100 %. Exposed with the `running` device class so it overlays cleanly on ORP history graphs.
 
