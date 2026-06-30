@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.43.6] - 2026-06-30
+
 ### Changed
 - **Zodiac Ei2 iQ Evo component scan widened** (Issue #104, @crdo78) — the `cc25102423` Evo profile now also scans c9/c13/c14/c103/c154 to locate the production-mode registers. This layout has no 0/1/2 Auto/Manual/Off selector (c20 is the ORP setpoint, 750 mV); production is driven by two binary mainboard features — CLE (External Chlorine Control, a remote on/off) and COU/COV (Pool Cover, low-production mode) — which weren't polled until now. They need to appear in a fresh capture pair (toggled once ON, once OFF) before they can be mapped as binary sensors/switches. No new entity yet.
 
