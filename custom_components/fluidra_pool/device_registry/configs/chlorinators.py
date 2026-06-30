@@ -412,7 +412,15 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "temperature": 172,  # Confirmed (17.6°C).
                 "salinity": 174,
             },
-            "specific_components": [10, 16, 20, 165, 170, 172, 174],
+            # c9/c13/c14/c103/c154 widen the scan to locate the production-mode
+            # registers on the Zodiac Ei2 iQ Evo (Issue #104, @crdo78): this layout
+            # has no 0/1/2 Auto/Manual/Off selector (c20 is the ORP setpoint, 750 mV),
+            # but two binary mainboard features — CLE (External Chlorine Control, a
+            # remote on/off dry-contact) and COU/COV (Pool Cover, low-production mode).
+            # They aren't polled yet, so they never reached the diagnostics. Keeping
+            # them in the scan surfaces the real registers in the next capture pair
+            # (toggled once with CLE/COU ON, once OFF) so they can be mapped reliably.
+            "specific_components": [9, 10, 13, 14, 16, 20, 103, 154, 165, 170, 172, 174],
         },
         priority=88,
     ),

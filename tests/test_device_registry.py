@@ -149,6 +149,10 @@ class TestDeviceConfigRegistry:
         assert sensors["orp"] == 170  # 652 mV
         assert sensors["temperature"] == 172  # 28.1 °C
         assert sensors["salinity"] == 174  # 5.0 g/L
+        # Scan is widened to hunt the CLE / COU production-mode registers (Issue #104):
+        # c20 is the ORP setpoint, so there is no 0/1/2 mode on this Evo layout.
+        for candidate in (9, 13, 14, 103, 154):
+            assert candidate in config.features["specific_components"]
 
     def test_lc24009805_irripool_isalt_uses_teclc2_layout(self):
         """Irripool iSalt LC24009805 maps to the Irripool iSALT tecnoLC2 profile (Issue #73)."""
