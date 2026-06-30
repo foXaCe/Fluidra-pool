@@ -58,6 +58,11 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "chlorinator_producing": {
+        "name": "Producing"
+      }
+    },
     "sensor": {
       "schedule_count": {
         "name": "Active Schedules"

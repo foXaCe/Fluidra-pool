@@ -47,6 +47,11 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "chlorinator_producing": {
+        "name": "A produzir"
+      }
+    },
     "climate": {
       "heat_pump": {
         "name": "Bomba de Calor",
