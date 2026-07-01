@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **AstralPool Clear Connect chlorinator `CC25011632`** (Issue #123, @josgaming) — the unit fell back to the generic profile whose legacy layout both mis-read the sensors (c172 = 263 shown as pH 2.63 instead of 26.3 °C) and shared component IDs between setpoint read-back and measurement (pH setpoint and pH sensor both on c172, ORP both on c177), so moving the "Consigne pH/ORP" slider overwrote the measured pH/ORP values. Added a dedicated tecnoLC2 profile with setpoints on c16/c20 — distinct from the c165/c170 measurements — so the collision is gone and pH (c165), ORP (c170), temperature (c172) and salinity (c174) read correctly.
+
 ## [2.44.1] - 2026-06-30
 
 ### Fixed

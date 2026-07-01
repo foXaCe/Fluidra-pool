@@ -315,6 +315,31 @@ class TestDeviceConfigRegistry:
         }
         assert DeviceIdentifier.identify_device(device) is config
 
+    def test_cc25011632_clear_connect_no_setpoint_sensor_collision(self):
+        """CC25011632 uses the tecnoLC2 layout so setpoints and measurements don't collide (Issue #123)."""
+        config = DEVICE_CONFIGS["cc25011632_chlorinator"]
+        device = {
+            "device_id": "CC25011632.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 263}},  # 26.3 °C water temp, not pH 2.63.
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        sensors = config.features["sensors"]
+        assert sensors["ph"] == 165
+        assert sensors["orp"] == 170
+        assert sensors["temperature"] == 172
+        assert sensors["salinity"] == 174
+        # The generic profile shared IDs (ph_setpoint.read == sensors.ph == 172), which
+        # let a setpoint write overwrite the measurement. The setpoints must now live on
+        # distinct components from the measured sensors.
+        assert config.features["ph_setpoint"] == 16
+        assert config.features["orp_setpoint"] == 20
+        assert config.features["ph_setpoint"] not in sensors.values()
+        assert config.features["orp_setpoint"] not in sensors.values()
+
     def test_cc25019224_scans_production_state_candidates(self):
         """The Clear Connect 12 profile scans the cell-production candidates (Issue #109).
 

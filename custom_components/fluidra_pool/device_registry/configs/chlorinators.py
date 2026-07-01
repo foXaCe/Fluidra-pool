@@ -342,6 +342,38 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=88,
     ),
+    "cc25011632_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # AstralPool Clear Connect (tecnoLC2) — Issue #123 (@josgaming).
+        # CC25011632.nn_1 fell back to the generic *.nn_* profile, whose legacy layout
+        # both mis-reads the sensors (c172 = 263 read as pH 2.63 instead of 26.3 °C water
+        # temperature) AND shares component IDs between setpoint read-back and measurement
+        # (ph_setpoint.read = sensors.ph = 172, orp_setpoint.read = sensors.orp = 177), so
+        # moving the "Consigne pH/ORP" slider overwrote the pH/ORP sensor values. This is
+        # the standard tecnoLC2 layout (same as CC24009711 / LC25000122): setpoints live on
+        # c16/c20 — distinct from the c165/c170 measurements — so the collision disappears.
+        # pH/ORP/salinity components aren't in the generic scan, so they weren't in the
+        # diagnostics; mapping inferred from the family, pending the reporter's confirmation.
+        identifier_patterns=["CC25011632.nn_*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "orp_setpoint": 20,
+            "skip_mode_select": True,
+            "sensors": {
+                "ph": 165,  # pH measured (÷100).
+                "orp": 170,  # ORP measured (mV).
+                "temperature": 172,  # Water temperature (°C × 10) — 263 = 26.3 °C, not pH.
+                "salinity": 174,  # Salinity (g/L × 100).
+            },
+            "specific_components": [10, 16, 20, 165, 170, 172, 174],
+        },
+        priority=88,
+    ),
     "cc24009711_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # AstralPool Clear Connect Scalable 21 G/H (tecnoLC2) — Issue #55.
