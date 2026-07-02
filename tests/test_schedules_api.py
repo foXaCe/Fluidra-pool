@@ -1,7 +1,7 @@
 """Tests for fluidra_api/_schedules.py (SchedulesMixin).
 
 Focus: SUCCESS paths, the DM24049704 format conversion branches, and the
-set_schedule/clear_schedule/get_default_schedule methods. The request layer is
+set_schedule/clear_schedule methods. The request layer is
 mocked so no network access happens.
 """
 
@@ -184,7 +184,8 @@ async def test_set_schedule_success_returns_true_and_puts_payload() -> None:
     assert args[0] == "PUT"
     url = args[1]
     assert url.startswith("https://api.fluidra-emea.com/generic/devices/DEV-1/components/")
-    assert f"/components/{COMPONENT_SCHEDULE}?deviceType=connected" in url
+    assert url.endswith(f"/components/{COMPONENT_SCHEDULE}")
+    assert kwargs.get("params") == {"deviceType": "connected"}
     assert kwargs["json_data"] == {"desiredValue": schedules}
     # content-type header is set on the auth headers.
     assert kwargs["headers"]["content-type"] == "application/json; charset=utf-8"
@@ -230,7 +231,8 @@ async def test_set_schedule_dm24049704_component_converts_payload() -> None:
     assert result is True
     args, kwargs = api._request.await_args
     url = args[1]
-    assert f"/components/{COMPONENT_DM24049704_SCHEDULE}?deviceType=connected" in url
+    assert url.endswith(f"/components/{COMPONENT_DM24049704_SCHEDULE}")
+    assert kwargs.get("params") == {"deviceType": "connected"}
     desired = kwargs["json_data"]["desiredValue"]
     # Converted (programs/dayPrograms) shape, not the raw cron list.
     assert isinstance(desired, dict)
@@ -286,25 +288,8 @@ async def test_clear_schedule_passes_component_id_through() -> None:
     assert result is True
     args, kwargs = api._request.await_args
     url = args[1]
-    assert f"/components/{COMPONENT_DM24049704_SCHEDULE}?deviceType=connected" in url
+    assert url.endswith(f"/components/{COMPONENT_DM24049704_SCHEDULE}")
+    assert kwargs.get("params") == {"deviceType": "connected"}
     # Empty list converted to empty programs/dayPrograms structure.
     desired = kwargs["json_data"]["desiredValue"]
     assert desired["programs"] == []
-
-
-# --- get_default_schedule -----------------------------------------------
-
-
-async def test_get_default_schedule_returns_single_template_entry() -> None:
-    """The default template is a one-element list with the expected fields."""
-    api = _make_api()
-
-    default = await api.get_default_schedule()
-
-    assert isinstance(default, list)
-    assert len(default) == 1
-    entry = default[0]
-    assert entry["enabled"] is True
-    assert entry["startTime"] == "08 30 * * 1,2,3,4,5,6,7"
-    assert entry["endTime"] == "09 59 * * 1,2,3,4,5,6,7"
-    assert entry["startActions"] == {"operationName": 1}

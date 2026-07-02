@@ -60,23 +60,6 @@ class CommandsMixin(FluidraAPIBase):
             return await self.control_device_component(device_id, COMPONENT_HEAT_PUMP_ONOFF, 0)
         return await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 0)
 
-    async def set_pump_speed(self, device_id: str, speed_percent: int) -> bool:
-        """Set pump speed. ``speed_percent`` snaps to the nearest API level."""
-        if not 0 <= speed_percent <= 100:
-            return False
-
-        if speed_percent == 0:
-            return await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 0)
-
-        if speed_percent <= 45:
-            speed_level = 0
-        elif speed_percent <= 65:
-            speed_level = 1
-        else:
-            speed_level = 2
-
-        return await self.control_device_component(device_id, COMPONENT_PUMP_SPEED, speed_level)
-
     async def enable_auto_mode(self, device_id: str) -> bool:
         """Enable auto mode.
 

@@ -297,7 +297,7 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
         api = FluidraPoolAPI(email, password)
 
         try:
-            await api._cognito_initial_auth()
+            await api.initial_auth()
             _LOGGER.info("Authentication successful for %s", mask_email(email))
             return None, None
         except FluidraMFARequired as mfa_err:
@@ -328,7 +328,7 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
         api = FluidraPoolAPI(email, password)
 
         try:
-            await api._cognito_respond_to_mfa(code, session, challenge_name)
+            await api.respond_to_mfa(code, session, challenge_name)
             _LOGGER.info("MFA verification successful for %s", mask_email(email))
             return None, api.refresh_token
         except FluidraAuthError:

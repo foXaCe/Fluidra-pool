@@ -24,6 +24,11 @@ def enable_custom_integrations(request: pytest.FixtureRequest) -> None:
 def mock_api() -> AsyncMock:
     """Create a mock FluidraPoolAPI."""
     api = AsyncMock(spec=FluidraPoolAPI)
+    # Instance attributes are invisible to spec= (the class is not slotted);
+    # wire the ones production code reads directly.
+    api.access_token = "test-access-token"
+    api.refresh_token = "test-refresh-token"
+    api.token_expires_at = None
     api.authenticate = AsyncMock(return_value=True)
     api.ensure_valid_token = AsyncMock(return_value=True)
     api.get_pools = AsyncMock(

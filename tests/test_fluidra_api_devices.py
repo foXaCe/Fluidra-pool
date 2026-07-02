@@ -347,14 +347,6 @@ async def test_cached_pools_returns_last_get_pools_result_without_api_call() -> 
     api._request.assert_not_called()
 
 
-async def test_get_pool_by_id_returns_matching_pool_or_none() -> None:
-    """O(n) lookup in the cached pools list."""
-    api = _FakeAPI()
-    api._pools = [{"id": "pool_1"}, {"id": "pool_2"}]
-    assert api.get_pool_by_id("pool_2") == {"id": "pool_2"}
-    assert api.get_pool_by_id("missing") is None
-
-
 async def test_get_device_by_id_searches_across_all_pools() -> None:
     """A device may live under any pool."""
     api = _FakeAPI()
@@ -500,35 +492,3 @@ async def test_get_pool_details_partial_success_returns_what_we_have() -> None:
     ]
     result = await api.get_pool_details("pool_1")
     assert result == {"name": "Pool One"}
-
-
-# --- get_user_pools ------------------------------------------------------
-
-
-async def test_get_user_pools_returns_list_on_200() -> None:
-    """The list response is forwarded as-is."""
-    api = _FakeAPI()
-    api._request.return_value = (200, [{"id": "pool_1"}], "[]")
-    assert await api.get_user_pools() == [{"id": "pool_1"}]
-
-
-async def test_get_user_pools_returns_none_on_non_list_response() -> None:
-    """A dict-shaped response (legacy) is treated as no-data."""
-    api = _FakeAPI()
-    api._request.return_value = (200, {"pools": [{"id": "pool_1"}]}, "{}")
-    assert await api.get_user_pools() is None
-
-
-async def test_get_user_pools_returns_none_on_request_error() -> None:
-    """Connection errors → None."""
-    api = _FakeAPI()
-    api._request.side_effect = FluidraConnectionError("boom")
-    assert await api.get_user_pools() is None
-
-
-async def test_get_user_pools_raises_when_not_authenticated() -> None:
-    """No access token → AuthError."""
-    api = _FakeAPI()
-    api.access_token = None
-    with pytest.raises(FluidraAuthError):
-        await api.get_user_pools()

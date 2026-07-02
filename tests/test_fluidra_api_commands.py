@@ -123,42 +123,6 @@ async def test_stop_pump_routes_by_device_type() -> None:
     api.control_device_component.assert_awaited_once_with("HP-1", COMPONENT_HEAT_PUMP_ONOFF, 0)
 
 
-# --- set_pump_speed -----------------------------------------------------
-
-
-async def test_set_pump_speed_returns_false_when_value_out_of_range() -> None:
-    """Speeds outside 0-100 are rejected at the source."""
-    api = _FakeAPI()
-    assert await api.set_pump_speed("P1", -1) is False
-    assert await api.set_pump_speed("P1", 101) is False
-    api.control_device_component.assert_not_awaited()
-
-
-async def test_set_pump_speed_zero_turns_pump_off() -> None:
-    """A 0% speed maps to an explicit OFF (not speed level 0)."""
-    api = _FakeAPI()
-    await api.set_pump_speed("P1", 0)
-    api.control_device_component.assert_awaited_once_with("P1", COMPONENT_PUMP_ONOFF, 0)
-
-
-@pytest.mark.parametrize(
-    ("incoming_percent", "expected_level"),
-    [
-        (45, 0),  # Low.
-        (40, 0),  # Snaps down to low.
-        (65, 1),  # Medium boundary.
-        (60, 1),  # Snaps to medium.
-        (100, 2),  # High.
-        (80, 2),  # Snaps to high.
-    ],
-)
-async def test_set_pump_speed_snaps_to_three_levels(incoming_percent, expected_level) -> None:
-    """A percentage snaps to one of three discrete speed levels (0/1/2)."""
-    api = _FakeAPI()
-    await api.set_pump_speed("P1", incoming_percent)
-    api.control_device_component.assert_awaited_once_with("P1", COMPONENT_PUMP_SPEED, expected_level)
-
-
 # --- enable/disable auto mode --------------------------------------------
 
 

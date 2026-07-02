@@ -9,7 +9,7 @@ from urllib.parse import quote
 from ..api_resilience import FluidraAuthError, FluidraCircuitBreakerError, FluidraError
 from ..utils import mask_device_id
 from ._base import FluidraAPIBase
-from ._constants import FLUIDRA_EMEA_BASE
+from ._constants import DEVICES_ENDPOINT, FLUIDRA_EMEA_BASE, USER_POOLS_ENDPOINT
 from ._helpers import classify_device_type
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,13 +21,12 @@ class DevicesMixin(FluidraAPIBase):
     async def async_update_data(self) -> None:
         """Discover pools and devices for the account; atomic replacement at end."""
         headers = self._build_auth_headers()
-        pools_url = f"{FLUIDRA_EMEA_BASE}/generic/users/me/pools"
 
         user_pools: list[dict[str, Any]] = []
         devices: list[dict[str, Any]] = []
 
         try:
-            status, data, _ = await self._request("GET", pools_url, headers=headers)
+            status, data, _ = await self._request("GET", USER_POOLS_ENDPOINT, headers=headers)
             if status == 200:
                 if isinstance(data, list):
                     user_pools = data
@@ -48,11 +47,10 @@ class DevicesMixin(FluidraAPIBase):
 
     async def _discover_devices_for_pool(self, pool_id: str, headers: dict[str, str]) -> list[dict[str, Any]]:
         """Discover devices for a single pool. Returns newly-discovered devices only."""
-        devices_url = f"{FLUIDRA_EMEA_BASE}/generic/devices"
         params = {"poolId": pool_id, "format": "tree"}
 
         try:
-            status, devices_data, _ = await self._request("GET", devices_url, headers=headers, params=params)
+            status, devices_data, _ = await self._request("GET", DEVICES_ENDPOINT, headers=headers, params=params)
             if status != 200:
                 return []
         except FluidraError as err:
@@ -178,13 +176,6 @@ class DevicesMixin(FluidraAPIBase):
         """Return cached pools without an API call."""
         return self._pools
 
-    def get_pool_by_id(self, pool_id: str) -> dict[str, Any] | None:
-        """Return a specific pool by ID."""
-        for pool in self._pools:
-            if pool["id"] == pool_id:
-                return pool
-        return None
-
     def get_device_by_id(self, device_id: str) -> dict[str, Any] | None:
         """Return a specific device by ID across all pools."""
         for pool in self._pools:
@@ -203,11 +194,10 @@ class DevicesMixin(FluidraAPIBase):
             raise FluidraAuthError("Token refresh failed")
 
         headers = self._build_auth_headers()
-        url = f"{FLUIDRA_EMEA_BASE}/generic/devices"
         params = {"poolId": pool_id, "format": "tree"}
 
         try:
-            status, data, _ = await self._request("GET", url, headers=headers, params=params)
+            status, data, _ = await self._request("GET", DEVICES_ENDPOINT, headers=headers, params=params)
         except FluidraCircuitBreakerError:
             _LOGGER.debug("Circuit breaker open, skipping poll for device %s", mask_device_id(device_id))
             return None
@@ -286,24 +276,3 @@ class DevicesMixin(FluidraAPIBase):
             pass
 
         return pool_data if pool_data else None
-
-    async def get_user_pools(self) -> list[dict[str, Any]] | None:
-        """Return the list of pools for the user."""
-        if not self.access_token:
-            raise FluidraAuthError("Not authenticated")
-
-        if not await self.ensure_valid_token():
-            raise FluidraAuthError("Token refresh failed")
-
-        headers = self._build_auth_headers()
-        url = f"{FLUIDRA_EMEA_BASE}/generic/users/me/pools"
-
-        try:
-            status, data, _ = await self._request("GET", url, headers=headers)
-        except FluidraError as err:
-            _LOGGER.debug("Get user pools failed: %s", err)
-            return None
-
-        if status == 200 and isinstance(data, list):
-            return data
-        return None

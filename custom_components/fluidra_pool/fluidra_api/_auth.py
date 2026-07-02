@@ -18,13 +18,24 @@ from ..api_resilience import (
 )
 from ..utils import mask_email
 from ._base import FluidraAPIBase
-from ._constants import COGNITO_CLIENT_ID, COGNITO_ENDPOINT, FLUIDRA_EMEA_BASE, FLUIDRA_USER_AGENT
+from ._constants import (
+    COGNITO_CLIENT_ID,
+    COGNITO_ENDPOINT,
+    CONSUMER_PROFILE_ENDPOINT,
+    FLUIDRA_USER_AGENT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class AuthMixin(FluidraAPIBase):
-    """Cognito sign-in, MFA, refresh-token rotation, and standard auth headers."""
+    """Cognito sign-in, MFA, refresh-token rotation, and standard auth headers.
+
+    Every Cognito call passes ``skip_circuit_breaker=True`` on purpose: the
+    circuit breaker guards the Fluidra EMEA data plane, and Cognito is a
+    different service on a different host — sharing the breaker would let an
+    EMEA outage block re-authentication (and vice versa).
+    """
 
     async def authenticate(self) -> None:
         """Authenticate via AWS Cognito.
@@ -128,13 +139,25 @@ class AuthMixin(FluidraAPIBase):
         if not self.access_token:
             raise FluidraAuthError("Access token not received after MFA")
 
+    async def initial_auth(self) -> None:
+        """Run the raw Cognito credentials auth (public config-flow entry).
+
+        Unlike :meth:`authenticate`, this performs no profile fetch or device
+        discovery — the config flow only needs to validate credentials. Raises
+        :class:`FluidraMFARequired` when the account has MFA enabled.
+        """
+        await self._cognito_initial_auth()
+
+    async def respond_to_mfa(self, code: str, session: str, challenge_name: str = "SOFTWARE_TOKEN_MFA") -> None:
+        """Complete a Cognito MFA challenge (public config-flow entry)."""
+        await self._cognito_respond_to_mfa(code, session, challenge_name)
+
     def _store_tokens(self, auth_result: dict[str, Any]) -> None:
         """Persist freshly-minted tokens and notify the entry callback."""
         self.access_token = auth_result.get("AccessToken")
         new_refresh = auth_result.get("RefreshToken")
         if new_refresh:
             self.refresh_token = new_refresh
-        self.id_token = auth_result.get("IdToken")
 
         expires_in = auth_result.get("ExpiresIn", 3600)
         margin = min(300, max(30, expires_in // 10))
@@ -142,6 +165,7 @@ class AuthMixin(FluidraAPIBase):
 
         if not self.access_token:
             raise FluidraAuthError("Access token not received")
+        self._last_token_store = time.monotonic()
 
         if self.refresh_token and self._on_token_persist:
             self._on_token_persist(self.refresh_token)
@@ -155,10 +179,9 @@ class AuthMixin(FluidraAPIBase):
         ignored on purpose — the profile is not needed for operation.
         """
         headers = self._build_auth_headers()
-        profile_url = f"{FLUIDRA_EMEA_BASE}/mobile/consumers/me"
 
         try:
-            status, data, _ = await self._request("GET", profile_url, headers=headers)
+            status, data, _ = await self._request("GET", CONSUMER_PROFILE_ENDPOINT, headers=headers)
             if status == 200 and isinstance(data, dict):
                 return data
         except FluidraError:
@@ -215,7 +238,13 @@ class AuthMixin(FluidraAPIBase):
 
     async def force_refresh_token(self) -> bool:
         """Refresh credentials after the API rejects the current access token."""
+        entered_at = time.monotonic()
         async with self._token_lock:
+            # Double-checked locking: when several parallel requests hit a 401
+            # at once, only the first waiter actually refreshes — the others
+            # see a token stored after they entered and reuse it.
+            if self._last_token_store > entered_at and self.access_token:
+                return True
             if await self.refresh_access_token():
                 return True
 
@@ -251,6 +280,7 @@ class AuthMixin(FluidraAPIBase):
         headers = {
             "Content-Type": "application/x-amz-json-1.1; charset=utf-8",
             "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth",
+            "User-Agent": FLUIDRA_USER_AGENT,
         }
 
         try:

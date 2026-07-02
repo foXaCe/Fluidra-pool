@@ -22,27 +22,11 @@ if TYPE_CHECKING:
 
 
 class FluidraPoolAPI(SessionMixin, AuthMixin, DevicesMixin, ComponentsMixin, CommandsMixin, SchedulesMixin):
-    """Wrapper for Fluidra Pool API for Home Assistant."""
+    """Wrapper for Fluidra Pool API for Home Assistant.
 
-    __slots__ = (
-        "_circuit_breaker",
-        "_hass",
-        "_on_token_persist",
-        "_owns_session",
-        "_pools",
-        "_rate_limiter",
-        "_session",
-        "_session_lock",
-        "_token_lock",
-        "access_token",
-        "devices",
-        "email",
-        "id_token",
-        "password",
-        "refresh_token",
-        "token_expires_at",
-        "user_pools",
-    )
+    Deliberately not slotted: there is a single instance per config entry (no
+    memory pressure) and tests monkeypatch methods on real instances.
+    """
 
     def __init__(
         self,
@@ -62,8 +46,11 @@ class FluidraPoolAPI(SessionMixin, AuthMixin, DevicesMixin, ComponentsMixin, Com
 
         self.access_token: str | None = None
         self.refresh_token: str | None = refresh_token
-        self.id_token: str | None = None
         self.token_expires_at: int | None = None
+        # Monotonic stamp of the last successful token store — lets waiters on
+        # the token lock detect that another task already refreshed (see
+        # AuthMixin.force_refresh_token).
+        self._last_token_store: float = 0.0
 
         self._on_token_persist: Callable[[str], None] | None = on_token_persist
 
