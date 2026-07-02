@@ -17,6 +17,7 @@ def _standard_tecnolc2(
     priority: int,
     boost_mode: int | None = None,
     free_chlorine: int | None = None,
+    cell_production_state: int | None = None,
 ) -> DeviceConfig:
     """Build a DeviceConfig for the standard tecnoLC2 chlorinator layout.
 
@@ -26,8 +27,9 @@ def _standard_tecnolc2(
     (÷100), c20 = ORP setpoint (mV), c103 = boost mode (when present),
     c165 = pH measured (÷100), c170 = ORP measured (mV), c172 = water
     temperature (°C × 10), c174 = salinity (g/L × 100), c178 = free chlorine
-    (mg/L, when present). The OFF/ON/AUTO mode select does not drive these
-    units (skip_mode_select).
+    (mg/L, when present), c154 = cell actual-production register (when
+    present — drives the `chlorinator_producing` binary sensor, Issue #109).
+    The OFF/ON/AUTO mode select does not drive these units (skip_mode_select).
     """
     features: dict[str, Any] = {
         "chlorination_level": 10,
@@ -46,6 +48,8 @@ def _standard_tecnolc2(
     if free_chlorine is not None:
         sensors["free_chlorine"] = free_chlorine
     features["sensors"] = sensors
+    if cell_production_state is not None:
+        features["cell_production_state"] = cell_production_state
 
     specific_components = [10, 16, 20]
     if boost_mode is not None:
@@ -53,6 +57,8 @@ def _standard_tecnolc2(
     specific_components.extend([165, 170, 172, 174])
     if free_chlorine is not None:
         specific_components.append(free_chlorine)
+    if cell_production_state is not None:
+        specific_components.append(cell_production_state)
     features["specific_components"] = specific_components
 
     return DeviceConfig(
@@ -208,6 +214,18 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         ["CC24033907*"],
         priority=85,
         boost_mode=103,
+    ),
+    # Ducere 21 (tecnoLC2) — Issue #125 (@onslope). The unit fell back to the
+    # generic profile whose legacy layout read c172 (water temperature) as pH.
+    # Mapping supplied and validated by the reporter: standard tecnoLC2 layout
+    # + boost on c103, free chlorine on c178 (probe-dependent — may stay empty)
+    # and the cell actual-production register on c154 (producing binary sensor).
+    "lc24008202_chlorinator": _standard_tecnolc2(
+        ["LC24008202*"],
+        priority=90,
+        boost_mode=103,
+        free_chlorine=178,
+        cell_production_state=154,
     ),
     "lc24008313_chlorinator": _standard_tecnolc2(
         ["LC24008313*"],  # Blauswim chlorinator (I.D. Electroquimica/Fluidra).
