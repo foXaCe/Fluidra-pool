@@ -355,3 +355,18 @@ async def test_setup_adds_new_device_dynamically() -> None:
     new_uids = {e.unique_id for e in added} - uids_after_setup
     assert new_uids, "new device entities should be added without a reload"
     assert all("dev2" in u for u in new_uids), "only the newly-added device's entities are created"
+
+
+def test_pump_speed_auto_mode_zero_percent_reads_stopped() -> None:
+    """In auto mode with 0% derived speed, the select reads 'stopped'."""
+    select = _pump_speed({"is_running": True, "auto_reported": 1, "online": True, "speed_percent": 0})
+    assert select.current_option == "stopped"
+
+
+async def test_pump_speed_select_raises_when_api_reports_failure() -> None:
+    """success=False from the API surfaces as HomeAssistantError (error convention)."""
+    select = _pump_speed({"is_running": False, "online": True})
+    select._api.control_device_component.return_value = False
+    with pytest.raises(HomeAssistantError):
+        await select.async_select_option("low")
+    assert select._optimistic_option is None

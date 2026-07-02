@@ -346,3 +346,75 @@ class TestCalculateAutoSpeed:
     async def test_no_schedule_data_returns_zero(self, coordinator: FluidraDataUpdateCoordinator):
         device = {}
         assert coordinator._calculate_auto_speed_from_schedules(device) == 0
+
+
+class TestSyncDeviceFirmware:
+    """Firmware versions reported by devices are mirrored into the registry."""
+
+    _POOLS = [{"id": "p1", "devices": [{"device_id": "D1", "firmware_version_component": "2.0"}]}]
+
+    def _sync(self, hass: HomeAssistant, mock_api: AsyncMock, pools, registry_entry):
+        coord = FluidraDataUpdateCoordinator(hass, mock_api)
+        dev_reg = MagicMock()
+        dev_reg.async_get_device.return_value = registry_entry
+        with patch(
+            "custom_components.fluidra_pool.coordinator.coordinator.dr.async_get",
+            return_value=dev_reg,
+        ):
+            coord._sync_device_firmware(pools)
+        return dev_reg
+
+    def test_updates_registry_when_firmware_differs(self, hass: HomeAssistant, mock_api: AsyncMock):
+        entry = MagicMock()
+        entry.id = "reg_1"
+        entry.sw_version = "1.0"
+        dev_reg = self._sync(hass, mock_api, self._POOLS, entry)
+        dev_reg.async_update_device.assert_called_once_with("reg_1", sw_version="2.0")
+
+    def test_noop_when_firmware_unchanged(self, hass: HomeAssistant, mock_api: AsyncMock):
+        entry = MagicMock()
+        entry.sw_version = "2.0"
+        dev_reg = self._sync(hass, mock_api, self._POOLS, entry)
+        dev_reg.async_update_device.assert_not_called()
+
+    def test_noop_when_device_not_registered(self, hass: HomeAssistant, mock_api: AsyncMock):
+        dev_reg = self._sync(hass, mock_api, self._POOLS, None)
+        dev_reg.async_update_device.assert_not_called()
+
+    def test_skips_devices_without_firmware_or_id(self, hass: HomeAssistant, mock_api: AsyncMock):
+        pools = [{"id": "p1", "devices": [{"device_id": "D1"}, {"firmware_version_component": "9"}]}]
+        dev_reg = self._sync(hass, mock_api, pools, MagicMock())
+        dev_reg.async_get_device.assert_not_called()
+
+
+class TestUpdateDataOutagePath:
+    """A whole-cycle refresh failure counts towards the connection issue."""
+
+    async def _run_update(self, hass: HomeAssistant, mock_api: AsyncMock, *, refresh_fails: bool):
+        coord = FluidraDataUpdateCoordinator(hass, mock_api)
+        coord._first_update = False
+        mock_api.ensure_valid_token = AsyncMock(return_value=True)
+        mock_api.get_pools = AsyncMock(return_value=[{"id": "p1", "devices": []}])
+        side_effect = FluidraConnectionError("cloud down") if refresh_fails else None
+        with (
+            patch.object(coord, "_refresh_pool", AsyncMock(side_effect=side_effect)),
+            patch.object(coord, "_note_update_failure") as note_failure,
+            patch.object(coord, "_handle_update_success") as note_success,
+            patch.object(coord, "_sync_device_firmware") as sync_fw,
+        ):
+            data = await coord._async_update_data()
+        return data, note_failure, note_success, sync_fw
+
+    async def test_all_pools_failing_counts_as_failure(self, hass: HomeAssistant, mock_api: AsyncMock):
+        data, note_failure, note_success, sync_fw = await self._run_update(hass, mock_api, refresh_fails=True)
+        note_failure.assert_called_once()
+        note_success.assert_not_called()
+        sync_fw.assert_not_called()
+        assert "p1" in data  # graceful degradation: data is still returned
+
+    async def test_successful_cycle_resets_streak_and_syncs_firmware(self, hass: HomeAssistant, mock_api: AsyncMock):
+        data, note_failure, note_success, sync_fw = await self._run_update(hass, mock_api, refresh_fails=False)
+        note_failure.assert_not_called()
+        note_success.assert_called_once()
+        sync_fw.assert_called_once()
+        assert "p1" in data
