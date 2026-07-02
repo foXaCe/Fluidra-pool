@@ -188,6 +188,32 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["chlorination_level"] == 10
 
+    def test_lc24008202_ducere21_uses_tecnolc2_layout(self):
+        """Ducere 21 LC24008202 maps on the tecnoLC2 layout, not the generic profile (Issue #125)."""
+        config = DEVICE_CONFIGS["lc24008202_chlorinator"]
+        device = {
+            "device_id": "LC24008202.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        sensors = config.features["sensors"]
+        # c172 is water temperature — the generic profile wrongly read it as pH.
+        assert sensors["ph"] == 165
+        assert sensors["orp"] == 170
+        assert sensors["temperature"] == 172
+        assert sensors["salinity"] == 174
+        assert sensors["free_chlorine"] == 178
+        assert config.features["ph_setpoint"] == 16
+        assert config.features["orp_setpoint"] == 20
+        assert config.features["boost_mode"] == 103
+        # c154 drives the chlorinator_producing binary sensor (Issue #109).
+        assert config.features["cell_production_state"] == 154
+        assert 154 in config.features["specific_components"]
+        assert config.features["skip_mode_select"] is True
+
     def test_lc25024524_uses_teclc2_layout(self):
         """tecnoLC2 chlorinator LC25024524 maps on the tecnoLC2 layout, not the generic profile (Issue #73)."""
         config = DEVICE_CONFIGS["lc25024524_chlorinator"]
