@@ -7,10 +7,12 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
 from ..const import DOMAIN
 from ..device_registry import DeviceIdentifier
+from ..helpers import get_schedule_data
 from ..utils import convert_cron_days
 from .base import FluidraPoolSwitchEntity
 
@@ -56,23 +58,10 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
     def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
-            device_data = self.device_data
-
-            if not device_data:
-                return None
-
-            if "schedule_data" in device_data:
-                schedules = device_data["schedule_data"]
-
-                for schedule in schedules:
-                    schedule_id = schedule.get("id")
-                    if str(schedule_id) == str(self._schedule_id):
-                        value: dict[str, Any] = schedule
-                        return value
-
+            return get_schedule_data(self.device_data, self._schedule_id)
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
-        return None
+            return None
 
     def _get_schedule_component(self) -> int:
         """Get the schedule component used by this device."""
@@ -143,7 +132,14 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 await self.coordinator.async_request_refresh()
             else:
                 self._clear_pending_state()
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="schedule_set_failed",
+                    translation_placeholders={"device_id": self._device_id},
+                )
 
+        except HomeAssistantError:
+            raise
         except (
             aiohttp.ClientError,
             TimeoutError,
@@ -155,6 +151,11 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         ) as err:
             _LOGGER.debug("Failed to enable schedule: %s", err)
             self._clear_pending_state()
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_set_failed",
+                translation_placeholders={"device_id": self._device_id},
+            ) from err
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable the schedule using exact mobile app format with optimistic UI."""
@@ -192,7 +193,14 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 await self.coordinator.async_request_refresh()
             else:
                 self._clear_pending_state()
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="schedule_set_failed",
+                    translation_placeholders={"device_id": self._device_id},
+                )
 
+        except HomeAssistantError:
+            raise
         except (
             aiohttp.ClientError,
             TimeoutError,
@@ -204,6 +212,11 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         ) as err:
             _LOGGER.debug("Failed to disable schedule: %s", err)
             self._clear_pending_state()
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_set_failed",
+                translation_placeholders={"device_id": self._device_id},
+            ) from err
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

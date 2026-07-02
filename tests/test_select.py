@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.fluidra_pool.select import (
@@ -119,10 +119,19 @@ def test_pump_speed_optimistic_option_takes_precedence() -> None:
     assert select.current_option == "high"
 
 
-def test_pump_speed_available_false_when_auto_mode_active() -> None:
-    """Auto mode locks manual speed control — entity becomes unavailable."""
-    select = _pump_speed({"is_running": True, "auto_reported": 1})
-    assert select.available is False
+def test_pump_speed_stays_available_when_auto_mode_active() -> None:
+    """Auto mode no longer hides the entity: the state stays readable."""
+    select = _pump_speed({"is_running": True, "auto_reported": 1, "online": True, "speed_percent": 65})
+    assert select.available is True
+    assert select.current_option == "medium"
+
+
+async def test_pump_speed_select_rejected_in_auto_mode() -> None:
+    """A manual write while auto mode drives the pump raises a clear error."""
+    select = _pump_speed({"is_running": True, "auto_reported": 1, "online": True})
+    with pytest.raises(ServiceValidationError):
+        await select.async_select_option("high")
+    select._api.control_device_component.assert_not_awaited()
 
 
 async def test_pump_speed_async_select_low_writes_pump_on_then_speed() -> None:

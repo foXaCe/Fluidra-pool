@@ -1,15 +1,15 @@
 """Coverage-gap tests for switch/pump.py and switch/schedule.py.
 
-These modules differ from heater/chlorinator: their async_turn_on/off methods
-*swallow* API errors (debug log + clear pending state) instead of re-raising
-HomeAssistantError. The tests here exercise the branches not already covered by
-test_switch.py / test_entity_error_paths.py:
+Like heater/chlorinator, these modules' async_turn_on/off methods clear the
+optimistic pending state and raise HomeAssistantError, both when the API
+raises and when it returns False. The tests here exercise the branches not
+already covered by test_switch.py / test_entity_error_paths.py:
 
 pump.py
 * icon OFF branch (both pump + auto-mode)
 * is_on optimistic clear on match AND on expiry (pump + auto-mode)
 * async_turn_on/off: API-returns-False revert, and the exception handler
-  (no raise, pending cleared, no refresh) for both pump + auto-mode
+  (raise, pending cleared, no refresh) for both pump + auto-mode
 
 schedule.py
 * icon OFF branch
@@ -17,7 +17,7 @@ schedule.py
 * is_on: pending state surfaces while server hasn't caught up (return path)
 * async_turn_on: empty current_schedules early-return
 * async_turn_off: missing schedule_data key + empty list early-returns
-* async_turn_on/off: API-returns-False revert + exception handler (no raise)
+* async_turn_on/off: API-returns-False revert + exception handler (raise)
 * extra_state_attributes with a schedule present (start/end/state/actions)
 """
 
@@ -28,6 +28,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.fluidra_pool.api_resilience import FluidraConnectionError
@@ -121,33 +122,37 @@ def test_pump_is_on_clears_pending_on_expiry() -> None:
 
 
 async def test_pump_turn_on_returns_false_reverts_no_refresh() -> None:
-    """start_pump False rolls back the optimistic state and skips refresh."""
+    """start_pump False rolls back the optimistic state, raises, and skips refresh."""
     pump = _pump(start_pump=AsyncMock(return_value=False))
-    await pump.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await pump.async_turn_on()
     assert pump._pending_state is None
     pump.coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_pump_turn_on_api_raises_is_swallowed_and_clears_pending() -> None:
-    """pump turn_on swallows API errors (no raise) and clears pending state."""
+    """pump turn_on wraps API errors as HomeAssistantError and clears pending state."""
     pump = _pump(start_pump=AsyncMock(side_effect=FluidraConnectionError("boom")))
-    await pump.async_turn_on()  # must NOT raise
+    with pytest.raises(HomeAssistantError):
+        await pump.async_turn_on()
     assert pump._pending_state is None
     pump.coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_pump_turn_off_returns_false_reverts_no_refresh() -> None:
-    """stop_pump False rolls back the optimistic state and skips refresh."""
+    """stop_pump False rolls back the optimistic state, raises, and skips refresh."""
     pump = _pump({"is_running": True}, stop_pump=AsyncMock(return_value=False))
-    await pump.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await pump.async_turn_off()
     assert pump._pending_state is None
     pump.coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_pump_turn_off_api_raises_is_swallowed_and_clears_pending() -> None:
-    """pump turn_off swallows API errors (no raise) and clears pending state."""
+    """pump turn_off wraps API errors as HomeAssistantError and clears pending state."""
     pump = _pump({"is_running": True}, stop_pump=AsyncMock(side_effect=aiohttp.ClientError("net")))
-    await pump.async_turn_off()  # must NOT raise
+    with pytest.raises(HomeAssistantError):
+        await pump.async_turn_off()
     assert pump._pending_state is None
 
 
@@ -210,33 +215,37 @@ def test_auto_mode_is_on_pending_shows_through_until_match() -> None:
 
 
 async def test_auto_mode_turn_on_returns_false_reverts_no_refresh() -> None:
-    """enable_auto_mode False rolls back the optimistic state, no refresh."""
+    """enable_auto_mode False rolls back the optimistic state, raises, no refresh."""
     auto = _auto(enable_auto_mode=AsyncMock(return_value=False))
-    await auto.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await auto.async_turn_on()
     assert auto._pending_state is None
     auto.coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_auto_mode_turn_on_api_raises_is_swallowed() -> None:
-    """auto-mode turn_on swallows API errors and clears pending state."""
+    """auto-mode turn_on wraps API errors as HomeAssistantError and clears pending state."""
     auto = _auto(enable_auto_mode=AsyncMock(side_effect=FluidraConnectionError("boom")))
-    await auto.async_turn_on()  # must NOT raise
+    with pytest.raises(HomeAssistantError):
+        await auto.async_turn_on()
     assert auto._pending_state is None
     auto.coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_auto_mode_turn_off_returns_false_reverts_no_refresh() -> None:
-    """disable_auto_mode False rolls back the optimistic state, no refresh."""
+    """disable_auto_mode False rolls back the optimistic state, raises, no refresh."""
     auto = _auto({"auto_mode_enabled": True}, disable_auto_mode=AsyncMock(return_value=False))
-    await auto.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await auto.async_turn_off()
     assert auto._pending_state is None
     auto.coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_auto_mode_turn_off_api_raises_is_swallowed() -> None:
-    """auto-mode turn_off swallows API errors and clears pending state."""
+    """auto-mode turn_off wraps API errors as HomeAssistantError and clears pending state."""
     auto = _auto({"auto_mode_enabled": True}, disable_auto_mode=AsyncMock(side_effect=aiohttp.ClientError("net")))
-    await auto.async_turn_off()  # must NOT raise
+    with pytest.raises(HomeAssistantError):
+        await auto.async_turn_off()
     assert auto._pending_state is None
 
 
@@ -320,16 +329,18 @@ async def test_schedule_turn_on_empty_schedules_early_return() -> None:
 
 
 async def test_schedule_turn_on_returns_false_reverts() -> None:
-    """set_schedule False rolls back the optimistic ON state."""
+    """set_schedule False rolls back the optimistic ON state and raises."""
     switch = _schedule([SCHEDULE_4], set_schedule=AsyncMock(return_value=False))
-    await switch.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await switch.async_turn_on()
     assert switch._pending_state is None
 
 
 async def test_schedule_turn_on_api_raises_is_swallowed() -> None:
-    """Enable swallows API errors (no raise) and clears pending state."""
+    """Enable wraps API errors as HomeAssistantError and clears pending state."""
     switch = _schedule([SCHEDULE_4], set_schedule=AsyncMock(side_effect=FluidraConnectionError("boom")))
-    await switch.async_turn_on()  # must NOT raise
+    with pytest.raises(HomeAssistantError):
+        await switch.async_turn_on()
     assert switch._pending_state is None
 
 
@@ -371,19 +382,21 @@ async def test_schedule_turn_off_sets_only_target_disabled() -> None:
 
 
 async def test_schedule_turn_off_returns_false_reverts() -> None:
-    """set_schedule False rolls back the optimistic OFF state."""
+    """set_schedule False rolls back the optimistic OFF state and raises."""
     switch = _schedule([{**SCHEDULE_4, "enabled": True}], set_schedule=AsyncMock(return_value=False))
-    await switch.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await switch.async_turn_off()
     assert switch._pending_state is None
 
 
 async def test_schedule_turn_off_api_raises_is_swallowed() -> None:
-    """Disable swallows API errors (no raise) and clears pending state."""
+    """Disable wraps API errors as HomeAssistantError and clears pending state."""
     switch = _schedule(
         [{**SCHEDULE_4, "enabled": True}],
         set_schedule=AsyncMock(side_effect=aiohttp.ClientError("net")),
     )
-    await switch.async_turn_off()  # must NOT raise
+    with pytest.raises(HomeAssistantError):
+        await switch.async_turn_off()
     assert switch._pending_state is None
 
 

@@ -279,6 +279,9 @@
     "auth_failed": {
       "message": "Authentication failed, please re-authenticate"
     },
+    "auto_mode_set_failed": {
+      "message": "Failed to change auto mode"
+    },
     "boost_set_failed": {
       "message": "Failed to set boost mode"
     },
@@ -332,6 +335,12 @@
     },
     "preset_schedule_set_rejected": {
       "message": "Fluidra API rejected the preset schedule update for {device_id}"
+    },
+    "pump_in_auto_mode": {
+      "message": "The speed level cannot be changed while auto mode is active. Disable auto mode first."
+    },
+    "pump_set_failed": {
+      "message": "Failed to control the pump"
     },
     "pump_speed_set_failed": {
       "message": "Failed to set the pump speed"

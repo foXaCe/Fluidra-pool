@@ -234,8 +234,9 @@ async def test_number_level_set_value_returns_false_no_refresh() -> None:
     api = _api(control_device_component=AsyncMock(return_value=False))
     entity = FluidraChlorinatorLevelNumber(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    # Returns False -> code logs debug, must NOT raise and must NOT refresh.
-    await entity.async_set_native_value(50)
+    # Returns False -> code logs debug, raises HomeAssistantError and does NOT refresh.
+    with pytest.raises(HomeAssistantError):
+        await entity.async_set_native_value(50)
     coordinator.async_request_refresh.assert_not_awaited()
 
 
@@ -254,7 +255,8 @@ async def test_number_ph_setpoint_returns_false_no_refresh() -> None:
     api = _api(control_device_component=AsyncMock(return_value=False))
     entity = FluidraChlorinatorPhSetpoint(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_set_native_value(7.4)
+    with pytest.raises(HomeAssistantError):
+        await entity.async_set_native_value(7.4)
     coordinator.async_request_refresh.assert_not_awaited()
 
 
@@ -273,7 +275,8 @@ async def test_number_orp_setpoint_returns_false_no_refresh() -> None:
     api = _api(control_device_component=AsyncMock(return_value=False))
     entity = FluidraChlorinatorOrpSetpoint(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_set_native_value(720)
+    with pytest.raises(HomeAssistantError):
+        await entity.async_set_native_value(720)
     coordinator.async_request_refresh.assert_not_awaited()
 
 
@@ -306,7 +309,8 @@ async def test_number_effect_speed_returns_false_no_refresh() -> None:
     api = _api(set_component_value=AsyncMock(return_value=False))
     entity = FluidraLightEffectSpeed(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_set_native_value(4)
+    with pytest.raises(HomeAssistantError):
+        await entity.async_set_native_value(4)
     coordinator.async_request_refresh.assert_not_awaited()
 
 
@@ -353,7 +357,8 @@ async def test_heater_turn_on_returns_false_clears_pending() -> None:
     api = _api(control_device_component=AsyncMock(return_value=False))
     entity = FluidraHeaterSwitch(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_on()
     assert entity._pending_state is None
     coordinator.async_request_refresh.assert_not_awaited()
 
@@ -374,8 +379,10 @@ async def test_heater_turn_off_returns_false_clears_pending() -> None:
     api = _api(control_device_component=AsyncMock(return_value=False))
     entity = FluidraHeaterSwitch(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_off()
     assert entity._pending_state is None
+    coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_heat_pump_turn_on_api_raises_clears_pending() -> None:
@@ -394,7 +401,8 @@ async def test_heat_pump_turn_on_returns_false_clears_pending() -> None:
     api = _api(start_pump=AsyncMock(return_value=False))
     entity = FluidraHeatPumpSwitch(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_on()
     assert entity._pending_state is None
     coordinator.async_request_refresh.assert_not_awaited()
 
@@ -415,7 +423,8 @@ async def test_heat_pump_turn_off_returns_false_clears_pending() -> None:
     api = _api(stop_pump=AsyncMock(return_value=False))
     entity = FluidraHeatPumpSwitch(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_off()
     assert entity._pending_state is None
     coordinator.async_request_refresh.assert_not_awaited()
 
@@ -470,7 +479,8 @@ async def test_chlorinator_turn_on_returns_false_clears_pending() -> None:
     api = _api(control_device_component=AsyncMock(return_value=False))
     entity = FluidraChlorinatorSwitch(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_on()
     assert entity._pending_state is None
     coordinator.async_request_refresh.assert_not_awaited()
 
@@ -491,7 +501,8 @@ async def test_chlorinator_turn_off_returns_false_clears_pending() -> None:
     api = _api(control_device_component=AsyncMock(return_value=False))
     entity = FluidraChlorinatorSwitch(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_off()
     assert entity._pending_state is None
     coordinator.async_request_refresh.assert_not_awaited()
 
@@ -513,7 +524,8 @@ async def test_chlorinator_boost_turn_on_returns_false_clears_pending() -> None:
     api = _api(control_device_component=AsyncMock(return_value=False))
     entity = FluidraChlorinatorBoostSwitch(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_on()
     assert entity._pending_state is None
     coordinator.async_request_refresh.assert_not_awaited()
 
@@ -534,7 +546,8 @@ async def test_chlorinator_boost_turn_off_returns_false_clears_pending() -> None
     api = _api(control_device_component=AsyncMock(return_value=False))
     entity = FluidraChlorinatorBoostSwitch(coordinator, api, POOL_ID, DEVICE_ID)
     _attach_ha(entity)
-    await entity.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_off()
     assert entity._pending_state is None
     coordinator.async_request_refresh.assert_not_awaited()
 

@@ -13,6 +13,7 @@ from typing import Any
 from homeassistant.util import dt as dt_util
 
 from ..const import PUMP_SPEED_PERCENTAGES
+from ..helpers import parse_cron_time
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -127,15 +128,7 @@ def parse_dm24049704_schedule_format(reported_value: dict[str, Any]) -> list[dic
 
 def _parse_cron_time(cron_time: str) -> time | None:
     """Parse cron ``mm HH …`` to a :class:`time` object."""
-    try:
-        parts = cron_time.split()
-        if len(parts) >= 2:
-            minute = int(parts[0])
-            hour = int(parts[1])
-            return time(hour, minute)
-    except (ValueError, IndexError):
-        pass
-    return None
+    return parse_cron_time(cron_time)
 
 
 def _parse_cron_days(cron_time: str) -> list[int]:

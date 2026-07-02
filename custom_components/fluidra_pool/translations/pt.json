@@ -279,6 +279,9 @@
     "auth_failed": {
       "message": "Falha na autenticação, por favor re-autentique-se"
     },
+    "auto_mode_set_failed": {
+      "message": "Falha ao alterar o modo automático"
+    },
     "boost_set_failed": {
       "message": "Falha ao ativar o modo boost"
     },
@@ -332,6 +335,12 @@
     },
     "preset_schedule_set_rejected": {
       "message": "A API Fluidra rejeitou a atualização da predefinição para {device_id}"
+    },
+    "pump_in_auto_mode": {
+      "message": "O nível de velocidade não pode ser alterado enquanto o modo automático estiver ativo. Desative primeiro o modo automático."
+    },
+    "pump_set_failed": {
+      "message": "Falha ao controlar a bomba"
     },
     "pump_speed_set_failed": {
       "message": "Falha ao definir a velocidade da bomba"

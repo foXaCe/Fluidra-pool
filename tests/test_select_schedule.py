@@ -391,13 +391,14 @@ async def test_chlor_schedule_speed_clears_optimistic_after_success() -> None:
 
 
 async def test_chlor_schedule_speed_clears_optimistic_after_api_failure() -> None:
-    """If the API returns False, the optimistic state is cleared (caller sees current)."""
+    """If the API returns False, the optimistic state is cleared and HomeAssistantError raised."""
     device = _chlor_device(schedule_data=[SCHEDULE])
     api = SimpleNamespace(set_schedule=AsyncMock(return_value=False))
     select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), api, POOL_ID, CHLOR_ID, schedule_id="1")
     _attach_ha(select)
 
-    await select.async_select_option("s2")
+    with pytest.raises(HomeAssistantError):
+        await select.async_select_option("s2")
 
     assert select._optimistic_option is None
 
@@ -583,14 +584,14 @@ async def test_chlor_schedule_speed_generic_branch_for_non_258_component() -> No
 
 
 async def test_chlor_schedule_speed_wraps_api_error_and_clears_optimistic() -> None:
-    """A FluidraError raised by set_schedule is swallowed and optimistic state cleared (355-366)."""
+    """A FluidraError raised by set_schedule is wrapped as HomeAssistantError (355-366)."""
     device = _chlor_device(schedule_data=[SCHEDULE])
     api = SimpleNamespace(set_schedule=AsyncMock(side_effect=FluidraError("boom")))
     select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), api, POOL_ID, CHLOR_ID, schedule_id="1")
     _attach_ha(select)
 
-    # The handler logs and recovers (no raise), leaving optimistic state cleared.
-    await select.async_select_option("s2")
+    with pytest.raises(HomeAssistantError):
+        await select.async_select_option("s2")
 
     assert select._optimistic_option is None
 

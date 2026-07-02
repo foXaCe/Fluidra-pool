@@ -31,6 +31,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.fluidra_pool.const import CHLORINATOR_MODE_OPTIMISTIC_TIMEOUT
 from custom_components.fluidra_pool.select import (
     FluidraChlorinatorModeSelect,
     FluidraPumpSpeedSelect,
@@ -118,10 +119,10 @@ def test_pump_available_auto_reported_zero_then_success_online_true() -> None:
     assert select.available is True
 
 
-def test_pump_available_auto_mode_enabled_fallback_true_blocks() -> None:
-    """Without auto_reported, auto_mode_enabled fallback blocks availability."""
+def test_pump_available_auto_mode_enabled_fallback_stays_available() -> None:
+    """Without auto_reported, the auto_mode_enabled fallback no longer hides the entity."""
     select = _pump_speed({"auto_mode_enabled": True, "online": True})
-    assert select.available is False
+    assert select.available is True
 
 
 def test_pump_available_fallback_false_then_online_true() -> None:
@@ -382,7 +383,7 @@ def test_chlor_optimistic_not_expired_recent() -> None:
 def test_chlor_optimistic_expired_old() -> None:
     """A timestamp older than OPTIMISTIC_TIMEOUT is expired."""
     select = _chlor()
-    select._optimistic_time = time.time() - (select.OPTIMISTIC_TIMEOUT + 10)
+    select._optimistic_time = time.time() - (CHLORINATOR_MODE_OPTIMISTIC_TIMEOUT + 10)
     assert select._optimistic_expired() is True
 
 
@@ -401,7 +402,7 @@ def test_chlor_current_option_optimistic_expired_uses_api() -> None:
     """An expired optimistic value is ignored; API mode is returned."""
     select = _chlor({"20": {"reportedValue": 1}})  # api: on
     select._optimistic_option = "auto"
-    select._optimistic_time = time.time() - (select.OPTIMISTIC_TIMEOUT + 10)
+    select._optimistic_time = time.time() - (CHLORINATOR_MODE_OPTIMISTIC_TIMEOUT + 10)
     assert select.current_option == "on"
 
 
@@ -429,7 +430,7 @@ def test_chlor_handle_update_clears_when_expired() -> None:
     """Optimistic value cleared once it expires even if API disagrees."""
     select = _chlor({"20": {"reportedValue": 1}})  # api: on (≠ auto)
     select._optimistic_option = "auto"
-    select._optimistic_time = time.time() - (select.OPTIMISTIC_TIMEOUT + 10)
+    select._optimistic_time = time.time() - (CHLORINATOR_MODE_OPTIMISTIC_TIMEOUT + 10)
     select._handle_coordinator_update()
     assert select._optimistic_option is None
 

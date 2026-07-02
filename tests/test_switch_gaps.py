@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.fluidra_pool.switch.chlorinator import (
@@ -235,17 +236,19 @@ async def test_chlorinator_turn_off_success_writes_zero_and_refreshes() -> None:
 
 
 async def test_chlorinator_turn_on_returns_false_reverts_no_refresh() -> None:
-    """API False rolls back the optimistic state and skips the refresh."""
+    """API False rolls back the optimistic state, raises and skips the refresh."""
     entity = _chlorinator(_chlorinator_device(), control_device_component=AsyncMock(return_value=False))
-    await entity.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_on()
     assert entity._pending_state is None
     entity.coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_chlorinator_turn_off_returns_false_reverts_no_refresh() -> None:
-    """API False on OFF rolls back too."""
+    """API False on OFF rolls back too, raising HomeAssistantError."""
     entity = _chlorinator(_chlorinator_device(), control_device_component=AsyncMock(return_value=False))
-    await entity.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_off()
     assert entity._pending_state is None
     entity.coordinator.async_request_refresh.assert_not_awaited()
 
@@ -408,10 +411,11 @@ async def test_boost_turn_on_custom_mapping_on_value() -> None:
 
 
 async def test_boost_turn_on_returns_false_reverts() -> None:
-    """API False on boost ON clears the optimistic state, no refresh."""
+    """API False on boost ON clears the optimistic state, raises, no refresh."""
     device = _chlorinator_device(features={"skip_mode_select": True, "boost_mode": 245})
     entity = _boost(device, control_device_component=AsyncMock(return_value=False))
-    await entity.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_on()
     assert entity._pending_state is None
     entity.coordinator.async_request_refresh.assert_not_awaited()
 
@@ -427,10 +431,11 @@ async def test_boost_turn_off_success() -> None:
 
 
 async def test_boost_turn_off_returns_false_reverts() -> None:
-    """API False on boost OFF clears the optimistic state, no refresh."""
+    """API False on boost OFF clears the optimistic state, raises, no refresh."""
     device = _chlorinator_device(features={"boost_mode": 245})
     entity = _boost(device, control_device_component=AsyncMock(return_value=False))
-    await entity.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_off()
     assert entity._pending_state is None
     entity.coordinator.async_request_refresh.assert_not_awaited()
 
@@ -579,17 +584,19 @@ async def test_heatpump_turn_off_z550_uses_component_21() -> None:
 
 
 async def test_heatpump_turn_on_returns_false_reverts() -> None:
-    """start_pump False clears the optimistic state and skips refresh."""
+    """start_pump False clears the optimistic state, raises and skips refresh."""
     entity = _heatpump(_heatpump_device(), start_pump=AsyncMock(return_value=False))
-    await entity.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_on()
     assert entity._pending_state is None
     entity.coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_heatpump_turn_off_returns_false_reverts() -> None:
-    """stop_pump False clears the optimistic state and skips refresh."""
+    """stop_pump False clears the optimistic state, raises and skips refresh."""
     entity = _heatpump(_heatpump_device(is_running=True), stop_pump=AsyncMock(return_value=False))
-    await entity.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_off()
     assert entity._pending_state is None
     entity.coordinator.async_request_refresh.assert_not_awaited()
 
@@ -691,16 +698,18 @@ async def test_heater_turn_off_success_writes_component_9_zero() -> None:
 
 
 async def test_heater_turn_on_returns_false_reverts() -> None:
-    """API False on heater ON clears the optimistic state, no refresh."""
+    """API False on heater ON clears the optimistic state, raises, no refresh."""
     entity = _heater(_heater_device(), control_device_component=AsyncMock(return_value=False))
-    await entity.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_on()
     assert entity._pending_state is None
     entity.coordinator.async_request_refresh.assert_not_awaited()
 
 
 async def test_heater_turn_off_returns_false_reverts() -> None:
-    """API False on heater OFF clears the optimistic state, no refresh."""
+    """API False on heater OFF clears the optimistic state, raises, no refresh."""
     entity = _heater(_heater_device(is_heating=True), control_device_component=AsyncMock(return_value=False))
-    await entity.async_turn_off()
+    with pytest.raises(HomeAssistantError):
+        await entity.async_turn_off()
     assert entity._pending_state is None
     entity.coordinator.async_request_refresh.assert_not_awaited()

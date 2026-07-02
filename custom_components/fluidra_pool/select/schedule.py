@@ -15,6 +15,7 @@ from ..api_resilience import FluidraError
 from ..const import COMMAND_CONFIRMATION_DELAY, DOMAIN, UI_UPDATE_DELAY
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolControlEntity
+from ..helpers import get_schedule_data
 from ..utils import convert_cron_days
 
 if TYPE_CHECKING:
@@ -52,20 +53,10 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
     def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
-            device_data = self.device_data
-
-            if "schedule_data" in device_data:
-                schedules = device_data["schedule_data"]
-
-                for schedule in schedules:
-                    schedule_id = schedule.get("id")
-                    if str(schedule_id) == str(self._schedule_id):
-                        schedule_data: dict[str, Any] = schedule
-                        return schedule_data
-
+            return get_schedule_data(self.device_data, self._schedule_id)
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
-        return None
+            return None
 
     @property
     def available(self) -> bool:
@@ -219,17 +210,10 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
     def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
-            device_data = self.device_data
-            if "schedule_data" in device_data:
-                schedules = device_data["schedule_data"]
-                for schedule in schedules:
-                    schedule_id = schedule.get("id")
-                    if str(schedule_id) == str(self._schedule_id):
-                        schedule_data: dict[str, Any] = schedule
-                        return schedule_data
+            return get_schedule_data(self.device_data, self._schedule_id)
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
-        return None
+            return None
 
     @property
     def available(self) -> bool:
@@ -339,7 +323,14 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
             else:
                 self._optimistic_option = None
                 self.async_write_ha_state()
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="schedule_set_failed",
+                    translation_placeholders={"device_id": self._device_id},
+                )
 
+        except HomeAssistantError:
+            raise
         except (
             aiohttp.ClientError,
             TimeoutError,
@@ -352,6 +343,11 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
             _LOGGER.error("Failed to set schedule speed: %s", err)
             self._optimistic_option = None
             self.async_write_ha_state()
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_set_failed",
+                translation_placeholders={"device_id": self._device_id},
+            ) from err
 
     def _format_cron_time(self, cron_time: str) -> str:
         """Format CRON time to match official app format (00 05 * * 1,2,3,4,5,6,7)."""

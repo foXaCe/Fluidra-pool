@@ -8,10 +8,11 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-from homeassistant.const import PERCENTAGE, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, UnitOfTemperature, UnitOfTime
 
 from ..api_resilience import FluidraError
 from ..const import LUMIPLUS_COMPONENT_BRIGHTNESS
+from ..helpers import parse_cron_time
 from .base import FluidraPoolSensorEntity
 
 if TYPE_CHECKING:
@@ -104,8 +105,9 @@ class FluidraRunningHoursSensor(FluidraPoolSensorEntity):
     """Running hours sensor for heat pumps (Z260iQ component 0 / Z550iQ+ component 60)."""
 
     _attr_translation_key = "running_hours"
+    _attr_device_class = SensorDeviceClass.DURATION
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
-    _attr_native_unit_of_measurement = "h"
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
     _attr_icon = "mdi:clock-outline"
 
     def __init__(
@@ -227,15 +229,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
 
     def _parse_cron_time(self, cron_time: str) -> time | None:
         """Parse cron time format 'mm HH * * 0,1,2,3,4,5,6' to time object."""
-        try:
-            parts = cron_time.split()
-            if len(parts) >= 2:
-                minute = int(parts[0])
-                hour = int(parts[1])
-                return time(hour, minute)
-        except (ValueError, TypeError):
-            pass
-        return None
+        return parse_cron_time(cron_time)
 
     def _format_schedule_time(self, schedule: dict[str, Any]) -> str:
         """Format schedule time range for display."""

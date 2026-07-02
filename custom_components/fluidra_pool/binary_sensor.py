@@ -10,10 +10,10 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
+from .entity import FluidraPoolEntity
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 PARALLEL_UPDATES = 0  # Coordinator handles all updates
 
 
-class FluidraChlorinatorProducingBinarySensor(CoordinatorEntity, BinarySensorEntity):
+class FluidraChlorinatorProducingBinarySensor(FluidraPoolEntity, BinarySensorEntity):
     """Binary sensor for the chlorinator cell active-production state.
 
     In ORP/CLI regulation the cell cycles on and off around the setpoint: the
@@ -46,37 +46,24 @@ class FluidraChlorinatorProducingBinarySensor(CoordinatorEntity, BinarySensorEnt
         component_id: int,
     ) -> None:
         """Initialize the chlorinator producing binary sensor."""
-        super().__init__(coordinator)
+        super().__init__(coordinator, pool_id, device_id)
         self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
         self._component_id = component_id
 
         self._attr_unique_id = f"fluidra_{self._device_id}_producing"
         self._attr_translation_key = "chlorinator_producing"
 
     @property
-    def device_data(self) -> dict[str, Any]:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool: dict[str, Any] | None = self.coordinator.data.get(self._pool_id)
-        if pool:
-            devices: list[dict[str, Any]] = pool.get("devices", [])
-            for device in devices:
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        firmware = self.device_data.get("firmware_version_component")
         return DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
             name=device_name,
             manufacturer=self.device_data.get("manufacturer", "Fluidra"),
             model="Chlorinator",
+            sw_version=str(firmware) if firmware is not None else None,
             via_device=(DOMAIN, self._pool_id),
         )
 

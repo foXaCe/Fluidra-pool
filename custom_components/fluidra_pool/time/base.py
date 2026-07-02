@@ -12,9 +12,10 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from ..api_resilience import FluidraError
-from ..const import DOMAIN
+from ..const import DEVICE_MODEL_FALLBACK, DEVICE_MODEL_MAP, DOMAIN
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolControlEntity
+from ..helpers import get_schedule_data
 from ..utils import extract_cron_days
 
 if TYPE_CHECKING:
@@ -70,10 +71,16 @@ def parse_schedule_time(time_value: time | int | float | str | None) -> time | N
     return None
 
 
-class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
-    """Base class for Fluidra pump/chlorinator schedule time entities."""
+class _FluidraTimeEntityBase(FluidraPoolControlEntity, TimeEntity):
+    """Private base sharing schedule lookup/parsing logic for time entities.
 
-    __slots__ = ("_optimistic_value", "_schedule_id", "_time_type")
+    Holds everything that is identical between the pump/chlorinator and
+    LumiPlus light schedule time entities. Device-specific behaviour
+    (``device_info`` naming/model, optimistic values, overlap validation)
+    stays in the public subclasses below.
+    """
+
+    __slots__ = ("_schedule_id", "_time_type")
 
     def __init__(
         self,
@@ -88,61 +95,14 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
         self._time_type = time_type  # "start" or "end"
-        self._optimistic_value: time | None = None
-
-    def _get_schedule_component(self) -> int:
-        """Get the correct schedule component ID for this device."""
-        device_data = self.device_data
-        # Per-device override (e.g. 258 for DM24049704 chlorinator).
-        schedule_comp: int = DeviceIdentifier.get_feature(device_data, "schedule_component")
-        if schedule_comp:
-            return schedule_comp
-        # Default to component 20 (pumps).
-        return 20
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device info using device registry for consistent naming."""
-        config = DeviceIdentifier.identify_device(self.device_data)
-
-        model_map = {
-            "chlorinator": "Chlorinator",
-            "pump": "Pump",
-            "heat_pump": "Heat Pump",
-            "light": "Light",
-            "heater": "Heater",
-        }
-        default_model = model_map.get(config.device_type, "Pool Equipment") if config else "Pool Equipment"
-
-        device_name = self.device_data.get("name") or f"Device {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": default_model,
-            "via_device": (DOMAIN, self._pool_id),
-        }
 
     def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
-            device_data = self.device_data
-
-            if not device_data:
-                return None
-
-            if "schedule_data" in device_data:
-                schedules = device_data["schedule_data"]
-
-                for schedule in schedules:
-                    schedule_id = schedule.get("id")
-                    if str(schedule_id) == str(self._schedule_id):
-                        result: dict[str, Any] = schedule
-                        return result
-
+            return get_schedule_data(self.device_data, self._schedule_id)
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
-        return None
+            return None
 
     @property
     def available(self) -> bool:
@@ -164,6 +124,54 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
             days = [1, 2, 3, 4, 5, 6, 7]  # All days in mobile-app format.
         days_str = ",".join(map(str, days))
         return f"{time_obj.minute} {time_obj.hour} * * {days_str}"
+
+
+class FluidraScheduleTimeEntity(_FluidraTimeEntityBase):
+    """Base class for Fluidra pump/chlorinator schedule time entities."""
+
+    __slots__ = ("_optimistic_value",)
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        schedule_id: str,
+        time_type: str,
+    ) -> None:
+        """Initialize the time entity."""
+        super().__init__(coordinator, api, pool_id, device_id, schedule_id, time_type)
+        self._optimistic_value: time | None = None
+
+    def _get_schedule_component(self) -> int:
+        """Get the correct schedule component ID for this device."""
+        device_data = self.device_data
+        # Per-device override (e.g. 258 for DM24049704 chlorinator).
+        schedule_comp: int = DeviceIdentifier.get_feature(device_data, "schedule_component")
+        if schedule_comp:
+            return schedule_comp
+        # Default to component 20 (pumps).
+        return 20
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info using device registry for consistent naming."""
+        config = DeviceIdentifier.identify_device(self.device_data)
+        default_model = (
+            DEVICE_MODEL_MAP.get(config.device_type, DEVICE_MODEL_FALLBACK) if config else DEVICE_MODEL_FALLBACK
+        )
+
+        device_name = self.device_data.get("name") or f"Device {self._device_id}"
+        firmware = self.device_data.get("firmware_version_component")
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device_name,
+            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+            model=default_model,
+            sw_version=str(firmware) if firmware is not None else None,
+            via_device=(DOMAIN, self._pool_id),
+        )
 
     def _get_schedule_days(self, schedule: dict[str, Any] | None) -> set[int]:
         """Return the active days for a schedule."""
@@ -246,74 +254,23 @@ class FluidraScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
         return cron_time
 
 
-class FluidraLightScheduleTimeEntity(FluidraPoolControlEntity, TimeEntity):
+class FluidraLightScheduleTimeEntity(_FluidraTimeEntityBase):
     """Base class for LumiPlus Connect light schedule time entities."""
 
-    __slots__ = ("_schedule_id", "_time_type")
+    __slots__ = ()
 
     SCHEDULE_COMPONENT = 40  # LumiPlus light schedules live on component 40.
-
-    def __init__(
-        self,
-        coordinator: FluidraDataUpdateCoordinator,
-        api: FluidraPoolAPI,
-        pool_id: str,
-        device_id: str,
-        schedule_id: str,
-        time_type: str,
-    ) -> None:
-        """Initialize the time entity."""
-        super().__init__(coordinator, api, pool_id, device_id)
-        self._schedule_id = schedule_id
-        self._time_type = time_type
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
         device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-            "name": device_name,
-            "manufacturer": self.device_data.get("manufacturer", "Fluidra"),
-            "model": self.device_data.get("model", "LumiPlus Connect"),
-            "via_device": (DOMAIN, self._pool_id),
-        }
-
-    def _get_schedule_data(self) -> dict[str, Any] | None:
-        """Get schedule data from coordinator."""
-        try:
-            device_data = self.device_data
-            if not device_data:
-                return None
-
-            if "schedule_data" in device_data:
-                schedules = device_data["schedule_data"]
-                for schedule in schedules:
-                    schedule_id = schedule.get("id")
-                    if str(schedule_id) == str(self._schedule_id):
-                        result: dict[str, Any] = schedule
-                        return result
-        except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
-            _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
-        return None
-
-    @property
-    def available(self) -> bool:
-        """Return True if the device/coordinator are healthy and the schedule exists."""
-        return super().available and self._get_schedule_data() is not None
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()
-
-    def _parse_cron_time(self, cron_time: time | int | float | str | None) -> time | None:
-        """Parse cron time format or numeric minutes to time object."""
-        return parse_schedule_time(cron_time)
-
-    def _format_time_to_cron(self, time_obj: time, days: list[int] | None = None) -> str:
-        """Format time object to cron format."""
-        if days is None:
-            days = [1, 2, 3, 4, 5, 6, 7]
-        days_str = ",".join(map(str, days))
-        return f"{time_obj.minute} {time_obj.hour} * * {days_str}"
+        firmware = self.device_data.get("firmware_version_component")
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device_name,
+            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+            model=self.device_data.get("model", "LumiPlus Connect"),
+            sw_version=str(firmware) if firmware is not None else None,
+            via_device=(DOMAIN, self._pool_id),
+        )

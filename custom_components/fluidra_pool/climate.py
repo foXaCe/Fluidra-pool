@@ -20,6 +20,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
 from .const import (
+    CLIMATE_OPTIMISTIC_TIMEOUT,
     DOMAIN,
     LG_MODE_TO_VALUE,
     LG_PRESET_MODES,
@@ -161,7 +162,9 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         # non-step-aligned service call) can't pin the UI to a stale setpoint.
         if self._pending_temperature is not None:
             confirmed = actual_temp is not None and abs(actual_temp - self._pending_temperature) < 0.05
-            expired = self._last_action_time is not None and time.time() - self._last_action_time > 5
+            expired = (
+                self._last_action_time is not None and time.time() - self._last_action_time > CLIMATE_OPTIMISTIC_TIMEOUT
+            )
             if confirmed or expired:
                 self._pending_temperature = None
                 self._last_action_time = None
@@ -239,7 +242,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         # Check for pending optimistic preset mode first
         if self._pending_preset_mode is not None and self._last_preset_action_time is not None:
             # Clear pending mode after 5 seconds
-            if time.time() - self._last_preset_action_time > 5:
+            if time.time() - self._last_preset_action_time > CLIMATE_OPTIMISTIC_TIMEOUT:
                 self._pending_preset_mode = None
                 self._last_preset_action_time = None
             else:
@@ -265,8 +268,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
 
         # Check for pending optimistic HVAC mode first
         if self._pending_hvac_mode is not None and self._last_hvac_action_time is not None:
-            # Clear pending mode after 5 seconds
-            if time.time() - self._last_hvac_action_time > 5:
+            if time.time() - self._last_hvac_action_time > CLIMATE_OPTIMISTIC_TIMEOUT:
                 self._pending_hvac_mode = None
                 self._last_hvac_action_time = None
             else:

@@ -67,6 +67,10 @@ SWITCH_CONFIRMATION_DELAY: Final = 2  # seconds - delay after switch toggle befo
 UI_UPDATE_DELAY: Final = 0.1  # seconds - small delay for UI responsiveness
 PUMP_START_DELAY: Final = 1  # seconds - delay after pump start before setting speed
 OPTIMISTIC_ACTION_TIMEOUT: Final = 10  # seconds - timeout for optimistic local state
+# Heat pumps report back quickly; a short optimistic window avoids masking real state.
+CLIMATE_OPTIMISTIC_TIMEOUT: Final = 5  # seconds
+# tecnoLC2 chlorinator cells can take up to ~2 min to report a mode change back.
+CHLORINATOR_MODE_OPTIMISTIC_TIMEOUT: Final = 120  # seconds
 
 # Fluidra component IDs (discovered via reverse engineering). Only IDs with a
 # single stable meaning get a name — most component IDs mean different things

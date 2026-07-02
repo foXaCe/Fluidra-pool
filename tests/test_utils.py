@@ -6,13 +6,9 @@ import pytest
 
 from custom_components.fluidra_pool.utils import (
     DEFAULT_CRON_ALL_DAYS,
-    build_cron_expression,
     convert_cron_days,
     extract_cron_days,
-    mask_device_id,
-    mask_email,
     normalize_mobile_days,
-    parse_cron_time,
 )
 
 # --- CRON conversion ---
@@ -69,69 +65,3 @@ def test_extract_cron_days_skips_invalid_entries() -> None:
 def test_extract_cron_days_short_cron_returns_default() -> None:
     """A truncated CRON expression (no day field) falls back to all days."""
     assert extract_cron_days("00 08") == {1, 2, 3, 4, 5, 6, 7}
-
-
-# --- parse_cron_time ---
-
-
-@pytest.mark.parametrize(
-    ("cron", "expected"),
-    [
-        ("30 08 * * 1,2", (8, 30)),
-        ("00 00 * * *", (0, 0)),
-        ("59 23 * * 1", (23, 59)),
-    ],
-)
-def test_parse_cron_time_extracts_hours_and_minutes(cron, expected) -> None:
-    """The hour/minute pair is read from the first two CRON fields."""
-    assert parse_cron_time(cron) == expected
-
-
-@pytest.mark.parametrize("invalid", ["", None, "garbage", "30"])
-def test_parse_cron_time_invalid_returns_none(invalid) -> None:
-    """Unparsable inputs return None rather than raising."""
-    assert parse_cron_time(invalid) is None
-
-
-# --- build_cron_expression ---
-
-
-def test_build_cron_expression_pads_hour_and_minute() -> None:
-    """Hour and minute are zero-padded so the format is stable."""
-    assert build_cron_expression(8, 5) == "05 08 * * 1,2,3,4,5,6,7"
-
-
-def test_build_cron_expression_accepts_custom_days() -> None:
-    """A custom day list is forwarded untouched as the day field."""
-    assert build_cron_expression(18, 30, "1,3,5") == "30 18 * * 1,3,5"
-
-
-# --- masking helpers (used in logs / diagnostics) ---
-
-
-@pytest.mark.parametrize(
-    ("email", "expected"),
-    [
-        (None, "***"),
-        ("", "***"),
-        ("ab", "***"),
-        ("foxace@gmail.com", "fox***"),
-    ],
-)
-def test_mask_email_keeps_first_three_chars(email, expected) -> None:
-    """Emails are reduced to a 3-char prefix to avoid leaking PII in logs."""
-    assert mask_email(email) == expected
-
-
-@pytest.mark.parametrize(
-    ("device_id", "expected"),
-    [
-        (None, "***"),
-        ("", "***"),
-        ("ABC", "***"),
-        ("LE24500883", "LE2***883"),
-    ],
-)
-def test_mask_device_id_keeps_first_and_last_chars(device_id, expected) -> None:
-    """Device IDs keep a recognisable prefix+suffix so support tickets stay matchable."""
-    assert mask_device_id(device_id) == expected
