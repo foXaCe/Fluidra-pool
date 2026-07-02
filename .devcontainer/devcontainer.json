@@ -2,7 +2,7 @@
   "name": "Fluidra Pool Development",
   "image": "ghcr.io/home-assistant/devcontainer:latest",
   "forwardPorts": [8123],
-  "postCreateCommand": "pip install -r requirements_dev.txt || true",
+  "postCreateCommand": "pip install -r requirements_test.txt",
   "customizations": {
     "vscode": {
       "extensions": [
