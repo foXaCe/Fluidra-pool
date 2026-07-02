@@ -116,7 +116,9 @@ class DevicesMixin(FluidraAPIBase):
                                 "connection_type": child_connection_type,
                                 "model": child_device_name,
                                 "manufacturer": "Fluidra",
-                                "online": child_connection_type == "connected",
+                                # Connection type is only trustworthy when explicit; anything else
+                                # is unknown (None) so it does not read as offline.
+                                "online": {"connected": True, "disconnected": False}.get(child_connection_type),
                                 "is_running": False,
                                 "auto_mode_enabled": False,
                                 "operation_mode": 0,
@@ -141,7 +143,8 @@ class DevicesMixin(FluidraAPIBase):
                     "connection_type": connection_type,
                     "model": device_name,
                     "manufacturer": "Fluidra",
-                    "online": connection_type == "connected",
+                    # See above: explicit values only, unknown stays None.
+                    "online": {"connected": True, "disconnected": False}.get(connection_type),
                     "is_running": False,
                     "auto_mode_enabled": False,
                     "operation_mode": 0,

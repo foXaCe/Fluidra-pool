@@ -283,7 +283,7 @@ def test_pump_attrs_auto_branch() -> None:
     )
     attrs = select.extra_state_attributes
     assert attrs["auto_mode"] is True
-    assert attrs["control_status"] == "Contrôlé par le mode automatique"
+    assert attrs["control_status"] == "auto"
     assert attrs["manual_control_disabled"] is True
     assert attrs["speed_percent"] == 65
     assert attrs["pump_model"] == "VS3"
@@ -300,7 +300,7 @@ def test_pump_attrs_manual_branch_with_fallback_and_optimistic() -> None:
     select._optimistic_option = "low"
     attrs = select.extra_state_attributes
     assert attrs["auto_mode"] is False
-    assert attrs["control_status"] == "Contrôle manuel disponible"
+    assert attrs["control_status"] == "manual"
     assert attrs["manual_control_disabled"] is False
     assert attrs["using_optimistic"] is True
     assert attrs["optimistic_option"] == "low"

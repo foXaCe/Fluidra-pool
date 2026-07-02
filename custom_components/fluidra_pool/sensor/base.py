@@ -93,8 +93,14 @@ class FluidraPoolSensorEntity(CoordinatorEntity, SensorEntity):
 
     @property
     def available(self) -> bool:
-        """Return if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
+        """Return if entity is available.
+
+        Only an explicit ``online=False`` gates availability — missing
+        connectivity info (first poll, statuses without connectivity) must not
+        read as offline. See FluidraPoolEntity.available.
+        """
+        device_data = self.device_data
+        return self.coordinator.last_update_success and bool(device_data) and device_data.get("online") is not False
 
 
 class FluidraPoolSensorBase(CoordinatorEntity, SensorEntity):

@@ -122,6 +122,7 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
         else:
             self._optimistic_option = None
             self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="chlorinator_mode_set_failed")
 
     @property
     def icon(self) -> str:

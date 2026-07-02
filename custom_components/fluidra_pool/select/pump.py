@@ -176,11 +176,9 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
             "using_optimistic": self._optimistic_option is not None,
         }
 
-        if auto_mode_enabled:
-            attrs["control_status"] = "Contrôlé par le mode automatique"
-            attrs["manual_control_disabled"] = True
-        else:
-            attrs["control_status"] = "Contrôle manuel disponible"
-            attrs["manual_control_disabled"] = False
+        # Stable machine-readable tokens (attribute values are not translatable
+        # in HA; the previous hardcoded French strings broke non-FR setups).
+        attrs["control_status"] = "auto" if auto_mode_enabled else "manual"
+        attrs["manual_control_disabled"] = auto_mode_enabled
 
         return attrs

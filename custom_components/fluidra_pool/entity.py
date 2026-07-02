@@ -80,8 +80,15 @@ class FluidraPoolEntity(CoordinatorEntity):
 
     @property
     def available(self) -> bool:
-        """Return if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
+        """Return if entity is available.
+
+        Unavailable only when the coordinator failed, the device vanished from
+        the data, or the cloud *explicitly* reports it offline. Missing
+        connectivity info (first poll after startup, devices whose status
+        carries no ``connectivity.connected``) must not read as offline.
+        """
+        device_data = self.device_data
+        return self.coordinator.last_update_success and bool(device_data) and device_data.get("online") is not False
 
 
 class FluidraPoolControlEntity(FluidraPoolEntity):

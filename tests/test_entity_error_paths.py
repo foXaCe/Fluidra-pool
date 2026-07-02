@@ -662,10 +662,12 @@ async def test_light_select_unknown_option_is_noop() -> None:
     coordinator.async_request_refresh.assert_not_awaited()
 
 
-async def test_light_select_success_clears_optimistic_and_refreshes() -> None:
+async def test_light_select_success_keeps_optimistic_until_confirmed() -> None:
     entity, coordinator = _light_select()
     await entity.async_select_option("scene_5")
-    assert entity._optimistic_option is None
+    # Confirm-or-expire: the optimistic value survives the write and is only
+    # dropped when the coordinator reports it back (or after the timeout).
+    assert entity._optimistic_option == "scene_5"
     coordinator.async_request_refresh.assert_awaited()
 
 
@@ -699,7 +701,8 @@ async def test_mode_select_api_raises_clears_optimistic() -> None:
 
 async def test_mode_select_returns_false_clears_optimistic() -> None:
     entity, coordinator = _mode_select(control_device_component=AsyncMock(return_value=False))
-    await entity.async_select_option("auto")
+    with pytest.raises(HomeAssistantError):
+        await entity.async_select_option("auto")
     assert entity._optimistic_option is None
     coordinator.async_request_refresh.assert_not_awaited()
 

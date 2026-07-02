@@ -198,16 +198,25 @@ async def test_discover_devices_bridged_non_pump_child_not_variable_speed() -> N
     assert devices[0]["variable_speed"] is False
 
 
-async def test_discover_devices_marks_offline_when_connection_type_not_connected() -> None:
-    """A `type` other than "connected" results in online=False."""
+async def test_discover_devices_online_tristate_from_connection_type() -> None:
+    """Only explicit connected/disconnected map to True/False; anything else is unknown (None)."""
     api = _FakeAPI()
     api._request.return_value = (
         200,
-        [{"id": "DEV-OFF", "info": {"name": "Pump", "family": "pump"}, "type": "offline"}],
+        [
+            {"id": "DEV-ON", "info": {"name": "Pump", "family": "pump"}, "type": "connected"},
+            {"id": "DEV-OFF", "info": {"name": "Pump", "family": "pump"}, "type": "disconnected"},
+            {"id": "DEV-UNK", "info": {"name": "Pump", "family": "pump"}, "type": "offline"},
+            {"id": "DEV-NONE", "info": {"name": "Pump", "family": "pump"}},
+        ],
         "[]",
     )
     devices = await api._discover_devices_for_pool("pool_1", {})
-    assert devices[0]["online"] is False
+    by_id = {d["device_id"]: d for d in devices}
+    assert by_id["DEV-ON"]["online"] is True
+    assert by_id["DEV-OFF"]["online"] is False
+    assert by_id["DEV-UNK"]["online"] is None
+    assert by_id["DEV-NONE"]["online"] is None
 
 
 # --- issue #69: de-duplicate offline/connected duplicate entries ---------

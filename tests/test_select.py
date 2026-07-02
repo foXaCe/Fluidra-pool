@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -9,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
+from custom_components.fluidra_pool.const import OPTIMISTIC_ACTION_TIMEOUT
 from custom_components.fluidra_pool.select import (
     FluidraChlorinatorModeSelect,
     FluidraLightEffectSelect,
@@ -191,10 +193,11 @@ async def test_chlor_mode_async_select_writes_value_to_mode_component() -> None:
 
 
 async def test_chlor_mode_async_select_on_failure_clears_optimistic() -> None:
-    """If the API rejects the write, the optimistic option is rolled back."""
+    """If the API rejects the write, the optimistic option is rolled back and the error surfaces."""
     select = _chlor_mode()
     select._api.control_device_component = AsyncMock(return_value=False)
-    await select.async_select_option("on")
+    with pytest.raises(HomeAssistantError):
+        await select.async_select_option("on")
     assert select._optimistic_option is None
 
 
@@ -261,10 +264,32 @@ async def test_light_effect_async_select_raises_on_api_rejection() -> None:
 
 
 def test_light_effect_optimistic_option_takes_precedence() -> None:
-    """A pending optimistic option overrides the reported component value."""
+    """A pending, unexpired optimistic option overrides the reported component value."""
     select = _light_effect(0)  # device reports static_color
     select._optimistic_option = "scene_7"
+    select._optimistic_time = time.time()
     assert select.current_option == "scene_7"
+
+
+def test_light_effect_optimistic_option_expires() -> None:
+    """An expired optimistic option falls back to the reported value."""
+    select = _light_effect(0)
+    select._optimistic_option = "scene_7"
+    select._optimistic_time = time.time() - (OPTIMISTIC_ACTION_TIMEOUT + 5)
+    assert select.current_option == "static_color"
+
+
+def test_light_effect_coordinator_update_confirms_optimistic() -> None:
+    """The optimistic option is dropped once the backend reports it."""
+    select = _light_effect(7)  # device now reports scene_7
+    select._optimistic_option = "scene_7"
+    select._optimistic_time = time.time()
+    with patch(
+        "homeassistant.helpers.update_coordinator.CoordinatorEntity._handle_coordinator_update",
+        lambda self: None,
+    ):
+        select._handle_coordinator_update()
+    assert select._optimistic_option is None
 
 
 def test_light_effect_uncoercible_value_falls_back_to_static_color() -> None:
