@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.45.0] - 2026-07-02
+
 ### Added
 - **`connection_error` repair issue is now actually raised** — after 3 consecutive failed poll cycles (including "every pool failed to refresh" outages where entities keep their previous data), and cleared automatically on the next successful cycle. The repairs feature was previously dead code.
 - **Firmware version on device pages** — `DeviceInfo.sw_version` is populated from the reported firmware and mirrored into the device registry after each successful refresh.
