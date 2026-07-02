@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [2.45.1] - 2026-07-02
+
+### Fixed
 - **Ducere 21 chlorinator `LC24008202`** (Issue #125, @onslope) — the unit fell back to the generic profile, which read the water temperature (c172) as pH. Dedicated tecnoLC2 profile (mapping supplied and validated by the reporter): pH (c165), ORP (c170), temperature (c172), salinity (c174), free chlorine (c178, probe-dependent), pH/ORP setpoints (c16/c20), boost (c103) and the cell-production register (c154) feeding the *producing* binary sensor.
 
 ## [2.45.0] - 2026-07-02
