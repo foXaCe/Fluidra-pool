@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DEVICE_MODEL_FALLBACK, DEVICE_MODEL_MAP, DOMAIN
 
 if TYPE_CHECKING:
     from .coordinator import FluidraDataUpdateCoordinator
@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 
 class FluidraPoolEntity(CoordinatorEntity):
     """Base class for all Fluidra Pool entities (read-only)."""
-
-    __slots__ = ("_device_id", "_pool_id")
 
     _attr_has_entity_name = True
 
@@ -65,36 +63,36 @@ class FluidraPoolEntity(CoordinatorEntity):
 
         # Use device registry to determine model type
         if config:
-            model_map = {
-                "chlorinator": "Chlorinator",
-                "pump": "Pump",
-                "heat_pump": "Heat Pump",
-                "light": "Light",
-                "heater": "Heater",
-            }
-            default_model = model_map.get(config.device_type, "Pool Equipment")
+            default_model = DEVICE_MODEL_MAP.get(config.device_type, DEVICE_MODEL_FALLBACK)
         else:
-            default_model = "Pool Equipment"
+            default_model = DEVICE_MODEL_FALLBACK
 
         device_name = device_data.get("name", f"Device {self._device_id}")
+        firmware = device_data.get("firmware_version_component")
         return DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
             name=device_name,
             manufacturer=device_data.get("manufacturer", "Fluidra"),
             model=default_model,
+            sw_version=str(firmware) if firmware is not None else None,
             via_device=(DOMAIN, self._pool_id),
         )
 
     @property
     def available(self) -> bool:
-        """Return if entity is available."""
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
+        """Return if entity is available.
+
+        Unavailable only when the coordinator failed, the device vanished from
+        the data, or the cloud *explicitly* reports it offline. Missing
+        connectivity info (first poll after startup, devices whose status
+        carries no ``connectivity.connected``) must not read as offline.
+        """
+        device_data = self.device_data
+        return self.coordinator.last_update_success and bool(device_data) and device_data.get("online") is not False
 
 
 class FluidraPoolControlEntity(FluidraPoolEntity):
     """Base class for Fluidra Pool entities that control devices."""
-
-    __slots__ = ("_api",)
 
     def __init__(
         self,

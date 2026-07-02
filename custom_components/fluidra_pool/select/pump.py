@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.select import SelectEntity
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from ..api_resilience import FluidraError
 from ..const import (
@@ -64,23 +64,21 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
 
         self._percent_to_option = {0: "stopped", 45: "low", 65: "medium", 100: "high"}
 
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available (and not auto-mode-controlled)."""
+    def _auto_mode_enabled(self) -> bool:
+        """Return True when the schedule-driven auto mode drives the pump."""
         auto_reported = self.device_data.get("auto_reported")
         if auto_reported is not None:
-            auto_mode_enabled = bool(auto_reported)
-        else:
-            auto_mode_enabled = self.device_data.get("auto_mode_enabled", False)
-
-        if auto_mode_enabled:
-            return False
-
-        return self.coordinator.last_update_success and self.device_data.get("online", False)
+            return bool(auto_reported)
+        return bool(self.device_data.get("auto_mode_enabled", False))
 
     @property
     def current_option(self) -> str | None:
-        """Return the current speed option."""
+        """Return the current speed option.
+
+        The entity stays available in auto mode: the state is perfectly
+        readable (the coordinator even derives the scheduled speed), only
+        *manual writes* are rejected — see :meth:`async_select_option`.
+        """
         if self._optimistic_option is not None:
             return self._optimistic_option
 
@@ -88,6 +86,14 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
 
         if not is_running:
             return "stopped"
+
+        if self._auto_mode_enabled():
+            # In auto mode the effective speed comes from the schedule
+            # calculation (speed_level_reported can be stale).
+            current_percent = self.device_data.get("speed_percent", 0)
+            if current_percent == 0:
+                return "stopped"
+            return self._percent_to_option.get(current_percent, "low")
 
         speed_level = self.device_data.get("speed_level_reported")
         if speed_level is not None:
@@ -106,6 +112,13 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
         if option not in self._speed_mapping:
             return
 
+        if self._auto_mode_enabled():
+            # Readable but not manually writable while schedules drive the pump.
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="pump_in_auto_mode",
+            )
+
         speed_config = self._speed_mapping[option]
         component = speed_config["component"]
         value = speed_config["value"]
@@ -123,48 +136,34 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
                     with contextlib.suppress(FluidraError, aiohttp.ClientError, TimeoutError):
                         await self._api.control_device_component(self._device_id, COMPONENT_PUMP_SPEED, -1)
             else:
-                await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 1)
-                success = await self._api.control_device_component(self._device_id, component, value)
+                success = await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 1)
+                if success:
+                    success = await self._api.control_device_component(self._device_id, component, value)
 
             if success:
                 await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
                 await self.coordinator.async_request_refresh()
 
         except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            self._optimistic_option = None
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="pump_speed_set_failed") from err
         finally:
             self._optimistic_option = None
             self.async_write_ha_state()
 
+        if not success:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="pump_speed_set_failed")
+
     @property
     def icon(self) -> str:
         """Return the icon for the entity."""
-        auto_reported = self.device_data.get("auto_reported")
-        if auto_reported is not None:
-            auto_mode_enabled = bool(auto_reported)
-        else:
-            auto_mode_enabled = self.device_data.get("auto_mode_enabled", False)
-
-        if auto_mode_enabled:
-            return "mdi:autorenew"
-
-        current_option = self.current_option
-        if current_option == "stopped":
-            return "mdi:pump"
-        if current_option in {"low", "medium"}:
-            return "mdi:pump"
-        return "mdi:pump"
+        return "mdi:autorenew" if self._auto_mode_enabled() else "mdi:pump"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
         current_percent = self.device_data.get("speed_percent", 0)
-
-        auto_reported = self.device_data.get("auto_reported")
-        if auto_reported is not None:
-            auto_mode_enabled = bool(auto_reported)
-        else:
-            auto_mode_enabled = self.device_data.get("auto_mode_enabled", False)
+        auto_mode_enabled = self._auto_mode_enabled()
 
         attrs = {
             "speed_percent": current_percent,
@@ -177,11 +176,9 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
             "using_optimistic": self._optimistic_option is not None,
         }
 
-        if auto_mode_enabled:
-            attrs["control_status"] = "Contrôlé par le mode automatique"
-            attrs["manual_control_disabled"] = True
-        else:
-            attrs["control_status"] = "Contrôle manuel disponible"
-            attrs["manual_control_disabled"] = False
+        # Stable machine-readable tokens (attribute values are not translatable
+        # in HA; the previous hardcoded French strings broke non-FR setups).
+        attrs["control_status"] = "auto" if auto_mode_enabled else "manual"
+        attrs["manual_control_disabled"] = auto_mode_enabled
 
         return attrs

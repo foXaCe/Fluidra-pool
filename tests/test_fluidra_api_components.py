@@ -75,13 +75,6 @@ async def test_get_component_state_url_encodes_device_id() -> None:
     assert "/components/165" in called_url
 
 
-async def test_get_device_component_state_is_an_alias() -> None:
-    """The legacy alias forwards to get_component_state."""
-    api = _FakeAPI()
-    api._request.return_value = (200, {"foo": "bar"}, "{}")
-    assert await api.get_device_component_state("DEV-1", 5) == {"foo": "bar"}
-
-
 # --- control_device_component -------------------------------------------
 
 

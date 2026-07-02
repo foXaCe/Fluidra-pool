@@ -41,6 +41,10 @@
           "email": "E-mail",
           "password": "Senha"
         },
+        "data_description": {
+          "email": "O endereço de e-mail da sua conta Fluidra Pool (iAquaLink).",
+          "password": "A palavra-passe da sua conta Fluidra Pool."
+        },
         "description": "Insira suas credenciais Fluidra Pool",
         "title": "Configuração Fluidra Pool"
       }
@@ -279,6 +283,9 @@
     "auth_failed": {
       "message": "Falha na autenticação, por favor re-autentique-se"
     },
+    "auto_mode_set_failed": {
+      "message": "Falha ao alterar o modo automático"
+    },
     "boost_set_failed": {
       "message": "Falha ao ativar o modo boost"
     },
@@ -333,6 +340,12 @@
     "preset_schedule_set_rejected": {
       "message": "A API Fluidra rejeitou a atualização da predefinição para {device_id}"
     },
+    "pump_in_auto_mode": {
+      "message": "O nível de velocidade não pode ser alterado enquanto o modo automático estiver ativo. Desative primeiro o modo automático."
+    },
+    "pump_set_failed": {
+      "message": "Falha ao controlar a bomba"
+    },
     "pump_speed_set_failed": {
       "message": "Falha ao definir a velocidade da bomba"
     },
@@ -365,14 +378,6 @@
     "connection_error": {
       "description": "Não foi possível conectar ao serviço Fluidra Pool",
       "title": "Erro de conexão"
-    },
-    "firmware_update_available": {
-      "description": "O dispositivo {device} tem a versão de firmware {version} disponível",
-      "title": "Atualização de firmware disponível"
-    },
-    "offline_device": {
-      "description": "O dispositivo {device} está offline",
-      "title": "Dispositivo offline"
     }
   },
   "options": {
@@ -380,6 +385,9 @@
       "init": {
         "data": {
           "scan_interval": "Intervalo de atualização (segundos)"
+        },
+        "data_description": {
+          "scan_interval": "Frequência com que o Home Assistant consulta a nuvem Fluidra. Um valor mais baixo fornece dados mais recentes mas gera mais pedidos."
         },
         "description": "Configurar opções avançadas",
         "title": "Opções Fluidra Pool"

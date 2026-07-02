@@ -41,6 +41,10 @@
           "email": "Adresse e-mail",
           "password": "Mot de passe"
         },
+        "data_description": {
+          "email": "L'adresse e-mail de votre compte Fluidra Pool (iAquaLink).",
+          "password": "Le mot de passe de votre compte Fluidra Pool."
+        },
         "description": "Saisissez vos identifiants Fluidra Pool",
         "title": "Configuration Fluidra Pool"
       }
@@ -279,6 +283,9 @@
     "auth_failed": {
       "message": "Échec d'authentification, veuillez vous ré-authentifier"
     },
+    "auto_mode_set_failed": {
+      "message": "Échec du changement du mode automatique"
+    },
     "boost_set_failed": {
       "message": "Échec de l'activation du mode boost"
     },
@@ -333,6 +340,12 @@
     "preset_schedule_set_rejected": {
       "message": "L'API Fluidra a refusé la mise à jour du programme prédéfini pour {device_id}"
     },
+    "pump_in_auto_mode": {
+      "message": "Le niveau de vitesse ne peut pas être modifié tant que le mode automatique est actif. Désactivez d'abord le mode automatique."
+    },
+    "pump_set_failed": {
+      "message": "Échec du contrôle de la pompe"
+    },
     "pump_speed_set_failed": {
       "message": "Échec du réglage de la vitesse de la pompe"
     },
@@ -365,14 +378,6 @@
     "connection_error": {
       "description": "Impossible de se connecter au service Fluidra Pool",
       "title": "Erreur de connexion"
-    },
-    "firmware_update_available": {
-      "description": "L'équipement {device} a la version firmware {version} disponible",
-      "title": "Mise à jour firmware disponible"
-    },
-    "offline_device": {
-      "description": "L'équipement {device} est hors ligne",
-      "title": "Équipement hors ligne"
     }
   },
   "options": {
@@ -380,6 +385,9 @@
       "init": {
         "data": {
           "scan_interval": "Intervalle de mise à jour (secondes)"
+        },
+        "data_description": {
+          "scan_interval": "Fréquence d'interrogation du cloud Fluidra par Home Assistant. Une valeur plus basse donne des données plus fraîches mais génère davantage de requêtes."
         },
         "description": "Configurer les options avancées",
         "title": "Options Fluidra Pool"

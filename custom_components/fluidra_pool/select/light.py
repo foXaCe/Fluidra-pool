@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.select import SelectEntity
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
-from ..const import COMMAND_CONFIRMATION_DELAY, DOMAIN, UI_UPDATE_DELAY
+from ..const import DOMAIN, OPTIMISTIC_ACTION_TIMEOUT, UI_UPDATE_DELAY
 from ..entity import FluidraPoolControlEntity
 
 if TYPE_CHECKING:
@@ -26,8 +28,6 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
 
     EFFECT_COMPONENT = 18
 
-    __slots__ = ("_effect_mapping", "_optimistic_option", "_value_to_effect")
-
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
@@ -38,6 +38,7 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
         """Initialize the light effect select."""
         super().__init__(coordinator, api, pool_id, device_id)
         self._optimistic_option: str | None = None
+        self._optimistic_time: float = 0.0
 
         self._attr_unique_id = f"fluidra_{self._device_id}_effect"
         self._attr_translation_key = "light_effect"
@@ -79,12 +80,8 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
             8: "scene_8",
         }
 
-    @property
-    def current_option(self) -> str | None:
-        """Return the current effect option."""
-        if self._optimistic_option is not None:
-            return self._optimistic_option
-
+    def _get_reported_effect(self) -> str:
+        """Read the effect option from coordinator component data."""
         components = self.device_data.get("components", {})
         component_data = components.get(str(self.EFFECT_COMPONENT), {})
         effect_value = component_data.get("reportedValue", component_data.get("desiredValue", 0))
@@ -98,6 +95,30 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
 
         return self._value_to_effect.get(effect_value, "static_color")
 
+    def _optimistic_expired(self) -> bool:
+        """Return True once the optimistic value has outlived its timeout."""
+        return time.time() - self._optimistic_time > OPTIMISTIC_ACTION_TIMEOUT
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current effect option (optimistic until the API confirms).
+
+        Pure getter: the optimistic value is dropped in
+        ``_handle_coordinator_update`` (or once it expires), never here.
+        """
+        if self._optimistic_option is not None and not self._optimistic_expired():
+            return self._optimistic_option
+        return self._get_reported_effect()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Drop the optimistic value once the backend confirms it (or it expires)."""
+        if self._optimistic_option is not None and (
+            self._get_reported_effect() == self._optimistic_option or self._optimistic_expired()
+        ):
+            self._optimistic_option = None
+        super()._handle_coordinator_update()
+
     async def async_select_option(self, option: str) -> None:
         """Select new effect option."""
         if option not in self._effect_mapping:
@@ -105,45 +126,32 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
 
         effect_value = self._effect_mapping[option]
 
+        self._optimistic_option = option
+        self._optimistic_time = time.time()
+        self.async_write_ha_state()
+
+        await asyncio.sleep(UI_UPDATE_DELAY)
+
+        _LOGGER.debug(
+            "Setting light effect for %s: component %s = %s",
+            self._device_id,
+            self.EFFECT_COMPONENT,
+            effect_value,
+        )
+
         try:
-            self._optimistic_option = option
-            self.async_write_ha_state()
-
-            await asyncio.sleep(UI_UPDATE_DELAY)
-
-            _LOGGER.debug(
-                "Setting light effect for %s: component %s = %s",
-                self._device_id,
-                self.EFFECT_COMPONENT,
-                effect_value,
-            )
-
             success = await self._api.control_device_component(self._device_id, self.EFFECT_COMPONENT, effect_value)
-
-            _LOGGER.debug("Light effect API call result: %s", success)
-
-            if not success:
-                # Surface a rejected command instead of silently reverting, matching
-                # the LumiPlus light entity which raises light_set_failed on failure.
-                raise HomeAssistantError(translation_domain=DOMAIN, translation_key="light_set_failed")
-
-            await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
-            await self.coordinator.async_request_refresh()
-
-        except (
-            aiohttp.ClientError,
-            TimeoutError,
-            FluidraError,
-            ValueError,
-            TypeError,
-            KeyError,
-            AttributeError,
-        ) as err:
-            _LOGGER.error("Failed to set light effect: %s", err)
-            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="light_set_failed") from err
-        finally:
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
             self._optimistic_option = None
             self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="light_set_failed") from err
+
+        if not success:
+            self._optimistic_option = None
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="light_set_failed")
+
+        await self.coordinator.async_request_refresh()
 
     @property
     def icon(self) -> str:

@@ -39,7 +39,6 @@ from custom_components.fluidra_pool.const import (
     Z550_MODE_AUTO,
     Z550_MODE_COOLING,
     Z550_MODE_HEATING,
-    Z550_PRESET_BOOST,
     Z550_STATE_COOLING,
     Z550_STATE_HEATING,
     Z550_STATE_IDLE,
@@ -279,17 +278,17 @@ def test_preset_mode_none_when_unsupported() -> None:
 
 def test_preset_mode_pending_optimistic_within_window() -> None:
     climate = _make(_pin(features={"z550_mode": True}, z550_preset_reported=0))
-    climate._pending_preset_mode = Z550_PRESET_BOOST
+    climate._pending_preset_mode = "boost"
     with patch(TIME_MOD) as mock_time:
         # action time = 1000, now = 1003 (< 5s) -> keep optimistic
         climate._last_preset_action_time = 1000.0
         mock_time.time.return_value = 1003.0
-        assert climate.preset_mode == Z550_PRESET_BOOST
+        assert climate.preset_mode == "boost"
 
 
 def test_preset_mode_pending_optimistic_expires() -> None:
     climate = _make(_pin(features={"z550_mode": True}, z550_preset_reported=0))
-    climate._pending_preset_mode = Z550_PRESET_BOOST
+    climate._pending_preset_mode = "boost"
     with patch(TIME_MOD) as mock_time:
         climate._last_preset_action_time = 1000.0
         mock_time.time.return_value = 1010.0  # > 5s -> expire, fall through
@@ -753,7 +752,7 @@ async def test_set_preset_mode_z550_noop() -> None:
     # Z550iQ+ has no controllable preset — set_preset_mode must not write (Issue #88).
     api = _api()
     climate = _make(_pin(features={"z550_mode": True}), api)
-    await climate.async_set_preset_mode(Z550_PRESET_BOOST)
+    await climate.async_set_preset_mode("boost")
     api.control_device_component.assert_not_called()
     assert climate._pending_preset_mode is None
 

@@ -15,7 +15,6 @@ from custom_components.fluidra_pool.api_resilience import (
     FluidraCircuitBreakerError,
     FluidraConnectionError,
     FluidraError,
-    FluidraRateLimitError,
     RateLimiter,
 )
 
@@ -39,17 +38,13 @@ class TestExceptionHierarchy:
         err = FluidraConnectionError("timeout")
         assert isinstance(err, FluidraError)
 
-    def test_rate_limit_error_inherits_from_base(self):
-        err = FluidraRateLimitError("too many requests")
-        assert isinstance(err, FluidraError)
-
     def test_circuit_breaker_error_inherits_from_base(self):
         err = FluidraCircuitBreakerError("circuit open")
         assert isinstance(err, FluidraError)
 
     def test_catch_all_fluidra_errors(self):
         """All specific errors can be caught with FluidraError."""
-        for exc_class in (FluidraAuthError, FluidraConnectionError, FluidraRateLimitError, FluidraCircuitBreakerError):
+        for exc_class in (FluidraAuthError, FluidraConnectionError, FluidraCircuitBreakerError):
             with pytest.raises(FluidraError):
                 raise exc_class("test")
 

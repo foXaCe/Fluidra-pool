@@ -10,12 +10,12 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, UnitOfElectricPotential, UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ..const import DOMAIN
 from ..device_registry import DeviceIdentifier
+from ..entity import FluidraPoolEntity
 
 if TYPE_CHECKING:
     from ..coordinator import FluidraDataUpdateCoordinator
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
+class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
     """Sensor for chlorinator measurements (pH, ORP, chlorine, temperature, salinity)."""
 
     _attr_has_entity_name = True
@@ -39,10 +39,8 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
         component_id: int,
     ) -> None:
         """Initialize the chlorinator sensor."""
-        super().__init__(coordinator)
+        super().__init__(coordinator, pool_id, device_id)
         self._api = api
-        self._pool_id = pool_id
-        self._device_id = device_id
         self._sensor_type = sensor_type
         self._component_id = component_id
 
@@ -58,7 +56,7 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
             },
             "orp": {
                 "translation_key": "chlorinator_orp",
-                "unit": "mV",
+                "unit": UnitOfElectricPotential.MILLIVOLT,
                 "device_class": SensorDeviceClass.VOLTAGE,
                 "state_class": SensorStateClass.MEASUREMENT,
                 "icon": "mdi:lightning-bolt",
@@ -112,27 +110,16 @@ class FluidraChlorinatorSensor(CoordinatorEntity, SensorEntity):
             self._divisor = custom_divisors[sensor_type]
 
     @property
-    def device_data(self) -> dict[str, Any]:
-        """Get device data from coordinator."""
-        if self.coordinator.data is None:
-            return {}
-        pool: dict[str, Any] | None = self.coordinator.data.get(self._pool_id)
-        if pool:
-            devices: list[dict[str, Any]] = pool.get("devices", [])
-            for device in devices:
-                if device.get("device_id") == self._device_id:
-                    return device
-        return {}
-
-    @property
     def device_info(self) -> DeviceInfo:
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        firmware = self.device_data.get("firmware_version_component")
         return DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
             name=device_name,
             manufacturer=self.device_data.get("manufacturer", "Fluidra"),
             model="Chlorinator",
+            sw_version=str(firmware) if firmware is not None else None,
             via_device=(DOMAIN, self._pool_id),
         )
 

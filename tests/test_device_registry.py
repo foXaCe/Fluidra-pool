@@ -584,7 +584,6 @@ class TestIdentifyDevice:
         assert config.features.get("chlorination_level") == 38
         # boost_mode removed - API returns 403 + unreadable for EXO
         assert config.features.get("boost_mode") is None
-        assert config.features.get("mode_control") is True
         assert config.features.get("mode_component") == 13
         assert config.features.get("schedules") is True
         assert config.features.get("orp_setpoint") == 39

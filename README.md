@@ -1,6 +1,6 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Quality Scale](https://img.shields.io/badge/Quality_Scale-Silver-silver.svg)](https://developers.home-assistant.io/docs/core/integration-quality-scale/)
+[![Quality Scale](https://img.shields.io/badge/Quality_Scale-Platinum-27ae60.svg)](https://developers.home-assistant.io/docs/core/integration-quality-scale/)
 [![GitHub release](https://img.shields.io/github/v/release/foXaCe/Fluidra-pool?sort=semver)](https://github.com/foXaCe/Fluidra-pool/releases)
 [![Donate](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/paypalme/foXaCe66)
 
@@ -74,6 +74,7 @@ profile, so unknown equipment is usually still usable.
 - **Z250iQ / Z25iQ** — on/off, target temperature, current temperature
 - **Z260iQ** — HVAC modes (heat / cool / heat-cool), presets, no-flow alarm, water/air temperatures
 - **Z550iQ+** — HVAC modes (heat / cool / auto), presets, HVAC action (heating/cooling/idle/no-flow), water/air temperatures
+- **Gre HPGIC** — on/off, target temperature, water temperature
 - Generic heat-pump fallback
 
 ### 🧂 Salt Chlorinators / Electrolysers
@@ -87,7 +88,7 @@ profile, so unknown equipment is usually still usable.
   salinity, water temperature)
 
 ### 🧪 Water Analysers
-- **Zodiac Blue Connect Silver** (`WA*`, BC3) — pH, ORP and water-temperature sensors (read-only)
+- **Zodiac Blue Connect Silver / Gold** (`WA*`, BC3) — pH, ORP and water-temperature sensors (read-only)
 
 ### 💡 Pool Lighting
 - **LumiPlus Connect** (RGBW) — on/off, brightness (0–100%), RGBW colour + white channel,

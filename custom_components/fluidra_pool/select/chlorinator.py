@@ -13,7 +13,7 @@ from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
-from ..const import DOMAIN, UI_UPDATE_DELAY
+from ..const import CHLORINATOR_MODE_OPTIMISTIC_TIMEOUT, DOMAIN, UI_UPDATE_DELAY
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolControlEntity
 
@@ -30,7 +30,6 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
     __slots__ = ("_mode_mapping", "_optimistic_option", "_optimistic_time", "_value_to_mode")
 
     # Keep optimistic value until API confirms (or this many seconds pass).
-    OPTIMISTIC_TIMEOUT = 120
 
     def __init__(
         self,
@@ -75,7 +74,7 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
 
     def _optimistic_expired(self) -> bool:
         """Return True once the optimistic value has outlived its timeout."""
-        return time.time() - self._optimistic_time > self.OPTIMISTIC_TIMEOUT
+        return time.time() - self._optimistic_time > CHLORINATOR_MODE_OPTIMISTIC_TIMEOUT
 
     @property
     def current_option(self) -> str | None:
@@ -123,6 +122,7 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
         else:
             self._optimistic_option = None
             self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="chlorinator_mode_set_failed")
 
     @property
     def icon(self) -> str:

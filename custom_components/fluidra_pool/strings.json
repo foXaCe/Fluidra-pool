@@ -1,37 +1,9 @@
 {
   "config": {
-    "step": {
-      "user": {
-        "title": "Fluidra Pool Configuration",
-        "description": "Enter your Fluidra Pool credentials",
-        "data": {
-          "email": "Email",
-          "password": "Password"
-        }
-      },
-      "reauth_confirm": {
-        "title": "Re-authenticate",
-        "description": "Session expired for {email}. Please re-enter your credentials.",
-        "data": {
-          "email": "Email",
-          "password": "Password"
-        }
-      },
-      "reconfigure": {
-        "title": "Reconfigure Fluidra Pool",
-        "description": "Update credentials for {email}",
-        "data": {
-          "email": "Email",
-          "password": "Password"
-        }
-      },
-      "mfa": {
-        "title": "Two-Factor Authentication",
-        "description": "Your account requires a verification code. Enter the code from your authenticator app or SMS.",
-        "data": {
-          "mfa_code": "Verification code"
-        }
-      }
+    "abort": {
+      "already_configured": "This account is already configured",
+      "reauth_successful": "Re-authentication successful",
+      "reconfigure_successful": "Configuration updated successfully"
     },
     "error": {
       "cannot_connect": "Unable to connect to Fluidra API",
@@ -40,20 +12,41 @@
       "no_pools": "No pools found. Make sure your equipment is configured in the Fluidra Pool app",
       "unknown": "Unexpected error"
     },
-    "abort": {
-      "already_configured": "This account is already configured",
-      "reauth_successful": "Re-authentication successful",
-      "reconfigure_successful": "Configuration updated successfully"
-    }
-  },
-  "options": {
     "step": {
-      "init": {
-        "title": "Fluidra Pool Options",
-        "description": "Configure advanced options",
+      "mfa": {
         "data": {
-          "scan_interval": "Update interval (seconds)"
-        }
+          "mfa_code": "Verification code"
+        },
+        "description": "Your account requires a verification code. Enter the code from your authenticator app or SMS.",
+        "title": "Two-Factor Authentication"
+      },
+      "reauth_confirm": {
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        },
+        "description": "Session expired for {email}. Please re-enter your credentials.",
+        "title": "Re-authenticate"
+      },
+      "reconfigure": {
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        },
+        "description": "Update credentials for {email}",
+        "title": "Reconfigure Fluidra Pool"
+      },
+      "user": {
+        "data": {
+          "email": "Email",
+          "password": "Password"
+        },
+        "data_description": {
+          "email": "The email address of your Fluidra Pool (iAquaLink) account.",
+          "password": "The password of your Fluidra Pool account."
+        },
+        "description": "Enter your Fluidra Pool credentials",
+        "title": "Fluidra Pool Configuration"
       }
     }
   },
@@ -63,133 +56,22 @@
         "name": "Producing"
       }
     },
-    "sensor": {
-      "schedule_count": {
-        "name": "Active Schedules"
-      },
-      "running_hours": {
-        "name": "Running Hours"
-      },
-      "current_temperature": {
-        "name": "Current Temperature"
-      },
-      "target_temperature": {
-        "name": "Target Temperature"
-      },
-      "water_temperature": {
-        "name": "Water Temperature"
-      },
-      "air_temperature": {
-        "name": "Air Temperature"
-      },
-      "brightness": {
-        "name": "Brightness"
-      },
-      "speed_mode": {
-        "name": "Speed",
-        "state": {
-          "stopped": "Stopped",
-          "not_running": "Not Running",
-          "low": "Low",
-          "medium": "Medium",
-          "high": "High"
-        }
-      },
-      "weather_temperature": {
-        "name": "Weather Temperature"
-      },
-      "device_info": {
-        "name": "Device Information",
-        "state": {
-          "online": "Online",
-          "signal_excellent": "Signal Excellent",
-          "signal_very_good": "Signal Very Good",
-          "signal_good": "Signal Good",
-          "signal_low": "Signal Low",
-          "signal_very_low": "Signal Very Low",
-          "error": "Error"
-        }
-      },
-      "pool_status": {
-        "name": "Pool Status",
-        "state": {
-          "using": "Active",
-          "maintenance": "Maintenance",
-          "offline": "Offline",
-          "winterized": "Winterized",
-          "connected": "Connected",
-          "unknown_state": "Unknown"
-        }
-      },
-      "pool_location": {
-        "name": "Pool Location"
-      },
-      "water_quality": {
-        "name": "Water Quality",
-        "state": {
-          "auto": "Automatic",
-          "manual": "Manual",
-          "not_configured": "Not Configured"
-        }
-      },
-      "chlorinator_ph": {
-        "name": "pH"
-      },
-      "chlorinator_orp": {
-        "name": "ORP"
-      },
-      "chlorinator_free_chlorine": {
-        "name": "Free Chlorine"
-      },
-      "chlorinator_water_temperature": {
-        "name": "Water Temperature"
-      },
-      "chlorinator_salinity": {
-        "name": "Salinity"
-      },
-      "chlorinator_chlorination_actual": {
-        "name": "Chlorination Actual"
-      }
-    },
-    "switch": {
-      "pump": {
-        "name": "Pump"
-      },
-      "auto_mode": {
-        "name": "Auto Mode"
-      },
-      "heat_pump": {
-        "name": "Heat Pump"
-      },
-      "heater": {
-        "name": "Heater"
-      },
-      "schedule_enable": {
-        "name": "Schedule {schedule_id}"
-      },
-      "chlorinator": {
-        "name": "Chlorinator"
-      },
-      "boost_mode": {
-        "name": "Boost Mode"
-      }
-    },
     "climate": {
       "heat_pump": {
         "name": "Heat Pump",
         "state_attributes": {
           "preset_mode": {
             "state": {
-              "silence": "Silence",
-              "smart": "Smart",
               "boost": "Boost",
-              "smart_heating": "Smart Heating",
+              "boost_cooling": "Boost Cooling",
+              "boost_heating": "Boost Heating",
+              "silence": "Silence",
+              "silence_cooling": "Silence Cooling",
+              "silence_heating": "Silence Heating",
+              "smart": "Smart",
               "smart_cooling": "Smart Cooling",
               "smart_heat_cool": "Smart Heat/Cool",
-              "boost_heating": "Boost Heating",
-              "silence_heating": "Silence Heating",
-              "boost_cooling": "Boost Cooling",
-              "silence_cooling": "Silence Cooling"
+              "smart_heating": "Smart Heating"
             }
           }
         }
@@ -204,54 +86,31 @@
       "chlorination_level": {
         "name": "Chlorination Level"
       },
-      "ph_setpoint": {
-        "name": "pH Setpoint"
+      "effect_speed": {
+        "name": "Effect Speed"
       },
       "orp_setpoint": {
         "name": "ORP Setpoint"
       },
-      "effect_speed": {
-        "name": "Effect Speed"
-      }
-    },
-    "time": {
-      "schedule_start": {
-        "name": "Schedule {schedule_id} Start"
-      },
-      "schedule_end": {
-        "name": "Schedule {schedule_id} End"
-      },
-      "light_schedule_start": {
-        "name": "Light Schedule {schedule_id} Start"
-      },
-      "light_schedule_end": {
-        "name": "Light Schedule {schedule_id} End"
+      "ph_setpoint": {
+        "name": "pH Setpoint"
       }
     },
     "select": {
-      "pump_speed": {
-        "name": "Speed Level",
-        "state": {
-          "stopped": "Not Running",
-          "low": "Low",
-          "medium": "Medium",
-          "high": "High"
-        }
-      },
-      "schedule_mode": {
-        "name": "Schedule {schedule_id} Mode",
-        "state": {
-          "0": "Low",
-          "1": "Medium",
-          "2": "High"
-        }
-      },
       "chlorinator_mode": {
         "name": "Mode",
         "state": {
+          "auto": "Auto",
           "off": "Off",
-          "on": "On",
-          "auto": "Auto"
+          "on": "On"
+        }
+      },
+      "chlorinator_schedule_output": {
+        "name": "Schedule {schedule_id} Output",
+        "state": {
+          "aux1": "Aux 1",
+          "aux2": "Aux 2",
+          "pump": "Pump"
         }
       },
       "chlorinator_schedule_speed": {
@@ -262,18 +121,9 @@
           "s3": "Speed 3"
         }
       },
-      "chlorinator_schedule_output": {
-        "name": "Schedule {schedule_id} Output",
-        "state": {
-          "pump": "Pump",
-          "aux1": "Aux 1",
-          "aux2": "Aux 2"
-        }
-      },
       "light_effect": {
         "name": "Effect",
         "state": {
-          "static_color": "Static Color",
           "scene_1": "Scene 1",
           "scene_2": "Scene 2",
           "scene_3": "Scene 3",
@@ -281,20 +131,163 @@
           "scene_5": "Scene 5",
           "scene_6": "Scene 6",
           "scene_7": "Scene 7",
-          "scene_8": "Scene 8"
+          "scene_8": "Scene 8",
+          "static_color": "Static Color"
         }
+      },
+      "pump_speed": {
+        "name": "Speed Level",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "medium": "Medium",
+          "stopped": "Not Running"
+        }
+      },
+      "schedule_mode": {
+        "name": "Schedule {schedule_id} Mode",
+        "state": {
+          "0": "Low",
+          "1": "Medium",
+          "2": "High"
+        }
+      }
+    },
+    "sensor": {
+      "air_temperature": {
+        "name": "Air Temperature"
+      },
+      "brightness": {
+        "name": "Brightness"
+      },
+      "chlorinator_chlorination_actual": {
+        "name": "Chlorination Actual"
+      },
+      "chlorinator_free_chlorine": {
+        "name": "Free Chlorine"
+      },
+      "chlorinator_orp": {
+        "name": "ORP"
+      },
+      "chlorinator_ph": {
+        "name": "pH"
+      },
+      "chlorinator_salinity": {
+        "name": "Salinity"
+      },
+      "chlorinator_water_temperature": {
+        "name": "Water Temperature"
+      },
+      "current_temperature": {
+        "name": "Current Temperature"
+      },
+      "device_info": {
+        "name": "Device Information",
+        "state": {
+          "error": "Error",
+          "online": "Online",
+          "signal_excellent": "Signal Excellent",
+          "signal_good": "Signal Good",
+          "signal_low": "Signal Low",
+          "signal_very_good": "Signal Very Good",
+          "signal_very_low": "Signal Very Low"
+        }
+      },
+      "pool_location": {
+        "name": "Pool Location"
+      },
+      "pool_status": {
+        "name": "Pool Status",
+        "state": {
+          "connected": "Connected",
+          "maintenance": "Maintenance",
+          "offline": "Offline",
+          "unknown_state": "Unknown",
+          "using": "Active",
+          "winterized": "Winterized"
+        }
+      },
+      "running_hours": {
+        "name": "Running Hours"
+      },
+      "schedule_count": {
+        "name": "Active Schedules"
+      },
+      "speed_mode": {
+        "name": "Speed",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "medium": "Medium",
+          "not_running": "Not Running",
+          "stopped": "Stopped"
+        }
+      },
+      "target_temperature": {
+        "name": "Target Temperature"
+      },
+      "water_quality": {
+        "name": "Water Quality",
+        "state": {
+          "auto": "Automatic",
+          "manual": "Manual",
+          "not_configured": "Not Configured"
+        }
+      },
+      "water_temperature": {
+        "name": "Water Temperature"
+      },
+      "weather_temperature": {
+        "name": "Weather Temperature"
+      }
+    },
+    "switch": {
+      "auto_mode": {
+        "name": "Auto Mode"
+      },
+      "boost_mode": {
+        "name": "Boost Mode"
+      },
+      "chlorinator": {
+        "name": "Chlorinator"
+      },
+      "heat_pump": {
+        "name": "Heat Pump"
+      },
+      "heater": {
+        "name": "Heater"
+      },
+      "pump": {
+        "name": "Pump"
+      },
+      "schedule_enable": {
+        "name": "Schedule {schedule_id}"
+      }
+    },
+    "time": {
+      "light_schedule_end": {
+        "name": "Light Schedule {schedule_id} End"
+      },
+      "light_schedule_start": {
+        "name": "Light Schedule {schedule_id} Start"
+      },
+      "schedule_end": {
+        "name": "Schedule {schedule_id} End"
+      },
+      "schedule_start": {
+        "name": "Schedule {schedule_id} Start"
       }
     }
   },
   "exceptions": {
-    "temperature_set_failed": {
-      "message": "Failed to set the target temperature to {temperature}°C"
+    "auth_failed": {
+      "message": "Authentication failed, please re-authenticate"
     },
-    "light_set_failed": {
-      "message": "Failed to set the LumiPlus light state"
+    "auto_mode_set_failed": {
+      "message": "Failed to change auto mode"
     },
-    "pump_speed_set_failed": {
-      "message": "Failed to set the pump speed"
+    "boost_set_failed": {
+      "message": "Failed to set boost mode"
     },
     "chlorinator_mode_set_failed": {
       "message": "Failed to set the chlorinator mode"
@@ -302,56 +295,44 @@
     "chlorinator_set_failed": {
       "message": "Failed to switch the chlorinator"
     },
-    "boost_set_failed": {
-      "message": "Failed to set boost mode"
-    },
-    "heater_set_failed": {
-      "message": "Failed to switch the heater"
-    },
-    "heat_pump_set_failed": {
-      "message": "Failed to switch the heat pump"
-    },
-    "number_set_failed": {
-      "message": "Failed to set the value on the device"
-    },
-    "light_schedule_set_failed": {
-      "message": "Failed to set the light schedule {schedule_id} time"
-    },
-    "schedule_overlap": {
-      "message": "This schedule overlaps another active schedule"
-    },
-    "temperature_out_of_range": {
-      "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"
-    },
-    "auth_failed": {
-      "message": "Authentication failed, please re-authenticate"
-    },
-    "mfa_required": {
-      "message": "Multi-factor authentication is required to sign in to Fluidra Pool"
-    },
     "device_not_found": {
       "message": "Fluidra device {device_id} was not found in any loaded config entry"
-    },
-    "invalid_time_format": {
-      "message": "Invalid time {value}, expected HH:MM"
     },
     "empty_schedule_days": {
       "message": "Schedule days cannot be empty"
     },
-    "unknown_preset": {
-      "message": "Unknown preset {preset}"
+    "heat_pump_control_failed": {
+      "message": "Heat-pump control failed ({error_type})"
     },
-    "schedule_set_failed": {
-      "message": "Fluidra API call failed while setting the schedule for {device_id}"
+    "heat_pump_set_failed": {
+      "message": "Failed to switch the heat pump"
     },
-    "schedule_set_rejected": {
-      "message": "Fluidra API rejected the schedule update for {device_id}"
+    "heater_set_failed": {
+      "message": "Failed to switch the heater"
     },
-    "schedule_clear_failed": {
-      "message": "Fluidra API call failed while clearing the schedule for {device_id}"
+    "hvac_mode_set_failed": {
+      "message": "Failed to set heat-pump mode to {hvac_mode}"
     },
-    "schedule_clear_rejected": {
-      "message": "Fluidra API rejected the schedule clear for {device_id}"
+    "invalid_time_format": {
+      "message": "Invalid time {value}, expected HH:MM"
+    },
+    "light_schedule_set_failed": {
+      "message": "Failed to set the light schedule {schedule_id} time"
+    },
+    "light_set_failed": {
+      "message": "Failed to set the LumiPlus light state"
+    },
+    "mfa_required": {
+      "message": "Multi-factor authentication is required to sign in to Fluidra Pool"
+    },
+    "number_set_failed": {
+      "message": "Failed to set the value on the device"
+    },
+    "preset_mode_control_failed": {
+      "message": "Preset mode control failed ({error_type})"
+    },
+    "preset_mode_set_failed": {
+      "message": "Failed to set preset mode to {preset_mode}"
     },
     "preset_schedule_set_failed": {
       "message": "Fluidra API call failed while applying the preset schedule for {device_id}"
@@ -359,71 +340,98 @@
     "preset_schedule_set_rejected": {
       "message": "Fluidra API rejected the preset schedule update for {device_id}"
     },
-    "hvac_mode_set_failed": {
-      "message": "Failed to set heat-pump mode to {hvac_mode}"
+    "pump_in_auto_mode": {
+      "message": "The speed level cannot be changed while auto mode is active. Disable auto mode first."
     },
-    "heat_pump_control_failed": {
-      "message": "Heat-pump control failed ({error_type})"
+    "pump_set_failed": {
+      "message": "Failed to control the pump"
     },
-    "preset_mode_set_failed": {
-      "message": "Failed to set preset mode to {preset_mode}"
+    "pump_speed_set_failed": {
+      "message": "Failed to set the pump speed"
     },
-    "preset_mode_control_failed": {
-      "message": "Preset mode control failed ({error_type})"
+    "schedule_clear_failed": {
+      "message": "Fluidra API call failed while clearing the schedule for {device_id}"
+    },
+    "schedule_clear_rejected": {
+      "message": "Fluidra API rejected the schedule clear for {device_id}"
+    },
+    "schedule_overlap": {
+      "message": "This schedule overlaps another active schedule"
+    },
+    "schedule_set_failed": {
+      "message": "Fluidra API call failed while setting the schedule for {device_id}"
+    },
+    "schedule_set_rejected": {
+      "message": "Fluidra API rejected the schedule update for {device_id}"
+    },
+    "temperature_out_of_range": {
+      "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"
+    },
+    "temperature_set_failed": {
+      "message": "Failed to set the target temperature to {temperature}°C"
+    },
+    "unknown_preset": {
+      "message": "Unknown preset {preset}"
     }
   },
   "issues": {
-    "offline_device": {
-      "title": "Device offline",
-      "description": "Device {device} is offline"
-    },
-    "firmware_update_available": {
-      "title": "Firmware update available",
-      "description": "Device {device} has firmware version {version} available"
-    },
     "connection_error": {
-      "title": "Connection error",
-      "description": "Unable to connect to Fluidra Pool service"
+      "description": "Unable to connect to Fluidra Pool service",
+      "title": "Connection error"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Update interval (seconds)"
+        },
+        "data_description": {
+          "scan_interval": "How often Home Assistant polls the Fluidra cloud. Lower values give fresher data but more requests."
+        },
+        "description": "Configure advanced options",
+        "title": "Fluidra Pool Options"
+      }
     }
   },
   "services": {
-    "set_schedule": {
-      "name": "Set pump schedule",
-      "description": "Configure the pump schedule",
-      "fields": {
-        "device_id": {
-          "name": "Device ID",
-          "description": "Device identifier (e.g. LE24500883)"
-        },
-        "schedules": {
-          "name": "Schedules",
-          "description": "List of time slots"
-        }
-      }
-    },
     "clear_schedule": {
-      "name": "Clear pump schedule",
       "description": "Delete all pump schedules",
       "fields": {
         "device_id": {
-          "name": "Device ID",
-          "description": "Device identifier (e.g. LE24500883)"
+          "description": "Device identifier (e.g. LE24500883)",
+          "name": "Device ID"
         }
-      }
+      },
+      "name": "Clear pump schedule"
     },
     "set_preset_schedule": {
-      "name": "Apply preset schedule",
       "description": "Apply a preset schedule",
       "fields": {
         "device_id": {
-          "name": "Device ID",
-          "description": "Device identifier (e.g. LE24500883)"
+          "description": "Device identifier (e.g. LE24500883)",
+          "name": "Device ID"
         },
         "preset": {
-          "name": "Preset",
-          "description": "Type of preset schedule"
+          "description": "Type of preset schedule",
+          "name": "Preset"
         }
-      }
+      },
+      "name": "Apply preset schedule"
+    },
+    "set_schedule": {
+      "description": "Configure the pump schedule",
+      "fields": {
+        "device_id": {
+          "description": "Device identifier (e.g. LE24500883)",
+          "name": "Device ID"
+        },
+        "schedules": {
+          "description": "List of time slots",
+          "name": "Schedules"
+        }
+      },
+      "name": "Set pump schedule"
     }
   }
 }

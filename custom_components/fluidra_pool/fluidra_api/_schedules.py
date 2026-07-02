@@ -10,7 +10,7 @@ from ..api_resilience import FluidraAuthError, FluidraError
 from ..const import COMPONENT_DM24049704_SCHEDULE, COMPONENT_SCHEDULE
 from ..utils import CRON_DAY_TO_NAME, extract_cron_days
 from ._base import FluidraAPIBase
-from ._constants import FLUIDRA_EMEA_BASE
+from ._constants import CONNECTED_PARAMS, FLUIDRA_EMEA_BASE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -112,17 +112,16 @@ class SchedulesMixin(FluidraAPIBase):
         headers = self._build_auth_headers()
         headers["content-type"] = "application/json; charset=utf-8"
 
-        url = (
-            f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}"
-            f"/components/{int(component_id)}?deviceType=connected"
-        )
+        url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}/components/{int(component_id)}"
         desired_value: Any = schedules
         if int(component_id) == COMPONENT_DM24049704_SCHEDULE:
             desired_value = self._convert_schedules_to_dm24049704_format(schedules)
         payload = {"desiredValue": desired_value}
 
         try:
-            status, _, raw_text = await self._request("PUT", url, headers=headers, json_data=payload)
+            status, _, raw_text = await self._request(
+                "PUT", url, headers=headers, json_data=payload, params=dict(CONNECTED_PARAMS)
+            )
         except FluidraError as err:
             _LOGGER.error("set_schedule error: %s", err)
             return False
@@ -133,19 +132,6 @@ class SchedulesMixin(FluidraAPIBase):
             # invisible and a failed write gave no diagnostic info — Issue #89).
             _LOGGER.warning("set_schedule rejected by Fluidra (HTTP %s): %s", status, raw_text[:500])
         return status == 200
-
-    async def get_default_schedule(self) -> list[dict[str, Any]]:
-        """Return a default schedule template."""
-        return [
-            {
-                "id": 1,
-                "groupId": 1,
-                "enabled": True,
-                "startTime": "08 30 * * 1,2,3,4,5,6,7",
-                "endTime": "09 59 * * 1,2,3,4,5,6,7",
-                "startActions": {"operationName": 1},
-            },
-        ]
 
     async def clear_schedule(self, device_id: str, component_id: int = COMPONENT_SCHEDULE) -> bool:
         """Clear all schedules for a device."""

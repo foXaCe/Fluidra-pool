@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.fluidra_pool.switch import (
@@ -105,10 +106,11 @@ async def test_pump_turn_on_invokes_start_pump_and_refresh() -> None:
 
 
 async def test_pump_turn_on_clears_pending_state_on_api_failure() -> None:
-    """When the API returns False, the optimistic state is rolled back."""
+    """When the API returns False, the optimistic state is rolled back and HomeAssistantError raised."""
     pump = _pump_switch(api_failure=True) if False else _pump_switch()
     pump._api.start_pump = AsyncMock(return_value=False)
-    await pump.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await pump.async_turn_on()
     assert pump._pending_state is None
 
 

@@ -10,7 +10,7 @@ from ..api_resilience import FluidraAuthError, FluidraCircuitBreakerError, Fluid
 from ..const import COMPONENT_AUTO_MODE, COMPONENT_PUMP_ONOFF
 from ..utils import mask_device_id
 from ._base import FluidraAPIBase
-from ._constants import FLUIDRA_EMEA_BASE
+from ._constants import CONNECTED_PARAMS, FLUIDRA_EMEA_BASE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class ComponentsMixin(FluidraAPIBase):
 
         headers = self._build_auth_headers()
         url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}/components/{int(component_id)}"
-        params = {"deviceType": "connected"}
+        params = dict(CONNECTED_PARAMS)
 
         try:
             status, data, _ = await self._request("GET", url, headers=headers, params=params)
@@ -36,10 +36,6 @@ class ComponentsMixin(FluidraAPIBase):
         if status == 200 and isinstance(data, dict):
             return data
         return None
-
-    async def get_device_component_state(self, device_id: str, component_id: int) -> dict[str, Any] | None:
-        """Return the state of a device component (backward-compatible alias)."""
-        return await self.get_component_state(device_id, component_id)
 
     async def control_device_component(
         self, device_id: str, component_id: int, value: int | str | dict[str, Any]
@@ -54,14 +50,13 @@ class ComponentsMixin(FluidraAPIBase):
         headers = self._build_auth_headers()
         headers["content-type"] = "application/json; charset=utf-8"
 
-        url = (
-            f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}"
-            f"/components/{int(component_id)}?deviceType=connected"
-        )
+        url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}/components/{int(component_id)}"
         payload = {"desiredValue": value}
 
         try:
-            status, data, raw_text = await self._request("PUT", url, headers=headers, json_data=payload)
+            status, data, raw_text = await self._request(
+                "PUT", url, headers=headers, json_data=payload, params=dict(CONNECTED_PARAMS)
+            )
         except FluidraCircuitBreakerError:
             _LOGGER.warning("Circuit breaker open, cannot control device %s", mask_device_id(device_id))
             return False
@@ -157,14 +152,13 @@ class ComponentsMixin(FluidraAPIBase):
         headers = self._build_auth_headers()
         headers["content-type"] = "application/json; charset=utf-8"
 
-        url = (
-            f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}"
-            f"/components/{int(component_id)}?deviceType=connected"
-        )
+        url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}/components/{int(component_id)}"
         payload = {"desiredValue": value}
 
         try:
-            status, _, _ = await self._request("PUT", url, headers=headers, json_data=payload)
+            status, _, _ = await self._request(
+                "PUT", url, headers=headers, json_data=payload, params=dict(CONNECTED_PARAMS)
+            )
         except FluidraError as err:
             _LOGGER.debug("Set component value failed: %s", err)
             return False

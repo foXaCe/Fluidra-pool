@@ -18,6 +18,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
 from .const import (
+    DEVICE_TYPE_LIGHT,
     DOMAIN,
     LUMIPLUS_COMPONENT_BRIGHTNESS,
     LUMIPLUS_COMPONENT_COLOR,
@@ -69,7 +70,7 @@ async def async_setup_entry(
                 device_type = device.get("type", "")
                 family = device.get("family", "").lower()
 
-                if device_type == "light" or "light" in family:
+                if device_type == DEVICE_TYPE_LIGHT or DEVICE_TYPE_LIGHT in family:
                     entities.append(FluidraLight(coordinator, coordinator.api, pool_id, device_id))
 
         if entities:

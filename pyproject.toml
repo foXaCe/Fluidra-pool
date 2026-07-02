@@ -29,6 +29,14 @@ known-first-party = ["custom_components.fluidra_pool"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 
+[tool.coverage.run]
+source = ["custom_components/fluidra_pool"]
+
+[tool.coverage.report]
+# Same gate as CI so a plain `pytest --cov` reproduces the CI verdict.
+fail_under = 90
+show_missing = true
+
 [tool.mypy]
 # Strict type checking enforced in CI (Platinum `strict-typing`).
 # 3.14 matches the CI runtime and the Home Assistant 2026.x requirement (HA ships

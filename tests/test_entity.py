@@ -116,3 +116,32 @@ class TestFluidraPoolControlEntity:
     def test_inherits_available(self, mock_coordinator: MagicMock, mock_api: AsyncMock):
         entity = FluidraPoolControlEntity(mock_coordinator, mock_api, "pool_001", "E30-001")
         assert entity.available is True
+
+
+def _availability_device(online_value) -> dict:
+    device = {"device_id": "DEV-1", "name": "Pump"}
+    if online_value != "absent":
+        device["online"] = online_value
+    return device
+
+
+@pytest.mark.parametrize(
+    ("online_value", "expected"),
+    [(True, True), ("absent", True), (None, True), (False, False)],
+)
+def test_available_only_gates_on_explicit_offline(online_value, expected) -> None:
+    """Missing/unknown connectivity must not read as offline; only online=False gates."""
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"pool_1": {"devices": [_availability_device(online_value)]}}
+    entity = FluidraPoolEntity(coordinator, "pool_1", "DEV-1")
+    assert entity.available is expected
+
+
+def test_available_false_when_device_vanished() -> None:
+    """A device missing from coordinator data is unavailable."""
+    coordinator = MagicMock()
+    coordinator.last_update_success = True
+    coordinator.data = {"pool_1": {"devices": []}}
+    entity = FluidraPoolEntity(coordinator, "pool_1", "DEV-1")
+    assert entity.available is False

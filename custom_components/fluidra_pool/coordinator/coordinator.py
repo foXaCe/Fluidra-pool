@@ -18,9 +18,20 @@ from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from ..api_resilience import FluidraError
-from ..const import DEFAULT_SCAN_INTERVAL, DOMAIN, STALE_DEVICE_THRESHOLD, FluidraPoolConfigEntry
+from ..const import (
+    CONNECTION_ISSUE_THRESHOLD,
+    DEFAULT_SCAN_INTERVAL,
+    DEVICE_TYPE_CHLORINATOR,
+    DEVICE_TYPE_HEAT_PUMP,
+    DEVICE_TYPE_LIGHT,
+    DOMAIN,
+    PUMP_SPEED_PERCENTAGES,
+    STALE_DEVICE_THRESHOLD,
+    FluidraPoolConfigEntry,
+)
 from ..device_registry import DeviceIdentifier
 from ..fluidra_api import FluidraPoolAPI
+from ..repairs import async_create_connection_issue, async_delete_connection_issue
 from ._parsers import calculate_auto_speed_from_schedules, parse_dm24049704_schedule_format
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,6 +52,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._missing_device_counts: dict[str, int] = {}
         # Skip heavy polling on first update for faster startup.
         self._first_update = True
+        # Consecutive failed poll cycles; drives the connection_error repair issue.
+        self._consecutive_update_failures = 0
 
         # Honour the user-configured polling interval.
         scan_interval = DEFAULT_SCAN_INTERVAL
@@ -242,17 +255,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 auto_mode = device.get("auto_mode_enabled", False)
                 if auto_mode:
                     device["speed_percent"] = calculate_auto_speed_from_schedules(device)
-                elif reported_value == 0:
-                    device["speed_percent"] = 45
-                elif reported_value == 1:
-                    device["speed_percent"] = 65
-                elif reported_value == 2:
-                    device["speed_percent"] = 100
+                elif isinstance(reported_value, int):
+                    device["speed_percent"] = PUMP_SPEED_PERCENTAGES.get(reported_value, 0)
                 else:
                     device["speed_percent"] = 0
         elif component_id == 13:
             device["component_13_data"] = component_state
-            if device.get("type", "").lower() == "heat_pump" and not DeviceIdentifier.has_feature(device, "z550_mode"):
+            if device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP and not DeviceIdentifier.has_feature(
+                device, "z550_mode"
+            ):
                 device["heat_pump_reported"] = reported_value
                 device["is_heating"] = bool(reported_value)
         elif component_id == 14:
@@ -269,7 +280,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raw_value = reported_value if reported_value is not None else desired_value
             device["component_15_speed"] = raw_value if raw_value is not None else 0
             temp_raw = raw_value
-            if device.get("type", "").lower() == "heat_pump" and temp_raw is not None:
+            if device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP and temp_raw is not None:
                 try:
                     temp_value = float(temp_raw) / 10.0
                     if 10.0 <= temp_value <= 50.0:
@@ -286,7 +297,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 device["z550_preset_reported"] = reported_value
         elif component_id == 19:
             device["timezone_component"] = reported_value
-            if device.get("type", "").lower() == "heat_pump" and reported_value:
+            if device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP and reported_value:
                 try:
                     water_temp_value = float(reported_value) / 10.0
                     if 5.0 <= water_temp_value <= 50.0:
@@ -295,7 +306,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     pass
         elif component_id == 20:
             device_type = device.get("type", "")
-            if device_type == "chlorinator":
+            if device_type == DEVICE_TYPE_CHLORINATOR:
                 # EXO chlorinators expose schedules (list) on component 20.
                 if isinstance(reported_value, list):
                     device["schedule_data"] = reported_value
@@ -332,7 +343,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 config = DeviceIdentifier.identify_device(device)
                 device_type = config.device_type if config else device.get("type", "")
-                if device_type == "light":
+                if device_type == DEVICE_TYPE_LIGHT:
                     schedule_data = reported_value if isinstance(reported_value, list) else []
                     device["schedule_data"] = schedule_data
                     self._track_schedule_count(pool_id, device_id, schedule_data)
@@ -358,7 +369,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 else:
                     device["hvac_action"] = "idle"
         elif component_id in [62, 65]:
-            if device.get("type", "").lower() == "heat_pump" and reported_value:
+            if device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP and reported_value:
                 try:
                     water_temp_value = float(reported_value) / 10.0
                     if 5.0 <= water_temp_value <= 50.0 and "water_temperature" not in device:
@@ -401,6 +412,35 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Cleanup happens asynchronously in a separate task to avoid blocking.
         self._previous_schedule_entities[device_key] = len(schedule_data)
 
+    def _note_update_failure(self) -> None:
+        """Record a failed poll cycle and raise the connection repair issue when persistent."""
+        self._consecutive_update_failures += 1
+        if self._consecutive_update_failures == CONNECTION_ISSUE_THRESHOLD:
+            _LOGGER.warning(
+                "%d consecutive failed poll cycles — creating connection_error repair issue",
+                self._consecutive_update_failures,
+            )
+            async_create_connection_issue(self.hass)
+
+    def _handle_update_success(self) -> None:
+        """Reset the failure streak and clear the connection repair issue if raised."""
+        if self._consecutive_update_failures >= CONNECTION_ISSUE_THRESHOLD:
+            async_delete_connection_issue(self.hass)
+        self._consecutive_update_failures = 0
+
+    def _sync_device_firmware(self, pools: list[dict[str, Any]]) -> None:
+        """Mirror reported firmware versions into the HA device registry (no-op if unchanged)."""
+        registry = dr.async_get(self.hass)
+        for pool in pools:
+            for device in pool.get("devices", []):
+                device_id = device.get("device_id")
+                firmware = device.get("firmware_version_component")
+                if not device_id or firmware is None:
+                    continue
+                entry = registry.async_get_device(identifiers={(DOMAIN, str(device_id))})
+                if entry is not None and entry.sw_version != str(firmware):
+                    registry.async_update_device(entry.id, sw_version=str(firmware))
+
     async def _async_update_data(self) -> dict[str, Any]:
         """Update data via library using optimized parallel polling."""
         try:
@@ -430,12 +470,14 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Fast startup: minimal data on first update.
             if self._first_update:
                 self._first_update = False
+                self._handle_update_success()
                 return {pool["id"]: pool for pool in pools}
 
             previous_data = self.data if isinstance(self.data, dict) else {}
 
             # Process each pool, isolating failures so one broken pool does not
             # make the whole integration unavailable.
+            failed_pool_refreshes = 0
             for pool in pools:
                 try:
                     await self._refresh_pool(pool, previous_data)
@@ -445,6 +487,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         pool.get("id"),
                         err,
                     )
+                    failed_pool_refreshes += 1
                     prev_pool = previous_data.get(pool["id"])
                     if prev_pool:
                         pool.update(prev_pool)
@@ -464,12 +507,22 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if pools:
                 await self._cleanup_removed_devices(current_device_ids)
 
+            # Every pool failed to refresh: entities keep their previous data
+            # (graceful degradation) but the outage still counts towards the
+            # connection_error repair issue so the user learns about it.
+            if pools and failed_pool_refreshes == len(pools):
+                self._note_update_failure()
+            else:
+                self._handle_update_success()
+                self._sync_device_firmware(pools)
+
             return {pool["id"]: pool for pool in pools}
 
         except ConfigEntryAuthFailed:
             raise
         except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
             _LOGGER.exception("Error updating Fluidra Pool data")
+            self._note_update_failure()
             raise UpdateFailed(f"Error communicating with API: {type(err).__name__}") from err
 
     async def _refresh_pool(self, pool: dict[str, Any], previous_data: dict[str, Any]) -> None:

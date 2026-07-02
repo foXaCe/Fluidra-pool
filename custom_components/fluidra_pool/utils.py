@@ -88,28 +88,6 @@ def convert_cron_days(cron_time: str) -> str:
     return cron_time
 
 
-def parse_cron_time(cron_time: str) -> tuple[int, int] | None:
-    """Extract ``(hour, minute)`` from a CRON expression."""
-    if not cron_time:
-        return None
-
-    parts = cron_time.split()
-    if len(parts) >= 2:
-        try:
-            minute = int(parts[0])
-            hour = int(parts[1])
-            return (hour, minute)
-        except (ValueError, IndexError) as err:
-            _LOGGER.debug("Failed to parse CRON time '%s': %s", cron_time, err)
-
-    return None
-
-
-def build_cron_expression(hour: int, minute: int, days: str = "1,2,3,4,5,6,7") -> str:
-    """Build a CRON expression from ``hour``, ``minute`` and ``days``."""
-    return f"{minute:02d} {hour:02d} * * {days}"
-
-
 def mask_email(email: str | None) -> str:
     """Return a privacy-friendly representation of an email for logging."""
     if not email:

@@ -114,7 +114,10 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
                 await self.coordinator.async_request_refresh()
             else:
                 self._clear_pending_state()
+                raise HomeAssistantError(translation_domain=DOMAIN, translation_key="boost_set_failed")
 
+        except HomeAssistantError:
+            raise
         except (
             aiohttp.ClientError,
             TimeoutError,
@@ -143,7 +146,10 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
                 await self.coordinator.async_request_refresh()
             else:
                 self._clear_pending_state()
+                raise HomeAssistantError(translation_domain=DOMAIN, translation_key="boost_set_failed")
 
+        except HomeAssistantError:
+            raise
         except (
             aiohttp.ClientError,
             TimeoutError,
@@ -226,6 +232,9 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
                 await self.coordinator.async_request_refresh()
             else:
                 self._clear_pending_state()
+                raise HomeAssistantError(translation_domain=DOMAIN, translation_key="chlorinator_set_failed")
+        except HomeAssistantError:
+            raise
         except (
             aiohttp.ClientError,
             TimeoutError,
@@ -253,6 +262,9 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
                 await self.coordinator.async_request_refresh()
             else:
                 self._clear_pending_state()
+                raise HomeAssistantError(translation_domain=DOMAIN, translation_key="chlorinator_set_failed")
+        except HomeAssistantError:
+            raise
         except (
             aiohttp.ClientError,
             TimeoutError,

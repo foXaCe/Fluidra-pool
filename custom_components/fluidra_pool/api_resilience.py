@@ -54,10 +54,6 @@ class FluidraConnectionError(FluidraError):
     """Exception for connection errors."""
 
 
-class FluidraRateLimitError(FluidraError):
-    """Exception for rate limit errors."""
-
-
 class FluidraCircuitBreakerError(FluidraError):
     """Exception when circuit breaker is open."""
 

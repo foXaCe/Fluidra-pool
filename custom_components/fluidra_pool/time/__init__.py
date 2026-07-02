@@ -7,7 +7,12 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.time import TimeEntity
 from homeassistant.core import callback
 
-from ..const import FluidraPoolConfigEntry
+from ..const import (
+    DEVICE_TYPE_CHLORINATOR,
+    DEVICE_TYPE_LIGHT,
+    DEVICE_TYPE_PUMP,
+    FluidraPoolConfigEntry,
+)
 from ..device_registry import DeviceIdentifier
 from .base import (
     FluidraLightScheduleTimeEntity,
@@ -69,7 +74,7 @@ async def async_setup_entry(
                 if DeviceIdentifier.has_feature(device, "skip_schedules"):
                     continue
 
-                if device_type == "light":
+                if device_type == DEVICE_TYPE_LIGHT:
                     # LumiPlus Connect lights — only create entities for existing schedules.
                     schedule_data = []
                     if coordinator.data:
@@ -93,7 +98,7 @@ async def async_setup_entry(
                                         coordinator, coordinator.api, pool_id, device_id, schedule_id
                                     )
                                 )
-                elif device_type == "pump" and DeviceIdentifier.should_create_entity(device, "time"):
+                elif device_type == DEVICE_TYPE_PUMP and DeviceIdentifier.should_create_entity(device, "time"):
                     # Pumps: 8 schedulers on component 20.
                     for schedule_id in ["1", "2", "3", "4", "5", "6", "7", "8"]:
                         entities.append(
@@ -104,7 +109,7 @@ async def async_setup_entry(
                         entities.append(
                             FluidraScheduleEndTimeEntity(coordinator, coordinator.api, pool_id, device_id, schedule_id)
                         )
-                elif device_type == "chlorinator" and DeviceIdentifier.has_feature(device, "schedules"):
+                elif device_type == DEVICE_TYPE_CHLORINATOR and DeviceIdentifier.has_feature(device, "schedules"):
                     # Chlorinators with schedules (e.g., DM24049704).
                     schedule_count = DeviceIdentifier.get_feature(device, "schedule_count", 3)
                     for i in range(1, schedule_count + 1):

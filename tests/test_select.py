@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import time
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
+from custom_components.fluidra_pool.const import OPTIMISTIC_ACTION_TIMEOUT
 from custom_components.fluidra_pool.select import (
     FluidraChlorinatorModeSelect,
     FluidraLightEffectSelect,
@@ -119,10 +121,19 @@ def test_pump_speed_optimistic_option_takes_precedence() -> None:
     assert select.current_option == "high"
 
 
-def test_pump_speed_available_false_when_auto_mode_active() -> None:
-    """Auto mode locks manual speed control — entity becomes unavailable."""
-    select = _pump_speed({"is_running": True, "auto_reported": 1})
-    assert select.available is False
+def test_pump_speed_stays_available_when_auto_mode_active() -> None:
+    """Auto mode no longer hides the entity: the state stays readable."""
+    select = _pump_speed({"is_running": True, "auto_reported": 1, "online": True, "speed_percent": 65})
+    assert select.available is True
+    assert select.current_option == "medium"
+
+
+async def test_pump_speed_select_rejected_in_auto_mode() -> None:
+    """A manual write while auto mode drives the pump raises a clear error."""
+    select = _pump_speed({"is_running": True, "auto_reported": 1, "online": True})
+    with pytest.raises(ServiceValidationError):
+        await select.async_select_option("high")
+    select._api.control_device_component.assert_not_awaited()
 
 
 async def test_pump_speed_async_select_low_writes_pump_on_then_speed() -> None:
@@ -182,10 +193,11 @@ async def test_chlor_mode_async_select_writes_value_to_mode_component() -> None:
 
 
 async def test_chlor_mode_async_select_on_failure_clears_optimistic() -> None:
-    """If the API rejects the write, the optimistic option is rolled back."""
+    """If the API rejects the write, the optimistic option is rolled back and the error surfaces."""
     select = _chlor_mode()
     select._api.control_device_component = AsyncMock(return_value=False)
-    await select.async_select_option("on")
+    with pytest.raises(HomeAssistantError):
+        await select.async_select_option("on")
     assert select._optimistic_option is None
 
 
@@ -252,10 +264,32 @@ async def test_light_effect_async_select_raises_on_api_rejection() -> None:
 
 
 def test_light_effect_optimistic_option_takes_precedence() -> None:
-    """A pending optimistic option overrides the reported component value."""
+    """A pending, unexpired optimistic option overrides the reported component value."""
     select = _light_effect(0)  # device reports static_color
     select._optimistic_option = "scene_7"
+    select._optimistic_time = time.time()
     assert select.current_option == "scene_7"
+
+
+def test_light_effect_optimistic_option_expires() -> None:
+    """An expired optimistic option falls back to the reported value."""
+    select = _light_effect(0)
+    select._optimistic_option = "scene_7"
+    select._optimistic_time = time.time() - (OPTIMISTIC_ACTION_TIMEOUT + 5)
+    assert select.current_option == "static_color"
+
+
+def test_light_effect_coordinator_update_confirms_optimistic() -> None:
+    """The optimistic option is dropped once the backend reports it."""
+    select = _light_effect(7)  # device now reports scene_7
+    select._optimistic_option = "scene_7"
+    select._optimistic_time = time.time()
+    with patch(
+        "homeassistant.helpers.update_coordinator.CoordinatorEntity._handle_coordinator_update",
+        lambda self: None,
+    ):
+        select._handle_coordinator_update()
+    assert select._optimistic_option is None
 
 
 def test_light_effect_uncoercible_value_falls_back_to_static_color() -> None:
@@ -346,3 +380,18 @@ async def test_setup_adds_new_device_dynamically() -> None:
     new_uids = {e.unique_id for e in added} - uids_after_setup
     assert new_uids, "new device entities should be added without a reload"
     assert all("dev2" in u for u in new_uids), "only the newly-added device's entities are created"
+
+
+def test_pump_speed_auto_mode_zero_percent_reads_stopped() -> None:
+    """In auto mode with 0% derived speed, the select reads 'stopped'."""
+    select = _pump_speed({"is_running": True, "auto_reported": 1, "online": True, "speed_percent": 0})
+    assert select.current_option == "stopped"
+
+
+async def test_pump_speed_select_raises_when_api_reports_failure() -> None:
+    """success=False from the API surfaces as HomeAssistantError (error convention)."""
+    select = _pump_speed({"is_running": False, "online": True})
+    select._api.control_device_component.return_value = False
+    with pytest.raises(HomeAssistantError):
+        await select.async_select_option("low")
+    assert select._optimistic_option is None

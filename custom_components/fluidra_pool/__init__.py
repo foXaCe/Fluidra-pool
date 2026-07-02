@@ -10,7 +10,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Final
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
+from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
@@ -25,8 +25,9 @@ import voluptuous as vol
 from .api_resilience import FluidraError, FluidraMFARequired
 from .const import (
     COMPONENT_SCHEDULE,
-    CONF_EMAIL,
-    CONF_PASSWORD,
+    CONF_REFRESH_TOKEN,
+    DEVICE_MODEL_FALLBACK,
+    DEVICE_MODEL_MAP,
     DOMAIN,
     FluidraPoolConfigEntry,
     FluidraPoolRuntimeData,
@@ -106,13 +107,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     from .fluidra_api import FluidraPoolAPI
 
     # Pass any stored refresh token so the API can bypass MFA on reload/restart.
-    stored_refresh_token = entry.data.get("refresh_token")
+    stored_refresh_token = entry.data.get(CONF_REFRESH_TOKEN)
 
     def _persist_refresh_token(new_token: str) -> None:
         """Persist the latest refresh token back into the config entry."""
-        if entry.data.get("refresh_token") == new_token:
+        if entry.data.get(CONF_REFRESH_TOKEN) == new_token:
             return  # No-op write would needlessly touch the entry.
-        hass.config_entries.async_update_entry(entry, data={**entry.data, "refresh_token": new_token})
+        hass.config_entries.async_update_entry(entry, data={**entry.data, CONF_REFRESH_TOKEN: new_token})
 
     api = FluidraPoolAPI(
         email,
@@ -179,13 +180,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     # Update device registry with correct names/models from coordinator data
     from .device_registry import DeviceIdentifier
 
-    model_map = {
-        "chlorinator": "Chlorinator",
-        "pump": "Pump",
-        "heat_pump": "Heat Pump",
-        "light": "Light",
-        "heater": "Heater",
-    }
     if coordinator.data:
         for pool_id, pool_data in coordinator.data.items():
             for device in pool_data.get("devices", []):
@@ -194,7 +188,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
                     continue
                 config = DeviceIdentifier.identify_device(device)
                 if config:
-                    model = model_map.get(config.device_type, "Pool Equipment")
+                    model = DEVICE_MODEL_MAP.get(config.device_type, DEVICE_MODEL_FALLBACK)
                     device_name = device.get("name", f"Device {device_id}")
                     device_registry.async_get_or_create(
                         config_entry_id=entry.entry_id,

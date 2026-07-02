@@ -79,6 +79,9 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
             else:
                 self._clear_pending_state()
                 self.async_write_ha_state()
+                raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heat_pump_set_failed")
+        except HomeAssistantError:
+            raise
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError) as e:
             _LOGGER.error("Error turning on heat pump %s: %s", self._device_id, e)
             self._clear_pending_state()
@@ -104,6 +107,9 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
             else:
                 self._clear_pending_state()
                 self.async_write_ha_state()
+                raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heat_pump_set_failed")
+        except HomeAssistantError:
+            raise
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError) as e:
             _LOGGER.error("Error turning off heat pump %s: %s", self._device_id, e)
             self._clear_pending_state()
@@ -175,6 +181,7 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
             await self.coordinator.async_request_refresh()
         else:
             self._clear_pending_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heater_set_failed")
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the heater off (component 9 = generic ON/OFF)."""
@@ -190,6 +197,7 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
             await self.coordinator.async_request_refresh()
         else:
             self._clear_pending_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="heater_set_failed")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

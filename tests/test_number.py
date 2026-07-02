@@ -505,8 +505,10 @@ async def test_light_effect_speed_async_set_truncates_to_int(incoming: float) ->
 
 
 async def test_light_effect_speed_logs_and_skips_refresh_on_failure(caplog: pytest.LogCaptureFixture) -> None:
-    """A rejected effect-speed write logs a debug line and does not refresh (climate_light_number-1)."""
+    """A rejected effect-speed write logs a debug line, raises and does not refresh (climate_light_number-1)."""
     import logging
+
+    from homeassistant.exceptions import HomeAssistantError
 
     coord = _coord_with(_light_device(1))
     coord.data[POOL_ID]["devices"][0]["device_id"] = "LP24-001"
@@ -514,8 +516,11 @@ async def test_light_effect_speed_logs_and_skips_refresh_on_failure(caplog: pyte
     number = FluidraLightEffectSpeed(coord, api, POOL_ID, "LP24-001")
     _attach_ha(number)
 
-    with caplog.at_level(logging.DEBUG, logger="custom_components.fluidra_pool.number"):
-        await number.async_set_native_value(5)  # Must not raise on a False return.
+    with (
+        caplog.at_level(logging.DEBUG, logger="custom_components.fluidra_pool.number"),
+        pytest.raises(HomeAssistantError),
+    ):
+        await number.async_set_native_value(5)
 
     assert "Failed to set effect speed" in caplog.text
     coord.async_request_refresh.assert_not_awaited()
