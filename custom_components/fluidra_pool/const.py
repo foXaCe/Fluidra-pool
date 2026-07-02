@@ -42,6 +42,10 @@ DEVICE_TYPE_CHLORINATOR = "chlorinator"
 # cloud response cannot wipe devices, entities and their history on one hiccup.
 STALE_DEVICE_THRESHOLD: Final = 3
 
+# Connection repair issue: raised after this many consecutive failed poll cycles
+# so a single cloud hiccup does not spam the repairs dashboard.
+CONNECTION_ISSUE_THRESHOLD: Final = 3
+
 # Attributes
 ATTR_DEVICE_ID = "device_id"
 ATTR_POOL_ID = "pool_id"

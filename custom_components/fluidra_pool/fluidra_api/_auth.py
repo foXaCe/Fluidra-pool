@@ -147,7 +147,13 @@ class AuthMixin(FluidraAPIBase):
             self._on_token_persist(self.refresh_token)
 
     async def _get_user_profile(self) -> dict[str, Any]:
-        """Fetch user profile."""
+        """Fetch user profile.
+
+        The result is intentionally unused: this call mirrors the official
+        mobile app's login sequence (Cognito auth → consumers/me → discovery)
+        so our traffic stays indistinguishable from the app's. Failures are
+        ignored on purpose — the profile is not needed for operation.
+        """
         headers = self._build_auth_headers()
         profile_url = f"{FLUIDRA_EMEA_BASE}/mobile/consumers/me"
 

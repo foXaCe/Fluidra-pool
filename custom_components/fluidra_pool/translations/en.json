@@ -365,14 +365,6 @@
     "connection_error": {
       "description": "Unable to connect to Fluidra Pool service",
       "title": "Connection error"
-    },
-    "firmware_update_available": {
-      "description": "Device {device} has firmware version {version} available",
-      "title": "Firmware update available"
-    },
-    "offline_device": {
-      "description": "Device {device} is offline",
-      "title": "Device offline"
     }
   },
   "options": {

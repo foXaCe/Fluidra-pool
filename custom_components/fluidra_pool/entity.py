@@ -77,11 +77,13 @@ class FluidraPoolEntity(CoordinatorEntity):
             default_model = "Pool Equipment"
 
         device_name = device_data.get("name", f"Device {self._device_id}")
+        firmware = device_data.get("firmware_version_component")
         return DeviceInfo(
             identifiers={(DOMAIN, self._device_id)},
             name=device_name,
             manufacturer=device_data.get("manufacturer", "Fluidra"),
             model=default_model,
+            sw_version=str(firmware) if firmware is not None else None,
             via_device=(DOMAIN, self._pool_id),
         )
 
