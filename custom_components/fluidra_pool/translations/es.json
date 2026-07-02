@@ -41,6 +41,10 @@
           "email": "Correo electrónico",
           "password": "Contraseña"
         },
+        "data_description": {
+          "email": "La dirección de correo electrónico de su cuenta Fluidra Pool (iAquaLink).",
+          "password": "La contraseña de su cuenta Fluidra Pool."
+        },
         "description": "Introduce tus credenciales de Fluidra Pool",
         "title": "Configuración de Fluidra Pool"
       }
@@ -381,6 +385,9 @@
       "init": {
         "data": {
           "scan_interval": "Intervalo de actualización (segundos)"
+        },
+        "data_description": {
+          "scan_interval": "Frecuencia con la que Home Assistant consulta la nube de Fluidra. Un valor más bajo ofrece datos más recientes pero genera más solicitudes."
         },
         "description": "Configurar opciones avanzadas",
         "title": "Opciones de Fluidra Pool"

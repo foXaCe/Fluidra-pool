@@ -15,6 +15,9 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, CONF_SCAN_INTERVAL
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
@@ -66,7 +69,7 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
 
         🥇 Gold: Options flow pour configurer les paramètres avancés.
         """
-        return FluidraPoolOptionsFlowHandler(config_entry)
+        return FluidraPoolOptionsFlowHandler()
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial step."""
@@ -348,11 +351,10 @@ class FluidraPoolOptionsFlowHandler(OptionsFlow):
     """Handle options flow for Fluidra Pool.
 
     🥇 Gold: Options flow pour configurer les paramètres avancés.
-    """
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize options flow."""
-        self._config_entry = config_entry
+    Uses the modern zero-arg pattern: ``self.config_entry`` is provided by
+    Home Assistant, nothing to store in ``__init__``.
+    """
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
@@ -360,7 +362,7 @@ class FluidraPoolOptionsFlowHandler(OptionsFlow):
             return self.async_create_entry(title="", data=user_input)
 
         # Get current values or defaults
-        current_scan_interval = self._config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        current_scan_interval = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
         return self.async_show_form(
             step_id="init",
@@ -369,7 +371,18 @@ class FluidraPoolOptionsFlowHandler(OptionsFlow):
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
                         default=current_scan_interval,
-                    ): vol.All(vol.Coerce(int), vol.Range(min=30, max=1800)),
+                    ): vol.All(
+                        NumberSelector(
+                            NumberSelectorConfig(
+                                min=30,
+                                max=1800,
+                                step=1,
+                                mode=NumberSelectorMode.BOX,
+                                unit_of_measurement="s",
+                            )
+                        ),
+                        vol.Coerce(int),
+                    ),
                 }
             ),
         )
