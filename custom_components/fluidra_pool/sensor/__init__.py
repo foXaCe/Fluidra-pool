@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.core import callback
 
-from ..const import FluidraPoolConfigEntry
+from ..const import DEVICE_TYPE_CHLORINATOR, FluidraPoolConfigEntry
 from ..device_registry import DeviceIdentifier
 from .base import FluidraPoolSensorBase, FluidraPoolSensorEntity
 from .chlorinator import FluidraChlorinatorSensor
@@ -120,7 +120,7 @@ async def async_setup_entry(
                 # Chlorinator sensors - create based on sensors_config from device registry
                 config = DeviceIdentifier.identify_device(device)
                 device_type = config.device_type if config else device.get("type", "")
-                if device_type == "chlorinator":
+                if device_type == DEVICE_TYPE_CHLORINATOR:
                     sensors_config = DeviceIdentifier.get_feature(device, "sensors", {})
 
                     for sensor_type in ("ph", "orp", "free_chlorine", "temperature", "salinity", "chlorination_actual"):

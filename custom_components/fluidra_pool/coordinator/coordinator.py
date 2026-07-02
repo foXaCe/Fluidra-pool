@@ -21,7 +21,11 @@ from ..api_resilience import FluidraError
 from ..const import (
     CONNECTION_ISSUE_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
+    DEVICE_TYPE_CHLORINATOR,
+    DEVICE_TYPE_HEAT_PUMP,
+    DEVICE_TYPE_LIGHT,
     DOMAIN,
+    PUMP_SPEED_PERCENTAGES,
     STALE_DEVICE_THRESHOLD,
     FluidraPoolConfigEntry,
 )
@@ -251,17 +255,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 auto_mode = device.get("auto_mode_enabled", False)
                 if auto_mode:
                     device["speed_percent"] = calculate_auto_speed_from_schedules(device)
-                elif reported_value == 0:
-                    device["speed_percent"] = 45
-                elif reported_value == 1:
-                    device["speed_percent"] = 65
-                elif reported_value == 2:
-                    device["speed_percent"] = 100
+                elif isinstance(reported_value, int):
+                    device["speed_percent"] = PUMP_SPEED_PERCENTAGES.get(reported_value, 0)
                 else:
                     device["speed_percent"] = 0
         elif component_id == 13:
             device["component_13_data"] = component_state
-            if device.get("type", "").lower() == "heat_pump" and not DeviceIdentifier.has_feature(device, "z550_mode"):
+            if device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP and not DeviceIdentifier.has_feature(
+                device, "z550_mode"
+            ):
                 device["heat_pump_reported"] = reported_value
                 device["is_heating"] = bool(reported_value)
         elif component_id == 14:
@@ -278,7 +280,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raw_value = reported_value if reported_value is not None else desired_value
             device["component_15_speed"] = raw_value if raw_value is not None else 0
             temp_raw = raw_value
-            if device.get("type", "").lower() == "heat_pump" and temp_raw is not None:
+            if device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP and temp_raw is not None:
                 try:
                     temp_value = float(temp_raw) / 10.0
                     if 10.0 <= temp_value <= 50.0:
@@ -295,7 +297,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 device["z550_preset_reported"] = reported_value
         elif component_id == 19:
             device["timezone_component"] = reported_value
-            if device.get("type", "").lower() == "heat_pump" and reported_value:
+            if device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP and reported_value:
                 try:
                     water_temp_value = float(reported_value) / 10.0
                     if 5.0 <= water_temp_value <= 50.0:
@@ -304,7 +306,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     pass
         elif component_id == 20:
             device_type = device.get("type", "")
-            if device_type == "chlorinator":
+            if device_type == DEVICE_TYPE_CHLORINATOR:
                 # EXO chlorinators expose schedules (list) on component 20.
                 if isinstance(reported_value, list):
                     device["schedule_data"] = reported_value
@@ -341,7 +343,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 config = DeviceIdentifier.identify_device(device)
                 device_type = config.device_type if config else device.get("type", "")
-                if device_type == "light":
+                if device_type == DEVICE_TYPE_LIGHT:
                     schedule_data = reported_value if isinstance(reported_value, list) else []
                     device["schedule_data"] = schedule_data
                     self._track_schedule_count(pool_id, device_id, schedule_data)
@@ -367,7 +369,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 else:
                     device["hvac_action"] = "idle"
         elif component_id in [62, 65]:
-            if device.get("type", "").lower() == "heat_pump" and reported_value:
+            if device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP and reported_value:
                 try:
                     water_temp_value = float(reported_value) / 10.0
                     if 5.0 <= water_temp_value <= 50.0 and "water_temperature" not in device:

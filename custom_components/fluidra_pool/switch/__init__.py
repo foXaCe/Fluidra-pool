@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import callback
 
-from ..const import FluidraPoolConfigEntry
+from ..const import (
+    DEVICE_TYPE_CHLORINATOR,
+    DEVICE_TYPE_HEAT_PUMP,
+    DEVICE_TYPE_HEATER,
+    DEVICE_TYPE_PUMP,
+    FluidraPoolConfigEntry,
+)
 from ..device_registry import DeviceIdentifier
 from .base import FluidraPoolSwitchEntity
 from .chlorinator import FluidraChlorinatorBoostSwitch, FluidraChlorinatorSwitch
@@ -66,13 +72,15 @@ async def async_setup_entry(
                     if device_config:
                         device_type = device_config.device_type
 
-                        if device_type == "heat_pump":
+                        if device_type == DEVICE_TYPE_HEAT_PUMP:
                             entities.append(FluidraHeatPumpSwitch(coordinator, coordinator.api, pool_id, device_id))
-                        elif device_type == "pump":
+                        elif device_type == DEVICE_TYPE_PUMP:
                             entities.append(FluidraPumpSwitch(coordinator, coordinator.api, pool_id, device_id))
-                        elif device_type == "heater":
+                        elif device_type == DEVICE_TYPE_HEATER:
                             entities.append(FluidraHeaterSwitch(coordinator, coordinator.api, pool_id, device_id))
-                        elif device_type == "chlorinator" and DeviceIdentifier.has_feature(device, "on_off_component"):
+                        elif device_type == DEVICE_TYPE_CHLORINATOR and DeviceIdentifier.has_feature(
+                            device, "on_off_component"
+                        ):
                             entities.append(FluidraChlorinatorSwitch(coordinator, coordinator.api, pool_id, device_id))
 
                 if DeviceIdentifier.should_create_entity(device, "switch_auto") and not DeviceIdentifier.has_feature(

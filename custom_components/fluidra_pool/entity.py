@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DEVICE_MODEL_FALLBACK, DEVICE_MODEL_MAP, DOMAIN
 
 if TYPE_CHECKING:
     from .coordinator import FluidraDataUpdateCoordinator
@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 
 class FluidraPoolEntity(CoordinatorEntity):
     """Base class for all Fluidra Pool entities (read-only)."""
-
-    __slots__ = ("_device_id", "_pool_id")
 
     _attr_has_entity_name = True
 
@@ -65,16 +63,9 @@ class FluidraPoolEntity(CoordinatorEntity):
 
         # Use device registry to determine model type
         if config:
-            model_map = {
-                "chlorinator": "Chlorinator",
-                "pump": "Pump",
-                "heat_pump": "Heat Pump",
-                "light": "Light",
-                "heater": "Heater",
-            }
-            default_model = model_map.get(config.device_type, "Pool Equipment")
+            default_model = DEVICE_MODEL_MAP.get(config.device_type, DEVICE_MODEL_FALLBACK)
         else:
-            default_model = "Pool Equipment"
+            default_model = DEVICE_MODEL_FALLBACK
 
         device_name = device_data.get("name", f"Device {self._device_id}")
         firmware = device_data.get("firmware_version_component")
@@ -95,8 +86,6 @@ class FluidraPoolEntity(CoordinatorEntity):
 
 class FluidraPoolControlEntity(FluidraPoolEntity):
     """Base class for Fluidra Pool entities that control devices."""
-
-    __slots__ = ("_api",)
 
     def __init__(
         self,

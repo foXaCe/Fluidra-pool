@@ -27,7 +27,7 @@ from .api_resilience import (
     FluidraError,
     FluidraMFARequired,
 )
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import CONF_REFRESH_TOKEN, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .fluidra_api import FluidraPoolAPI
 from .utils import mask_email
 
@@ -124,7 +124,7 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_PASSWORD: self._pending_password,
                 }
                 if refresh_token:
-                    entry_data["refresh_token"] = refresh_token
+                    entry_data[CONF_REFRESH_TOKEN] = refresh_token
                 if self._mfa_origin == "reauth":
                     # Reauth must re-authenticate the *same* account.
                     await self.async_set_unique_id(self._pending_email.lower())

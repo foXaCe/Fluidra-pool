@@ -13,7 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
-from .const import DEVICE_TYPE_PUMP, DOMAIN, FluidraPoolConfigEntry
+from .const import DEVICE_TYPE_CHLORINATOR, DEVICE_TYPE_LIGHT, DOMAIN, FluidraPoolConfigEntry
 from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolControlEntity
@@ -58,7 +58,7 @@ async def async_setup_entry(
 
                 # Chlorinator chlorination level — skip read-only probes (e.g. Blue
                 # Connect) that declare no "number" entity and do not dose.
-                if device_type == "chlorinator" and DeviceIdentifier.should_create_entity(device, "number"):
+                if device_type == DEVICE_TYPE_CHLORINATOR and DeviceIdentifier.should_create_entity(device, "number"):
                     entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool_id, device_id))
                     # Only add pH/ORP setpoints if the device has these features
                     if DeviceIdentifier.get_feature(device, "ph_setpoint"):
@@ -66,12 +66,8 @@ async def async_setup_entry(
                     if DeviceIdentifier.get_feature(device, "orp_setpoint"):
                         entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool_id, device_id))
 
-                if device_type == DEVICE_TYPE_PUMP:
-                    # Groupe Réglages - Contrôles de vitesse temporairement désactivés
-                    pass
-
                 # LumiPlus Connect effect speed control
-                if device_type == "light":
+                if device_type == DEVICE_TYPE_LIGHT:
                     entities.append(FluidraLightEffectSpeed(coordinator, coordinator.api, pool_id, device_id))
 
         if entities:

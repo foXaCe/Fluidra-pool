@@ -145,15 +145,7 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
         else:
             auto_mode_enabled = self.device_data.get("auto_mode_enabled", False)
 
-        if auto_mode_enabled:
-            return "mdi:autorenew"
-
-        current_option = self.current_option
-        if current_option == "stopped":
-            return "mdi:pump"
-        if current_option in {"low", "medium"}:
-            return "mdi:pump"
-        return "mdi:pump"
+        return "mdi:autorenew" if auto_mode_enabled else "mdi:pump"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

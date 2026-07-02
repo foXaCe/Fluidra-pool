@@ -6,7 +6,66 @@ differences across the CC/LC/DM/NS lineups.
 
 from __future__ import annotations
 
+from typing import Any
+
 from ..types import DeviceConfig
+
+
+def _standard_tecnolc2(
+    identifier_patterns: list[str],
+    *,
+    priority: int,
+    boost_mode: int | None = None,
+    free_chlorine: int | None = None,
+) -> DeviceConfig:
+    """Build a DeviceConfig for the standard tecnoLC2 chlorinator layout.
+
+    Shared by many rebadged tecnoLC2 units (AstralPool Clear Connect, Zodiac,
+    IrriPool/Irripool/Irrijardin iSalt, KLINWASS, ...) that expose the same
+    component mapping: c10 = chlorination level (0-100%), c16 = pH setpoint
+    (÷100), c20 = ORP setpoint (mV), c103 = boost mode (when present),
+    c165 = pH measured (÷100), c170 = ORP measured (mV), c172 = water
+    temperature (°C × 10), c174 = salinity (g/L × 100), c178 = free chlorine
+    (mg/L, when present). The OFF/ON/AUTO mode select does not drive these
+    units (skip_mode_select).
+    """
+    features: dict[str, Any] = {
+        "chlorination_level": 10,
+        "ph_setpoint": 16,
+        "orp_setpoint": 20,
+    }
+    if boost_mode is not None:
+        features["boost_mode"] = boost_mode
+    features["skip_mode_select"] = True
+    sensors = {
+        "ph": 165,
+        "orp": 170,
+        "temperature": 172,
+        "salinity": 174,
+    }
+    if free_chlorine is not None:
+        sensors["free_chlorine"] = free_chlorine
+    features["sensors"] = sensors
+
+    specific_components = [10, 16, 20]
+    if boost_mode is not None:
+        specific_components.append(boost_mode)
+    specific_components.extend([165, 170, 172, 174])
+    if free_chlorine is not None:
+        specific_components.append(free_chlorine)
+    features["specific_components"] = specific_components
+
+    return DeviceConfig(
+        device_type="chlorinator",
+        identifier_patterns=identifier_patterns,
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features=features,
+        priority=priority,
+    )
+
 
 CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "chlorinator": DeviceConfig(
@@ -18,7 +77,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         entities=["switch", "select", "number", "sensor_info"],
         features={
             "chlorination_level": {"write": 4, "read": 164},  # Component 4 (write) / 164 (read).
-            "mode_control": True,  # Component 20: 0=OFF, 1=ON, 2=AUTO.
+            # Mode on component 20: 0=OFF, 1=ON, 2=AUTO.
             "ph_setpoint": {"write": 8, "read": 172},  # Component 8 (write) / 172 (read).
             "orp_setpoint": {"write": 11, "read": 177},  # Component 11 (write) / 177 (read).
             "boost_mode": 245,  # Component 245.
@@ -127,8 +186,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=85,
     ),
-    "cc24047102_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "cc24047102_chlorinator": _standard_tecnolc2(
         # AstralPool Energy Connect (tecnoLC2) — Issue #85 (@Goetz67, @pitch110).
         # Standard tecnoLC2 layout, validated against the Fluidra app with the pump
         # running: c172 = water temperature (×10, 24.6 °C — the generic config wrongly
@@ -142,208 +200,64 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # CC25017029 (Issue #121, @luiscosta1979) — same generic fallback: diagnostics
         # show c172 = 254 read as pH 2.54, while the API status_data.waterTemperature
         # confirms 25.4 °C, and c183 (generic temperature slot) reads 0. Same layout.
-        identifier_patterns=["CC24047102*", "CC25010924*", "CC25008731*", "CC25017029*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # pH measured (÷100).
-                "orp": 170,  # ORP measured (mV).
-                "temperature": 172,  # Water temperature (°C × 10).
-                "salinity": 174,  # Salinity (g/L × 100).
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+        ["CC24047102*", "CC25010924*", "CC25008731*", "CC25017029*"],
         priority=88,
+        boost_mode=103,
     ),
-    "cc24033907_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["CC24033907*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,  # Component 10 (0-100%, values rounded to multiples of 10).
-            "ph_setpoint": 16,  # Component 16 (÷100).
-            "orp_setpoint": 20,  # Component 20 (mV).
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # pH measured value (÷100) — e.g. 712 = 7.12 pH.
-                "orp": 170,  # ORP measured value (mV) — e.g. 779 mV.
-                "temperature": 172,  # °C × 10 — e.g. 136 = 13.6°C.
-                "salinity": 174,  # Salinity (g/L × 100).
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+    "cc24033907_chlorinator": _standard_tecnolc2(
+        ["CC24033907*"],
         priority=85,
+        boost_mode=103,
     ),
-    "lc24008313_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["LC24008313*"],  # Blauswim chlorinator (I.D. Electroquimica/Fluidra).
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # e.g. 731 = 7.31 pH.
-                "orp": 170,  # e.g. 688 mV.
-                "temperature": 172,  # 201 → 20.1°C.
-                "salinity": 174,  # 536 → 5.36 g/L.
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+    "lc24008313_chlorinator": _standard_tecnolc2(
+        ["LC24008313*"],  # Blauswim chlorinator (I.D. Electroquimica/Fluidra).
         priority=86,
+        boost_mode=103,
     ),
-    "lc24019518_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["LC24019518*"],  # Issue #21 — jaf69.
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,
-                "orp": 170,
-                "temperature": 172,
-                "salinity": 174,
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+    "lc24019518_chlorinator": _standard_tecnolc2(
+        ["LC24019518*"],  # Issue #21 — jaf69.
         priority=86,
+        boost_mode=103,
     ),
-    "lc24013306_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "lc24013306_chlorinator": _standard_tecnolc2(
         # Irripool iSALT (tecnoLC2) — Issues #31, #73.
         # LC24009805 (@guilhem069) is the same Irripool iSalt; it fell back to the
         # generic profile, which read the water temperature (c172 = 32.2 °C) as pH and
         # the temperature from c183 (= 0 °C). Same standard tecnoLC2 layout below.
-        identifier_patterns=["LC24013306*", "LC24009805*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,
-                "orp": 170,
-                "temperature": 172,
-                "salinity": 174,
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+        ["LC24013306*", "LC24009805*"],
         priority=86,
+        boost_mode=103,
     ),
-    "lc24004804_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "lc24004804_chlorinator": _standard_tecnolc2(
         # Irrijardin iSalt — Issue #87 (@Math43). Same iSalt OEM cell as the Irripool
         # iSALT (lc24013306), rebadged by a different retailer, so it uses the standard
         # tecnoLC2 layout. Mapping verified by the reporter against his own integration:
         # c10 chlorination, c16 pH setpoint, c165 pH, c172 water temperature, c174 salinity.
         # ORP (c170) is kept to match the sibling iSalt profiles; if this unit has no ORP
         # probe it will simply read 0 — drop "orp"/"orp_setpoint" if the reporter confirms.
-        identifier_patterns=["LC24004804*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # pH measured (÷100).
-                "orp": 170,  # ORP measured (mV) — unconfirmed on this unit.
-                "temperature": 172,  # Water temperature (°C × 10).
-                "salinity": 174,  # Salinity (g/L × 100).
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+        ["LC24004804*"],
         priority=86,
+        boost_mode=103,
     ),
-    "lc25024524_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "lc25024524_chlorinator": _standard_tecnolc2(
         # tecnoLC2 chlorinator — Issue #73 (@Ausstriken). LC25024524.nn_1 fell back to the
         # generic profile, which read c172 (water temperature) as pH (÷100 → 3.16). Standard
         # tecnoLC2 layout (same as the LC iSALT siblings), confirmed against the Fluidra app:
         # c165 = pH (7.3), c170 = ORP (659 mV — c177 is the uncalibrated raw value),
         # c172 = water temperature (×10, 31.6 °C), c174 = salinity (5.4 g/L).
-        identifier_patterns=["LC25024524*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # pH measured (÷100).
-                "orp": 170,  # ORP measured (mV) — matches the app (c177 is uncalibrated).
-                "temperature": 172,  # Water temperature (°C × 10).
-                "salinity": 174,  # Salinity (g/L × 100).
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+        ["LC25024524*"],
         priority=86,
+        boost_mode=103,
     ),
-    "cc25024927_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "cc25024927_chlorinator": _standard_tecnolc2(
         # AstralPool Clear Connect Escalable (model 77020) — Issue #70 (@VICTOR28N).
         # Bridge CC25024927 with child device CC25024927.nn_1.
         # Mapping inferred from the tecnoLC2 family (same as LC25000122 / CC24009711);
         # pending diagnostic dump confirmation.
-        identifier_patterns=["CC25024927.nn_*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,  # Component 10 (0-100%).
-            "ph_setpoint": 16,  # Component 16 (÷100).
-            "orp_setpoint": 20,  # Component 20 (mV).
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # pH measured (÷100).
-                "orp": 170,  # ORP measured (mV).
-                "temperature": 172,  # Pool temperature (°C × 10).
-                "salinity": 174,  # Salinity (g/L × 100).
-            },
-            "specific_components": [10, 16, 20, 165, 170, 172, 174],
-        },
+        ["CC25024927.nn_*"],
         priority=88,
     ),
-    "cc25011632_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "cc25011632_chlorinator": _standard_tecnolc2(
         # AstralPool Clear Connect (tecnoLC2) — Issue #123 (@josgaming).
         # CC25011632.nn_1 fell back to the generic *.nn_* profile, whose legacy layout
         # both mis-reads the sensors (c172 = 263 read as pH 2.63 instead of 26.3 °C water
@@ -354,49 +268,14 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # c16/c20 — distinct from the c165/c170 measurements — so the collision disappears.
         # pH/ORP/salinity components aren't in the generic scan, so they weren't in the
         # diagnostics; mapping inferred from the family, pending the reporter's confirmation.
-        identifier_patterns=["CC25011632.nn_*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # pH measured (÷100).
-                "orp": 170,  # ORP measured (mV).
-                "temperature": 172,  # Water temperature (°C × 10) — 263 = 26.3 °C, not pH.
-                "salinity": 174,  # Salinity (g/L × 100).
-            },
-            "specific_components": [10, 16, 20, 165, 170, 172, 174],
-        },
+        ["CC25011632.nn_*"],
         priority=88,
     ),
-    "cc24009711_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "cc24009711_chlorinator": _standard_tecnolc2(
         # AstralPool Clear Connect Scalable 21 G/H (tecnoLC2) — Issue #55.
         # Bridge CC24009711 with child device CC24009711.nn_1.
         # Mapping confirmed by @smartincervera (same as LC25000122 / LC24026011).
-        identifier_patterns=["CC24009711.nn_*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # e.g. 751 = 7.51 pH.
-                "orp": 170,  # e.g. 657 mV.
-                "temperature": 172,  # 236 = 23.6°C.
-                "salinity": 174,  # 327 = 3.27 g/L.
-            },
-            "specific_components": [10, 16, 20, 165, 170, 172, 174],
-        },
+        ["CC24009711.nn_*"],
         priority=88,
     ),
     "cc25064524_chlorinator": DeviceConfig(
@@ -512,8 +391,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=87,
     ),
-    "lc24009904_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "lc24009904_chlorinator": _standard_tecnolc2(
         # KLINWASS (tecnoLC2 with pH + ORP probes) — Issue #82.
         # Was falling back to the generic config, which read c172 (water
         # temperature ×10) as pH ÷100 → wrong pH 4.27, and showed each sensor
@@ -521,118 +399,29 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # layout: c20 = ORP setpoint (600, matches the app), c172 = water
         # temperature ×10 (42.7 °C, matches status_data 41.7 °C). Same mapping
         # as cc25019007 / lc24026011 / lc25000122.
-        identifier_patterns=["LC24009904.nn_*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # pH measured (÷100).
-                "orp": 170,  # ORP measured (mV) — c177 is uncalibrated raw.
-                "temperature": 172,  # Water temperature (°C × 10).
-                "salinity": 174,  # Salinity (g/L × 100).
-            },
-            "specific_components": [10, 16, 20, 165, 170, 172, 174],
-        },
+        ["LC24009904.nn_*"],
         priority=87,
     ),
-    "cc25019007_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "cc25019007_chlorinator": _standard_tecnolc2(
         # Zodiac OE iQ 12 (tecnoLC2) — Issue #55 follow-up.
         # Mapping by analogy with the tecnoLC2 family.
-        identifier_patterns=["CC25019007.nn_*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,
-                "orp": 170,
-                "temperature": 172,
-                "salinity": 174,
-            },
-            "specific_components": [10, 16, 20, 165, 170, 172, 174],
-        },
+        ["CC25019007.nn_*"],
         priority=87,
     ),
-    "lc24026011_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "lc24026011_chlorinator": _standard_tecnolc2(
         # IrriPool iSalt tecnoLC2 bridge — Issue #58 (confirmed by @flyman1664 on Issue #53).
-        identifier_patterns=["LC24026011.nn_*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,  # 740 = 7.40 pH.
-            "orp_setpoint": 20,  # 710 mV.
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,
-                "orp": 170,
-                "temperature": 172,  # 204 = 20.4°C.
-                "salinity": 174,
-            },
-            "specific_components": [10, 16, 20, 165, 170, 172, 174],
-        },
+        ["LC24026011.nn_*"],
         priority=87,
     ),
-    "lc25000122_chlorinator": DeviceConfig(
-        device_type="chlorinator",
+    "lc25000122_chlorinator": _standard_tecnolc2(
         # IrriPool iSalt tecnoLC2 bridge — Issue #53.
-        identifier_patterns=["LC25000122.nn_*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # 731 = 7.31 pH.
-                "orp": 170,  # 727 mV.
-                "temperature": 172,  # 188 = 18.8°C.
-                "salinity": 174,  # 589 = 5.89 g/L.
-            },
-            "specific_components": [10, 16, 20, 165, 170, 172, 174],
-        },
+        ["LC25000122.nn_*"],
         priority=87,
     ),
-    "lc24015802_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["LC24015802.nn_*"],  # Tecno LC2 bridge child.
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,
-                "orp": 170,
-                "temperature": 172,
-                "salinity": 174,
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+    "lc24015802_chlorinator": _standard_tecnolc2(
+        ["LC24015802.nn_*"],  # Tecno LC2 bridge child.
         priority=87,
+        boost_mode=103,
     ),
     "lc24056317_chlorinator": DeviceConfig(
         device_type="chlorinator",
@@ -655,168 +444,42 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=86,
     ),
-    "lc25007119_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["LC25007119*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,
-                "orp": 170,
-                "temperature": 172,
-                "salinity": 174,
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+    "lc25007119_chlorinator": _standard_tecnolc2(
+        ["LC25007119*"],
         priority=86,
+        boost_mode=103,
     ),
-    "cc24018202_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["CC24018202*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # 727 = 7.27 pH.
-                "orp": 170,  # 768 mV.
-                "temperature": 172,  # 255 = 25.5°C.
-                "salinity": 174,
-                "free_chlorine": 178,
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174, 178],
-        },
+    "cc24018202_chlorinator": _standard_tecnolc2(
+        ["CC24018202*"],
         priority=87,
+        boost_mode=103,
+        free_chlorine=178,
     ),
-    "cc25113623_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["CC25113623*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # 716 = 7.16 pH.
-                "orp": 170,  # 681 mV.
-                "temperature": 172,  # 291 → 29.1°C.
-                "salinity": 174,  # 570 → 5.70 g/L.
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+    "cc25113623_chlorinator": _standard_tecnolc2(
+        ["CC25113623*"],
         priority=87,
+        boost_mode=103,
     ),
-    "cc24021110_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["CC24021110*"],
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # 741 = 7.41 pH.
-                "orp": 170,  # 791 mV.
-                "temperature": 172,  # 216 → 21.6°C.
-                "salinity": 174,
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+    "cc24021110_chlorinator": _standard_tecnolc2(
+        ["CC24021110*"],
         priority=88,
+        boost_mode=103,
     ),
-    "cc24042517_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["CC24042517*"],  # AstralPool Clear Connect Evo 21g — Issue #51.
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,
-            "ph_setpoint": 16,
-            "orp_setpoint": 20,
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # 680 = 6.80 pH.
-                "orp": 170,  # 692 mV.
-                "temperature": 172,  # 190 = 19.0°C.
-                "salinity": 174,  # 432 = 4.32 g/L.
-                "free_chlorine": 178,  # mg/L ÷ 100.
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174, 178],
-        },
+    "cc24042517_chlorinator": _standard_tecnolc2(
+        ["CC24042517*"],  # AstralPool Clear Connect Evo 21g — Issue #51.
         priority=88,
+        boost_mode=103,
+        free_chlorine=178,
     ),
-    "cc25002928_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["CC25002928*"],  # Energy Connect 21 Scalable.
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,  # 40 = 40%.
-            "ph_setpoint": 16,  # 720 = 7.20 pH.
-            "orp_setpoint": 20,  # 720 mV.
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # 719 = 7.19 pH.
-                "orp": 170,  # 729 mV.
-                "temperature": 172,  # 195 = 19.5°C.
-                "salinity": 174,  # 566 = 5.66 g/L.
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+    "cc25002928_chlorinator": _standard_tecnolc2(
+        ["CC25002928*"],  # Energy Connect 21 Scalable.
         priority=89,
+        boost_mode=103,
     ),
-    "cc25013923_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["CC25013923*"],  # joaopg — Issue #14.
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,  # 70 = 70%.
-            "ph_setpoint": 16,  # 720 = 7.20 pH.
-            "orp_setpoint": 20,  # 650 mV.
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # 720 = 7.20 pH.
-                "orp": 170,  # 733 mV.
-                "temperature": 172,  # 117 = 11.7°C.
-                "salinity": 174,  # 244 = 2.44 g/L.
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+    "cc25013923_chlorinator": _standard_tecnolc2(
+        ["CC25013923*"],  # joaopg — Issue #14.
         priority=90,
+        boost_mode=103,
     ),
     "cc25005502_chlorinator": DeviceConfig(
         device_type="chlorinator",
@@ -829,7 +492,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "chlorination_level": 10,
             "boost_mode": 103,
             "skip_mode_select": True,
-            "skip_ph_orp": True,  # No pH/ORP probes.
+            # No pH/ORP probes.
             "skip_firmware": True,  # Firmware value not meaningful for this model.
             "sensors": {
                 "temperature": 172,  # 66 = 6.6°C.
@@ -855,7 +518,6 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "ph_setpoint": 157,  # Component 157 (÷10, e.g., 72 → 7.2 pH).
             "ph_setpoint_divisor": 10,  # This device uses ÷10 (not ÷100).
             "skip_mode_select": True,
-            "skip_ph_orp": True,
             "sensors": {
                 "ph": 165,  # 686 → 6.86 pH.
                 "temperature": 172,  # 136 → 13.6°C.
@@ -917,28 +579,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=92,
     ),
-    "cc24017504_chlorinator": DeviceConfig(
-        device_type="chlorinator",
-        identifier_patterns=["CC24017504*"],  # Energy Connect tecnoLC2 (with pH/ORP) — nicolasp.
-        family_patterns=["chlorinator"],
-        components_range=25,
-        required_components=[0, 1, 2, 3],
-        entities=["switch", "number", "sensor_info"],
-        features={
-            "chlorination_level": 10,  # 80 = 80%.
-            "ph_setpoint": 16,  # 760 = 7.60 pH.
-            "orp_setpoint": 20,  # 700 mV.
-            "boost_mode": 103,
-            "skip_mode_select": True,
-            "sensors": {
-                "ph": 165,  # 760 = 7.60 pH.
-                "orp": 170,  # 669 mV.
-                "temperature": 172,  # 138 = 13.8°C.
-                "salinity": 174,  # 480 = 4.80 g/L.
-            },
-            "specific_components": [10, 16, 20, 103, 165, 170, 172, 174],
-        },
+    "cc24017504_chlorinator": _standard_tecnolc2(
+        ["CC24017504*"],  # Energy Connect tecnoLC2 (with pH/ORP) — nicolasp.
         priority=92,
+        boost_mode=103,
     ),
     "cc24000304_chlorinator": DeviceConfig(
         device_type="chlorinator",
@@ -974,7 +618,6 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "chlorination_level": 10,
             "boost_mode": 103,
             "skip_mode_select": True,
-            "skip_ph_orp": True,
             "sensors": {
                 "temperature": 172,  # 144 = 14.4°C.
                 "salinity": 174,  # 310 = 3.10 g/L.
@@ -993,7 +636,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         entities=["switch", "select", "number", "sensor_info", "time"],
         features={
             "chlorination_level": 4,
-            "mode_control": True,  # Component 20: 0=OFF, 1=ON, 2=AUTO.
+            # Mode on component 20: 0=OFF, 1=ON, 2=AUTO.
             "ph_setpoint": 8,  # 740 = 7.40 pH.
             "orp_setpoint": 11,  # 690 mV.
             "boost_mode": 245,
@@ -1056,7 +699,6 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "chlorination_max": 100,  # EXO uses 0-100% range.
             "chlorination_step": 5,  # Step 5% for EXO.
             # boost_mode: NOT supported on EXO (c14 unreadable + API 403 on write).
-            "mode_control": True,
             "mode_component": 13,
             "mode_mapping": {0: "off", 1: "auto", 2: "on"},  # EXO: 1=AUTO (confirmed).
             "orp_setpoint": 39,  # mV — e.g. 770.

@@ -12,6 +12,8 @@ from typing import Any
 
 from homeassistant.util import dt as dt_util
 
+from ..const import PUMP_SPEED_PERCENTAGES
+
 _LOGGER = logging.getLogger(__name__)
 
 _DAY_NAME_TO_CRON: dict[str, int] = {
@@ -25,11 +27,9 @@ _DAY_NAME_TO_CRON: dict[str, int] = {
 }
 
 # operationName → effective percentage at the pump (from mitmproxy capture).
-_OPERATION_TO_PERCENT: dict[str, int] = {
-    "0": 45,  # Low.
-    "1": 65,  # Medium.
-    "2": 100,  # High.
-}
+# Schedule payloads carry the speed level as a *string*; derive from the
+# canonical integer mapping in const.py so there is a single source of truth.
+_OPERATION_TO_PERCENT: dict[str, int] = {str(level): pct for level, pct in PUMP_SPEED_PERCENTAGES.items()}
 
 
 def parse_dm24049704_schedule_format(reported_value: dict[str, Any]) -> list[dict[str, Any]]:
