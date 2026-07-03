@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Zodiac Ei2 iQ 20 pH Evo chlorinator `CC26010842`** (Issue #104, @terminator1992) — the unit fell back to the legacy generic profile, which read the water temperature (c172 = 289 → 28.9 °C) as pH *and* as the pH-setpoint read-back (pH stuck mirroring the setpoint), left salinity/temperature at 0 and exposed a non-working mode select. Dedicated pH-only tecnoLC2 profile: pH (c165), temperature (c172), salinity (c174), pH setpoint (c16), chlorination level (c10) — no ORP entities (no probe, c20 is null on this unit). The scan also polls the candidate CLE/COU production registers (c9/c13/c14/c103/c154) like the sibling Ei2 iQ Evo profile.
+
 ## [2.45.1] - 2026-07-02
 
 ### Fixed

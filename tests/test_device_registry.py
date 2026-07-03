@@ -188,6 +188,32 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["chlorination_level"] == 10
 
+    def test_cc26010842_ei2_iq_20_ph_evo_ph_only_layout(self):
+        """Ei2 iQ 20 pH Evo CC26010842 maps on the pH-only tecnoLC2 layout (Issue #104)."""
+        config = DEVICE_CONFIGS["cc26010842_chlorinator"]
+        device = {
+            "device_id": "CC26010842.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        sensors = config.features["sensors"]
+        # c172 is water temperature (289 = 28.9 °C) — the generic profile read it as pH.
+        assert sensors["ph"] == 165
+        assert sensors["temperature"] == 172
+        assert sensors["salinity"] == 174
+        # pH-only unit: no ORP probe, no ORP setpoint (c20 = null in diagnostics).
+        assert "orp" not in sensors
+        assert "free_chlorine" not in sensors
+        assert "orp_setpoint" not in config.features
+        assert config.features["ph_setpoint"] == 16
+        assert config.features["skip_mode_select"] is True
+        # Widened scan shared with the sibling Evo profile (CLE/COU hunt).
+        for component in (9, 13, 14, 103, 154):
+            assert component in config.features["specific_components"]
+
     def test_lc24008202_ducere21_uses_tecnolc2_layout(self):
         """Ducere 21 LC24008202 maps on the tecnoLC2 layout, not the generic profile (Issue #125)."""
         config = DEVICE_CONFIGS["lc24008202_chlorinator"]
