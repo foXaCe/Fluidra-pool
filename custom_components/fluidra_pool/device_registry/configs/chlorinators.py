@@ -319,6 +319,39 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=87,
     ),
+    "cc26010842_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Zodiac Ei2 iQ 20 pH Evo (tecnoLC2, pH-only — no ORP probe) — Issue #104
+        # (@terminator1992). Fell back to the legacy generic profile which read
+        # c172 (water temperature, 289 → 28.9 °C, matches the app) as pH AND as
+        # the pH-setpoint read-back, so pH mirrored the setpoint (2.89). v2.45.1
+        # diagnostics confirmed: c20 = null (no ORP setpoint register on this
+        # pH-only unit), c177/c178/c183/c185 all 0 (legacy slots empty),
+        # disinfection saltLowLevel with pH-minus dosing only. Standard tecnoLC2
+        # layout minus everything ORP: pH c165, temperature c172, salinity c174,
+        # setpoint c16, chlorination c10.
+        identifier_patterns=["CC26010842*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "skip_mode_select": True,
+            "sensors": {
+                "ph": 165,
+                "temperature": 172,  # 289 = 28.9 °C — confirmed against the app.
+                "salinity": 174,
+            },
+            # c9/c13/c14/c103/c154 widen the scan like the sibling Evo profile
+            # (cc25102423): same Ei2 iQ Evo mainboard family, so the CLE/COU
+            # production registers (Issue #104) should surface in the next
+            # diagnostics capture without creating any entity yet.
+            "specific_components": [9, 10, 13, 14, 16, 103, 154, 165, 172, 174],
+        },
+        priority=90,
+    ),
     "cc25102423_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # tecnoLC2 "Evo" profile, with ORP + ORP setpoint — Issues #63, #73, #104.
