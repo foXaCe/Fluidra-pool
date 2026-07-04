@@ -148,6 +148,15 @@ The integration is configured entirely from the UI (config flow):
 - **Re-auth / Reconfigure** — Home Assistant prompts you to re-authenticate if the token is
   rejected; you can also reconfigure (e.g. change the account email) from the integration menu
 
+> [!IMPORTANT]
+> **Region — EMEA (Europe) only.** This integration talks to Fluidra's **EMEA** backend
+> (`api.fluidra-emea.com`). Only myFluidra / Fluidra Connect accounts registered in the
+> EMEA region can log in. Accounts created in other regions — e.g. **North America**
+> (iAquaLink US) or **Australia / APAC** — live on a different Fluidra backend and will be
+> rejected with an "invalid credentials" error even though the same credentials work in the
+> official app. Multi-region support isn't available yet (it needs the regional endpoints and
+> a test account to implement safely).
+
 ### Options
 - **Update interval** — polling interval in seconds, configurable from **30 to 1800**
   (default **30 s**). Change it via the integration's **Configure** button.
@@ -250,6 +259,7 @@ entities:
 
 | Symptom | Likely cause / fix |
 |---------|--------------------|
+| `Invalid credentials` but the app works | Account registered **outside EMEA** (North America, Australia, …) — not supported (see [Configuration](#-configuration)) |
 | `Authentication failed` | Wrong credentials or expired token → re-authenticate |
 | `No pools found` | Account has no equipment, or it's offline in the Fluidra app |
 | Device shows *unavailable* | The device reports itself offline to the Fluidra cloud |

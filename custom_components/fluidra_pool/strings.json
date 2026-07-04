@@ -7,7 +7,7 @@
     },
     "error": {
       "cannot_connect": "Unable to connect to Fluidra API",
-      "invalid_auth": "Invalid credentials. Check your email and password",
+      "invalid_auth": "Login failed. Check your email and password. If your account is registered outside the EMEA region (Europe), it is not currently supported.",
       "invalid_mfa_code": "Invalid or expired verification code. Please try again.",
       "no_pools": "No pools found. Make sure your equipment is configured in the Fluidra Pool app",
       "unknown": "Unexpected error"
@@ -45,7 +45,7 @@
           "email": "The email address of your Fluidra Pool (iAquaLink) account.",
           "password": "The password of your Fluidra Pool account."
         },
-        "description": "Enter your Fluidra Pool credentials",
+        "description": "Enter your Fluidra Pool (iAquaLink) account credentials.\n\n**Note:** only accounts registered in the EMEA region (Europe) are supported. Accounts from other regions (e.g. North America, Australia) use a different Fluidra backend and cannot connect here.",
         "title": "Fluidra Pool Configuration"
       }
     }
