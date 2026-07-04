@@ -500,6 +500,43 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         priority=86,
         boost_mode=103,
     ),
+    "cc24018506_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # AstralPool / Fluidra Energy Connect (tecnoLC2, firmware 40) — Issue #129
+        # (@luistf76). Fell back to the generic *.nn_* profile, which read c172
+        # (water temperature, 315 → 31.5 °C) as pH and c177 (raw, uncalibrated
+        # ORP, 676) as ORP. The reporter cross-checked every register against the
+        # Fluidra app on the live unit:
+        #   c170 = 597 → calibrated ORP (matches the app; c177 is ~79 mV high)
+        #   c172 = 315 → water temperature 31.5 °C
+        #   c16  = 740 → pH setpoint 7.40   c20 = 710 → ORP setpoint 710 mV
+        #   c4/c164     → chlorination level write/read (legacy slots; no c10)
+        # This bridge exposes no live pH-measured component (c165 absent; c8 is
+        # only the pH-setpoint write echo, dropping to 0 when the dosing pump is
+        # idle) and no live salinity (c185 stays 0; the app reads it from a
+        # different endpoint), so neither sensor is mapped rather than surfacing a
+        # misleading value. c20 is the ORP setpoint, not a 0/1/2 mode register, so
+        # the mode select is skipped (it would map 710 → "off" and clobber the
+        # setpoint on write).
+        identifier_patterns=["CC24018506*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "chlorination_level": {"write": 4, "read": 164},
+            "ph_setpoint": {"write": 8, "read": 16},
+            "orp_setpoint": {"write": 11, "read": 20},
+            "boost_mode": 245,
+            "skip_mode_select": True,
+            "sensors": {
+                "orp": 170,  # Calibrated ORP — matches the app (c177 is raw).
+                "temperature": 172,  # 315 = 31.5 °C.
+            },
+            "specific_components": [4, 8, 11, 16, 20, 164, 170, 172, 245],
+        },
+        priority=90,
+    ),
     "cc24018202_chlorinator": _standard_tecnolc2(
         ["CC24018202*"],
         priority=87,

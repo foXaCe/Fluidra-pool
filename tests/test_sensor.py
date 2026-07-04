@@ -279,3 +279,35 @@ def test_chlorinator_zero_non_orp_sensor_still_reads_zero() -> None:
     device = _pinned_device(DEVICE_ID, components={"178": {"reportedValue": 0}})
     sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "free_chlorine", 178)
     assert sensor.native_value == pytest.approx(0.0)
+
+
+def test_chlorinator_ph_zero_reads_unknown() -> None:
+    """A pH of exactly 0 is impossible for real pool water (Issue #129).
+
+    On some bridges the pH register only echoes the setpoint and clears to 0
+    when the dosing pump is idle, so 0 means "no live reading", not pH 0.0.
+    """
+    device = _pinned_device(DEVICE_ID, components={"8": {"reportedValue": 0}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 8)
+    assert sensor.native_value is None
+
+
+def test_chlorinator_salinity_zero_reads_unknown() -> None:
+    """A running salt cell never reads exactly 0 g/L — a frozen 0 means no reading (Issue #129)."""
+    device = _pinned_device(DEVICE_ID, components={"185": {"reportedValue": 0}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "salinity", 185)
+    assert sensor.native_value is None
+
+
+def test_chlorinator_ph_nonzero_reads_value() -> None:
+    """A real pH reading is still reported unchanged (regression guard for #129)."""
+    device = _pinned_device(DEVICE_ID, components={"165": {"reportedValue": 742}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 165)
+    assert sensor.native_value == pytest.approx(7.42)
+
+
+def test_chlorinator_temperature_zero_still_reads_zero() -> None:
+    """Temperature is not guarded: 0 °C is a legitimate (if cold) reading."""
+    device = _pinned_device(DEVICE_ID, components={"172": {"reportedValue": 0}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "temperature", 172)
+    assert sensor.native_value == pytest.approx(0.0)
