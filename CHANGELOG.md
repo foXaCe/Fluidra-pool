@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Region limitation documented** (Issue #91) — the integration only supports myFluidra / Fluidra Connect accounts registered in the **EMEA** region (Europe). Accounts from other regions (North America, Australia/APAC) use a different Fluidra backend and are rejected with an "invalid credentials" error even though the same login works in the official app. The config-flow login screen now states this upfront, the `invalid_auth` error mentions it as a possible cause, and the README has a dedicated note.
+
 ## [2.45.2] - 2026-07-03
 
 ### Fixed
