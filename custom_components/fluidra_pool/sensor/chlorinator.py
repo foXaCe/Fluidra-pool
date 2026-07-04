@@ -151,12 +151,14 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
             _LOGGER.debug("Failed to parse sensor value %s for component %s", raw_value, self._component_id)
             return None
 
-        # An ORP (redox) probe immersed in water always reads a non-zero mV
-        # potential, so a flat 0 means no probe is connected — e.g. the Zodiac
-        # eXO iQ LS, where the ORP probe is an optional Dual Link add-on (Issue
-        # #111). Report "unknown" instead of a misleading 0 mV; the entity
-        # surfaces a real value automatically if a probe is added later.
-        if self._sensor_type == "orp" and value == 0:
+        # A pH / ORP / salinity reading of exactly 0 is physically impossible for
+        # a probe in a running salt pool, so it means "no live reading" rather
+        # than a real value: a bare ORP register on a probe-less unit (Zodiac
+        # eXO iQ LS optional Dual Link probe, Issue #111), a pH register that
+        # only echoes the setpoint and clears to 0 when the dosing pump is idle,
+        # or a salinity slot frozen at 0 (Issue #129). Report "unknown" instead
+        # of a misleading 0; a real value surfaces automatically if it appears.
+        if value == 0 and self._sensor_type in ("orp", "ph", "salinity"):
             return None
 
         return value

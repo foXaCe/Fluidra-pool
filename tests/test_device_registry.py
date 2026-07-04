@@ -188,6 +188,32 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["chlorination_level"] == 10
 
+    def test_cc24018506_energy_connect_calibrated_orp_no_fake_ph_salinity(self):
+        """Energy Connect CC24018506 uses calibrated ORP (c170) and drops the fake pH/salinity (Issue #129)."""
+        config = DEVICE_CONFIGS["cc24018506_chlorinator"]
+        device = {
+            "device_id": "CC24018506.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+        }
+        # Must win over the generic *.nn_* profile (priority 80).
+        assert DeviceIdentifier.identify_device(device) is config
+        assert config.priority > 80
+        sensors = config.features["sensors"]
+        # Calibrated ORP (c170), not the raw/uncalibrated c177 the generic profile used.
+        assert sensors["orp"] == 170
+        assert sensors["temperature"] == 172  # 315 = 31.5 °C, not read as pH.
+        # No live pH-measured / salinity component on this bridge -> no misleading sensor.
+        assert "ph" not in sensors
+        assert "salinity" not in sensors
+        # c20 is the ORP setpoint, not a mode register -> the broken mode select is skipped.
+        assert config.features["skip_mode_select"] is True
+        assert config.features["ph_setpoint"] == {"write": 8, "read": 16}
+        assert config.features["orp_setpoint"] == {"write": 11, "read": 20}
+        assert config.features["chlorination_level"] == {"write": 4, "read": 164}
+
     def test_cc26010842_ei2_iq_20_ph_evo_ph_only_layout(self):
         """Ei2 iQ 20 pH Evo CC26010842 maps on the pH-only tecnoLC2 layout (Issue #104)."""
         config = DEVICE_CONFIGS["cc26010842_chlorinator"]
