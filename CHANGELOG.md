@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.45.4] - 2026-07-05
+
 ### Fixed
 - **AstralPool / Fluidra Energy Connect chlorinator `CC24018506`** (tecnoLC2, fw 40 — Issue #129, @luistf76). The unit fell back to the generic profile, which read c172 (water temperature, 31.5 °C) as pH and c177 (raw, uncalibrated ORP) as ORP — ~72 mV higher than the app. Dedicated profile validated register-by-register against the Fluidra app: **calibrated ORP on c170**, temperature c172, pH/ORP setpoints c16/c20, legacy chlorination c4/c164. The unit exposes no live pH-measured component (c8 only echoes the pH setpoint) and no live salinity (c185 stays 0), so those misleading sensors are no longer created, and the mode select is skipped (c20 is the ORP setpoint, not a mode register).
 - **Impossible-zero guard extended to pH and salinity** (Issue #129) — a pH or salinity reading of exactly 0 (a setpoint-echo register clearing to 0, or a frozen salinity slot) now shows *unknown* instead of a physically-impossible 0.0, mirroring the existing ORP guard (Issue #111).
