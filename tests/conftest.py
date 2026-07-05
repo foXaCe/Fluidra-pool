@@ -29,6 +29,7 @@ def mock_api() -> AsyncMock:
     api.access_token = "test-access-token"
     api.refresh_token = "test-refresh-token"
     api.token_expires_at = None
+    api.user_id = "test-user-id"
     api.authenticate = AsyncMock(return_value=True)
     api.ensure_valid_token = AsyncMock(return_value=True)
     api.get_pools = AsyncMock(

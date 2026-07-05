@@ -117,6 +117,12 @@ class FluidraPoolStatusSensor(FluidraPoolSensorBase):
         attrs["pool_state"] = pool_data.get("state", "unknown")
         if "owner" in pool_data:
             attrs["owner_id"] = pool_data["owner"]
+        access_level = pool_data.get("access_level")
+        if access_level:
+            attrs["access_level"] = access_level
+            # Read-only account: control writes are accepted by the cloud but
+            # silently discarded (Issue #129).
+            attrs["read_only"] = access_level == "viewer"
 
         characteristics = pool_data.get("characteristics", {})
         if characteristics:

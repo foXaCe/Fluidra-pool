@@ -264,6 +264,7 @@ entities:
 | `No pools found` | Account has no equipment, or it's offline in the Fluidra app |
 | Device shows *unavailable* | The device reports itself offline to the Fluidra cloud |
 | Commands seem ignored | Check debug logs; transient cloud rejections now surface as errors |
+| Setpoints/switches never change (no error) | Account has **viewer** (read-only) access to the pool — the cloud accepts writes but doesn't apply them. Check the `access_level` attribute on the pool status sensor; owner access is required to control equipment |
 
 ---
 

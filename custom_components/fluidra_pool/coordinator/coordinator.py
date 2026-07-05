@@ -31,6 +31,7 @@ from ..const import (
 )
 from ..device_registry import DeviceIdentifier
 from ..fluidra_api import FluidraPoolAPI
+from ..helpers import determine_pool_access
 from ..repairs import async_create_connection_issue, async_delete_connection_issue
 from ._parsers import calculate_auto_speed_from_schedules, parse_dm24049704_schedule_format
 
@@ -54,6 +55,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._first_update = True
         # Consecutive failed poll cycles; drives the connection_error repair issue.
         self._consecutive_update_failures = 0
+        # Pools already warned about read-only (viewer) access — warn once, not every poll.
+        self._read_only_pools_warned: set[str] = set()
 
         # Honour the user-configured polling interval.
         scan_interval = DEFAULT_SCAN_INTERVAL
@@ -546,6 +549,21 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             api_devices = pool.get("devices", [])
             pool.update(pool_details_result)
             pool["devices"] = api_devices
+
+        # Determine whether the account can actually control this pool. A viewer
+        # (read-only) contract makes the backend accept control writes with a
+        # fake HTTP 200 that echoes the requested value but never persists it, so
+        # commands silently have no effect (Issue #129). Surface it and warn once.
+        access_level = determine_pool_access(pool, self.api.user_id)
+        pool["access_level"] = access_level
+        if access_level == "viewer" and pool_id not in self._read_only_pools_warned:
+            self._read_only_pools_warned.add(pool_id)
+            _LOGGER.warning(
+                "Account has viewer (read-only) access to pool %s: control commands "
+                "(setpoints, switches) are accepted by the Fluidra cloud but not applied. "
+                "Owner-level access is required to change settings",
+                pool.get("name", pool_id),
+            )
 
         if isinstance(water_quality_result, dict):
             pool["water_quality"] = water_quality_result
