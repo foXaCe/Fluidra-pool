@@ -386,7 +386,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     pass
         elif component_id == 67:
             device["component_67_data"] = component_state
-            if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
+            # Air temperature on the Z260iQ and Z250iQ (same register/scale).
+            air_temp_model = DeviceIdentifier.has_feature(device, "z260iq_mode") or DeviceIdentifier.has_feature(
+                device, "z250iq_mode"
+            )
+            if air_temp_model and reported_value is not None:
                 try:
                     air_temp = float(reported_value) / 10.0
                     if -30.0 <= air_temp <= 60.0:

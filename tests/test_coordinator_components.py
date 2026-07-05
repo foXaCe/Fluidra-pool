@@ -150,6 +150,20 @@ async def test_component_67_out_of_range_temperature_ignored(coordinator: Fluidr
     assert "air_temperature" not in device
 
 
+async def test_component_67_air_temperature_for_z250iq(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """Component 67 is air temperature ×10 for the Z250iQ too (Issue #131)."""
+    device = _pinned_device(features={"z250iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 67, {"reportedValue": 213})
+    assert device["air_temperature"] == 21.3
+
+
+async def test_component_67_ignored_without_air_temp_model(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """A heat pump without z250iq_mode/z260iq_mode does not expose c67 as air temperature."""
+    device = _pinned_device(features={})
+    coordinator._process_component_state(device, "pool_001", 67, {"reportedValue": 245})
+    assert "air_temperature" not in device
+
+
 # --- Z550 specific paths (16, 17, 21, 37, 40, 61) -----------------------
 
 

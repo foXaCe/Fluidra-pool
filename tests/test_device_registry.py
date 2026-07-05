@@ -188,6 +188,17 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["chlorination_level"] == 10
 
+    def test_z250iq_exposes_air_temperature_without_becoming_z260(self):
+        """Z250iQ gains the air-temperature sensor (c67) but keeps its own mode handling (Issue #131)."""
+        config = DEVICE_CONFIGS["z250iq_heat_pump"]
+        # Air temp is wired: component scanned, sensor_temperature entity, dedicated flag.
+        assert 67 in config.features["specific_components"]
+        assert "sensor_temperature" in config.entities
+        assert config.features.get("z250iq_mode") is True
+        # But it is NOT turned into a Z260iQ: no z260iq_mode, own hvac_modes kept.
+        assert "z260iq_mode" not in config.features
+        assert config.features["hvac_modes"] == ["off", "heat"]
+
     def test_cc24018506_energy_connect_calibrated_orp_no_fake_ph_salinity(self):
         """Energy Connect CC24018506 uses calibrated ORP (c170) and drops the fake pH/salinity (Issue #129)."""
         config = DEVICE_CONFIGS["cc24018506_chlorinator"]
