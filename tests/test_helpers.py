@@ -64,3 +64,50 @@ def test_parse_cron_time_valid(cron, expected) -> None:
 def test_parse_cron_time_invalid_returns_none(invalid) -> None:
     """Short, non-numeric, out-of-range or non-string input → None."""
     assert parse_cron_time(invalid) is None  # type: ignore[arg-type]
+
+
+# --- determine_pool_access --------------------------------------------------
+
+
+def test_pool_access_owner_by_user_id_match() -> None:
+    """The account owns the pool when its consumer id matches pool['owner']."""
+    from custom_components.fluidra_pool.helpers import determine_pool_access
+
+    pool = {"owner": "user-1", "contracts": [{"id": "user-1", "accessLevel": "viewer"}]}
+    # Owner match wins even if a contract says viewer.
+    assert determine_pool_access(pool, "user-1") == "owner"
+
+
+def test_pool_access_viewer_when_all_contracts_viewer_and_not_owner() -> None:
+    from custom_components.fluidra_pool.helpers import determine_pool_access
+
+    pool = {
+        "owner": "someone-else",
+        "contracts": [{"id": "a", "accessLevel": "viewer"}, {"id": "b", "accessLevel": "viewer"}],
+    }
+    assert determine_pool_access(pool, "user-1") == "viewer"
+
+
+def test_pool_access_reads_own_contract_level() -> None:
+    """When our contract is identifiable, its exact level is returned."""
+    from custom_components.fluidra_pool.helpers import determine_pool_access
+
+    pool = {
+        "owner": "owner-x",
+        "contracts": [{"id": "user-1", "accessLevel": "editor"}, {"id": "b", "accessLevel": "viewer"}],
+    }
+    assert determine_pool_access(pool, "user-1") == "editor"
+
+
+def test_pool_access_shared_when_mixed_and_unmatched() -> None:
+    from custom_components.fluidra_pool.helpers import determine_pool_access
+
+    pool = {"owner": "owner-x", "contracts": [{"accessLevel": "viewer"}, {"accessLevel": "owner"}]}
+    assert determine_pool_access(pool, "user-1") == "shared"
+
+
+def test_pool_access_unknown_without_contracts() -> None:
+    from custom_components.fluidra_pool.helpers import determine_pool_access
+
+    assert determine_pool_access({"owner": "x"}, None) == "unknown"
+    assert determine_pool_access({}, "user-1") == "unknown"

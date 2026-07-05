@@ -65,3 +65,39 @@ def parse_cron_time(cron_time: str) -> time | None:
     except (ValueError, TypeError, IndexError, AttributeError):
         pass
     return None
+
+
+def determine_pool_access(pool: dict[str, Any], user_id: str | None) -> str:
+    """Classify the account's access to a pool.
+
+    Returns one of ``"owner"``, ``"viewer"``, ``"shared"`` or ``"unknown"``.
+    The account owns the pool when its consumer id matches ``pool["owner"]``.
+    Otherwise the access level is read from the ``contracts`` list: the account's
+    own contract when it can be matched by id, else ``"viewer"`` when every
+    contract is viewer-only, else ``"shared"``. ``"unknown"`` when there is not
+    enough information.
+
+    A ``"viewer"`` result matters because the Fluidra backend accepts control
+    writes from a viewer with an HTTP 200 that echoes the requested value but
+    never persists it, so commands silently have no effect (Issue #129).
+    """
+    owner_id = pool.get("owner")
+    if user_id and owner_id and owner_id == user_id:
+        return "owner"
+
+    contracts = pool.get("contracts")
+    if not isinstance(contracts, list) or not contracts:
+        return "unknown"
+
+    levels = [c.get("accessLevel") for c in contracts if isinstance(c, dict)]
+
+    if user_id:
+        for contract in contracts:
+            if isinstance(contract, dict) and contract.get("id") == user_id:
+                level = contract.get("accessLevel")
+                if isinstance(level, str):
+                    return level
+
+    if levels and all(level == "viewer" for level in levels):
+        return "viewer"
+    return "shared"

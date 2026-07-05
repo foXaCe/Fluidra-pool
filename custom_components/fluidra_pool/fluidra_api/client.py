@@ -47,6 +47,9 @@ class FluidraPoolAPI(SessionMixin, AuthMixin, DevicesMixin, ComponentsMixin, Com
         self.access_token: str | None = None
         self.refresh_token: str | None = refresh_token
         self.token_expires_at: int | None = None
+        # Consumer id of the authenticated account (from mobile/consumers/me);
+        # lets us tell whether the account owns a pool or only has shared access.
+        self.user_id: str | None = None
         # Monotonic stamp of the last successful token store — lets waiters on
         # the token lock detect that another task already refreshed (see
         # AuthMixin.force_refresh_token).

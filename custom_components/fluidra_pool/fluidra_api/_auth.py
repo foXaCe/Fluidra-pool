@@ -173,16 +173,20 @@ class AuthMixin(FluidraAPIBase):
     async def _get_user_profile(self) -> dict[str, Any]:
         """Fetch user profile.
 
-        The result is intentionally unused: this call mirrors the official
-        mobile app's login sequence (Cognito auth → consumers/me → discovery)
-        so our traffic stays indistinguishable from the app's. Failures are
-        ignored on purpose — the profile is not needed for operation.
+        Mirrors the official mobile app's login sequence (Cognito auth →
+        consumers/me → discovery) so our traffic stays indistinguishable from
+        the app's. We also keep the consumer id, which lets the coordinator tell
+        whether the account owns a pool or only has shared/viewer access.
+        Failures are ignored on purpose — the profile is not required to operate.
         """
         headers = self._build_auth_headers()
 
         try:
             status, data, _ = await self._request("GET", CONSUMER_PROFILE_ENDPOINT, headers=headers)
             if status == 200 and isinstance(data, dict):
+                consumer_id = data.get("id")
+                if isinstance(consumer_id, str):
+                    self.user_id = consumer_id
                 return data
         except FluidraError:
             _LOGGER.debug("Failed to get user profile, continuing anyway")

@@ -418,3 +418,35 @@ class TestUpdateDataOutagePath:
         note_success.assert_called_once()
         sync_fw.assert_called_once()
         assert "p1" in data
+
+
+class TestPoolAccessLevel:
+    """The coordinator classifies pool access and warns once on viewer (read-only)."""
+
+    async def _refresh(self, hass: HomeAssistant, mock_api: AsyncMock, pool_details: dict, user_id):
+        coord = FluidraDataUpdateCoordinator(hass, mock_api)
+        mock_api.user_id = user_id
+        mock_api.get_pool_details = AsyncMock(return_value=pool_details)
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_device_status = AsyncMock(return_value=None)
+        pool = {"id": "pool_1", "name": "casa", "devices": []}
+        await coord._refresh_pool(pool, {})
+        return coord, pool
+
+    async def test_viewer_access_flagged_and_warns_once(self, hass: HomeAssistant, mock_api: AsyncMock, caplog):
+        details = {"owner": "someone-else", "contracts": [{"id": "me", "accessLevel": "viewer"}]}
+        coord, pool = await self._refresh(hass, mock_api, details, "me")
+        assert pool["access_level"] == "viewer"
+        assert "pool_1" in coord._read_only_pools_warned
+        assert any("viewer (read-only) access" in r.message for r in caplog.records)
+
+        # A second refresh of the same pool must not warn again.
+        caplog.clear()
+        pool2 = {"id": "pool_1", "name": "casa", "devices": []}
+        await coord._refresh_pool(pool2, {})
+        assert not any("viewer (read-only) access" in r.message for r in caplog.records)
+
+    async def test_owner_access_not_flagged(self, hass: HomeAssistant, mock_api: AsyncMock):
+        details = {"owner": "me", "contracts": [{"id": "me", "accessLevel": "viewer"}]}
+        _, pool = await self._refresh(hass, mock_api, details, "me")
+        assert pool["access_level"] == "owner"
