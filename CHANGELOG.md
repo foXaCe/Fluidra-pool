@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.46.0] - 2026-07-05
+
 ### Added
 - **Pool access-level awareness** (Issue #129 follow-up) — the integration now records whether the account **owns** a pool or only has **viewer** (read-only) access, exposed as the `access_level` / `read_only` attributes on the pool status sensor. A viewer account is a known trap: the Fluidra cloud accepts control writes (setpoints, switches) with an HTTP 200 that echoes the requested value but never persists it, so commands silently have no effect. When a pool is viewer-only, a clear warning is logged once at setup. (Control entities are intentionally left enabled — the permission model isn't fully known and owner accounts must keep working.)
 - **Air temperature sensor for the Z250iQ heat pump** (Issue #131, @Kal42) — the Z250iQ exposes the same air-temperature register (component 67, ×0.1) as the Z260iQ, confirmed against the official app. It now gets water and air temperature sensors like the Z260iQ, without otherwise changing its behaviour (it keeps its own on/off + preset handling — no Z260 mode/no-flow/running-hours).
