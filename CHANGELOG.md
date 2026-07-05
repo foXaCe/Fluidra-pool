@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Air temperature sensor for the Z250iQ heat pump** (Issue #131, @Kal42) — the Z250iQ exposes the same air-temperature register (component 67, ×0.1) as the Z260iQ, confirmed against the official app. It now gets water and air temperature sensors like the Z260iQ, without otherwise changing its behaviour (it keeps its own on/off + preset handling — no Z260 mode/no-flow/running-hours).
+
 ## [2.45.4] - 2026-07-05
 
 ### Fixed

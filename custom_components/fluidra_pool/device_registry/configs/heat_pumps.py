@@ -32,15 +32,20 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         family_patterns=["heat pump"],
         components_range=5,
         required_components=[0, 1, 2, 3],
-        entities=["climate", "switch", "sensor_info"],
+        entities=["climate", "switch", "sensor_info", "sensor_temperature"],
         features={
             "preset_modes": True,
             "temperature_control": True,
             "hvac_modes": ["off", "heat"],
             "skip_auto_mode": True,
             "skip_schedules": True,
-            # 7=signature (for differentiation), 13=ON/OFF, 14=preset, 15=target temp, 19=water temp.
-            "specific_components": [7, 13, 14, 15, 19],
+            # Air temperature only — kept distinct from z260iq_mode so the Z250iQ
+            # keeps its own on/off + preset handling (no Z260 mode/no-flow/running-hours).
+            "z250iq_mode": True,
+            # 7=signature (for differentiation), 13=ON/OFF, 14=preset, 15=target temp,
+            # 19=water temp (×0.1), 67=air temp (×0.1) — same air/water layout as the
+            # Z260iQ (Issue #131, confirmed by @Kal42: matches the official app).
+            "specific_components": [7, 13, 14, 15, 19, 67],
         },
         priority=95,
     ),
