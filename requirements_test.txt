@@ -1,6 +1,6 @@
 # Test/CI dependencies (pinned for reproducible CI runs).
 # pytest-homeassistant-custom-component pins a compatible Home Assistant,
 # pytest and pytest-asyncio as transitive dependencies.
-pytest-homeassistant-custom-component==0.13.342
+pytest-homeassistant-custom-component==0.13.345
 pytest-cov==7.1.0
 mypy==2.1.0
