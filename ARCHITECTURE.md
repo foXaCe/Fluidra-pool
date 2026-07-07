@@ -93,6 +93,14 @@ User-input rejections (e.g. changing speed while auto mode is active) raise
   (`fluidra_{device}_…` vs `fluidra_pool_{pool}_{device}_…`) but each is
   stable; changing one orphans user entities. Any future change requires
   `async_migrate_entry` + `ConfigFlow.VERSION` bump + tests.
+- Config-flow entry updates (reauth/reconfigure) go through
+  `_async_update_entry_and_reload` (explicit `async_update_entry` +
+  `async_schedule_reload`), **not** `async_update_reload_and_abort`: combining
+  that helper with the entry update listener is deprecated since HA 2026.6
+  (error in 2026.12). The update listener only reloads on *options* changes
+  (guarded by `options_snapshot`), so exactly one reload runs. Once the min HA
+  floor reaches ≥ 2025.8, migrate to `OptionsFlowWithReload` and drop the
+  listener.
 - Entity `available` gates on `device["online"]` — known first-cycle
   limitation, deliberately kept until real device captures allow a safe fix.
 - Z250iQ/Z260iQ identification via component 7 is no-touch without captures.
@@ -122,7 +130,7 @@ User-input rejections (e.g. changing speed while auto mode is active) raise
 
 ## Tests
 
-`tests/` (pytest + pytest-homeassistant-custom-component): 1286 tests, 98 %
+`tests/` (pytest + pytest-homeassistant-custom-component): 1312 tests, 97.5 %
 coverage, every module ≥ 90 % (CI gate: 90 %). `conftest.py` provides
 `mock_api` (spec'd `AsyncMock` with wired instance attributes) and
 `mock_pool_data`. mypy runs `--strict` (Platinum), ruff lints/formats, hassfest
