@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **HA 2026.6 deprecation fixed ahead of the 2026.12 enforcement** — the reauth and reconfigure flows no longer use `async_update_reload_and_abort` (deprecated when the integration also registers an entry update listener, as this one does for options changes). The flows now update the entry and schedule exactly one reload explicitly; behaviour is unchanged and the minimum supported HA version stays 2025.1.0.
+
+### Fixed
+- **Active-schedule detection now follows the Home Assistant timezone** — the pump *schedules* sensor computed its `current_schedule_*` attributes from the host's naive local clock instead of `dt_util.now()` (used everywhere else). On systems where the OS timezone differs from the HA-configured one, the currently-active schedule window could be misreported.
+
 ## [2.46.0] - 2026-07-05
 
 ### Added

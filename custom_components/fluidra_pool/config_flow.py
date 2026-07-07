@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import logging
 from typing import Any
 
@@ -132,16 +133,17 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
                     # Reauth must re-authenticate the *same* account.
                     await self.async_set_unique_id(self._pending_email.lower())
                     self._abort_if_unique_id_mismatch()
-                    return self.async_update_reload_and_abort(
+                    return self._async_update_entry_and_reload(
                         self._get_reauth_entry(),
                         data=entry_data,
+                        reason="reauth_successful",
                     )
                 if self._mfa_origin == "reconfigure":
                     reconfigure_entry = self._get_reconfigure_entry()
                     if self._pending_email.lower() != reconfigure_entry.unique_id:
                         await self.async_set_unique_id(self._pending_email.lower())
                         self._abort_if_unique_id_configured()
-                    return self.async_update_reload_and_abort(
+                    return self._async_update_entry_and_reload(
                         reconfigure_entry,
                         unique_id=self._pending_email.lower(),
                         data=entry_data,
@@ -192,12 +194,13 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Update the existing config entry — only for the same account.
                 await self.async_set_unique_id(email.lower())
                 self._abort_if_unique_id_mismatch()
-                return self.async_update_reload_and_abort(
+                return self._async_update_entry_and_reload(
                     self._get_reauth_entry(),
                     data={
                         CONF_EMAIL: email,
                         CONF_PASSWORD: password,
                     },
+                    reason="reauth_successful",
                 )
 
         # Pre-fill email from existing entry
@@ -246,7 +249,7 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
                     await self.async_set_unique_id(email.lower())
                     self._abort_if_unique_id_configured()
 
-                return self.async_update_reload_and_abort(
+                return self._async_update_entry_and_reload(
                     reconfigure_entry,
                     unique_id=email.lower(),
                     data={
@@ -270,6 +273,30 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
             description_placeholders={"email": existing_email},
         )
+
+    @callback
+    def _async_update_entry_and_reload(
+        self,
+        entry: ConfigEntry,
+        *,
+        data: Mapping[str, Any],
+        unique_id: str | None = None,
+        reason: str,
+    ) -> ConfigFlowResult:
+        """Update the entry, schedule a single reload and abort the flow.
+
+        Replaces ``async_update_reload_and_abort``: combining that helper with
+        the integration's update listener is deprecated since HA 2026.6 (error
+        in 2026.12). The listener only reloads on *options* changes, so the
+        explicit ``async_schedule_reload`` below is the only reload triggered
+        here — both APIs exist since the supported floor (HA 2025.1).
+        """
+        if unique_id is not None:
+            self.hass.config_entries.async_update_entry(entry, data=data, unique_id=unique_id)
+        else:
+            self.hass.config_entries.async_update_entry(entry, data=data)
+        self.hass.config_entries.async_schedule_reload(entry.entry_id)
+        return self.async_abort(reason=reason)
 
     def _get_reauth_entry(self) -> ConfigEntry:
         """Get the config entry being reauthenticated."""
