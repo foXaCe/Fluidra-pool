@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import time
 import logging
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import PERCENTAGE, UnitOfTemperature, UnitOfTime
+from homeassistant.util import dt as dt_util
 
 from ..api_resilience import FluidraError
 from ..const import LUMIPLUS_COMPONENT_BRIGHTNESS
@@ -247,7 +248,7 @@ class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):
 
     def _get_current_schedule(self, schedules: list[dict[str, Any]]) -> dict[str, Any] | None:
         """Get currently active schedule based on current time."""
-        now = datetime.now().time()
+        now = dt_util.now().time()
 
         for schedule in schedules:
             if not schedule.get("enabled", False):

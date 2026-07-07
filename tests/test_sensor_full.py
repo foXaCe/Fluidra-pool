@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -451,50 +451,42 @@ def test_schedule_parse_cron_time_handles_short_and_bad() -> None:
     assert parsed.minute == 15
 
 
-def test_schedule_get_current_schedule_active_window(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_schedule_get_current_schedule_active_window() -> None:
     """_get_current_schedule returns the schedule whose window contains 'now'."""
-    from datetime import datetime as real_datetime
-    from datetime import time as real_time
+    from datetime import UTC, datetime
 
-    import custom_components.fluidra_pool.sensor.device as device_mod
-
-    class _FixedDateTime(real_datetime):
-        @classmethod
-        def now(cls, tz=None):  # type: ignore[override]
-            return real_datetime(2026, 5, 30, 10, 0, 0)
-
-    monkeypatch.setattr(device_mod, "datetime", _FixedDateTime)
+    fake_now = datetime(2026, 5, 30, 10, 0, 0, tzinfo=UTC)
 
     device = _pinned_device(DEVICE_ID)
     sensor = FluidraPumpScheduleSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
     active = _schedule(sched_id="active", start="0 8 * * *", end="0 18 * * *")
     inactive = _schedule(sched_id="inactive", start="0 20 * * *", end="0 22 * * *")
     disabled = _schedule(sched_id="disabled", enabled=False, start="0 9 * * *", end="0 11 * * *")
-    result = sensor._get_current_schedule([disabled, inactive, active])
+    with patch(
+        "custom_components.fluidra_pool.sensor.device.dt_util.now",
+        return_value=fake_now,
+    ):
+        result = sensor._get_current_schedule([disabled, inactive, active])
     assert result is not None
     assert result["id"] == "active"
-    assert isinstance(real_time(10, 0), real_time)
 
 
-def test_schedule_extra_attributes_includes_current_schedule(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_schedule_extra_attributes_includes_current_schedule() -> None:
     """When 'now' is inside an enabled schedule, current_* attrs are populated."""
-    from datetime import datetime as real_datetime
+    from datetime import UTC, datetime
 
-    import custom_components.fluidra_pool.sensor.device as device_mod
-
-    class _FixedDateTime(real_datetime):
-        @classmethod
-        def now(cls, tz=None):  # type: ignore[override]
-            return real_datetime(2026, 5, 30, 10, 0, 0)
-
-    monkeypatch.setattr(device_mod, "datetime", _FixedDateTime)
+    fake_now = datetime(2026, 5, 30, 10, 0, 0, tzinfo=UTC)
 
     device = _pinned_device(
         DEVICE_ID,
         schedule_data=[_schedule(sched_id="now", start="0 8 * * *", end="0 18 * * *", operation="1")],
     )
     sensor = FluidraPumpScheduleSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
-    attrs = sensor.extra_state_attributes
+    with patch(
+        "custom_components.fluidra_pool.sensor.device.dt_util.now",
+        return_value=fake_now,
+    ):
+        attrs = sensor.extra_state_attributes
     assert attrs["current_schedule_id"] == "now"
     assert attrs["current_time_range"] == "08:00-18:00"
     assert attrs["current_mode"] == "medium (65%)"
