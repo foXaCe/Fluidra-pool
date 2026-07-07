@@ -156,6 +156,33 @@ async def test_reauth_confirm_success(hass: HomeAssistant, mock_api: AsyncMock) 
     assert entry.data[CONF_PASSWORD] == "new-password"
 
 
+async def test_reauth_confirm_schedules_single_reload(hass: HomeAssistant, mock_api: AsyncMock) -> None:
+    """Reauth completion schedules exactly one entry reload.
+
+    Regression for the HA 2026.6 deprecation of combining an entry update
+    listener with ``async_update_reload_and_abort``: the flow must reload via
+    a single explicit ``async_schedule_reload`` call.
+    """
+    entry = _entry(hass)
+    result = await _start_reauth(hass, entry)
+
+    mock_api.initial_auth = AsyncMock(return_value=None)
+
+    with (
+        patch(_PATCH_TARGET, return_value=mock_api),
+        patch.object(hass.config_entries, "async_schedule_reload") as mock_reload,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={CONF_EMAIL: EMAIL, CONF_PASSWORD: "new-password"},
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    mock_reload.assert_called_once_with(entry.entry_id)
+
+
 async def test_reauth_confirm_invalid_auth(hass: HomeAssistant, mock_api: AsyncMock) -> None:
     """Bad credentials in reauth_confirm surface invalid_auth."""
     entry = _entry(hass)
@@ -291,6 +318,33 @@ async def test_reconfigure_success(hass: HomeAssistant, mock_api: AsyncMock) -> 
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_PASSWORD] == "changed-pass"
+
+
+async def test_reconfigure_schedules_single_reload(hass: HomeAssistant, mock_api: AsyncMock) -> None:
+    """Reconfigure completion schedules exactly one entry reload.
+
+    Same regression guard as ``test_reauth_confirm_schedules_single_reload``,
+    on the reconfigure path (which also rewrites the entry unique_id).
+    """
+    entry = _entry(hass)
+    result = await _start_reconfigure(hass, entry)
+
+    mock_api.initial_auth = AsyncMock(return_value=None)
+
+    with (
+        patch(_PATCH_TARGET, return_value=mock_api),
+        patch.object(hass.config_entries, "async_schedule_reload") as mock_reload,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={CONF_EMAIL: EMAIL, CONF_PASSWORD: "changed-pass"},
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_PASSWORD] == "changed-pass"
+    mock_reload.assert_called_once_with(entry.entry_id)
 
 
 async def test_reconfigure_invalid_auth(hass: HomeAssistant, mock_api: AsyncMock) -> None:
