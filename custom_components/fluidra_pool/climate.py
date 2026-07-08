@@ -22,6 +22,7 @@ from .api_resilience import FluidraError
 from .const import (
     CLIMATE_OPTIMISTIC_TIMEOUT,
     DOMAIN,
+    HEAT_COOL_ACTION_DEADBAND,
     LG_MODE_TO_VALUE,
     LG_PRESET_MODES,
     LG_PRESET_SMART_COOLING,
@@ -354,6 +355,26 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
 
         return HVACMode.OFF
 
+    def _infer_heat_cool_action(self) -> HVACAction:
+        """Infer the running direction in Smart Heat+Cool (component 14 = 2).
+
+        The hardware exposes no direction register in this mode (unlike the
+        Z550's component 61), so mirror the unit's own regulation: compare the
+        water temperature to the setpoint with a ±HEAT_COOL_ACTION_DEADBAND
+        deadband (Issue #139). Inside the deadband the setpoint is satisfied
+        and the compressor rests — report IDLE. Stays a heuristic until a real
+        state register is identified.
+        """
+        current = self.current_temperature
+        target = self.target_temperature
+        if current is None or target is None:
+            return HVACAction.IDLE
+        if target - current > HEAT_COOL_ACTION_DEADBAND:
+            return HVACAction.HEATING
+        if current - target > HEAT_COOL_ACTION_DEADBAND:
+            return HVACAction.COOLING
+        return HVACAction.IDLE
+
     @property
     def hvac_action(self) -> HVACAction | None:
         """Return the current hvac action."""
@@ -388,8 +409,8 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                 return HVACAction.COOLING
             if mode_value in (0, 3, 4):  # Smart/Boost/Silence Heat
                 return HVACAction.HEATING
-            if mode_value == 2:  # Smart Heat+Cool: direction unknown
-                return HVACAction.IDLE
+            if mode_value == 2:  # Smart Heat+Cool: infer direction from temps
+                return self._infer_heat_cool_action()
             return HVACAction.HEATING if bool(heat_pump_reported) else HVACAction.OFF
 
         # LG heat pumps: decode the same component-14 direction values.
@@ -405,8 +426,8 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             reported = components.get("14", {}).get("reportedValue") if isinstance(components, dict) else None
             if reported in (1, 5, 6):  # cooling presets
                 return HVACAction.COOLING
-            if reported == 2:  # heat_cool: direction unknown
-                return HVACAction.IDLE
+            if reported == 2:  # heat_cool: infer direction from temps
+                return self._infer_heat_cool_action()
             return HVACAction.HEATING
 
         if device_data.get("is_heating", False):

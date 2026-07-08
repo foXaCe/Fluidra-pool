@@ -451,11 +451,34 @@ def test_hvac_action_z260_no_flow_idle() -> None:
         (5, HVACAction.COOLING),
         (0, HVACAction.HEATING),
         (3, HVACAction.HEATING),
-        (2, HVACAction.IDLE),
+        (2, HVACAction.IDLE),  # Smart H+C without temperatures: deadband fallback
     ],
 )
 def test_hvac_action_z260_by_mode(mode_value, expected) -> None:
     climate = _make(_pin(features={"z260iq_mode": True}, heat_pump_reported=1, z260iq_mode_value=mode_value))
+    assert climate.hvac_action == expected
+
+
+@pytest.mark.parametrize(
+    ("water", "target", "expected"),
+    [
+        (24.0, 28.0, HVACAction.HEATING),  # water 4°C below setpoint
+        (30.0, 26.0, HVACAction.COOLING),  # water 4°C above setpoint
+        (27.5, 28.0, HVACAction.IDLE),  # inside the ±1.0°C deadband: satisfied
+        (28.9, 28.0, HVACAction.IDLE),  # just under the deadband edge
+    ],
+)
+def test_hvac_action_z260_heat_cool_inferred_from_temp_delta(water, target, expected) -> None:
+    """Smart H+C (c14=2) infers the running direction from the water-vs-setpoint delta (Issue #139)."""
+    climate = _make(
+        _pin(
+            features={"z260iq_mode": True},
+            heat_pump_reported=1,
+            z260iq_mode_value=2,
+            water_temperature=water,
+            target_temperature=target,
+        )
+    )
     assert climate.hvac_action == expected
 
 
@@ -477,10 +500,25 @@ def test_hvac_action_lg_cooling() -> None:
 
 
 def test_hvac_action_lg_heat_cool_idle() -> None:
+    """Without temperatures, LG heat_cool falls back to IDLE (deadband path)."""
     climate = _make(
         _pin(features={"preset_modes": True}, heat_pump_reported=1, components={"14": {"reportedValue": 2}})
     )
     assert climate.hvac_action == HVACAction.IDLE
+
+
+def test_hvac_action_lg_heat_cool_inferred_from_temp_delta() -> None:
+    """LG heat_cool shares the Smart H+C temperature-delta inference (Issue #139)."""
+    climate = _make(
+        _pin(
+            features={"preset_modes": True},
+            heat_pump_reported=1,
+            components={"14": {"reportedValue": 2}},
+            water_temperature=24.0,
+            target_temperature=28.0,
+        )
+    )
+    assert climate.hvac_action == HVACAction.HEATING
 
 
 def test_hvac_action_lg_heating_default() -> None:

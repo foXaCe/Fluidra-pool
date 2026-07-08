@@ -54,6 +54,11 @@ STALE_DEVICE_THRESHOLD: Final = 3
 # so a single cloud hiccup does not spam the repairs dashboard.
 CONNECTION_ISSUE_THRESHOLD: Final = 3
 
+# Smart Heat+Cool (c14=2) exposes no direction register, so hvac_action is
+# inferred from the water-vs-setpoint delta; inside this deadband (°C) the
+# setpoint is satisfied and the unit reports IDLE (Issue #139).
+HEAT_COOL_ACTION_DEADBAND: Final = 1.0
+
 # Consecutive "connectivity.connected == false" reports required before a device
 # is marked offline. The Fluidra cloud heartbeat routinely misreports a healthy
 # WiFi device (e.g. Z550iQ+) as disconnected for a single poll — the same
