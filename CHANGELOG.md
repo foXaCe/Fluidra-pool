@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.48.1] - 2026-07-08
+
+### Fixed
+- **`hvac_action` no longer stuck on `idle` in Smart Heat+Cool** (Issue #139 follow-up, @Kal42) — mode 2 (Smart H+C) carries no direction register, so the previous code always reported `idle` even while the unit was actively heating or cooling. The action is now inferred from the water-vs-setpoint delta with a ±1.0 °C deadband (heating below, cooling above, idle when the setpoint is satisfied) — the same approach the unit's own regulation uses. Applies to the Z260iQ family (incl. the promoted Z250iQ) and LG heat pumps; explicit heating/cooling presets and the no-flow/off guards keep priority. Heuristic until a real state register (like the Z550's c61) is identified.
+
 ## [2.48.0] - 2026-07-08
 
 ### Added
