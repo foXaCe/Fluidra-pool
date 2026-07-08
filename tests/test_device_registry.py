@@ -188,16 +188,38 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["chlorination_level"] == 10
 
-    def test_z250iq_exposes_air_temperature_without_becoming_z260(self):
-        """Z250iQ gains the air-temperature sensor (c67) but keeps its own mode handling (Issue #131)."""
+    def test_z250iq_promoted_to_full_z260iq_feature_set(self):
+        """Z250iQ carries the full Z260iQ layout, validated by a live dump (Issue #139).
+
+        The dump (@Kal42) confirmed every register during a real no-flow —
+        c0 running hours, c14 modes (app shows heating AND cooling presets),
+        c17 status, c28=1 no-flow, c81/c82 setpoint bounds — so the profile is
+        promoted to z260iq_mode handling. Identification stays its own
+        (LF* + z250/z25 name patterns, priority 95): a wrong-model promotion
+        would silently break installs, so the match rules must not change.
+        """
         config = DEVICE_CONFIGS["z250iq_heat_pump"]
-        # Air temp is wired: component scanned, sensor_temperature entity, dedicated flag.
+        # Full Z260iQ feature set.
+        assert config.features.get("z260iq_mode") is True
+        assert "z250iq_mode" not in config.features  # dead flag removed
+        assert config.features["hvac_modes"] == ["off", "heat", "cool", "heat_cool"]
+        assert (config.features["min_temp"], config.features["max_temp"]) == (7.0, 40.0)
+        assert "sensor_running_hours" in config.entities
+        for component in (0, 17, 28, 81, 82):  # hours, status, no-flow, bounds
+            assert component in config.features["specific_components"]
+        # Air temp from Issue #131 is still wired.
         assert 67 in config.features["specific_components"]
         assert "sensor_temperature" in config.entities
-        assert config.features.get("z250iq_mode") is True
-        # But it is NOT turned into a Z260iQ: no z260iq_mode, own hvac_modes kept.
-        assert "z260iq_mode" not in config.features
-        assert config.features["hvac_modes"] == ["off", "heat"]
+        # Identification unchanged: an LF* serial named Z250iQ still matches this profile.
+        device = {
+            "device_id": "LF25001234",
+            "name": "Z250iQ",
+            "family": "Heat Pump",
+            "type": "heat_pump",
+            "model": "Z250iQ",
+            "components": {},
+        }
+        assert DeviceIdentifier.identify_device(device) is config
 
     def test_cc24018506_energy_connect_calibrated_orp_no_fake_ph_salinity(self):
         """Energy Connect CC24018506 uses calibrated ORP (c170) and drops the fake pH/salinity (Issue #129)."""

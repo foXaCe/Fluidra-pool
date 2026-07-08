@@ -32,20 +32,25 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         family_patterns=["heat pump"],
         components_range=5,
         required_components=[0, 1, 2, 3],
-        entities=["climate", "switch", "sensor_info", "sensor_temperature"],
+        entities=["climate", "switch", "sensor_info", "sensor_temperature", "sensor_running_hours"],
         features={
+            # Same firmware family as the Z260iQ — full register-by-register
+            # validation from a live Z250iQ dump (Issue #139, @Kal42): c0=161 h
+            # running hours, c13=1 ON, c14=2 Smart H+C, c15=280 setpoint,
+            # c17=0 status, c19=267 water, c28=1 during a REAL no-flow,
+            # c67=237 air, c81/c82=7/40 setpoint bounds; the official app
+            # offers the full Smart/Boost/Silence heating AND cooling presets.
+            # Identification (LF* + z250/z25 name, priority 95) is untouched.
+            "z260iq_mode": True,
             "preset_modes": True,
             "temperature_control": True,
-            "hvac_modes": ["off", "heat"],
+            "hvac_modes": ["off", "heat", "cool", "heat_cool"],
             "skip_auto_mode": True,
             "skip_schedules": True,
-            # Air temperature only — kept distinct from z260iq_mode so the Z250iQ
-            # keeps its own on/off + preset handling (no Z260 mode/no-flow/running-hours).
-            "z250iq_mode": True,
-            # 7=signature (for differentiation), 13=ON/OFF, 14=preset, 15=target temp,
-            # 19=water temp (×0.1), 67=air temp (×0.1) — same air/water layout as the
-            # Z260iQ (Issue #131, confirmed by @Kal42: matches the official app).
-            "specific_components": [7, 13, 14, 15, 19, 67],
+            "min_temp": 7.0,
+            "max_temp": 40.0,
+            "temp_step": 1.0,
+            "specific_components": [0, 7, 13, 14, 15, 17, 19, 28, 67, 81, 82],
         },
         priority=95,
     ),

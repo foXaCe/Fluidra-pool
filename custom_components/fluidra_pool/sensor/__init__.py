@@ -102,10 +102,9 @@ async def async_setup_entry(
                         entities.append(
                             FluidraTemperatureSensor(coordinator, coordinator.api, pool_id, device_id, "air")
                         )
-                    # Z260iQ / Z250iQ heat pump specific temperature sensors
-                    if DeviceIdentifier.has_feature(device, "z260iq_mode") or DeviceIdentifier.has_feature(
-                        device, "z250iq_mode"
-                    ):
+                    # Z260iQ-family heat pump temperature sensors (incl. the
+                    # Z250iQ, promoted to the same layout — Issue #139).
+                    if DeviceIdentifier.has_feature(device, "z260iq_mode"):
                         entities.append(
                             FluidraTemperatureSensor(coordinator, coordinator.api, pool_id, device_id, "water")
                         )
