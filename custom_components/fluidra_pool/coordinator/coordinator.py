@@ -25,6 +25,7 @@ from ..const import (
     DEVICE_TYPE_HEAT_PUMP,
     DEVICE_TYPE_LIGHT,
     DOMAIN,
+    OFFLINE_GRACE_POLLS,
     PUMP_SPEED_PERCENTAGES,
     STALE_DEVICE_THRESHOLD,
     FluidraPoolConfigEntry,
@@ -51,6 +52,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._previous_schedule_entities: dict[str, int] = {}
         # Consecutive polls each registry device has been missing (stale-devices).
         self._missing_device_counts: dict[str, int] = {}
+        # Consecutive offline connectivity reports per device (Issue #140 debounce).
+        self._offline_poll_counts: dict[str, int] = {}
         # Skip heavy polling on first update for faster startup.
         self._first_update = True
         # Consecutive failed poll cycles; drives the connection_error repair issue.
@@ -143,6 +146,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Drop strike counters for devices no longer in the registry.
             self._missing_device_counts = {
                 did: count for did, count in self._missing_device_counts.items() if did in seen_ids
+            }
+            self._offline_poll_counts = {
+                did: count for did, count in self._offline_poll_counts.items() if did in seen_ids
             }
 
         except Exception as err:  # best-effort cleanup must never fail the poll
@@ -532,6 +538,25 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._note_update_failure()
             raise UpdateFailed(f"Error communicating with API: {type(err).__name__}") from err
 
+    def _apply_online_flag(self, device: dict[str, Any], device_id: str, connected: bool) -> None:
+        """Debounce the cloud connectivity flag before it gates availability.
+
+        The Fluidra heartbeat routinely misreports a healthy device as
+        disconnected for a single poll (Issue #140 — same unreliable flag as
+        Issue #63), which flipped every entity of the device unavailable for
+        one scan interval. Mark a device offline only after
+        OFFLINE_GRACE_POLLS consecutive offline reports; recover immediately
+        on the first online report.
+        """
+        if connected:
+            device["online"] = True
+            self._offline_poll_counts.pop(device_id, None)
+            return
+        strikes = self._offline_poll_counts.get(device_id, 0) + 1
+        self._offline_poll_counts[device_id] = strikes
+        if strikes >= OFFLINE_GRACE_POLLS:
+            device["online"] = False
+
     async def _refresh_pool(self, pool: dict[str, Any], previous_data: dict[str, Any]) -> None:
         """Refresh a single pool and its devices."""
         pool_id = pool["id"]
@@ -578,16 +603,23 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         devices_with_ids = [(d, d.get("device_id")) for d in pool.get("devices", []) if d.get("device_id")]
         if devices_with_ids:
-            status_tasks = [self.api.poll_device_status(pool_id, did) for _, did in devices_with_ids]
-            status_results = await asyncio.gather(*status_tasks, return_exceptions=True)
+            # One tree fetch per pool: the endpoint returns every device of the
+            # pool, so per-device polling was N identical requests (Issue #140).
+            try:
+                statuses = await self.api.poll_pool_device_statuses(pool_id)
+            except FluidraError as err:
+                _LOGGER.debug("Device status poll failed for pool %s: %s", pool_id, err)
+                statuses = None
 
-            for (device, _), status in zip(devices_with_ids, status_results, strict=False):
-                if isinstance(status, dict):
-                    device["status"] = status
-                    connectivity = status.get("connectivity", {})
-                    device["connectivity"] = connectivity
-                    if "connected" in connectivity:
-                        device["online"] = connectivity["connected"]
+            if statuses:
+                for device, device_id in devices_with_ids:
+                    status = statuses.get(device_id)
+                    if isinstance(status, dict):
+                        device["status"] = status
+                        connectivity = status.get("connectivity", {})
+                        device["connectivity"] = connectivity
+                        if "connected" in connectivity:
+                            self._apply_online_flag(device, device_id, bool(connectivity["connected"]))
 
         for device in pool.get("devices", []):
             device_id = device.get("device_id")

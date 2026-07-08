@@ -10,7 +10,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
 
 from custom_components.fluidra_pool.api_resilience import FluidraConnectionError
-from custom_components.fluidra_pool.const import STALE_DEVICE_THRESHOLD
+from custom_components.fluidra_pool.const import OFFLINE_GRACE_POLLS, STALE_DEVICE_THRESHOLD
 from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordinator
 
 
@@ -77,7 +77,7 @@ class TestAsyncUpdateData:
         # Second update
         await coordinator._async_update_data()
         assert mock_api.get_pool_details.called
-        assert mock_api.poll_device_status.called
+        assert mock_api.poll_pool_device_statuses.called
 
     async def test_raises_auth_failed_on_invalid_token(
         self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
@@ -428,7 +428,7 @@ class TestPoolAccessLevel:
         mock_api.user_id = user_id
         mock_api.get_pool_details = AsyncMock(return_value=pool_details)
         mock_api.poll_water_quality = AsyncMock(return_value=None)
-        mock_api.poll_device_status = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value=None)
         pool = {"id": "pool_1", "name": "casa", "devices": []}
         await coord._refresh_pool(pool, {})
         return coord, pool
@@ -450,3 +450,54 @@ class TestPoolAccessLevel:
         details = {"owner": "me", "contracts": [{"id": "me", "accessLevel": "viewer"}]}
         _, pool = await self._refresh(hass, mock_api, details, "me")
         assert pool["access_level"] == "owner"
+
+
+class TestOnlineDebounce:
+    """A single offline connectivity report must not flip a device offline (Issue #140).
+
+    The Fluidra heartbeat routinely misreports a healthy device as disconnected
+    for one poll; the coordinator only marks a device offline after
+    OFFLINE_GRACE_POLLS consecutive offline reports, and recovers immediately.
+    """
+
+    def test_single_offline_report_keeps_device_online(self, coordinator: FluidraDataUpdateCoordinator):
+        device = {"device_id": "D1", "online": True}
+        coordinator._apply_online_flag(device, "D1", False)
+        assert device["online"] is True
+        assert coordinator._offline_poll_counts["D1"] == 1
+
+    def test_consecutive_offline_reports_mark_device_offline(self, coordinator: FluidraDataUpdateCoordinator):
+        device = {"device_id": "D1", "online": True}
+        for _ in range(OFFLINE_GRACE_POLLS):
+            coordinator._apply_online_flag(device, "D1", False)
+        assert device["online"] is False
+
+    def test_online_report_recovers_immediately_and_resets_strikes(self, coordinator: FluidraDataUpdateCoordinator):
+        device = {"device_id": "D1", "online": False}
+        coordinator._offline_poll_counts["D1"] = OFFLINE_GRACE_POLLS
+        coordinator._apply_online_flag(device, "D1", True)
+        assert device["online"] is True
+        assert "D1" not in coordinator._offline_poll_counts
+        # A later isolated offline report starts counting from scratch.
+        coordinator._apply_online_flag(device, "D1", False)
+        assert device["online"] is True
+
+    async def test_refresh_pool_applies_debounced_flag(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """The connectivity flag flows through _refresh_pool with the debounce applied."""
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value={"D1": {"connectivity": {"connected": False}}})
+        device = {"device_id": "D1", "name": "Heat pump", "online": True, "components": {}}
+        pool = {"id": "pool_1", "name": "Pool", "devices": [device]}
+
+        await coordinator._refresh_pool(pool, {})
+        assert device["online"] is True  # first strike tolerated
+
+        await coordinator._refresh_pool(pool, {})
+        assert device["online"] is False  # second consecutive strike is trusted
+
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value={"D1": {"connectivity": {"connected": True}}})
+        await coordinator._refresh_pool(pool, {})
+        assert device["online"] is True  # immediate recovery

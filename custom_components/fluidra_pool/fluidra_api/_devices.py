@@ -188,8 +188,14 @@ class DevicesMixin(FluidraAPIBase):
                     return device
         return None
 
-    async def poll_device_status(self, pool_id: str, device_id: str) -> dict[str, Any] | None:
-        """Poll device state from the Fluidra API."""
+    async def poll_pool_device_statuses(self, pool_id: str) -> dict[str, dict[str, Any]] | None:
+        """Fetch the pool device tree once and return statuses keyed by device id.
+
+        The tree endpoint returns every device (and bridged children) of the
+        pool in a single response, so polling it once per pool replaces one
+        identical GET per device (Issue #140). Returns ``None`` when the fetch
+        failed — callers keep the previous per-device data.
+        """
         if not self.access_token:
             raise FluidraAuthError("Not authenticated")
 
@@ -202,10 +208,10 @@ class DevicesMixin(FluidraAPIBase):
         try:
             status, data, _ = await self._request("GET", DEVICES_ENDPOINT, headers=headers, params=params)
         except FluidraCircuitBreakerError:
-            _LOGGER.debug("Circuit breaker open, skipping poll for device %s", mask_device_id(device_id))
+            _LOGGER.debug("Circuit breaker open, skipping status poll for pool %s", pool_id)
             return None
         except FluidraError as err:
-            _LOGGER.debug("Poll device status failed: %s", err)
+            _LOGGER.debug("Poll pool device statuses failed: %s", err)
             return None
 
         if status != 200:
@@ -217,17 +223,32 @@ class DevicesMixin(FluidraAPIBase):
         if not isinstance(data, list):
             return None
 
+        statuses: dict[str, dict[str, Any]] = {}
         device_list: list[dict[str, Any]] = data
         for device in device_list:
-            if device.get("id") == device_id:
-                return device
+            if not isinstance(device, dict):
+                continue
+            if device.get("id") is not None:
+                statuses[device["id"]] = device
             children = device.get("devices")
             if isinstance(children, list):
                 child_list: list[dict[str, Any]] = children
                 for child in child_list:
-                    if child.get("id") == device_id:
-                        return child
-        return None
+                    if isinstance(child, dict) and child.get("id") is not None:
+                        statuses[child["id"]] = child
+        return statuses
+
+    async def poll_device_status(self, pool_id: str, device_id: str) -> dict[str, Any] | None:
+        """Poll a single device's state from the Fluidra API.
+
+        Fetches the whole pool tree — prefer :meth:`poll_pool_device_statuses`
+        when several devices of the same pool are needed.
+        """
+        statuses = await self.poll_pool_device_statuses(pool_id)
+        if statuses is None:
+            _LOGGER.debug("No status tree for device %s", mask_device_id(device_id))
+            return None
+        return statuses.get(device_id)
 
     async def poll_water_quality(self, pool_id: str) -> dict[str, Any] | None:
         """Poll water quality telemetry for a pool."""

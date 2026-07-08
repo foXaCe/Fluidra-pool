@@ -54,6 +54,7 @@ def mock_api() -> AsyncMock:
     api.get_pool_details = AsyncMock(return_value={})
     api.poll_water_quality = AsyncMock(return_value={})
     api.poll_device_status = AsyncMock(return_value={"connectivity": {"online": True}})
+    api.poll_pool_device_statuses = AsyncMock(return_value={"E30-001": {"connectivity": {"online": True}}})
     api.get_component_state = AsyncMock(return_value={"reportedValue": 0})
     api.set_component_value = AsyncMock(return_value=True)
     api.set_component_string_value = AsyncMock(return_value=True)

@@ -54,6 +54,14 @@ STALE_DEVICE_THRESHOLD: Final = 3
 # so a single cloud hiccup does not spam the repairs dashboard.
 CONNECTION_ISSUE_THRESHOLD: Final = 3
 
+# Consecutive "connectivity.connected == false" reports required before a device
+# is marked offline. The Fluidra cloud heartbeat routinely misreports a healthy
+# WiFi device (e.g. Z550iQ+) as disconnected for a single poll — the same
+# unreliable flag worked around for chlorinators in Issue #63 — which flipped
+# every entity of the device unavailable for one scan interval (Issue #140).
+# Recovery is immediate on the first online report.
+OFFLINE_GRACE_POLLS: Final = 2
+
 # Attributes
 ATTR_BRIGHTNESS: Final = "brightness"
 

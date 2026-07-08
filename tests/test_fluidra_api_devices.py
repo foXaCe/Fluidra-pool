@@ -501,3 +501,34 @@ async def test_get_pool_details_partial_success_returns_what_we_have() -> None:
     ]
     result = await api.get_pool_details("pool_1")
     assert result == {"name": "Pool One"}
+
+
+# --- poll_pool_device_statuses --------------------------------------------
+
+
+async def test_poll_pool_device_statuses_maps_parents_and_children() -> None:
+    """One tree fetch returns statuses for parents and bridged children (Issue #140)."""
+    api = _FakeAPI()
+    api._request.return_value = (
+        200,
+        [
+            {"id": "DEV-1", "connectivity": {"connected": True}},
+            {
+                "id": "BRIDGE-1",
+                "devices": [{"id": "BRIDGE-1.nn_1", "connectivity": {"connected": False}}],
+            },
+        ],
+        "[]",
+    )
+    result = await api.poll_pool_device_statuses("pool_1")
+    assert result is not None
+    assert set(result) == {"DEV-1", "BRIDGE-1", "BRIDGE-1.nn_1"}
+    assert result["BRIDGE-1.nn_1"]["connectivity"] == {"connected": False}
+    assert api._request.await_count == 1
+
+
+async def test_poll_pool_device_statuses_returns_none_on_non_200() -> None:
+    """A non-200 response yields None so callers keep previous data."""
+    api = _FakeAPI()
+    api._request.return_value = (503, None, "")
+    assert await api.poll_pool_device_statuses("pool_1") is None
