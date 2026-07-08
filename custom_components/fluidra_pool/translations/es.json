@@ -160,6 +160,9 @@
       "brightness": {
         "name": "Brillo"
       },
+      "chlorinator_battery_voltage": {
+        "name": "Tensión de la Batería"
+      },
       "chlorinator_chlorination_actual": {
         "name": "Cloración Real"
       },

@@ -463,6 +463,8 @@ class TestDeviceConfigRegistry:
         """Blue Connect Gold gets its own salinity-aware profile, matched by product name (Issue #75)."""
         gold_config = DEVICE_CONFIGS["blue_connect_gold"]
         assert gold_config.features["sensors"]["salinity"] == 16  # confirmed via Issue #75 diagnostics
+        assert gold_config.features["sensors"]["battery_voltage"] == 19  # Issue #138 (mV samples)
+        assert 19 in gold_config.features["specific_components"]  # c19 must actually be polled
         gold = {
             "device_id": "QX25004412",  # QX serial, not WA — matched by name instead.
             "name": "Blue Connect Gold",

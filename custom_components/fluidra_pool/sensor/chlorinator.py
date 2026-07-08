@@ -10,7 +10,12 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfElectricPotential, UnitOfTemperature
+from homeassistant.const import (
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfElectricPotential,
+    UnitOfTemperature,
+)
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from ..const import DOMAIN
@@ -94,6 +99,15 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
                 "icon": "mdi:percent",
                 "divisor": 1,  # Already a percentage.
             },
+            "battery_voltage": {
+                "translation_key": "chlorinator_battery_voltage",
+                "unit": UnitOfElectricPotential.MILLIVOLT,
+                "device_class": SensorDeviceClass.VOLTAGE,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "icon": "mdi:battery",
+                "divisor": 1,  # Direct mV (Issue #138: 4116 = 4.116 V).
+                "entity_category": EntityCategory.DIAGNOSTIC,
+            },
         }
 
         config = self._sensor_config.get(sensor_type, {})
@@ -103,6 +117,7 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         self._attr_device_class = config.get("device_class")
         self._attr_state_class = config.get("state_class")
         self._attr_icon = config.get("icon")
+        self._attr_entity_category = config.get("entity_category")
         self._divisor = config.get("divisor", 1)
         # Override divisor from device registry if available
         custom_divisors = DeviceIdentifier.get_feature(self.device_data, "sensor_divisors", {})

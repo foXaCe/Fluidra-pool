@@ -125,7 +125,15 @@ async def async_setup_entry(
                 if device_type == DEVICE_TYPE_CHLORINATOR:
                     sensors_config = DeviceIdentifier.get_feature(device, "sensors", {})
 
-                    for sensor_type in ("ph", "orp", "free_chlorine", "temperature", "salinity", "chlorination_actual"):
+                    for sensor_type in (
+                        "ph",
+                        "orp",
+                        "free_chlorine",
+                        "temperature",
+                        "salinity",
+                        "chlorination_actual",
+                        "battery_voltage",
+                    ):
                         if sensor_type in sensors_config:
                             entities.append(
                                 FluidraChlorinatorSensor(

@@ -207,6 +207,7 @@ def test_pool_location_unknown_when_missing() -> None:
         ("salinity", 174, 627, 6.27),
         ("free_chlorine", 178, 150, 1.5),
         ("chlorination_actual", 154, 80, 80.0),
+        ("battery_voltage", 19, 4116, 4116.0),
     ],
 )
 def test_chlorinator_sensor_applies_per_type_divisor(
@@ -218,6 +219,20 @@ def test_chlorinator_sensor_applies_per_type_divisor(
         _coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, sensor_type, component_id
     )
     assert sensor.native_value == pytest.approx(expected)
+
+
+def test_chlorinator_battery_voltage_is_diagnostic_millivolt_sensor() -> None:
+    """The Blue Connect battery voltage sensor is a diagnostic mV voltage sensor (Issue #138)."""
+    from homeassistant.components.sensor import SensorDeviceClass
+    from homeassistant.const import EntityCategory, UnitOfElectricPotential
+
+    device = _pinned_device(DEVICE_ID, components={"19": {"reportedValue": 4104}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "battery_voltage", 19)
+    assert sensor.native_value == pytest.approx(4104.0)
+    assert sensor.native_unit_of_measurement == UnitOfElectricPotential.MILLIVOLT
+    assert sensor.device_class is SensorDeviceClass.VOLTAGE
+    assert sensor.entity_category is EntityCategory.DIAGNOSTIC
+    assert sensor.unique_id == f"fluidra_{DEVICE_ID}_battery_voltage"
 
 
 def test_chlorinator_sensor_returns_none_when_no_reading() -> None:

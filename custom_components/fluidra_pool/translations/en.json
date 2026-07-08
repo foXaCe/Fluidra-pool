@@ -160,6 +160,9 @@
       "brightness": {
         "name": "Brightness"
       },
+      "chlorinator_battery_voltage": {
+        "name": "Battery Voltage"
+      },
       "chlorinator_chlorination_actual": {
         "name": "Chlorination Actual"
       },
