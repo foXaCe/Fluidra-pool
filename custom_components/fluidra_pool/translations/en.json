@@ -331,6 +331,9 @@
     "number_set_failed": {
       "message": "Failed to set the value on the device"
     },
+    "pool_read_only": {
+      "message": "The Fluidra account only has viewer (read-only) access to pool {pool_name} — the cloud accepts control commands but never applies them. Ask the pool owner for full access."
+    },
     "preset_mode_control_failed": {
       "message": "Preset mode control failed ({error_type})"
     },

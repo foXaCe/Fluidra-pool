@@ -60,6 +60,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the heat pump on using discovered API with optimistic UI."""
+        self._ensure_pool_writable()
         try:
             self._set_pending_state(True)
             self.async_write_ha_state()
@@ -90,6 +91,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the heat pump off using discovered API with optimistic UI."""
+        self._ensure_pool_writable()
         try:
             self._set_pending_state(False)
             self.async_write_ha_state()
@@ -169,6 +171,7 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the heater on (component 9 = generic ON/OFF)."""
+        self._ensure_pool_writable()
         self._set_pending_state(True)
         try:
             success = await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 1)
@@ -185,6 +188,7 @@ class FluidraHeaterSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the heater off (component 9 = generic ON/OFF)."""
+        self._ensure_pool_writable()
         self._set_pending_state(False)
         try:
             success = await self._api.control_device_component(self._device_id, COMPONENT_PUMP_ONOFF, 0)

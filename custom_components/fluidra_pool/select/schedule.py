@@ -74,6 +74,7 @@ class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Select new mode option using exact mobile app format."""
+        self._ensure_pool_writable()
         if option not in self._attr_options:
             return
 
@@ -242,6 +243,7 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
 
     async def async_select_option(self, option: str) -> None:
         """Select new speed option."""
+        self._ensure_pool_writable()
         if option not in self._speed_mapping:
             return
 

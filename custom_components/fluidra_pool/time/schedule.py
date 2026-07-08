@@ -60,6 +60,7 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
 
     async def async_set_value(self, value: time) -> None:
         """Set the start time using exact mobile app format."""
+        self._ensure_pool_writable()
         try:
             self._optimistic_value = value
             self.async_write_ha_state()
@@ -218,6 +219,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
 
     async def async_set_value(self, value: time) -> None:
         """Set the end time using exact mobile app format."""
+        self._ensure_pool_writable()
         try:
             self._optimistic_value = value
             self.async_write_ha_state()

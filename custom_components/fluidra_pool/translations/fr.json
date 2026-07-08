@@ -331,6 +331,9 @@
     "number_set_failed": {
       "message": "Échec du réglage de la valeur sur l'appareil"
     },
+    "pool_read_only": {
+      "message": "Le compte Fluidra n'a qu'un accès lecteur (lecture seule) à la piscine {pool_name} — le cloud accepte les commandes mais ne les applique jamais. Demandez au propriétaire de la piscine un accès complet."
+    },
     "preset_mode_control_failed": {
       "message": "Échec du contrôle du préréglage ({error_type})"
     },

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -104,3 +105,19 @@ class FluidraPoolControlEntity(FluidraPoolEntity):
         """Initialize the control entity."""
         super().__init__(coordinator, pool_id, device_id)
         self._api = api
+
+    def _ensure_pool_writable(self) -> None:
+        """Fail fast when the account only has viewer access to this pool.
+
+        The Fluidra cloud accepts control writes from a viewer (read-only)
+        account with a fake HTTP 200 that echoes the requested value but never
+        persists it (Issue #133), so commands silently have no effect. Raise a
+        clear error instead — before any optimistic state is set. Only the
+        confirmed-read-only level blocks; owner/shared/unknown pass through.
+        """
+        if self.pool_data.get("access_level") == "viewer":
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="pool_read_only",
+                translation_placeholders={"pool_name": str(self.pool_data.get("name", self._pool_id))},
+            )

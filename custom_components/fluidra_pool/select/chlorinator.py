@@ -98,6 +98,7 @@ class FluidraChlorinatorModeSelect(FluidraPoolControlEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Select new mode option."""
+        self._ensure_pool_writable()
         if option not in self._mode_mapping:
             return
 

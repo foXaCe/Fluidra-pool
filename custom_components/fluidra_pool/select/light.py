@@ -121,6 +121,7 @@ class FluidraLightEffectSelect(FluidraPoolControlEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Select new effect option."""
+        self._ensure_pool_writable()
         if option not in self._effect_mapping:
             return
 

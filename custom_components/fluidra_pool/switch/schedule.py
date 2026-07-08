@@ -95,6 +95,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Enable the schedule using exact mobile app format with optimistic UI."""
+        self._ensure_pool_writable()
         try:
             self._set_pending_state(True)
             device_data = self.device_data
@@ -159,6 +160,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable the schedule using exact mobile app format with optimistic UI."""
+        self._ensure_pool_writable()
         try:
             self._set_pending_state(False)
             device_data = self.device_data

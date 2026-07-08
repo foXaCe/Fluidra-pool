@@ -210,6 +210,7 @@ class FluidraLight(FluidraPoolControlEntity, LightEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the light on, optionally setting brightness/colour."""
+        self._ensure_pool_writable()
         self._optimistic_is_on = True
         # Aggregate every sub-command's result: a False from brightness or colour
         # must fail (and roll back) just like a failed power command, otherwise a
@@ -254,6 +255,7 @@ class FluidraLight(FluidraPoolControlEntity, LightEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the light off."""
+        self._ensure_pool_writable()
         self._optimistic_is_on = False
         try:
             success = await self._api.set_component_string_value(self._device_id, LUMIPLUS_COMPONENT_POWER, "0")

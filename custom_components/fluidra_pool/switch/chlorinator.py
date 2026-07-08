@@ -88,6 +88,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn boost mode on with optimistic UI."""
+        self._ensure_pool_writable()
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
 
         mode_comp = DeviceIdentifier.get_feature(self.device_data, "mode_component", 20)
@@ -134,6 +135,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn boost mode off with optimistic UI."""
+        self._ensure_pool_writable()
         boost_component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", 245)
 
         try:
@@ -221,6 +223,7 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the chlorinator on."""
+        self._ensure_pool_writable()
         try:
             self._set_pending_state(True)
 
@@ -251,6 +254,7 @@ class FluidraChlorinatorSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the chlorinator off."""
+        self._ensure_pool_writable()
         try:
             self._set_pending_state(False)
 

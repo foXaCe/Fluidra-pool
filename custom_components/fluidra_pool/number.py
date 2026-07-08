@@ -138,6 +138,7 @@ class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set chlorination level."""
+        self._ensure_pool_writable()
         # Write component from device config (int or {"read","write"} dict; default 10).
         _, write_component = self._level_components()
 
@@ -224,6 +225,7 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the pH setpoint."""
+        self._ensure_pool_writable()
         # Convert pH value to API format
         divisor = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint_divisor", 100)
         int_value = int(value * divisor)
@@ -322,6 +324,7 @@ class FluidraChlorinatorOrpSetpoint(FluidraPoolControlEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the ORP setpoint."""
+        self._ensure_pool_writable()
         int_value = int(value)
 
         # Get component config dynamically
@@ -395,6 +398,7 @@ class FluidraLightEffectSpeed(FluidraPoolControlEntity, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set effect speed to component 20."""
+        self._ensure_pool_writable()
         int_value = int(value)
 
         try:

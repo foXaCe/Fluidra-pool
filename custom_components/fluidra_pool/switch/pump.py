@@ -44,6 +44,7 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the pump on using discovered API with optimistic UI."""
+        self._ensure_pool_writable()
         try:
             self._set_pending_state(True)
 
@@ -72,6 +73,7 @@ class FluidraPumpSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the pump off using discovered API with optimistic UI."""
+        self._ensure_pool_writable()
         try:
             self._set_pending_state(False)
 
@@ -145,6 +147,7 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn auto mode on using discovered Component 10 with optimistic UI."""
+        self._ensure_pool_writable()
         try:
             self._set_pending_state(True)
 
@@ -172,6 +175,7 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn auto mode off using discovered Component 10 with optimistic UI."""
+        self._ensure_pool_writable()
         try:
             self._set_pending_state(False)
 

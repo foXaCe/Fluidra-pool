@@ -422,6 +422,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target hvac mode."""
+        self._ensure_pool_writable()
         try:
             # Optimistic update - show immediately in UI
 
@@ -525,6 +526,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
+        self._ensure_pool_writable()
         temperature = kwargs.get("temperature")
         if temperature is None:
             return
@@ -594,6 +596,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode for heat pumps with this feature."""
+        self._ensure_pool_writable()
         try:
             # Optimistic update - show immediately in UI
 

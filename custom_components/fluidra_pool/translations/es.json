@@ -331,6 +331,9 @@
     "number_set_failed": {
       "message": "No se pudo ajustar el valor en el dispositivo"
     },
+    "pool_read_only": {
+      "message": "La cuenta de Fluidra solo tiene acceso de observador (solo lectura) a la piscina {pool_name}: la nube acepta los comandos pero nunca los aplica. Solicite al propietario de la piscina un acceso completo."
+    },
     "preset_mode_control_failed": {
       "message": "Error de control del modo predefinido ({error_type})"
     },

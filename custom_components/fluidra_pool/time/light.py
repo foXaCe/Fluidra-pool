@@ -56,6 +56,7 @@ class FluidraLightScheduleStartTimeEntity(FluidraLightScheduleTimeEntity):
 
     async def async_set_value(self, value: time) -> None:
         """Set the start time."""
+        self._ensure_pool_writable()
         try:
             device_data = self.device_data
             if "schedule_data" not in device_data:
@@ -154,6 +155,7 @@ class FluidraLightScheduleEndTimeEntity(FluidraLightScheduleTimeEntity):
 
     async def async_set_value(self, value: time) -> None:
         """Set the end time."""
+        self._ensure_pool_writable()
         try:
             device_data = self.device_data
             if "schedule_data" not in device_data:

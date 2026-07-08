@@ -331,6 +331,9 @@
     "number_set_failed": {
       "message": "Falha ao definir o valor no dispositivo"
     },
+    "pool_read_only": {
+      "message": "A conta Fluidra tem apenas acesso de observador (somente leitura) à piscina {pool_name} — a nuvem aceita os comandos mas nunca os aplica. Peça ao proprietário da piscina um acesso completo."
+    },
     "preset_mode_control_failed": {
       "message": "Erro de controlo da predefinição ({error_type})"
     },

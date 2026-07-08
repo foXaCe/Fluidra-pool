@@ -316,6 +316,25 @@ def _get_coordinator_for_device(hass: HomeAssistant, device_id: str) -> FluidraD
     )
 
 
+def _ensure_device_pool_writable(coordinator: FluidraDataUpdateCoordinator, device_id: str) -> None:
+    """Fail fast when the device's pool is viewer (read-only) — Issue #133.
+
+    Mirrors ``FluidraPoolControlEntity._ensure_pool_writable`` for domain
+    services: a viewer write is accepted by the Fluidra cloud with a fake
+    HTTP 200 that never persists, so raise a clear error instead.
+    """
+    for pool_id, pool in (coordinator.data or {}).items():
+        for device in pool.get("devices", []):
+            if device.get("device_id") == device_id:
+                if pool.get("access_level") == "viewer":
+                    raise ServiceValidationError(
+                        translation_domain=DOMAIN,
+                        translation_key="pool_read_only",
+                        translation_placeholders={"pool_name": str(pool.get("name", pool_id))},
+                    )
+                return
+
+
 def _parse_service_time(value: str) -> tuple[int, int]:
     """Parse service HH:MM input into hour/minute integers."""
     try:
@@ -383,6 +402,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         device_id = call.data["device_id"]
         schedules_data = call.data["schedules"]
         coordinator = _get_coordinator_for_device(hass, device_id)
+        _ensure_device_pool_writable(coordinator, device_id)
 
         # Convert HA format to Fluidra API format
         fluidra_schedules = [
@@ -421,6 +441,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         """
         device_id = call.data["device_id"]
         coordinator = _get_coordinator_for_device(hass, device_id)
+        _ensure_device_pool_writable(coordinator, device_id)
 
         try:
             success = await coordinator.api.clear_schedule(
@@ -451,6 +472,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         device_id = call.data["device_id"]
         preset = call.data["preset"]
         coordinator = _get_coordinator_for_device(hass, device_id)
+        _ensure_device_pool_writable(coordinator, device_id)
 
         # Define presets
         presets: dict[str, list[dict[str, Any]]] = {
