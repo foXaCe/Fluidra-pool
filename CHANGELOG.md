@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.47.0] - 2026-07-08
+
+### Added
+- **Blue Connect Gold battery voltage sensor** (Issue #138, @Kal42) — component 19 carries the probe's battery voltage in millivolts (samples 4116/4104 mV ≈ a near-full cell on this 3.6 V-nominal probe). Exposed as a diagnostic `voltage` sensor in mV.
+
 ### Changed
+- **One status fetch per pool instead of one per device** (Issue #140 follow-up) — `poll_device_status` fetched the entire pool device tree once *per device*, i.e. N identical HTTP requests per poll cycle. The coordinator now fetches the tree once per pool and distributes the per-device statuses, cutting request volume and rate-limiting pressure (cf. Issue #63).
 - **HA 2026.6 deprecation fixed ahead of the 2026.12 enforcement** — the reauth and reconfigure flows no longer use `async_update_reload_and_abort` (deprecated when the integration also registers an entry update listener, as this one does for options changes). The flows now update the entry and schedule exactly one reload explicitly; behaviour is unchanged and the minimum supported HA version stays 2025.1.0.
 
 ### Fixed
+- **Heat-pump entities no longer flip `unavailable` for a single poll cycle** (Issue #140, @edmondharty) — the Fluidra cloud heartbeat routinely misreports a healthy WiFi device (e.g. Z550iQ+) as disconnected for one poll, and the coordinator wrote that flag straight through, making every entity of the device unavailable for ~30 s several times a day. The offline transition is now debounced: a device is marked offline only after 2 consecutive offline reports, and recovers immediately on the first online one. Same unreliable flag already worked around for chlorinators in Issue #63.
 - **Active-schedule detection now follows the Home Assistant timezone** — the pump *schedules* sensor computed its `current_schedule_*` attributes from the host's naive local clock instead of `dt_util.now()` (used everywhere else). On systems where the OS timezone differs from the HA-configured one, the currently-active schedule window could be misreported.
 
 ## [2.46.0] - 2026-07-05
