@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.48.0] - 2026-07-08
+
+### Added
+- **Viewer (read-only) pools now reject control commands with a clear error** (Issue #133, follow-up) — an owner-side diagnostics dump (@Kal42) confirmed the sharing model: the owner is identified by `pool.owner` only, and `contracts[]` lists the other accounts with `accessLevel: "viewer"`. Every control entry point (switches, selects, numbers, times, climate, light, and the `set_schedule`/`clear_schedule`/`set_preset_schedule` services) now fails fast with a translated `pool_read_only` error on confirmed-viewer pools, instead of letting the cloud fake-accept the write (HTTP 200 that never persists). Owner/shared/unknown levels are untouched.
+- **Z250iQ heat pump promoted to the full Z260iQ feature set** (Issue #139, @Kal42) — a live register dump validated the complete Z260iQ layout on the Z250iQ (c0 running hours, c17 status, **c28 no-flow captured during a real no-flow**, c81/c82 setpoint bounds 7–40 °C), and the official app confirms the full Smart/Boost/Silence presets in both heating **and cooling**. The Z250iQ now gets the mode/preset select with cooling, the no-flow alarm on the climate entity, the running-hours sensor and the 7–40 °C setpoint bounds. Device identification is unchanged (LF* serial + z250/z25 name).
+
 ## [2.47.0] - 2026-07-08
 
 ### Added
