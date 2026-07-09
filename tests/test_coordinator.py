@@ -293,6 +293,27 @@ class TestCleanupRemovedDevices:
 
         dev_reg.async_remove_device.assert_called_once_with("dev_reg_1")
 
+    async def test_cleanup_prunes_strike_counters_for_unregistered_devices(
+        self, hass: HomeAssistant, mock_api: AsyncMock
+    ):
+        """Strike counters for a device_id absent from the HA device registry are dropped.
+
+        `_offline_poll_counts` and `_missing_device_counts` are keyed by device_id;
+        if a device_id never (or no longer) appears in the HA device registry at
+        all, its stray counters must be pruned rather than accumulating forever.
+        """
+        coord = self._coord(hass, mock_api)
+        device_entry = self._device_entry()
+        dev_reg, ent_reg = MagicMock(), MagicMock()
+
+        coord._offline_poll_counts["GHOST"] = 1
+        coord._missing_device_counts["GHOST"] = 1
+
+        await self._run(coord, current_device_ids=set(), device_entry=device_entry, dev_reg=dev_reg, ent_reg=ent_reg)
+
+        assert "GHOST" not in coord._offline_poll_counts
+        assert "GHOST" not in coord._missing_device_counts
+
 
 class TestParseDM24049704Schedule:
     """Test DM24049704 schedule format parsing."""

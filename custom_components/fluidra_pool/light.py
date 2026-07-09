@@ -26,6 +26,7 @@ from .const import (
     FluidraPoolConfigEntry,
 )
 from .entity import FluidraPoolControlEntity
+from .platform_setup import async_setup_dynamic_platform
 
 if TYPE_CHECKING:
     from .coordinator import FluidraDataUpdateCoordinator
@@ -44,48 +45,20 @@ async def async_setup_entry(
     """Set up Fluidra Pool light entities, including devices added later."""
     coordinator = entry.runtime_data.coordinator
 
-    if not coordinator.data:
-        await coordinator.async_config_entry_first_refresh()
-
-    known_devices: set[str] = set()
-
-    @callback
-    def _add_entities(pools: list[dict[str, Any]]) -> None:
-        """Create light entities for any device not seen yet (dynamic-devices)."""
+    def _build(pool_id: str, device: dict[str, Any]) -> list[FluidraLight]:
+        """Create light entities for one device."""
         entities: list[FluidraLight] = []
+        device_id = device["device_id"]
 
-        for pool in pools:
-            pool_id = pool["id"]
+        device_type = device.get("type", "")
+        family = device.get("family", "").lower()
 
-            for device in pool.get("devices", []):
-                device_id = device.get("device_id")
-                if not device_id:
-                    continue
+        if device_type == DEVICE_TYPE_LIGHT or DEVICE_TYPE_LIGHT in family:
+            entities.append(FluidraLight(coordinator, coordinator.api, pool_id, device_id))
 
-                key = f"{pool_id}_{device_id}"
-                if key in known_devices:
-                    continue
-                known_devices.add(key)
+        return entities
 
-                device_type = device.get("type", "")
-                family = device.get("family", "").lower()
-
-                if device_type == DEVICE_TYPE_LIGHT or DEVICE_TYPE_LIGHT in family:
-                    entities.append(FluidraLight(coordinator, coordinator.api, pool_id, device_id))
-
-        if entities:
-            async_add_entities(entities)
-
-    # Initial setup from the cached discovery (consistent with the other platforms).
-    pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
-    _add_entities(pools)
-
-    # Add entities for devices that appear on later polls, without a reload.
-    @callback
-    def _on_coordinator_update() -> None:
-        _add_entities(coordinator.get_pools_from_data())
-
-    entry.async_on_unload(coordinator.async_add_listener(_on_coordinator_update))
+    await async_setup_dynamic_platform(entry, async_add_entities, _build)
 
 
 class FluidraLight(FluidraPoolControlEntity, LightEntity):

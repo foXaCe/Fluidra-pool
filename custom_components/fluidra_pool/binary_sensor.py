@@ -8,12 +8,12 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolEntity
+from .platform_setup import async_setup_dynamic_platform
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -112,53 +112,29 @@ async def async_setup_entry(
 ) -> None:
     """Set up Fluidra Pool binary sensors, including devices added later."""
     coordinator = config_entry.runtime_data.coordinator
-    known_devices: set[str] = set()
 
-    @callback
-    def _add_entities(pools: list[dict[str, Any]]) -> None:
-        """Create entities for any device not seen yet (dynamic-devices)."""
+    def _build(pool_id: str, device: dict[str, Any]) -> list[BinarySensorEntity]:
+        """Create binary sensors for one device."""
         entities: list[BinarySensorEntity] = []
+        device_id = device["device_id"]
 
-        for pool in pools:
-            pool_id = pool["id"]
+        config = DeviceIdentifier.identify_device(device)
+        device_type = config.device_type if config else device.get("type", "")
+        if device_type != "chlorinator":
+            return entities
 
-            for device in pool.get("devices", []):
-                device_id = device.get("device_id")
-                if not device_id:
-                    continue
+        production_component = DeviceIdentifier.get_feature(device, "cell_production_state")
+        if production_component is not None:
+            entities.append(
+                FluidraChlorinatorProducingBinarySensor(
+                    coordinator,
+                    coordinator.api,
+                    pool_id,
+                    device_id,
+                    production_component,
+                )
+            )
 
-                key = f"{pool_id}_{device_id}"
-                if key in known_devices:
-                    continue
-                known_devices.add(key)
+        return entities
 
-                config = DeviceIdentifier.identify_device(device)
-                device_type = config.device_type if config else device.get("type", "")
-                if device_type != "chlorinator":
-                    continue
-
-                production_component = DeviceIdentifier.get_feature(device, "cell_production_state")
-                if production_component is not None:
-                    entities.append(
-                        FluidraChlorinatorProducingBinarySensor(
-                            coordinator,
-                            coordinator.api,
-                            pool_id,
-                            device_id,
-                            production_component,
-                        )
-                    )
-
-        if entities:
-            async_add_entities(entities)
-
-    # Initial setup from the cached discovery (fast startup, unchanged behaviour).
-    pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
-    _add_entities(pools)
-
-    # Add entities for devices that appear on later polls, without a reload.
-    @callback
-    def _on_coordinator_update() -> None:
-        _add_entities(coordinator.get_pools_from_data())
-
-    config_entry.async_on_unload(coordinator.async_add_listener(_on_coordinator_update))
+    await async_setup_dynamic_platform(config_entry, async_add_entities, _build)

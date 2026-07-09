@@ -466,6 +466,9 @@ def test_hvac_action_z260_by_mode(mode_value, expected) -> None:
         (30.0, 26.0, HVACAction.COOLING),  # water 4°C above setpoint
         (27.5, 28.0, HVACAction.IDLE),  # inside the ±1.0°C deadband: satisfied
         (28.9, 28.0, HVACAction.IDLE),  # just under the deadband edge
+        (27.0, 28.0, HVACAction.IDLE),  # delta exactly at the deadband: strict >, stays idle
+        (26.9, 28.0, HVACAction.HEATING),  # just past the edge below → heating
+        (29.1, 28.0, HVACAction.COOLING),  # just past the edge above → cooling
     ],
 )
 def test_hvac_action_z260_heat_cool_inferred_from_temp_delta(water, target, expected) -> None:
@@ -480,6 +483,19 @@ def test_hvac_action_z260_heat_cool_inferred_from_temp_delta(water, target, expe
         )
     )
     assert climate.hvac_action == expected
+
+
+def test_hvac_action_z260_heat_cool_idle_when_temperature_unknown() -> None:
+    """Missing water or target temperature must fall back to IDLE, not crash."""
+    climate = _make(
+        _pin(
+            features={"z260iq_mode": True},
+            heat_pump_reported=1,
+            z260iq_mode_value=2,
+            # no water_temperature / target_temperature keys
+        )
+    )
+    assert climate.hvac_action == HVACAction.IDLE
 
 
 def test_hvac_action_z260_default_heating_when_on_no_mode() -> None:
