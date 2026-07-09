@@ -85,6 +85,26 @@ def test_temperature_sensor_unknown_type_returns_none() -> None:
     assert sensor.native_value is None
 
 
+# --- FluidraPoolSensorEntity base (inherited from FluidraPoolEntity) ----
+
+
+def test_sensor_unique_id_format_is_frozen() -> None:
+    """unique_id format must stay `{DOMAIN}_{pool}_{device}_sensor[_type]` verbatim."""
+    device = _pinned_device("d1")
+    sensor = FluidraTemperatureSensor(_coord([device], None), SimpleNamespace(), "p1", "d1", "ph")
+    assert sensor.unique_id == "fluidra_pool_p1_d1_sensor_ph"
+
+    sensor_no_type = FluidraTemperatureSensor(_coord([device], None), SimpleNamespace(), "p1", "d1", "")
+    assert sensor_no_type.unique_id == "fluidra_pool_p1_d1_sensor"
+
+
+def test_sensor_device_info_exposes_firmware() -> None:
+    """device_info now inherits sw_version from FluidraPoolEntity (was missing before)."""
+    device = _pinned_device(DEVICE_ID, firmware_version_component="1.23")
+    sensor = FluidraTemperatureSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "current")
+    assert sensor.device_info["sw_version"] == "1.23"
+
+
 # --- FluidraLightBrightnessSensor ----------------------------------------
 
 
