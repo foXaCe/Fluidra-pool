@@ -94,6 +94,22 @@ def test_redact_pools_data_redacts_pool_id_in_key_but_keeps_values() -> None:
     assert redacted[pool_key]["water_quality"] == {"status": "ok"}
 
 
+def test_redact_pools_data_redacts_inner_pool_id() -> None:
+    """The pool id anonymised in the dict key must not also leak in clear in the value."""
+    redacted = _redact_pools_data(
+        {
+            "real-pool-uuid-1234": {
+                "id": "real-pool-uuid-1234",
+                "name": "Family Pool",
+                "devices": [],
+            }
+        }
+    )
+    pool_key = next(iter(redacted))
+    assert redacted[pool_key]["id"] == REDACTED
+    assert redacted[pool_key]["name"] == "Family Pool"
+
+
 def test_redact_pools_data_handles_non_dict_pool_payloads() -> None:
     """A non-dict pool payload is forwarded as-is (defensive fallback)."""
     redacted = _redact_pools_data({"pool-abc": "unexpected"})
@@ -145,6 +161,36 @@ def test_redact_devices_data_redacts_identifier_mirror_fields() -> None:
     assert redacted[0]["signal_strength_component"] == REDACTED
     # The coordinator names are misleading: comp 0 numeric (= signal) stays in clear.
     assert redacted[0]["device_id_component"] == -44
+
+
+def test_redact_devices_data_redacts_serial_in_status() -> None:
+    """The raw tree entry under device["status"]["id"] carries the serial — redact it."""
+    redacted = _redact_devices_data(
+        [
+            {
+                "device_id": "DEV-1",
+                "status": {"id": "LE24500883", "connectivity": {"connected": True}},
+                "components": {},
+            }
+        ]
+    )
+    assert redacted[0]["status"]["id"] == REDACTED
+    # Telemetry nested in status stays readable for debugging.
+    assert redacted[0]["status"]["connectivity"] == {"connected": True}
+
+
+def test_redact_devices_data_redacts_bridge_children_ids_in_status() -> None:
+    """Bridge child device ids nested under status["devices"] are also serials — redact them."""
+    redacted = _redact_devices_data(
+        [
+            {
+                "device_id": "DEV-1",
+                "status": {"id": "LE24500883", "devices": [{"id": "CC25052635"}]},
+                "components": {},
+            }
+        ]
+    )
+    assert redacted[0]["status"]["devices"][0]["id"] == REDACTED
 
 
 def test_redact_devices_data_redacts_scalar_identifiers_via_pattern() -> None:
