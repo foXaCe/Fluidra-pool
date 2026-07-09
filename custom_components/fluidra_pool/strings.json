@@ -384,6 +384,10 @@
     "connection_error": {
       "description": "Unable to connect to Fluidra Pool service",
       "title": "Connection error"
+    },
+    "unverified_device_profile": {
+      "description": "This device was matched by a generic profile whose sensor mapping is a best guess — readings such as pH, ORP or temperature may be wrong. Please download the integration diagnostics and open a GitHub issue so an exact profile can be added for your model.",
+      "title": "Device profile not verified: {device_name}"
     }
   },
   "options": {

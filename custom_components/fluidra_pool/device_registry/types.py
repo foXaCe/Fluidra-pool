@@ -28,3 +28,9 @@ class DeviceConfig:
 
     # Higher priority is evaluated first when picking a match.
     priority: int = 0
+
+    # False for catch-all / legacy profiles whose component mapping is a best
+    # guess: entities are still created, but the coordinator raises a repair
+    # issue so the user knows the values may be wrong and how to report the
+    # device (README "Adding New Equipment").
+    verified: bool = True

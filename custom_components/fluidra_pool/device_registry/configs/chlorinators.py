@@ -98,6 +98,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "specific_components": [4, 8, 11, 20, 164, 172, 177, 178, 183, 185, 245],
         },
         priority=80,  # High to avoid confusion with pumps.
+        verified=False,
     ),
     "cc25052635_chlorinator": DeviceConfig(
         device_type="chlorinator",

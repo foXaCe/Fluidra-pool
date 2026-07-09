@@ -384,6 +384,10 @@
     "connection_error": {
       "description": "Não foi possível conectar ao serviço Fluidra Pool",
       "title": "Erro de conexão"
+    },
+    "unverified_device_profile": {
+      "description": "Este dispositivo foi identificado por um perfil genérico cujo mapeamento de sensores é uma aproximação — as leituras (pH, ORP, temperatura…) podem estar erradas. Descarregue os diagnósticos da integração e abra uma issue no GitHub para que seja adicionado um perfil exato para o seu modelo.",
+      "title": "Perfil de dispositivo não verificado: {device_name}"
     }
   },
   "options": {

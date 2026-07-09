@@ -12,6 +12,7 @@ import pytest
 from custom_components.fluidra_pool.api_resilience import FluidraConnectionError
 from custom_components.fluidra_pool.const import OFFLINE_GRACE_POLLS, STALE_DEVICE_THRESHOLD
 from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordinator
+from custom_components.fluidra_pool.device_registry import DeviceIdentifier
 
 
 @pytest.fixture
@@ -501,3 +502,120 @@ class TestOnlineDebounce:
         mock_api.poll_pool_device_statuses = AsyncMock(return_value={"D1": {"connectivity": {"connected": True}}})
         await coordinator._refresh_pool(pool, {})
         assert device["online"] is True  # immediate recovery
+
+
+class TestUnverifiedProfileIssue:
+    """Devices resolved on a catch-all/legacy profile raise a repair issue once (Plan 004)."""
+
+    async def _refresh(self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock, device: dict) -> dict:
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value=None)
+        pool = {"id": "pool_1", "name": "Pool", "devices": [device]}
+        await coordinator._refresh_pool(pool, {})
+        return pool
+
+    async def test_unverified_catchall_device_raises_issue(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        # Bridged device with no serial-specific profile: matches the generic
+        # "*.nn_*" + family catch-all chlorinator profile, not any verified
+        # serial-specific one.
+        device = {
+            "device_id": "ZZ99999999.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinator",
+            "type": "chlorinator",
+            "components": {},
+        }
+        # Sanity check the fixture actually exercises the unverified path before
+        # asserting on the issue — a scoring/pattern change must be reported,
+        # not silently worked around.
+        resolved = DeviceIdentifier.identify_device(device)
+        assert resolved is not None
+        assert resolved.verified is False
+
+        with patch(
+            "custom_components.fluidra_pool.coordinator.coordinator.async_create_unverified_profile_issue"
+        ) as create:
+            await self._refresh(coordinator, mock_api, device)
+            create.assert_called_once_with(coordinator.hass, "ZZ99999999.nn_1", "Chlorinator")
+
+        assert coordinator._unverified_profile_flagged == {"ZZ99999999.nn_1"}
+
+    async def test_second_refresh_does_not_duplicate_issue(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        device = {
+            "device_id": "ZZ99999999.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinator",
+            "type": "chlorinator",
+            "components": {},
+        }
+        with patch(
+            "custom_components.fluidra_pool.coordinator.coordinator.async_create_unverified_profile_issue"
+        ) as create:
+            await self._refresh(coordinator, mock_api, device)
+            await self._refresh(coordinator, mock_api, device)
+            create.assert_called_once()
+
+        assert len(coordinator._unverified_profile_flagged) == 1
+
+    async def test_verified_profile_device_does_not_raise_issue(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        # Serial-specific profile (cc25052635_chlorinator) — verified by default.
+        device = {
+            "device_id": "CC25052635xyz",
+            "name": "Chlorinator",
+            "family": "Chlorinator",
+            "type": "chlorinator",
+            "components": {},
+        }
+        resolved = DeviceIdentifier.identify_device(device)
+        assert resolved is not None
+        assert resolved.verified is True
+
+        with patch(
+            "custom_components.fluidra_pool.coordinator.coordinator.async_create_unverified_profile_issue"
+        ) as create:
+            await self._refresh(coordinator, mock_api, device)
+            create.assert_not_called()
+
+        assert coordinator._unverified_profile_flagged == set()
+
+    async def test_profile_becoming_verified_clears_the_issue(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """If a code update adds a verified profile, the stale issue is cleared."""
+        device = {
+            "device_id": "ZZ99999999.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinator",
+            "type": "chlorinator",
+            "components": {},
+        }
+        with patch("custom_components.fluidra_pool.coordinator.coordinator.async_create_unverified_profile_issue"):
+            await self._refresh(coordinator, mock_api, device)
+        assert "ZZ99999999.nn_1" in coordinator._unverified_profile_flagged
+
+        # Simulate a later release shipping a verified serial-specific profile
+        # for this same device_id by stubbing identify_device's result — the
+        # coordinator's own scan/scoring logic is not touched.
+        verified_config = DeviceIdentifier.identify_device({"device_id": "CC25052635xyz"})
+        assert verified_config is not None
+        assert verified_config.verified is True
+        with (
+            patch(
+                "custom_components.fluidra_pool.coordinator.coordinator.DeviceIdentifier.identify_device",
+                return_value=verified_config,
+            ),
+            patch(
+                "custom_components.fluidra_pool.coordinator.coordinator.async_delete_unverified_profile_issue"
+            ) as delete,
+        ):
+            await self._refresh(coordinator, mock_api, device)
+            delete.assert_called_once_with(coordinator.hass, "ZZ99999999.nn_1")
+
+        assert coordinator._unverified_profile_flagged == set()

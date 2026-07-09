@@ -16,6 +16,7 @@ GENERIC_CONFIGS: dict[str, DeviceConfig] = {
             "specific_components": [13, 14, 15],
         },
         priority=30,
+        verified=False,
     ),
     "generic_pump": DeviceConfig(
         device_type="pump",
@@ -27,6 +28,7 @@ GENERIC_CONFIGS: dict[str, DeviceConfig] = {
             "specific_components": [9, 10],
         },
         priority=10,
+        verified=False,
     ),
     "generic_heater": DeviceConfig(
         device_type="heater",
@@ -37,6 +39,7 @@ GENERIC_CONFIGS: dict[str, DeviceConfig] = {
         entities=["switch"],
         features={},
         priority=20,
+        verified=False,
     ),
     "generic_light": DeviceConfig(
         device_type="light",
@@ -48,5 +51,6 @@ GENERIC_CONFIGS: dict[str, DeviceConfig] = {
             "effect_select": 18,
         },
         priority=20,
+        verified=False,
     ),
 }

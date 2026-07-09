@@ -28,6 +28,25 @@ def async_delete_connection_issue(hass: HomeAssistant) -> None:
     ir.async_delete_issue(hass, DOMAIN, "connection_error")
 
 
+def async_create_unverified_profile_issue(hass: HomeAssistant, device_id: str, device_name: str) -> None:
+    """Warn that a device matched a catch-all profile: its readings may be wrong."""
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        f"unverified_profile_{device_id}",
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="unverified_device_profile",
+        translation_placeholders={"device_name": device_name},
+        learn_more_url="https://github.com/foXaCe/fluidra-pool#-adding-new-equipment",
+    )
+
+
+def async_delete_unverified_profile_issue(hass: HomeAssistant, device_id: str) -> None:
+    """Clear the unverified-profile issue (device now matches a verified profile)."""
+    ir.async_delete_issue(hass, DOMAIN, f"unverified_profile_{device_id}")
+
+
 async def async_create_fix_flow(
     hass: HomeAssistant,
     issue_id: str,
