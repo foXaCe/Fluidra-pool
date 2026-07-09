@@ -19,6 +19,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
+from .climate_behaviors import resolve_behavior
 from .const import (
     CLIMATE_OPTIMISTIC_TIMEOUT,
     DOMAIN,
@@ -29,11 +30,6 @@ from .const import (
     LG_PRESET_SMART_HEAT_COOL,
     LG_PRESET_SMART_HEATING,
     LG_VALUE_TO_MODE,
-    Z260_MAX_TEMP,
-    Z260_MIN_TEMP,
-    Z260_TEMP_STEP,
-    Z550_MAX_TEMP,
-    Z550_MIN_TEMP,
     Z550_MODE_AUTO,
     Z550_MODE_COOLING,
     Z550_MODE_HEATING,
@@ -41,7 +37,6 @@ from .const import (
     Z550_STATE_HEATING,
     Z550_STATE_IDLE,
     Z550_STATE_NO_FLOW,
-    Z550_TEMP_STEP,
     FluidraPoolConfigEntry,
 )
 from .device_registry import DeviceIdentifier
@@ -154,29 +149,17 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
     @property
     def min_temp(self) -> float:
         """Return the minimum temperature."""
-        if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
-            return Z550_MIN_TEMP
-        if DeviceIdentifier.has_feature(self.device_data, "z260iq_mode"):
-            return Z260_MIN_TEMP
-        return 10.0
+        return resolve_behavior(self.device_data).min_temp
 
     @property
     def max_temp(self) -> float:
         """Return the maximum temperature."""
-        if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
-            return Z550_MAX_TEMP
-        if DeviceIdentifier.has_feature(self.device_data, "z260iq_mode"):
-            return Z260_MAX_TEMP
-        return 40.0
+        return resolve_behavior(self.device_data).max_temp
 
     @property
     def target_temperature_step(self) -> float:
         """Return the supported step of target temperature."""
-        if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
-            return Z550_TEMP_STEP
-        if DeviceIdentifier.has_feature(self.device_data, "z260iq_mode"):
-            return Z260_TEMP_STEP
-        return 1.0
+        return resolve_behavior(self.device_data).temp_step
 
     @property
     def supported_features(self) -> ClimateEntityFeature:
@@ -195,13 +178,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
     @property
     def hvac_modes(self) -> list[HVACMode]:
         """Return the list of available hvac operation modes."""
-        # Z550iQ+ supports heat/cool/auto
-        if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
-            return [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL]
-        # Z260iQ supports heat/cool/heat_cool
-        if DeviceIdentifier.has_feature(self.device_data, "z260iq_mode"):
-            return [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL]
-        return [HVACMode.OFF, HVACMode.HEAT]
+        return resolve_behavior(self.device_data).hvac_modes
 
     @property
     def preset_modes(self) -> list[str]:
