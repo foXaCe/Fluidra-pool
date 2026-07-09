@@ -1,0 +1,41 @@
+{
+  "_test_notes": {
+    "purpose": "Standard tecnoLC2 layout — all four sensor slots present and cited from a real, already-confirmed profile.",
+    "provenance": "Numbers copied from the cc25051112_chlorinator comment in custom_components/fluidra_pool/device_registry/configs/chlorinators.py (Zodiac GenSalt OE iQ pH 25 IVO, Issue #80, @lolo31370): pH 7.5, ORP 663 mV (c177=725 uncalibrated), water temperature 21.3 degC, salinity 3.7 g/L, chlorination 100%, ORP setpoint 750 mV. pH setpoint (c16) and boost mode (c103) are synthetic placeholders, not from the cited comment.",
+    "expected_anchors_cli": "--anchor ph=7.5 --anchor orp=663 --anchor temperature=21.3 --anchor salinity=3.7",
+    "expected_outcome": "propose_device_profile.py should propose a _standard_tecnolc2(...) call: ph->165, orp->170, temperature->172, salinity->174 all match the standard slots exactly (0% error)."
+  },
+  "pools": {
+    "pool_0001": {
+      "id": "pool_0001",
+      "name": "Family Pool",
+      "devices": [
+        {
+          "device_id": "**REDACTED**",
+          "name": "Chlorinator",
+          "family": "Chlorinators",
+          "type": "chlorinator",
+          "model": "Chlorinator",
+          "online": true,
+          "components": {
+            "0": {"reportedValue": -52},
+            "1": {"reportedValue": "**REDACTED**"},
+            "2": {"reportedValue": "**REDACTED**"},
+            "3": {"reportedValue": "1.4.2"},
+            "6": {"reportedValue": "**REDACTED**"},
+            "7": {"reportedValue": "TCLC2"},
+            "10": {"reportedValue": 100, "desiredValue": 100},
+            "16": {"reportedValue": 720, "desiredValue": 720},
+            "20": {"reportedValue": 750, "desiredValue": 750},
+            "103": {"reportedValue": 0, "desiredValue": 0},
+            "165": {"reportedValue": 750},
+            "170": {"reportedValue": 663},
+            "172": {"reportedValue": 213},
+            "174": {"reportedValue": 370},
+            "177": {"reportedValue": 725}
+          }
+        }
+      ]
+    }
+  }
+}

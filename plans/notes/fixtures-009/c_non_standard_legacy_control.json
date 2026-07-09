@@ -1,0 +1,42 @@
+{
+  "_test_notes": {
+    "purpose": "Non-standard tecnoLC2 wiring: sensor slots (ORP/temperature) match the standard layout, but the CONTROL slots (chlorination level) do NOT — they sit on the legacy c4 (write) / c164 (read) pair instead of the standard c10. This is a deliberate stress test for the 'propose _standard_tecnolc2() when >=2 anchors match' heuristic: with only orp+temperature anchors it would (wrongly) look standard; adding a chlorination_level anchor exposes the mismatch.",
+    "provenance": "All numeric values are copied verbatim from the cc24018506_chlorinator comment in chlorinators.py (AstralPool/Fluidra Energy Connect, firmware 40, Issue #129, @luistf76): c170=597 (calibrated ORP, matches app), c177=676 (uncalibrated raw, ~79 mV high), c172=315 (31.5 degC), c16=740 (pH setpoint 7.40), c20=710 (ORP setpoint 710 mV). c164=60 (chlorination level read, legacy slot) is a synthetic addition — the real comment doesn't give a chlorination-level figure. No c165 (pH) and no live c185 (salinity) per the same comment ('no live pH-measured component', 'no live salinity').",
+    "expected_anchors_cli_misleading": "--anchor orp=597 --anchor temperature=31.5 (2 anchors, BOTH match the standard 170/172 slots -> tool proposes a _standard_tecnolc2() call, which is WRONG for this device: the real profile needs the c4/c164 chlorination pair, c8/c16 + c11/c20 setpoint read/write split, and c245 boost — see chlorinators.py.)",
+    "expected_anchors_cli_correct": "--anchor orp=597 --anchor temperature=31.5 --anchor chlorination_level=60 (adding the chlorination_level anchor: its best candidate is component 164, which contradicts the standard slot 10 (absent from this device) -> tool correctly falls back to an explicit DeviceConfig block instead of the terse call.)"
+  },
+  "pools": {
+    "pool_0003": {
+      "id": "pool_0003",
+      "name": "Backyard Pool",
+      "devices": [
+        {
+          "device_id": "**REDACTED**",
+          "name": "Chlorinator",
+          "family": "Chlorinators",
+          "type": "chlorinator",
+          "model": "Chlorinator",
+          "online": true,
+          "components": {
+            "0": {"reportedValue": -58},
+            "1": {"reportedValue": "**REDACTED**"},
+            "2": {"reportedValue": "**REDACTED**"},
+            "3": {"reportedValue": "1.4.0"},
+            "7": {"reportedValue": "TCLC2"},
+            "4": {"reportedValue": 60, "desiredValue": 60},
+            "8": {"reportedValue": 740, "desiredValue": 740},
+            "11": {"reportedValue": 710, "desiredValue": 710},
+            "16": {"reportedValue": 740},
+            "20": {"reportedValue": 710},
+            "164": {"reportedValue": 60},
+            "170": {"reportedValue": 597},
+            "172": {"reportedValue": 315},
+            "177": {"reportedValue": 676},
+            "185": {"reportedValue": 0},
+            "245": {"reportedValue": 0, "desiredValue": 0}
+          }
+        }
+      ]
+    }
+  }
+}
