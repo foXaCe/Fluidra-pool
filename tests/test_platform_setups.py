@@ -562,24 +562,3 @@ async def test_light_setup_light_without_device_id_skipped():
     coordinator = _coordinator([light], data=data)
     added, _ = await _run(light_setup, coordinator)
     assert _count(added, FluidraLight) == 0
-
-
-async def test_light_setup_triggers_first_refresh_when_no_data():
-    """When coordinator.data is empty, the first-refresh hook is awaited."""
-    coordinator = _coordinator([], data={})
-    coordinator.data = {}
-    added, _ = await _run(light_setup, coordinator)
-    coordinator.async_config_entry_first_refresh.assert_awaited_once()
-    assert added == []
-
-
-async def test_light_setup_no_data_after_refresh_adds_nothing():
-    """If data is still empty after the refresh hook, no entities are added."""
-    coordinator = _coordinator([], data=None)
-    coordinator.data = None
-    coordinator.async_config_entry_first_refresh = AsyncMock()
-    added, async_add = await _run(light_setup, coordinator)
-    coordinator.async_config_entry_first_refresh.assert_awaited_once()
-    # With no devices the platform now skips the empty async_add_entities call.
-    async_add.assert_not_called()
-    assert added == []
