@@ -19,7 +19,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
-from .climate_behaviors import Z260iqBehavior, resolve_behavior
+from .climate_behaviors import Z260iqBehavior, Z550Behavior, resolve_behavior
 from .const import (
     CLIMATE_OPTIMISTIC_TIMEOUT,
     DOMAIN,
@@ -437,6 +437,10 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         device_data = self.device_data
+        # z550_mode and z260iq_mode are mutually exclusive across every real
+        # device config, so resolving the behavior once here is equivalent to
+        # two independent device-feature checks below.
+        behavior = resolve_behavior(device_data)
         attrs = {
             "device_type": "heat_pump",
             "device_id": self._device_id,
@@ -483,7 +487,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             attrs["ip_address"] = device_data["ip_address"]
 
         # Z550iQ+ specific attributes
-        if DeviceIdentifier.has_feature(device_data, "z550_mode"):
+        if isinstance(behavior, Z550Behavior):
             # Air temperature
             air_temp = device_data.get("air_temperature")
             if air_temp is not None:
@@ -522,7 +526,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             attrs["component_61_raw"] = device_data.get("components", {}).get("61", {}).get("reportedValue")
 
         # Z260iQ specific attributes
-        if DeviceIdentifier.has_feature(device_data, "z260iq_mode"):
+        if isinstance(behavior, Z260iqBehavior):
             air_temp = device_data.get("air_temperature")
             if air_temp is not None:
                 attrs["air_temperature"] = air_temp
