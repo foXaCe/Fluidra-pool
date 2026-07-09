@@ -716,6 +716,44 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=92,
     ),
+    "dm24008702_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Neolysis Connect (thing type domoticS2, bridged) — Issue #141 (@overcraft47).
+        # Surfaced by the unverified-profile repair issue: the unit matched the generic
+        # catch-all, whose *legacy* layout is in fact the right one for this domoticS2
+        # family (c172 = pH, c177 = ORP, c183 = temperature, c185 = salinity) — unlike
+        # the tecnoLC2 units. Same family as the SheepPool (DM24049704) but a distinct
+        # layout: chlorination has split write/read registers (c4 desired / c164
+        # reported) and there is no schedule component.
+        # Reporter's component dump: c8 = pH setpoint (720 → 7.20), c11 = ORP setpoint
+        # (700 mV), c172 = pH measured (722 → 7.22), c177 = ORP measured (539 mV),
+        # c183 = water temperature (298 → 29.8 °C), c185 = salinity (316 → 3.16 g/L),
+        # c178 = free chlorine (null — no probe fitted), c245 = boost.
+        # NB: setpoints are read on c8/c11 (the actual targets), not on the measured
+        # c172/c177 the catch-all wrongly reused — so the number entities show 7.20 /
+        # 700, not the live readings.
+        identifier_patterns=["DM24008702*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "select", "number", "sensor_info"],
+        features={
+            "chlorination_level": {"write": 4, "read": 164},  # c4 desired / c164 reported.
+            # Mode on component 20: 0=OFF, 1=ON, 2=AUTO.
+            "ph_setpoint": 8,  # c8 = 720 → 7.20 pH (target, distinct from measured c172).
+            "orp_setpoint": 11,  # c11 = 700 mV (target, distinct from measured c177).
+            "boost_mode": 245,
+            "sensors": {
+                "ph": 172,  # pH measured (÷100) — 722 → 7.22.
+                "orp": 177,  # ORP measured (mV) — 539.
+                "free_chlorine": 178,  # mg/L — null until a probe is fitted.
+                "temperature": 183,  # Water temperature (°C × 10) — 298 → 29.8.
+                "salinity": 185,  # Salinity (g/L × 100) — 316 → 3.16.
+            },
+            "specific_components": [4, 8, 11, 20, 164, 172, 177, 178, 183, 185, 245],
+        },
+        priority=90,
+    ),
     "dm24049704_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["DM24049704*"],  # Domotic S2 chlorinator (SheepPool).
