@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.49.0] - 2026-07-09
+
+### Added
+- **Repair issue for unrecognized device profiles** — when a device (typically a not-yet-supported chlorinator) matches a generic catch-all profile whose sensor mapping is only a best guess, Home Assistant now surfaces a repair issue guiding you to download the diagnostics and open an issue, instead of silently reporting possibly-wrong pH / ORP / temperature readings.
+
+### Changed
+- **Minimum Home Assistant version raised to 2025.4.** The integration already imported a core API (`AddConfigEntryEntitiesCallback`) that only exists since HA 2025.4, so it would in fact fail to load on the 2025.1–2025.3 range the manifest previously claimed to support. The declared floor now matches reality, and a new CI job re-checks floor compatibility on every change.
+- Sensor devices now expose the firmware version (`sw_version`), consistent with the other platforms.
+- Internal refactoring with no user-facing behaviour change: the heat-pump climate entity is split into per-family behaviour objects, and the per-platform entity setup is factored into a single shared helper. Verified behaviour-preserving against the full test suite.
+
+### Security
+- **Device serial numbers and pool ids are no longer exposed in diagnostics dumps.** The raw device `status` block (`status.id`, plus bridged children under `status.devices[]`) and the pool id value are now redacted like every other identifier. Diagnostics dumps shared before this release should be considered as having leaked those ids.
+
 ## [2.48.1] - 2026-07-08
 
 ### Fixed
