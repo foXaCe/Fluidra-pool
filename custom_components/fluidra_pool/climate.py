@@ -273,10 +273,15 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
 
             behavior = resolve_behavior(self.device_data)
             # Only the Z260iQ family needs the current preset (to keep the
-            # specific Smart/Boost/Silence variant); reading self.preset_mode
-            # for every family would needlessly touch its optimistic-preset
-            # expiry side effect for families that never look at it.
-            current_preset = self.preset_mode if isinstance(behavior, Z260iqBehavior) else None
+            # specific Smart/Boost/Silence variant), and only on a non-OFF
+            # write — its OFF branch ignores current_preset, and the original
+            # never read self.preset_mode on OFF either. Reading it more widely
+            # would needlessly trigger the property's optimistic-preset expiry
+            # side effect (clearing an expired _pending_preset_mode) on paths
+            # where the original left it untouched.
+            current_preset = (
+                self.preset_mode if isinstance(behavior, Z260iqBehavior) and hvac_mode != HVACMode.OFF else None
+            )
             success = await behavior.async_set_hvac_mode(
                 self._api, self._pool_id, self._device_id, hvac_mode, current_preset
             )
