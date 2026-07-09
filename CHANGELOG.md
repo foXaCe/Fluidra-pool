@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.49.1] - 2026-07-09
+
+### Added
+- **Neolysis Connect chlorinator support** (Issue #141, @overcraft47) — the Neolysis Connect (domoticS2 family) now resolves to a verified device profile instead of the generic catch-all: pH (c172), ORP (c177), water temperature (c183), salinity (c185), free chlorine (c178) and the chlorination level (c4 desired / c164 reported) are mapped on the correct registers, and the pH / ORP setpoint number entities read the actual targets (c8 = 7.20, c11 = 700 mV) rather than the live measurements. This also clears the "unverified device profile" repair issue for this unit — the very repair issue that surfaced the mapping in the first place.
+
 ## [2.49.0] - 2026-07-09
 
 ### Added
