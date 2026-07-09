@@ -19,20 +19,15 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
-from .climate_behaviors import resolve_behavior
+from .climate_behaviors import Z260iqBehavior, resolve_behavior
 from .const import (
     CLIMATE_OPTIMISTIC_TIMEOUT,
     DOMAIN,
     HEAT_COOL_ACTION_DEADBAND,
     LG_MODE_TO_VALUE,
     LG_PRESET_MODES,
-    LG_PRESET_SMART_COOLING,
-    LG_PRESET_SMART_HEAT_COOL,
     LG_PRESET_SMART_HEATING,
     LG_VALUE_TO_MODE,
-    Z550_MODE_AUTO,
-    Z550_MODE_COOLING,
-    Z550_MODE_HEATING,
     Z550_STATE_NO_FLOW,
     FluidraPoolConfigEntry,
 )
@@ -276,73 +271,22 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             self._last_hvac_action_time = time.time()
             self.async_write_ha_state()
 
-            success = False
+            behavior = resolve_behavior(self.device_data)
+            # Only the Z260iQ family needs the current preset (to keep the
+            # specific Smart/Boost/Silence variant); reading self.preset_mode
+            # for every family would needlessly touch its optimistic-preset
+            # expiry side effect for families that never look at it.
+            current_preset = self.preset_mode if isinstance(behavior, Z260iqBehavior) else None
+            success = await behavior.async_set_hvac_mode(
+                self._api, self._pool_id, self._device_id, hvac_mode, current_preset
+            )
 
-            # Z550iQ+ specific mode handling
-            if DeviceIdentifier.has_feature(self.device_data, "z550_mode"):
-                if hvac_mode == HVACMode.OFF:
-                    # Turn OFF: component 21 = 0
-                    success = await self._api.control_device_component(self._device_id, 21, 0)
-                else:
-                    # Turn ON first: component 21 = 1
-                    success = await self._api.control_device_component(self._device_id, 21, 1)
-                    if success:
-                        # Set mode: component 16 (0=heating, 1=cooling, 2=auto)
-                        mode_value: int | None = None
-                        if hvac_mode == HVACMode.HEAT:
-                            mode_value = Z550_MODE_HEATING
-                        elif hvac_mode == HVACMode.COOL:
-                            mode_value = Z550_MODE_COOLING
-                        elif hvac_mode == HVACMode.HEAT_COOL:
-                            mode_value = Z550_MODE_AUTO
-                        if mode_value is not None:
-                            success = await self._api.control_device_component(self._device_id, 16, mode_value)
-                            if not success:
-                                # Power was just turned on but the mode write failed:
-                                # roll power back off so the physical device matches the
-                                # reverted optimistic UI instead of running in a stale mode.
-                                await self._api.control_device_component(self._device_id, 21, 0)
-            elif DeviceIdentifier.has_feature(self.device_data, "z260iq_mode"):
-                # Z260iQ: ON/OFF via component 13, mode via component 14
-                if hvac_mode == HVACMode.OFF:
-                    success = await self._api.control_device_component(self._device_id, 13, 0)
-                else:
-                    # Determine component 14 value from target HVAC mode:
-                    # Use the current preset to preserve the specific mode, or default to Smart variant
-                    current_preset = self.preset_mode
-                    if hvac_mode == HVACMode.HEAT:
-                        # Keep current preset if it's already a HEAT preset, else default to Smart Heat
-                        mode_value = LG_MODE_TO_VALUE.get(
-                            current_preset or LG_PRESET_SMART_HEATING, LG_MODE_TO_VALUE[LG_PRESET_SMART_HEATING]
-                        )
-                        if mode_value not in (0, 3, 4):
-                            mode_value = LG_MODE_TO_VALUE[LG_PRESET_SMART_HEATING]
-                    elif hvac_mode == HVACMode.COOL:
-                        mode_value = LG_MODE_TO_VALUE.get(
-                            current_preset or LG_PRESET_SMART_COOLING, LG_MODE_TO_VALUE[LG_PRESET_SMART_COOLING]
-                        )
-                        if mode_value not in (1, 5, 6):
-                            mode_value = LG_MODE_TO_VALUE[LG_PRESET_SMART_COOLING]
-                    elif hvac_mode == HVACMode.HEAT_COOL:
-                        mode_value = LG_MODE_TO_VALUE[LG_PRESET_SMART_HEAT_COOL]
-                    else:
-                        self._pending_hvac_mode = None
-                        self._last_hvac_action_time = None
-                        return
-                    success = await self._api.control_device_component(self._device_id, 14, mode_value)
-                    if success:
-                        success = await self._api.control_device_component(self._device_id, 13, 1)
-            else:
-                # Standard heat pump (LG, etc.)
-                if hvac_mode == HVACMode.HEAT:
-                    success = await self._api.start_pump(self._device_id)
-                elif hvac_mode == HVACMode.OFF:
-                    success = await self._api.stop_pump(self._device_id)
-                else:
-                    # Clear optimistic state for unsupported modes
-                    self._pending_hvac_mode = None
-                    self._last_hvac_action_time = None
-                    return
+            if success is None:
+                # Unsupported hvac_mode for this family: clear optimistic
+                # state silently, like the pre-refactor early return.
+                self._pending_hvac_mode = None
+                self._last_hvac_action_time = None
+                return
 
             if success:
                 await self.coordinator.async_request_refresh()
