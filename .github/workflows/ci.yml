@@ -111,3 +111,26 @@ jobs:
       # ([tool.mypy] strict = true).
       - name: Run mypy (strict)
         run: mypy custom_components/fluidra_pool/
+
+  floor-compat:
+    name: Floor compat (HA floor)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          # HA floor (hacs.json) requires Python 3.13; the test/typing jobs use 3.14.
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install the declared HA floor + runtime deps
+        run: |
+          python -m pip install --upgrade pip
+          FLOOR=$(python -c "import json; print(json.load(open('hacs.json'))['homeassistant'])")
+          REQS=$(python -c "import json; print(' '.join(json.load(open('custom_components/fluidra_pool/manifest.json'))['requirements']))")
+          pip install "homeassistant==${FLOOR}" ${REQS}
+
+      - name: Import-sweep against the floor
+        run: python scripts/check_floor_compat.py
