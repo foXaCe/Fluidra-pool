@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 from homeassistant.components.repairs import ConfirmRepairFlow
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
 import pytest
 
 from custom_components.fluidra_pool.const import CONNECTION_ISSUE_THRESHOLD, DOMAIN
@@ -13,7 +14,9 @@ from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordina
 from custom_components.fluidra_pool.repairs import (
     async_create_connection_issue,
     async_create_fix_flow,
+    async_create_unverified_profile_issue,
     async_delete_connection_issue,
+    async_delete_unverified_profile_issue,
 )
 
 
@@ -55,6 +58,30 @@ async def test_async_create_fix_flow_returns_confirm_flow(hass: HomeAssistant) -
     """The fix-flow factory returns a ConfirmRepairFlow for the fixable issue."""
     flow = await async_create_fix_flow(hass, "connection_error", None)
     assert isinstance(flow, ConfirmRepairFlow)
+
+
+def test_unverified_profile_issue_create_and_delete(hass: HomeAssistant) -> None:
+    """The helper pair delegates to the issue registry with the per-device issue id."""
+    with (
+        patch("custom_components.fluidra_pool.repairs.ir.async_create_issue") as create_mock,
+        patch("custom_components.fluidra_pool.repairs.ir.async_delete_issue") as delete_mock,
+    ):
+        async_create_unverified_profile_issue(hass, "D1", "My Chlorinator")
+        async_delete_unverified_profile_issue(hass, "D1")
+
+    create_mock.assert_called_once()
+    create_args = create_mock.call_args
+    assert create_args.args[0] is hass
+    assert create_args.args[1] == DOMAIN
+    assert create_args.args[2] == "unverified_profile_D1"
+
+    kwargs = create_mock.call_args.kwargs
+    assert kwargs["is_fixable"] is False
+    assert kwargs["severity"] == ir.IssueSeverity.WARNING
+    assert kwargs["translation_key"] == "unverified_device_profile"
+    assert kwargs["translation_placeholders"] == {"device_name": "My Chlorinator"}
+
+    delete_mock.assert_called_once_with(hass, DOMAIN, "unverified_profile_D1")
 
 
 class TestCoordinatorConnectionIssue:

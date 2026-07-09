@@ -33,7 +33,12 @@ from ..const import (
 from ..device_registry import DeviceIdentifier
 from ..fluidra_api import FluidraPoolAPI
 from ..helpers import determine_pool_access
-from ..repairs import async_create_connection_issue, async_delete_connection_issue
+from ..repairs import (
+    async_create_connection_issue,
+    async_create_unverified_profile_issue,
+    async_delete_connection_issue,
+    async_delete_unverified_profile_issue,
+)
 from ._parsers import calculate_auto_speed_from_schedules, parse_dm24049704_schedule_format
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,6 +65,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._consecutive_update_failures = 0
         # Pools already warned about read-only (viewer) access — warn once, not every poll.
         self._read_only_pools_warned: set[str] = set()
+        # Devices already flagged for an unverified profile — raise once, not every poll.
+        self._unverified_profile_flagged: set[str] = set()
 
         # Honour the user-configured polling interval.
         scan_interval = DEFAULT_SCAN_INTERVAL
@@ -649,3 +656,17 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 device["speed_percent"] = (
                     calculate_auto_speed_from_schedules(device) if device.get("is_running", False) else 0
                 )
+
+            # Flag devices resolved on a catch-all/legacy profile whose component
+            # mapping is a best guess (Issue #73 and friends): the entities are
+            # still created, but a repair issue tells the user their readings
+            # may be wrong and how to get an exact profile added.
+            config = DeviceIdentifier.identify_device(device)
+            if config is not None and not config.verified:
+                if device_id not in self._unverified_profile_flagged:
+                    self._unverified_profile_flagged.add(device_id)
+                    async_create_unverified_profile_issue(self.hass, device_id, str(device.get("name", device_id)))
+            elif device_id in self._unverified_profile_flagged:
+                # A code update added a verified profile for this device.
+                self._unverified_profile_flagged.discard(device_id)
+                async_delete_unverified_profile_issue(self.hass, device_id)
