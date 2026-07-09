@@ -1,0 +1,40 @@
+{
+  "_test_notes": {
+    "purpose": "Known-tricky case: the historical bug read c172 (water temperature) as pH. This fixture has a real pH probe on c165 too, so the tool must not fall into the same trap.",
+    "provenance": "c172=290 -> 29.0 degC is the exact figure confirmed in the cc25016001_chlorinator comment (chlorinators.py) — 'c172 = water temperature is confirmed (290 -> 29.0 degC)'. The 'wrongly read c172 as pH -> 2.9' framing is from the cc25052635_chlorinator comment in the same file. c165 (pH), c170/c177 (ORP pair) and c174 (salinity) values are synthetic but the c170-calibrated-vs-c177-raw-uncalibrated relationship (~50 mV gap) mirrors the documented trap for that same profile.",
+    "expected_anchors_cli": "--anchor temperature=29.0 --anchor ph=7.3 --anchor orp=640",
+    "expected_outcome": "temperature -> 172 (÷10 of 290 = 29.0, exact). ph -> 165 (÷100 of 730 = 7.30, exact) — NOT 172 (÷100 of 290 = 2.90 is a ~60% relative error from the 7.3 anchor, well outside tolerance). orp -> 170 (640 exact), with component 177 (690) flagged as an ambiguous alternate citing the known calibrated/raw trap."
+  },
+  "pools": {
+    "pool_0002": {
+      "id": "pool_0002",
+      "name": "Garden Pool",
+      "devices": [
+        {
+          "device_id": "**REDACTED**",
+          "name": "Chlorinator",
+          "family": "Chlorinators",
+          "type": "chlorinator",
+          "model": "Chlorinator",
+          "online": true,
+          "components": {
+            "0": {"reportedValue": -61},
+            "1": {"reportedValue": "**REDACTED**"},
+            "2": {"reportedValue": "**REDACTED**"},
+            "3": {"reportedValue": "1.3.9"},
+            "7": {"reportedValue": "TCLC2"},
+            "10": {"reportedValue": 90, "desiredValue": 90},
+            "16": {"reportedValue": 730, "desiredValue": 730},
+            "20": {"reportedValue": 640, "desiredValue": 640},
+            "103": {"reportedValue": 0, "desiredValue": 0},
+            "165": {"reportedValue": 730},
+            "170": {"reportedValue": 640},
+            "172": {"reportedValue": 290},
+            "174": {"reportedValue": 520},
+            "177": {"reportedValue": 690}
+          }
+        }
+      ]
+    }
+  }
+}
