@@ -132,6 +132,29 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         assert config.features["orp_setpoint"] == 20  # this variant exposes the ORP setpoint (c20 = 750)
 
+    def test_dm24008702_neolysis_connect_identifies_over_generic(self):
+        """Neolysis Connect (DM24008702, domoticS2) resolves to its verified profile, not the catch-all (Issue #141)."""
+        device = {
+            "device_id": "DM24008702.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 722}},
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is DEVICE_CONFIGS["dm24008702_chlorinator"]
+        assert config.verified is True  # verified profile → no unverified-profile repair issue
+        sensors = config.features["sensors"]
+        assert sensors["ph"] == 172  # domoticS2 legacy layout: pH on c172 (not the tecnoLC2 c165)
+        assert sensors["orp"] == 177
+        assert sensors["temperature"] == 183
+        assert sensors["salinity"] == 185
+        # Setpoints read the target registers (c8/c11), not the measured c172/c177.
+        assert config.features["ph_setpoint"] == 8
+        assert config.features["orp_setpoint"] == 11
+        assert config.features["chlorination_level"] == {"write": 4, "read": 164}
+
     def test_cc25021136_zodiac_ei2_iq_evo_uses_teclc2_layout(self):
         """Zodiac Ei2 iQ Evo (CC25021136) maps to the tecnoLC2 Evo profile, not the generic one (Issue #104)."""
         config = DEVICE_CONFIGS["cc25102423_chlorinator"]
