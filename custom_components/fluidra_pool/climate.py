@@ -33,9 +33,6 @@ from .const import (
     Z550_MODE_AUTO,
     Z550_MODE_COOLING,
     Z550_MODE_HEATING,
-    Z550_STATE_COOLING,
-    Z550_STATE_HEATING,
-    Z550_STATE_IDLE,
     Z550_STATE_NO_FLOW,
     FluidraPoolConfigEntry,
 )
@@ -260,60 +257,7 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
     def hvac_action(self) -> HVACAction | None:
         """Return the current hvac action."""
         device_data = self.device_data
-
-        # Z550iQ+ uses component 61 for detailed state
-        if DeviceIdentifier.has_feature(device_data, "z550_mode"):
-            z550_state = device_data.get("z550_state_reported")
-            if z550_state == Z550_STATE_HEATING:
-                return HVACAction.HEATING
-            if z550_state == Z550_STATE_COOLING:
-                return HVACAction.COOLING
-            # No flow: the unit is powered but circulation is blocked (typically an
-            # external pump is off). Report IDLE — like the Z260 no-flow alarm — so
-            # it doesn't read as switched off (Issue #88).
-            if z550_state == Z550_STATE_NO_FLOW:
-                return HVACAction.IDLE
-            if z550_state == Z550_STATE_IDLE:
-                return HVACAction.IDLE
-            return HVACAction.OFF
-
-        # Z260iQ: derive the action from ON/OFF + mode direction (component 14),
-        # not is_heating — otherwise an actively-cooling unit reports HEATING.
-        if DeviceIdentifier.has_feature(device_data, "z260iq_mode"):
-            heat_pump_reported = device_data.get("heat_pump_reported")
-            if heat_pump_reported is not None and not bool(heat_pump_reported):
-                return HVACAction.OFF
-            if device_data.get("no_flow_alarm"):
-                return HVACAction.IDLE
-            mode_value = device_data.get("z260iq_mode_value")
-            if mode_value in (1, 5, 6):  # Smart/Boost/Silence Cool
-                return HVACAction.COOLING
-            if mode_value in (0, 3, 4):  # Smart/Boost/Silence Heat
-                return HVACAction.HEATING
-            if mode_value == 2:  # Smart Heat+Cool: infer direction from temps
-                return self._infer_heat_cool_action()
-            return HVACAction.HEATING if bool(heat_pump_reported) else HVACAction.OFF
-
-        # LG heat pumps: decode the same component-14 direction values.
-        if DeviceIdentifier.has_feature(device_data, "preset_modes"):
-            on = device_data.get("heat_pump_reported")
-            if on is None:
-                on = device_data.get("pump_reported")
-            if on is None:
-                on = device_data.get("is_running")
-            if not on:
-                return HVACAction.OFF
-            components = device_data.get("components", {})
-            reported = components.get("14", {}).get("reportedValue") if isinstance(components, dict) else None
-            if reported in (1, 5, 6):  # cooling presets
-                return HVACAction.COOLING
-            if reported == 2:  # heat_cool: infer direction from temps
-                return self._infer_heat_cool_action()
-            return HVACAction.HEATING
-
-        if device_data.get("is_heating", False):
-            return HVACAction.HEATING
-        return HVACAction.OFF
+        return resolve_behavior(device_data).hvac_action(device_data, self._infer_heat_cool_action)
 
     @property
     def icon(self) -> str:
