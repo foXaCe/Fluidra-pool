@@ -14,7 +14,7 @@ from homeassistant.components.climate.const import (
     HVACMode,
 )
 from homeassistant.const import UnitOfTemperature
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -46,6 +46,7 @@ from .const import (
 )
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolControlEntity
+from .platform_setup import async_setup_dynamic_platform
 from .utils import mask_device_id
 
 if TYPE_CHECKING:
@@ -64,43 +65,19 @@ async def async_setup_entry(
 ) -> None:
     """Set up Fluidra Pool climate entities, including devices added later."""
     coordinator = config_entry.runtime_data.coordinator
-    known_devices: set[str] = set()
 
-    @callback
-    def _add_entities(pools: list[dict[str, Any]]) -> None:
-        """Create climate entities for any device not seen yet (dynamic-devices)."""
+    def _build(pool_id: str, device: dict[str, Any]) -> list[ClimateEntity]:
+        """Create climate entities for one device."""
         entities: list[ClimateEntity] = []
+        device_id = device["device_id"]
 
-        for pool in pools:
-            pool_id = pool["id"]
+        # Create climate entities based on device registry
+        if DeviceIdentifier.should_create_entity(device, "climate"):
+            entities.append(FluidraHeatPumpClimate(coordinator, coordinator.api, pool_id, device_id))
 
-            for device in pool.get("devices", []):
-                device_id = device.get("device_id")
-                if not device_id:
-                    continue
+        return entities
 
-                key = f"{pool_id}_{device_id}"
-                if key in known_devices:
-                    continue
-                known_devices.add(key)
-
-                # Create climate entities based on device registry
-                if DeviceIdentifier.should_create_entity(device, "climate"):
-                    entities.append(FluidraHeatPumpClimate(coordinator, coordinator.api, pool_id, device_id))
-
-        if entities:
-            async_add_entities(entities)
-
-    # Initial setup from the cached discovery (fast startup, unchanged behaviour).
-    pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
-    _add_entities(pools)
-
-    # Add entities for devices that appear on later polls, without a reload.
-    @callback
-    def _on_coordinator_update() -> None:
-        _add_entities(coordinator.get_pools_from_data())
-
-    config_entry.async_on_unload(coordinator.async_add_listener(_on_coordinator_update))
+    await async_setup_dynamic_platform(config_entry, async_add_entities, _build)
 
 
 class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):

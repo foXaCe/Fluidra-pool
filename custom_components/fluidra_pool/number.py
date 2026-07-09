@@ -18,6 +18,7 @@ from .coordinator import FluidraDataUpdateCoordinator
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolControlEntity
 from .helpers import resolve_component_rw
+from .platform_setup import async_setup_dynamic_platform
 
 if TYPE_CHECKING:
     from .fluidra_api import FluidraPoolAPI
@@ -34,56 +35,32 @@ async def async_setup_entry(
 ) -> None:
     """Set up Fluidra Pool number entities, including devices added later."""
     coordinator = config_entry.runtime_data.coordinator
-    known_devices: set[str] = set()
 
-    @callback
-    def _add_entities(pools: list[dict[str, Any]]) -> None:
-        """Create number entities for any device not seen yet (dynamic-devices)."""
+    def _build(pool_id: str, device: dict[str, Any]) -> list[NumberEntity]:
+        """Create number entities for one device."""
         entities: list[NumberEntity] = []
+        device_id = device["device_id"]
 
-        for pool in pools:
-            pool_id = pool["id"]
+        config = DeviceIdentifier.identify_device(device)
+        device_type = config.device_type if config else device.get("type", "")
 
-            for device in pool.get("devices", []):
-                device_id = device.get("device_id")
-                if not device_id:
-                    continue
+        # Chlorinator chlorination level — skip read-only probes (e.g. Blue
+        # Connect) that declare no "number" entity and do not dose.
+        if device_type == DEVICE_TYPE_CHLORINATOR and DeviceIdentifier.should_create_entity(device, "number"):
+            entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool_id, device_id))
+            # Only add pH/ORP setpoints if the device has these features
+            if DeviceIdentifier.get_feature(device, "ph_setpoint"):
+                entities.append(FluidraChlorinatorPhSetpoint(coordinator, coordinator.api, pool_id, device_id))
+            if DeviceIdentifier.get_feature(device, "orp_setpoint"):
+                entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool_id, device_id))
 
-                key = f"{pool_id}_{device_id}"
-                if key in known_devices:
-                    continue
-                known_devices.add(key)
+        # LumiPlus Connect effect speed control
+        if device_type == DEVICE_TYPE_LIGHT:
+            entities.append(FluidraLightEffectSpeed(coordinator, coordinator.api, pool_id, device_id))
 
-                config = DeviceIdentifier.identify_device(device)
-                device_type = config.device_type if config else device.get("type", "")
+        return entities
 
-                # Chlorinator chlorination level — skip read-only probes (e.g. Blue
-                # Connect) that declare no "number" entity and do not dose.
-                if device_type == DEVICE_TYPE_CHLORINATOR and DeviceIdentifier.should_create_entity(device, "number"):
-                    entities.append(FluidraChlorinatorLevelNumber(coordinator, coordinator.api, pool_id, device_id))
-                    # Only add pH/ORP setpoints if the device has these features
-                    if DeviceIdentifier.get_feature(device, "ph_setpoint"):
-                        entities.append(FluidraChlorinatorPhSetpoint(coordinator, coordinator.api, pool_id, device_id))
-                    if DeviceIdentifier.get_feature(device, "orp_setpoint"):
-                        entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool_id, device_id))
-
-                # LumiPlus Connect effect speed control
-                if device_type == DEVICE_TYPE_LIGHT:
-                    entities.append(FluidraLightEffectSpeed(coordinator, coordinator.api, pool_id, device_id))
-
-        if entities:
-            async_add_entities(entities)
-
-    # Initial setup from the cached discovery (fast startup, unchanged behaviour).
-    pools = coordinator.api.cached_pools or await coordinator.api.get_pools()
-    _add_entities(pools)
-
-    # Add entities for devices that appear on later polls, without a reload.
-    @callback
-    def _on_coordinator_update() -> None:
-        _add_entities(coordinator.get_pools_from_data())
-
-    config_entry.async_on_unload(coordinator.async_add_listener(_on_coordinator_update))
+    await async_setup_dynamic_platform(config_entry, async_add_entities, _build)
 
 
 class FluidraChlorinatorLevelNumber(FluidraPoolControlEntity, NumberEntity):
