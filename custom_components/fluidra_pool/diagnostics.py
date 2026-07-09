@@ -46,6 +46,11 @@ TO_REDACT = {
 TO_REDACT_LOWER = {key.lower() for key in TO_REDACT}
 REDACTED = "**REDACTED**"
 
+# The raw device tree entry stored under device["status"] carries the device
+# serial in its "id" field (and in nested bridge children under "devices[].id").
+# "id" must NOT go into the global TO_REDACT: schedule/job ids would be lost.
+TO_REDACT_STATUS = TO_REDACT | {"id"}
+
 # Components that typically carry device identifiers (serial, MAC, IP, SKU).
 # Their `reportedValue`/`desiredValue` strings are redacted regardless of the device
 # family — these slots are reserved for telemetry-metadata on the Fluidra cloud:
@@ -133,6 +138,10 @@ def _redact_pools_data(pools_data: dict[str, Any]) -> dict[str, Any]:
                 elif key == "water_quality":
                     # Water-quality telemetry is useful for debugging algorithms.
                     redacted_pool[key] = value
+                elif key == "id":
+                    # The pool id is already anonymised in the dict key
+                    # (pool_XXXX) — keeping it in the value defeats that.
+                    redacted_pool[key] = REDACTED
                 elif isinstance(value, dict):
                     redacted_pool[key] = async_redact_data(value, TO_REDACT)
                 else:
@@ -165,6 +174,11 @@ def _redact_devices_data(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 elif key in _IDENTIFIER_DEVICE_FIELDS:
                     # Mirror of an identifier-bearing component — always redact strings.
                     redacted_device[key] = REDACTED if isinstance(value, str) else value
+                elif key == "status" and isinstance(value, dict):
+                    # Raw tree entry: its "id" (and children "devices[].id") is
+                    # the device serial — redact it (async_redact_data recurses
+                    # into nested lists/dicts).
+                    redacted_device[key] = async_redact_data(value, TO_REDACT_STATUS)
                 elif isinstance(value, dict):
                     redacted_device[key] = async_redact_data(value, TO_REDACT)
                 elif isinstance(value, list):
