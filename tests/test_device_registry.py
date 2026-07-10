@@ -345,11 +345,13 @@ class TestDeviceConfigRegistry:
         assert config.features["sensors"] == DEVICE_CONFIGS["lc24013306_chlorinator"].features["sensors"]
 
     def test_cc24047102_energy_connect_uses_teclc2_layout(self):
-        """AstralPool Energy Connect serials map on the tecnoLC2 layout (Issues #85, #117, #121)."""
+        """AstralPool Energy Connect serials map on the tecnoLC2 layout (Issues #85, #117, #121, #142)."""
         config = DEVICE_CONFIGS["cc24047102_chlorinator"]
         # CC25008731 (#117) / CC25017029 (#121) are the same layout — c172 = water
         # temperature, not pH as the generic profile read it (e.g. 254 → 25.4 °C, not pH 2.54).
-        for serial in ("CC24047102.nn_1", "CC25010924.nn_1", "CC25008731.nn_1", "CC25017029.nn_1"):
+        # CC25059122 (#142) is the Clear Connect EVO 12, a rebadged Energy Connect:
+        # c172 = 239 matched the app's 23.9 °C exactly.
+        for serial in ("CC24047102.nn_1", "CC25010924.nn_1", "CC25008731.nn_1", "CC25017029.nn_1", "CC25059122.nn_1"):
             device = {
                 "device_id": serial,
                 "name": "Chlorinator",

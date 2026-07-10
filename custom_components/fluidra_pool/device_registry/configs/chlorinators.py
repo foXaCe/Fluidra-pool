@@ -207,7 +207,14 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # CC25017029 (Issue #121, @luiscosta1979) — same generic fallback: diagnostics
         # show c172 = 254 read as pH 2.54, while the API status_data.waterTemperature
         # confirms 25.4 °C, and c183 (generic temperature slot) reads 0. Same layout.
-        ["CC24047102*", "CC25010924*", "CC25008731*", "CC25017029*"],
+        # CC25059122 (Issue #142, @LudovicOmarini) — AstralPool Clear Connect EVO 12,
+        # a rebadged Energy Connect (the device's own status carries the
+        # manual_energyconnect_* user manuals). Anchored against the app screenshot:
+        # c172 = 239 matches the app's 23.9 °C pool temperature exactly (the catch-all
+        # read it as pH 2.39), c20 = 700 matches the 700 mV ORP setpoint, c177 = 747
+        # is the usual ~50 mV-off uncalibrated raw ORP (app shows 697 on c170), and
+        # the legacy c183/c185 slots read 0 while the app shows 23.9 °C / 3.9 g/L.
+        ["CC24047102*", "CC25010924*", "CC25008731*", "CC25017029*", "CC25059122*"],
         priority=88,
         boost_mode=103,
     ),
