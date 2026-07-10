@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.49.2] - 2026-07-10
+
+### Added
+- **AstralPool Clear Connect EVO 12 support** (Issue #142, @LudovicOmarini) — the CC25059122 serial is a rebadged Energy Connect (tecnoLC2): it now resolves to the verified Energy Connect profile instead of the generic catch-all. pH moves to the live probe (c165), ORP to the calibrated register (c170, the raw c177 reads ~50 mV high), water temperature to c172 (anchored against the app: 239 → 23.9 °C, previously misread as pH 2.39) and salinity to c174. This also clears the "unverified device profile" repair issue for this unit.
+
 ## [2.49.1] - 2026-07-09
 
 ### Added
