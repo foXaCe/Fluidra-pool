@@ -730,7 +730,9 @@ class TestIdentifyDevice:
         assert config.features["sensors"]["ph"] == 62
         assert config.features["sensors"]["orp"] == 63
         assert config.features["sensors"]["temperature"] == 64
-        assert config.features["sensors"]["salinity"] == 36
+        # Salinity is not mapped: the eXO iQ exposes no live salinity over the API;
+        # c36 was a static low-salt threshold, not a probe reading (Issue #143).
+        assert "salinity" not in config.features["sensors"]
 
     def test_invalid_input_returns_none(self):
         assert DeviceIdentifier.identify_device(None) is None

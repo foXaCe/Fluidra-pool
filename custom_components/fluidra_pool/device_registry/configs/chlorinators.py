@@ -903,8 +903,12 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "schedule_output_type": "output",  # pump/aux1/aux2.
             "exo_mode": True,
             # on_off_component removed — mode select (AUTO/ON/OFF) replaces ON/OFF switch.
+            # Salinity is intentionally NOT mapped: the eXO iQ exposes no live salinity
+            # over the API (the official app shows only pH/ORP/temperature and merely
+            # raises a low-salt alarm). c36 was a static register — it sat frozen at
+            # exactly 2750 (2.75 g/L) across two different units for 10+ days — i.e. the
+            # low-salt threshold, not a probe reading (Issue #143, @AminShAT).
             "sensor_divisors": {
-                "salinity": 1000,  # EXO reports salinity in mg/L (2750 = 2.75 g/L).
                 "ph": 10,  # EXO reports pH * 10 (69 = 6.9 pH).
                 "temperature": 1,  # EXO c64 is direct °C (14 = 14°C).
             },
@@ -912,9 +916,8 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "ph": 62,  # ÷10 — 69 = 6.9 pH.
                 "orp": 63,  # mV — 738 = 738 mV.
                 "temperature": 64,  # Direct °C — 14 = 14°C.
-                "salinity": 36,  # ÷1000 for g/L — 2750 = 2.75 g/L.
             },
-            "specific_components": [9, 13, 14, 15, 17, 20, 35, 36, 38, 39, 40, 62, 63, 64],
+            "specific_components": [9, 13, 14, 15, 17, 20, 35, 38, 39, 40, 62, 63, 64],
         },
         priority=85,
     ),
