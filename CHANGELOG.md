@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.51.0] - 2026-07-12
+
+### Added
+- **Zodiac GenSalt OE iQ 20" support** (Issue #145, @Ibizagrove) — the CC26009743 serial (a tecnoLC2 chlorinator) now resolves to a verified profile instead of the generic catch-all. Chlorination control writes to the correct register (c10, fixing the "cannot set device value" error), and pH (c165), ORP (c170), water temperature (c172) and salinity (c174) are mapped on the right registers instead of misreading c172 (water temperature) as pH. This also clears the "unverified device profile" repair issue for this unit.
+
+### Fixed
+- **eXO iQ (NS25) salinity sensor no longer shows a frozen placeholder** (Issue #143, @AminShAT) — the eXO iQ exposes no live salinity over the API (the official app shows only pH/ORP/temperature and merely raises a low-salt alarm), and the register the integration read (c36) is a static low-salt threshold that stayed pinned at 2.75 g/L for days. The salinity sensor is now dropped from the NS25/eXO profile rather than reporting a value that never changes; pH, ORP and water temperature are unaffected.
+
 ## [2.50.1] - 2026-07-12
 
 ### Fixed
