@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.50.1] - 2026-07-12
+
+### Fixed
+- **Heat/cool `hvac_action` no longer over-reports in the 1-2 °C band** (Issue #139, @Kal42) — the Smart Heat+Cool direction is inferred from the water-vs-setpoint delta, and the deadband is now ±2.0 °C instead of ±1.0 °C. A Z250iQ power-meter capture showed the compressor stays off until the water is 2 °C past the setpoint (28 °C setpoint → engages at 30 °C), so the previous ±1 °C window claimed *heating*/*cooling* a full degree before the unit actually ran. The entity now stays *idle* through the 1-2 °C band on the Z250iQ / Z260iQ / Z550iQ family.
+
 ## [2.50.0] - 2026-07-12
 
 ### Added
