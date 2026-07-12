@@ -464,11 +464,13 @@ def test_hvac_action_z260_by_mode(mode_value, expected) -> None:
     [
         (24.0, 28.0, HVACAction.HEATING),  # water 4°C below setpoint
         (30.0, 26.0, HVACAction.COOLING),  # water 4°C above setpoint
-        (27.5, 28.0, HVACAction.IDLE),  # inside the ±1.0°C deadband: satisfied
-        (28.9, 28.0, HVACAction.IDLE),  # just under the deadband edge
-        (27.0, 28.0, HVACAction.IDLE),  # delta exactly at the deadband: strict >, stays idle
-        (26.9, 28.0, HVACAction.HEATING),  # just past the edge below → heating
-        (29.1, 28.0, HVACAction.COOLING),  # just past the edge above → cooling
+        (27.5, 28.0, HVACAction.IDLE),  # 0.5°C below: inside the ±2.0°C deadband
+        (29.5, 28.0, HVACAction.IDLE),  # 1.5°C above: still idle — the Z250iQ power meter
+        #                                 showed the compressor only engages at +2°C (#139)
+        (26.0, 28.0, HVACAction.IDLE),  # delta exactly 2.0: strict >, stays idle
+        (30.0, 28.0, HVACAction.IDLE),  # delta exactly 2.0 (cooling side): stays idle
+        (25.9, 28.0, HVACAction.HEATING),  # delta 2.1: just past the edge → heating
+        (30.1, 28.0, HVACAction.COOLING),  # delta 2.1: just past the edge → cooling
     ],
 )
 def test_hvac_action_z260_heat_cool_inferred_from_temp_delta(water, target, expected) -> None:
