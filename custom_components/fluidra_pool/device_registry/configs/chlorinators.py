@@ -165,6 +165,35 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=90,
     ),
+    "cc26009743_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Zodiac GenSalt OE iQ 20" (tecnoLC2) — Issue #145 (@Ibizagrove). Fell back to the
+        # generic profile: c172 (water temperature, 293 → 29.3 °C) was misread as pH 2.93,
+        # the real pH/ORP/salinity (c165/c170/c174) were never scanned so they read 0, and
+        # chlorination writes went to c4 instead of c10 ("cannot set device value"). Same
+        # standard tecnoLC2 layout as the GenSalt OE iQ pH 12 Evo (cc25052635); c20 (ORP
+        # setpoint) read null on this unit so it is left unmapped like that sibling.
+        identifier_patterns=["CC26009743*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "number", "sensor_info"],
+        features={
+            "on_off_component": 0,
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "boost_mode": 103,
+            "skip_mode_select": True,
+            "sensors": {
+                "ph": 165,  # pH measured (÷100).
+                "orp": 170,  # ORP measured (mV).
+                "temperature": 172,  # Water temperature (°C × 10) — 293 → 29.3.
+                "salinity": 174,  # Salinity (g/L × 100).
+            },
+            "specific_components": [0, 10, 16, 20, 103, 165, 170, 172, 174],
+        },
+        priority=90,
+    ),
     "cc25016001_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # Zodiac Ei2 iQ (tecnoLC2, salt-only — no pH/ORP probe) — Issue #84 (@Felix62-byte).
