@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.50.0] - 2026-07-12
+
+### Added
+- **pH-only Domotic S2 chlorinator support** (Issue #144, @MiguelCosta) — the DM25028908 serial (a domoticS2 chlorinator with no ORP probe and no salt) now resolves to a verified device profile instead of the generic catch-all. Chlorination (c4 desired / c164 reported), pH setpoint (c8), pH probe (c172), water temperature (c183) and salinity (c185) are mapped on the correct registers, with ORP left unmapped since the unit has no ORP probe. Every value was cross-checked against the official app (chlorination 50 %, pH 7.4 / 7.04, water 28.7 °C). This also clears the "unverified device profile" repair issue for this unit.
+
 ## [2.49.2] - 2026-07-10
 
 ### Added
