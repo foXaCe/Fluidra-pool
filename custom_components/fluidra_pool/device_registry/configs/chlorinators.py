@@ -761,6 +761,36 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=90,
     ),
+    "dm25028908_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # pH-only domoticS2 chlorinator (thing type domoticS2, bridged) — Issue #144
+        # (@MiguelCosta, cloud serial DM25028908.nn_1). Same split-register layout as
+        # the Neolysis Connect (DM24008702): chlorination writes to c4 / reads back on
+        # c164, mode on c20 (0=OFF / 1=ON / 2=AUTO), boost on c245. Unlike that unit
+        # this one has no ORP probe and no salt: c11/c177 (ORP setpoint/measured) and
+        # c178 (free chlorine) are null and salinity (c185) reads 0.0 g/L — so ORP is
+        # not mapped. Values confirmed against the official app: chlorination 50 %
+        # setpoint (c4) / 0 % actual (c164), pH setpoint 7.4 (c8), pH measured 7.04
+        # (c172 ÷100), water temperature 28.7 °C (c183 ÷10).
+        identifier_patterns=["DM25028908*"],
+        family_patterns=["chlorinator"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "select", "number", "sensor_info"],
+        features={
+            "chlorination_level": {"write": 4, "read": 164},  # c4 desired / c164 reported.
+            # Mode on component 20: 0=OFF, 1=ON, 2=AUTO.
+            "ph_setpoint": 8,  # c8 = 740 → 7.40 pH (target, distinct from measured c172).
+            "boost_mode": 245,
+            "sensors": {
+                "ph": 172,  # pH measured (÷100) — 704 → 7.04.
+                "temperature": 183,  # Water temperature (°C × 10) — 287 → 28.7.
+                "salinity": 185,  # Salinity (g/L × 100) — 0 on this saltless unit.
+            },
+            "specific_components": [4, 8, 20, 164, 172, 183, 185, 245],
+        },
+        priority=90,
+    ),
     "dm24049704_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["DM24049704*"],  # Domotic S2 chlorinator (SheepPool).
