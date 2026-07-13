@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.53.0] - 2026-07-13
+
+### Added
+- **AstralPool Advance Connect support** (Issue #149, @sergielez) — the LC24025216 serial (a tecnoLC2 chlorinator) now resolves to a verified profile instead of the generic catch-all. pH (c165), ORP (c170), water temperature (c172) and salinity (c174) are mapped on the right registers instead of misreading c172 (water temperature, 28.2 °C) as pH, and chlorination control writes to c10. This also clears the "unverified device profile" repair issue for this unit.
+
+### Changed
+- CI maintenance: bumped `actions/cache` to v6, and Renovate no longer opens PRs bumping the hand-pinned `python-version` values in the workflows (the Floor compat job deliberately pins the HA floor 3.13).
+
 ## [2.52.0] - 2026-07-13
 
 ### Added
