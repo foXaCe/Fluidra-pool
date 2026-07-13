@@ -252,6 +252,16 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         priority=85,
         boost_mode=103,
     ),
+    "lc24025216_chlorinator": _standard_tecnolc2(
+        # AstralPool Advance Connect (tecnoLC2) — Issue #149 (@sergielez). Fell back to
+        # the generic profile, which read c172 (water temperature, 282 → 28.2 °C — the
+        # same value the pool status reports) as pH 2.82, and left ORP/temperature/
+        # salinity at 0 because the real registers (c165 pH, c170 ORP, c172 temperature,
+        # c174 salinity) are never scanned by the generic layout. Standard tecnoLC2 map.
+        ["LC24025216*"],
+        priority=86,
+        boost_mode=103,
+    ),
     # Ducere 21 (tecnoLC2) — Issue #125 (@onslope). The unit fell back to the
     # generic profile whose legacy layout read c172 (water temperature) as pH.
     # Mapping supplied and validated by the reporter: standard tecnoLC2 layout
