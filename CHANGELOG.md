@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.52.0] - 2026-07-13
+
+### Added
+- **Zodiac/Fluidra Victoria Smart Connect VS — initial recognition** (Issue #144, @MiguelCosta) — the variable-speed Victoria pump now matches a dedicated profile (by model name) instead of the generic pump fallback. A capture taken while the pump ran at 100 % showed the standard on/off (c9) and auto (c10) registers both reading 0, so — unlike the E30iQ — this pump reports its speed and running state on other components that the narrow generic scan never fetched. This profile widens the diagnostic scan to the full pump register window (c9-c24) so the next running capture reveals the real registers; it is intentionally left **unverified** (the "device profile not verified" warning stays, and control is still the basic generic on/off) until the speed/state mapping is confirmed and wired up.
+
 ## [2.51.0] - 2026-07-12
 
 ### Added
