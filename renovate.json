@@ -63,6 +63,12 @@
       "matchDepNames": ["python", "homeassistant", "ghcr.io/home-assistant/devcontainer"],
       "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Workflow python-version values are pinned by hand (Floor compat job pins the HA floor 3.13; the test/typing jobs pin 3.14). Renovate must not touch them at all — it opened a bad PR (#146) raising the floor job to 3.14, which breaks the floor-compat check.",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["python"],
+      "enabled": false
     }
   ]
 }
