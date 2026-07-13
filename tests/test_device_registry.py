@@ -610,6 +610,25 @@ class TestIdentifyDevice:
         assert config is not None
         assert config.device_type == "pump"
 
+    def test_identify_victoria_smart_connect_pump(self):
+        """Victoria Smart Connect VS matches its own (unverified) profile by model, with a
+        widened diagnostic scan — c9/c10 stay 0 while running, so the E30 layout doesn't
+        apply and the real registers must be revealed by a wider capture (Issue #144)."""
+        device = {
+            "device_id": "170125500054",  # numeric serial, no E30*/LE*/PUMP* prefix
+            "name": "Victoria Smart Connect VS",
+            "family": "Filtration Pumps",
+            "model": "Victoria Smart Connect VS",
+            "type": "pump",
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is not None
+        assert config.device_type == "pump"
+        assert config.verified is False  # registers not yet confirmed
+        # Diagnostic window must reach past the generic scan (c0-c3 + c9/c10).
+        assert 15 in config.features["specific_components"]
+        assert config.features["specific_components"][-1] >= 21
+
     def test_identify_chlorinator_bridged(self):
         device = {
             "device_id": "AB123.nn_456",
