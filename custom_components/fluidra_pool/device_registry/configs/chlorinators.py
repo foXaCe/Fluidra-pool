@@ -243,7 +243,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # read it as pH 2.39), c20 = 700 matches the 700 mV ORP setpoint, c177 = 747
         # is the usual ~50 mV-off uncalibrated raw ORP (app shows 697 on c170), and
         # the legacy c183/c185 slots read 0 while the app shows 23.9 °C / 3.9 g/L.
-        ["CC24047102*", "CC25010924*", "CC25008731*", "CC25017029*", "CC25059122*"],
+        # CC26002143 (Issue #153, @Squallium) — Astra Pool Energy Connect, same layout;
+        # app screenshot shows pH 7.3, ORP 706 mV (setpoint 700 on c20), water 28.8 °C
+        # (c172 = 288, misread as pH 2.88 by the catch-all) and salinity 0.0 g/L.
+        ["CC24047102*", "CC25010924*", "CC25008731*", "CC25017029*", "CC25059122*", "CC26002143.nn_*"],
         priority=88,
         boost_mode=103,
     ),
