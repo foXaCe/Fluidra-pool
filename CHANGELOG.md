@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.55.0] - 2026-07-14
+
+### Added
+- **Astra Pool Energy Connect `CC26002143`** (Issue #153, @Squallium) — added to the AstralPool Energy Connect profile (tecnoLC2, pH + ORP). pH (c165, 7.3), ORP (c170, 706 mV), water temperature (c172, 28.8 °C — the generic profile misread it as pH 2.88) and salinity (c174) now map correctly and the "unverified profile" warning clears.
+
 ## [2.54.0] - 2026-07-14
 
 ### Added
