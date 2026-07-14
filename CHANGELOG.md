@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.54.0] - 2026-07-14
+
+### Added
+- **Automatic detection of unknown tecnoLC2 chlorinators** — a chlorinator with an unrecognised serial that would otherwise land on the generic domoticS2 catch-all is now re-routed to the correct tecnoLC2 profile when its components give it away (c8, the domoticS2 pH setpoint, is blank and c172 sits in the water-temperature band rather than the pH band). These units get the right pH (c165), ORP (c170), water temperature (c172) and salinity (c174) registers and the "unverified profile" warning clears, without waiting for the serial to be added by hand. Recognised serials and genuine domoticS2 units are unaffected.
+- **Astralpool Clear Connect `CC25060723`** (Issue #152, @ClaudeK83) — self-diagnosed as the existing Clear Connect layout; added to that verified profile.
+
 ## [2.53.0] - 2026-07-13
 
 ### Added
