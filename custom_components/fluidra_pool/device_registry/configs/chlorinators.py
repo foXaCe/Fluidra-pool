@@ -441,7 +441,9 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # Astralpool Clear Connect 12 (G/H) (tecnoLC2) — Issues #66, #81.
         # Full mapping confirmed by @alapedra's v2.35.1 diagnostics.
         # CC25009932 — same model with ORP + pH probes (@christian123125, #81).
-        identifier_patterns=["CC25019224.nn_*", "CC25009932*"],
+        # CC25060723 — same Clear Connect layout, self-diagnosed by @ClaudeK83 (#152):
+        # the existing mapping matched his unit exactly, only the serial was missing.
+        identifier_patterns=["CC25019224.nn_*", "CC25009932*", "CC25060723.nn_*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
