@@ -933,4 +933,16 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=85,
     ),
+    # Standard tecnoLC2 layout applied by the component-signature fallback in
+    # identifier.py: an unknown-serial chlorinator whose c8 (the domoticS2 pH setpoint)
+    # is blank and whose c172 sits in the water-temperature band is really a tecnoLC2
+    # unit, not a domoticS2 one, so it gets the correct pH/ORP/temperature/salinity
+    # registers instead of the misreading catch-all. This profile is NEVER matched by
+    # pattern (see the family_patterns reset below) — it is returned only by that
+    # signature check, so it does not disturb normal serial/priority scoring.
+    "tecnolc2_signature": _standard_tecnolc2([], priority=0, boost_mode=103),
 }
+
+# Signature-only profile: strip every pattern so it can never win pattern/priority
+# scoring; identifier.py hands it out solely via the tecnoLC2 component signature.
+CHLORINATOR_CONFIGS["tecnolc2_signature"].family_patterns = []

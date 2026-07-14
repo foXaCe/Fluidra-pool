@@ -32,6 +32,34 @@ def _match(value: str, patterns: tuple[str, ...]) -> bool:
     return False
 
 
+# tecnoLC2 water temperature (c172, °C × 10) realistically spans ~3-52 °C. A genuine
+# domoticS2 pH on c172 reads 600-850 (6.0-8.5 pH), so a c172 in this lower band cannot
+# be a pH value — it is a temperature, i.e. the device is tecnoLC2.
+_TECNOLC2_C172_MIN = 30
+_TECNOLC2_C172_MAX = 520
+
+
+def _looks_like_tecnolc2(comp8_value: str, comp172_value: str) -> bool:
+    """Signature for a tecnoLC2 chlorinator that fell to the domoticS2 catch-all.
+
+    domoticS2 units carry the pH setpoint on c8 (~700-800) and read pH on c172;
+    tecnoLC2 units leave c8 blank (0) and use c172 for the water temperature. A blank
+    c8 *and* a c172 in the temperature band means the catch-all's pH reading is
+    nonsense and the unit is really tecnoLC2. Both conditions are required: a
+    misconfigured domoticS2 unit keeps its pH setpoint on c8, so it can never satisfy
+    the blank-c8 half.
+    """
+    if comp8_value not in ("", "0", "0.0", "None"):
+        return False
+    if not comp172_value:
+        return False
+    try:
+        temperature = float(comp172_value)
+    except (TypeError, ValueError):
+        return False
+    return _TECNOLC2_C172_MIN <= temperature <= _TECNOLC2_C172_MAX
+
+
 @lru_cache(maxsize=512)
 def _identify_device_uncached(
     *,
@@ -100,6 +128,24 @@ def _identify_device_uncached(
     return best_match
 
 
+def _tecnolc2_signature_override(config: DeviceConfig | None, components: dict[str, Any]) -> DeviceConfig | None:
+    """Re-route the domoticS2 catch-all to the tecnoLC2 profile when the components say so.
+
+    Applied *after* identification (and outside the device-level cache) so it re-reads
+    c8/c172 on every call — the signature only becomes true once those components have
+    been scanned, and a stale cache must never pin the device to the wrong profile. Only
+    the generic ``chlorinator`` catch-all is ever overridden; every serial/priority match
+    is returned untouched.
+    """
+    if config is not DEVICE_CONFIGS.get("chlorinator"):
+        return config
+    comp8_value = str(components["8"].get("reportedValue", "")) if isinstance(components.get("8"), dict) else ""
+    comp172_value = str(components["172"].get("reportedValue", "")) if isinstance(components.get("172"), dict) else ""
+    if _looks_like_tecnolc2(comp8_value, comp172_value):
+        return DEVICE_CONFIGS.get("tecnolc2_signature", config)
+    return config
+
+
 class DeviceIdentifier:
     """Helper to identify device type from device data."""
 
@@ -163,7 +209,9 @@ class DeviceIdentifier:
         )
         cache = device.get("_identify_cache")
         if isinstance(cache, dict) and cache.get("key") == cache_key:
-            return cache.get("config")
+            # The tecnoLC2 signature is re-evaluated here (not baked into the cache) so
+            # it activates as soon as c8/c172 are scanned, without a key change.
+            return _tecnolc2_signature_override(cache.get("config"), components)
 
         result = _identify_device_uncached(
             device_id=str(cache_key[0]),
@@ -174,7 +222,7 @@ class DeviceIdentifier:
             comp7_value=comp7_value,
         )
         device["_identify_cache"] = {"key": cache_key, "config": result}
-        return result
+        return _tecnolc2_signature_override(result, components)
 
     @staticmethod
     def should_create_entity(device: dict[str, Any], entity_type: str) -> bool:

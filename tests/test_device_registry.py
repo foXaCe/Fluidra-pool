@@ -852,3 +852,66 @@ class TestCheckComponentSignature:
     def test_no_components(self):
         device = {}
         assert DeviceIdentifier._check_component_signature(device, 7, ["BXWAA"]) is False
+
+
+class TestTecnoLC2Signature:
+    """Signature fallback: unknown-serial tecnoLC2 chlorinators routed off the catch-all.
+
+    tecnoLC2 units report a generic model/name, so an unknown serial lands on the
+    domoticS2 catch-all, which misreads c172 (water temperature) as pH. When c8 (the
+    domoticS2 pH setpoint) is blank and c172 is in the temperature band, the device is
+    really tecnoLC2 and must get the standard tecnoLC2 registers (Issues #145/#149/#151/
+    #152/#153...).
+    """
+
+    @staticmethod
+    def _device(device_id, **components):
+        return {
+            "device_id": device_id,
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "model": "",
+            "type": "chlorinator",
+            "components": {str(k): {"reportedValue": v} for k, v in components.items()},
+        }
+
+    @staticmethod
+    def _name(config):
+        return next((n for n, c in DEVICE_CONFIGS.items() if c is config), None)
+
+    def test_unknown_tecnolc2_routes_to_signature_profile(self):
+        """Blank c8 + c172 in the temperature band -> standard tecnoLC2 profile, verified."""
+        config = DeviceIdentifier.identify_device(self._device("CC29999999.nn_1", **{"8": 0, "172": 303}))
+        assert self._name(config) == "tecnolc2_signature"
+        assert config.verified is True
+        assert config.features["sensors"] == {"ph": 165, "orp": 170, "temperature": 172, "salinity": 174}
+        assert config.features["chlorination_level"] == 10
+
+    def test_unknown_domotics2_stays_on_catch_all(self):
+        """A real domoticS2 unit keeps its pH setpoint on c8, so it is never re-routed."""
+        config = DeviceIdentifier.identify_device(self._device("DM99999999.nn_1", **{"8": 740, "172": 704}))
+        assert self._name(config) == "chlorinator"
+        assert config.verified is False
+
+    def test_known_serial_is_not_overridden(self):
+        """A device matching a dedicated serial profile keeps it, signature notwithstanding."""
+        config = DeviceIdentifier.identify_device(self._device("CC25060723.nn_1", **{"8": 0, "172": 303}))
+        assert self._name(config) == "cc25019224_chlorinator"
+
+    def test_c172_in_ph_band_is_not_tecnolc2(self):
+        """Blank c8 but c172 in the pH band (704 = 7.04) must not trigger the signature."""
+        config = DeviceIdentifier.identify_device(self._device("CC29999997.nn_1", **{"8": 0, "172": 704}))
+        assert self._name(config) == "chlorinator"
+
+    def test_missing_c172_falls_back_to_catch_all(self):
+        """No temperature reading yet -> no false positive, stays on the catch-all."""
+        config = DeviceIdentifier.identify_device(self._device("CC29999998.nn_1", **{"8": 0}))
+        assert self._name(config) == "chlorinator"
+
+    def test_signature_activates_after_components_are_scanned(self):
+        """The override is re-evaluated post-cache: it flips once c8/c172 are present."""
+        device = self._device("CC29990002.nn_1")
+        device["components"] = {}
+        assert self._name(DeviceIdentifier.identify_device(device)) == "chlorinator"
+        device["components"] = {"8": {"reportedValue": 0}, "172": {"reportedValue": 303}}
+        assert self._name(DeviceIdentifier.identify_device(device)) == "tecnolc2_signature"
