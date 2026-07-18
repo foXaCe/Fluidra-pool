@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.56.0] - 2026-07-18
+
+### Added
+- **Victoria Smart Connect VS — read-side support** (Issue #144, @MiguelCosta; register captures by @renaatski) — the pump reports its state as *strings* on registers the numeric E30iQ layout never used, decoded from five running/stopped/flow/speed captures: c14 `RUNNING`/`NOT RUNNING`, c16 `AUTO`/`QUICK FUNCTION`, c17+c18 the target and its kind (`SPEED` % or `FLOW` m³/h), c21 the live output %. The pump and auto-mode switches now show the real state (previously always "off"), the speed sensor reads the live output % even under a schedule, and the mode/setpoint are exposed as attributes. Two new sensors surface telemetry cross-checked against the pump's local HMI: **Power** (c22, W — exact at high speed, factory performance-curve data below) and **Head** (c24, reported in cm, shown in m). The write path (start/stop, speed control from HA) is still unknown — captures of what the official app writes are welcome in Issue #144 — so the profile stays unverified and control commands are not wired yet.
+
 ## [2.55.0] - 2026-07-14
 
 ### Added
