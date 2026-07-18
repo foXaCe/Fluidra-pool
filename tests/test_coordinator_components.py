@@ -413,3 +413,185 @@ async def test_standard_layout_unchanged_without_info_layout(
     coordinator._process_component_state(device, "pool_001", 2, {"reportedValue": -65})
     assert device["device_id_component"] == "DEV-ID"
     assert device["signal_strength_component"] == -65
+
+
+# --- Victoria Smart Connect VS string-register decoder (Issue #144) ------
+
+
+def _victoria_device() -> dict[str, Any]:
+    return _pinned_device(features={"victoria_vs_mode": True})
+
+
+async def test_victoria_component_14_running_string(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c14 carries the running state as a string on the Victoria."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 14, {"reportedValue": "RUNNING"})
+    assert device["is_running"] is True
+    assert device["pump_reported"] is True
+    coordinator._process_component_state(device, "pool_001", 14, {"reportedValue": "NOT RUNNING"})
+    assert device["is_running"] is False
+    assert device["pump_reported"] is False
+
+
+async def test_victoria_component_14_non_string_ignored(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """A missing/numeric c14 must not claim the pump stopped."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 14, {"reportedValue": None})
+    assert "is_running" not in device
+    assert "pump_reported" not in device
+
+
+async def test_victoria_component_16_mode_string(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c16 is AUTO (schedule-driven) vs QUICK FUNCTION (manual)."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "AUTO"})
+    assert device["auto_mode_enabled"] is True
+    assert device["auto_reported"] is True
+    assert device["pump_mode"] == "AUTO"
+    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "QUICK FUNCTION"})
+    assert device["auto_mode_enabled"] is False
+    assert device["auto_reported"] is False
+    assert device["pump_mode"] == "QUICK FUNCTION"
+
+
+async def test_victoria_component_17_18_setpoint_value_and_type(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """c17 is the target (95 % or 5 m³/h) and c18 says which one (SPEED/FLOW)."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 17, {"reportedValue": 95})
+    coordinator._process_component_state(device, "pool_001", 18, {"reportedValue": "SPEED"})
+    assert device["pump_setpoint"] == 95
+    assert device["pump_setpoint_type"] == "SPEED"
+    coordinator._process_component_state(device, "pool_001", 17, {"reportedValue": 5})
+    coordinator._process_component_state(device, "pool_001", 18, {"reportedValue": "FLOW"})
+    assert device["pump_setpoint"] == 5
+    assert device["pump_setpoint_type"] == "FLOW"
+
+
+async def test_victoria_component_20_is_preset_slot_not_schedules(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """c20 is the quick-function preset slot; it must not be parsed as schedules."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 20, {"reportedValue": -1})
+    assert device["pump_preset_slot"] == -1
+    assert "schedule_data" not in device
+
+
+async def test_victoria_component_21_live_output_percent(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c21 is the live output %, not the network status."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 21, {"reportedValue": 62})
+    assert device["speed_percent"] == 62
+    assert "network_status_component" not in device
+
+
+async def test_victoria_component_21_clamped_to_percent_range(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 21, {"reportedValue": 250})
+    assert device["speed_percent"] == 100
+    coordinator._process_component_state(device, "pool_001", 21, {"reportedValue": -3})
+    assert device["speed_percent"] == 0
+
+
+async def test_victoria_component_22_power_watts(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c22 tracks the HMI power display (719 at 95 % → 720 W on the HMI)."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 22, {"reportedValue": 719})
+    assert device["pump_power"] == 719
+
+
+async def test_victoria_component_24_head_cm_to_metres(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c24 is the head in cm (1197 → HMI shows 11-12 m)."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 24, {"reportedValue": 1197})
+    assert device["pump_head"] == 11.97
+
+
+async def test_victoria_components_9_10_do_not_stomp_state(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """c9/c10 stay 0 on this family even at full speed; the numeric E30 mapping
+    must not override the c14/c16 string state."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 14, {"reportedValue": "RUNNING"})
+    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "AUTO"})
+    coordinator._process_component_state(device, "pool_001", 9, {"reportedValue": 0})
+    coordinator._process_component_state(device, "pool_001", 10, {"reportedValue": 0})
+    assert device["is_running"] is True
+    assert device["pump_reported"] is True
+    assert device["auto_mode_enabled"] is True
+    assert device["auto_reported"] is True
+
+
+async def test_victoria_raw_component_data_kept_for_diagnostics(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """Undeciphered registers (c13/c23) keep their raw dumps for Issue #144."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 23, {"reportedValue": 40})
+    assert device["components"]["23"] == {"reportedValue": 40}
+    assert device["component_23_data"] == {"reportedValue": 40}
+
+
+async def test_non_victoria_pump_component_14_keeps_default_path(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """Without the flag, c14 keeps the shared mapping (no pump state derived)."""
+    device = _pinned_device()
+    coordinator._process_component_state(device, "pool_001", 14, {"reportedValue": "RUNNING"})
+    assert "is_running" not in device
+    assert device["component_14_data"] == {"reportedValue": "RUNNING"}
+
+
+async def test_victoria_full_capture_replay(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """Replay @renaatski's real '7 m³/h quick function' capture end-to-end.
+
+    Every component of the scan window is processed in scan order; the final
+    device state must match what the pump's app and HMI showed at capture time.
+    """
+    device = _victoria_device()
+    capture = {
+        0: "170126080134",
+        1: "PN-REDACTED",
+        2: "SIG-REDACTED",
+        3: "3.19.9",
+        9: 0,
+        10: 0,
+        11: "77946",
+        12: "1hp",
+        13: 1,
+        14: "RUNNING",
+        15: 0,
+        16: "QUICK FUNCTION",
+        17: 5,
+        18: "FLOW",
+        19: "s6",
+        20: 4,
+        21: 62,
+        22: 203,
+        23: 40,
+        24: 457,
+    }
+    for component_id, value in capture.items():
+        coordinator._process_component_state(device, "pool_001", component_id, {"reportedValue": value})
+
+    # Standard info slots still resolve through the shared path.
+    assert device["device_id_component"] == "170126080134"
+    assert device["firmware_version_component"] == "3.19.9"
+    # Decoded pump state: running manually at 5 m³/h target, 62 % output.
+    assert device["is_running"] is True
+    assert device["auto_mode_enabled"] is False
+    assert device["pump_mode"] == "QUICK FUNCTION"
+    assert device["pump_setpoint"] == 5
+    assert device["pump_setpoint_type"] == "FLOW"
+    assert device["pump_preset_slot"] == 4
+    assert device["speed_percent"] == 62
+    assert device["pump_power"] == 203
+    assert device["pump_head"] == 4.57
+    # Dead registers must not have stomped anything.
+    assert device["pump_reported"] is True
+    assert device["auto_reported"] is False

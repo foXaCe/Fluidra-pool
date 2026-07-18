@@ -26,6 +26,8 @@ from custom_components.fluidra_pool.sensor import (
     FluidraPoolStatusSensor,
     FluidraPoolWaterQualitySensor,
     FluidraPoolWeatherSensor,
+    FluidraPumpHeadSensor,
+    FluidraPumpPowerSensor,
     FluidraPumpScheduleSensor,
     FluidraPumpSpeedSensor,
     FluidraRunningHoursSensor,
@@ -1242,3 +1244,77 @@ async def test_setup_falls_back_to_get_pools_when_no_cache() -> None:
     added = await _run_setup(coordinator)
     coordinator.api.get_pools.assert_awaited_once()
     assert any(isinstance(e, FluidraDeviceInfoSensor) for e in added)
+
+
+# --------------------------------------------------------------------------- #
+# Victoria VS read-side sensors (Issue #144) — power, head, speed attributes   #
+# --------------------------------------------------------------------------- #
+
+
+def test_pump_power_sensor_reports_watts() -> None:
+    """pump_power (Victoria c22) is exposed as a W measurement."""
+    device = _pinned_device(DEVICE_ID, pump_power=719)
+    sensor = FluidraPumpPowerSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value == 719
+    assert sensor.native_unit_of_measurement == "W"
+    assert sensor.unique_id == f"{DOMAIN}_{POOL_ID}_{DEVICE_ID}_sensor_power"
+
+
+def test_pump_power_sensor_none_until_reported() -> None:
+    device = _pinned_device(DEVICE_ID)
+    sensor = FluidraPumpPowerSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value is None
+
+
+def test_pump_head_sensor_reports_metres() -> None:
+    """pump_head (Victoria c24, converted cm → m by the coordinator)."""
+    device = _pinned_device(DEVICE_ID, pump_head=11.97)
+    sensor = FluidraPumpHeadSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value == 11.97
+    assert sensor.native_unit_of_measurement == "m"
+    assert sensor.unique_id == f"{DOMAIN}_{POOL_ID}_{DEVICE_ID}_sensor_head"
+
+
+def test_pump_head_sensor_none_until_reported() -> None:
+    device = _pinned_device(DEVICE_ID)
+    sensor = FluidraPumpHeadSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value is None
+
+
+def test_pump_speed_attributes_include_victoria_setpoint() -> None:
+    """Victoria pumps surface mode + setpoint (SPEED % or FLOW m³/h) as attributes."""
+    device = _pinned_device(
+        DEVICE_ID,
+        is_running=True,
+        speed_percent=62,
+        pump_mode="QUICK FUNCTION",
+        pump_setpoint=7,
+        pump_setpoint_type="FLOW",
+    )
+    sensor = FluidraPumpSpeedSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    attrs = sensor.extra_state_attributes
+    assert attrs["pump_mode"] == "QUICK FUNCTION"
+    assert attrs["setpoint"] == 7
+    assert attrs["setpoint_type"] == "FLOW"
+
+
+def test_pump_speed_attributes_omit_victoria_fields_for_other_pumps() -> None:
+    """Non-Victoria pumps keep the historical attribute set untouched."""
+    device = _pinned_device(DEVICE_ID, is_running=True, speed_percent=40)
+    attrs = FluidraPumpSpeedSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID).extra_state_attributes
+    assert "pump_mode" not in attrs
+    assert "setpoint" not in attrs
+    assert "setpoint_type" not in attrs
+
+
+async def test_setup_creates_power_and_head_sensors_when_configured() -> None:
+    """The sensor_power / sensor_head entity keys wire the Victoria telemetry sensors."""
+    device = _pinned_device(
+        DEVICE_ID,
+        entities=["sensor_power", "sensor_head"],
+        device_type="pump",
+    )
+    coordinator = _setup_coordinator([device])
+    added = await _run_setup(coordinator)
+    assert any(isinstance(e, FluidraPumpPowerSensor) for e in added)
+    assert any(isinstance(e, FluidraPumpHeadSensor) for e in added)

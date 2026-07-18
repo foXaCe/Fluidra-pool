@@ -14,6 +14,8 @@ from .chlorinator import FluidraChlorinatorSensor
 from .device import (
     FluidraDeviceInfoSensor,
     FluidraLightBrightnessSensor,
+    FluidraPumpHeadSensor,
+    FluidraPumpPowerSensor,
     FluidraPumpScheduleSensor,
     FluidraPumpSpeedSensor,
     FluidraRunningHoursSensor,
@@ -40,6 +42,8 @@ __all__ = [
     "FluidraPoolStatusSensor",
     "FluidraPoolWaterQualitySensor",
     "FluidraPoolWeatherSensor",
+    "FluidraPumpHeadSensor",
+    "FluidraPumpPowerSensor",
     "FluidraPumpScheduleSensor",
     "FluidraPumpSpeedSensor",
     "FluidraRunningHoursSensor",
@@ -72,6 +76,12 @@ async def async_setup_entry(
 
         if DeviceIdentifier.should_create_entity(device, "sensor_speed"):
             entities.append(FluidraPumpSpeedSensor(coordinator, coordinator.api, pool_id, device_id))
+
+        if DeviceIdentifier.should_create_entity(device, "sensor_power"):
+            entities.append(FluidraPumpPowerSensor(coordinator, coordinator.api, pool_id, device_id))
+
+        if DeviceIdentifier.should_create_entity(device, "sensor_head"):
+            entities.append(FluidraPumpHeadSensor(coordinator, coordinator.api, pool_id, device_id))
 
         if DeviceIdentifier.should_create_entity(device, "sensor_temperature"):
             # Temperature sensors for heaters / heat pumps.

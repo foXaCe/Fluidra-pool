@@ -210,6 +210,12 @@
           "winterized": "Hivernage"
         }
       },
+      "pump_head": {
+        "name": "Hauteur manométrique"
+      },
+      "pump_power": {
+        "name": "Puissance"
+      },
       "running_hours": {
         "name": "Heures de fonctionnement"
       },

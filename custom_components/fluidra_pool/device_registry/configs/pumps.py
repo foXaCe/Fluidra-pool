@@ -32,24 +32,27 @@ PUMP_CONFIGS: dict[str, DeviceConfig] = {
     ),
     "victoria_smart_connect_pump": DeviceConfig(
         device_type="pump",
-        # Fluidra Victoria Smart Connect VS (variable-speed, "connected") — Issue #144
-        # (@MiguelCosta). Fell back to the generic pump profile, which only scans
-        # c0-c3 + c9/c10. A capture taken while the pump ran at 100 % under a schedule
-        # still showed c9 = 0 AND c10 = 0 — so, unlike the E30iQ, this pump reports
-        # neither on/off on c9 nor auto on c10; its running state and speed live on
-        # components the narrow generic scan never fetches. This profile widens the
-        # scan (diagnostic round) so the next running capture reveals the real speed /
-        # state registers, after which the control/sensor mapping is completed. Matched
-        # by model so every Victoria Smart Connect unit is covered. Kept unverified
-        # until the registers are confirmed.
+        # Fluidra Victoria Smart Connect VS (variable-speed, "connected", thingType
+        # mppvs) — Issue #144. Unlike the E30iQ (numeric c9 on/off + c10 auto), the
+        # Victoria reports its state as *strings* on a different window, decoded from
+        # five captures (@renaatski, running/stopped/flow/speed/95 %/100 %):
+        #   c14 "RUNNING"/"NOT RUNNING", c16 "AUTO"/"QUICK FUNCTION",
+        #   c17 setpoint value (% or m³/h), c18 "SPEED"/"FLOW", c21 live output %,
+        #   c22 power (W, matches the HMI at high speed), c24 head (cm),
+        #   c20 quick-function preset slot; c9/c10/c15 stay 0 (unused).
+        # The read side is wired via the victoria_vs_mode coordinator branch; the
+        # write path (how the app starts the pump / sets a speed) is still unknown,
+        # so control is not wired and the profile stays unverified until it is.
         model_patterns=["Victoria Smart Connect"],
         components_range=25,
         required_components=[0, 1, 2, 3],
-        entities=["switch", "switch_auto", "sensor_info"],
+        entities=["switch", "switch_auto", "sensor_speed", "sensor_power", "sensor_head", "sensor_info"],
         features={
             "auto_mode": True,
-            # Diagnostic window: fetch the full VS-pump register range so the next
-            # running capture reveals which components carry speed / state / schedule.
+            "victoria_vs_mode": True,
+            # Full VS-pump register window: the decoded registers above, plus the
+            # still-unknown ones (c13/c23) kept in diagnostics dumps for the
+            # ongoing write-path investigation in Issue #144.
             "specific_components": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
         },
         priority=50,

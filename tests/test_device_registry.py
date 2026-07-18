@@ -611,9 +611,10 @@ class TestIdentifyDevice:
         assert config.device_type == "pump"
 
     def test_identify_victoria_smart_connect_pump(self):
-        """Victoria Smart Connect VS matches its own (unverified) profile by model, with a
-        widened diagnostic scan — c9/c10 stay 0 while running, so the E30 layout doesn't
-        apply and the real registers must be revealed by a wider capture (Issue #144)."""
+        """Victoria Smart Connect VS matches its own profile by model, with the
+        string-register decoder flag and the read-side sensors wired from the
+        captures in Issue #144 (c14/c16/c17/c18/c21/c22/c24). Still unverified:
+        the write path (start/stop, speed) is unknown."""
         device = {
             "device_id": "170125500054",  # numeric serial, no E30*/LE*/PUMP* prefix
             "name": "Victoria Smart Connect VS",
@@ -624,10 +625,14 @@ class TestIdentifyDevice:
         config = DeviceIdentifier.identify_device(device)
         assert config is not None
         assert config.device_type == "pump"
-        assert config.verified is False  # registers not yet confirmed
-        # Diagnostic window must reach past the generic scan (c0-c3 + c9/c10).
-        assert 15 in config.features["specific_components"]
-        assert config.features["specific_components"][-1] >= 21
+        assert config.verified is False  # write path not yet confirmed
+        assert config.features["victoria_vs_mode"] is True
+        # Decoded read registers must all be scanned.
+        for component in (14, 16, 17, 18, 20, 21, 22, 24):
+            assert component in config.features["specific_components"]
+        # Read-side entities: state/speed/power/head sensors.
+        for entity in ("sensor_speed", "sensor_power", "sensor_head"):
+            assert entity in config.entities
 
     def test_identify_chlorinator_bridged(self):
         device = {

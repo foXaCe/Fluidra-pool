@@ -210,6 +210,12 @@
           "winterized": "Winterized"
         }
       },
+      "pump_head": {
+        "name": "Head"
+      },
+      "pump_power": {
+        "name": "Power"
+      },
       "running_hours": {
         "name": "Running Hours"
       },

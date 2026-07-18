@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-from homeassistant.const import PERCENTAGE, UnitOfTemperature, UnitOfTime
+from homeassistant.const import PERCENTAGE, UnitOfLength, UnitOfPower, UnitOfTemperature, UnitOfTime
 from homeassistant.util import dt as dt_util
 
 from ..api_resilience import FluidraError
@@ -194,7 +194,7 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         current_speed = self.device_data.get("speed_percent", 0)
         speed_level = self.device_data.get("speed_level_reported")
 
-        return {
+        attrs: dict[str, Any] = {
             "pump_running": is_running,
             "auto_mode": auto_mode,
             "speed_percent": current_speed,
@@ -207,6 +207,70 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
                 "speed_percent": self.device_data.get("speed_percent"),
             },
         }
+
+        # Victoria VS pumps also report their mode and setpoint (Issue #144):
+        # the target is either a speed % or a flow rate in m³/h depending on
+        # setpoint_type ("SPEED" vs "FLOW").
+        if "pump_setpoint_type" in self.device_data or "pump_mode" in self.device_data:
+            attrs["pump_mode"] = self.device_data.get("pump_mode")
+            attrs["setpoint_type"] = self.device_data.get("pump_setpoint_type")
+            attrs["setpoint"] = self.device_data.get("pump_setpoint")
+
+        return attrs
+
+
+class FluidraPumpPowerSensor(FluidraPoolSensorEntity):
+    """Electrical power reported by VS pumps that expose it (Victoria c22).
+
+    Cross-checked against the pump's local HMI in Issue #144: exact at high
+    speed (719 vs 720 W at 95 %), within a few tens of watts below — the pump
+    reports factory performance-curve data rather than a metered value.
+    """
+
+    _attr_translation_key = "pump_power"
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the pump power sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "power")
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the reported pump power in watts."""
+        return self.device_data.get("pump_power")
+
+
+class FluidraPumpHeadSensor(FluidraPoolSensorEntity):
+    """Hydraulic head reported by VS pumps that expose it (Victoria c24, cm → m)."""
+
+    _attr_translation_key = "pump_head"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfLength.METERS
+    _attr_suggested_display_precision = 1
+    _attr_icon = "mdi:waves-arrow-up"
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the pump head sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "head")
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the reported hydraulic head in metres."""
+        return self.device_data.get("pump_head")
 
 
 class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):

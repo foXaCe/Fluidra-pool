@@ -217,6 +217,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Store ALL component data.
         device["components"][str(component_id)] = component_state
 
+        # Victoria Smart Connect VS pumps use a string-based register layout on
+        # c9-c24 that collides with the shared numeric mappings below (c9/c10 are
+        # dead 0s that would stomp the state, c20 is a preset slot rather than
+        # schedules, c21 is the live speed % rather than network status), so the
+        # whole pump window is dispatched to its own decoder (Issue #144).
+        if component_id >= 9 and DeviceIdentifier.has_feature(device, "victoria_vs_mode"):
+            self._process_victoria_component(device, component_id, component_state)
+            return
+
         # Info-component layout. Fluidra's standard slots are 0=device-id,
         # 1=part-numbers, 2=signal/RSSI, 3=firmware. The Blue Connect (BC3)
         # reorders them — 0=RSSI, 1=serial, 2=hardware-UID — which made the
@@ -424,6 +433,52 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 device["schedule_data"] = schedule_data
                 self._track_schedule_count(pool_id, device_id, schedule_data)
             device[f"component_{component_id}_data"] = component_state
+
+    def _process_victoria_component(
+        self, device: dict[str, Any], component_id: int, component_state: dict[str, Any]
+    ) -> None:
+        """Decode one Victoria Smart Connect VS pump register (Issue #144).
+
+        Layout established from five captures (running / stopped / flow schedule /
+        quick-function 95 % / 100 %): the pump reports state and mode as strings
+        (c14/c16/c18), the setpoint on c17, the live output % on c21, and two
+        telemetry values cross-checked against the pump's local HMI — c22 tracks
+        the power display (W) and c24 the head display (cm). c9/c10/c15 stay 0 on
+        this family and c13/c23 are still undeciphered; their raw values are kept
+        in ``components`` for the ongoing write-path investigation.
+        """
+        reported_value = component_state.get("reportedValue")
+        device[f"component_{component_id}_data"] = component_state
+
+        if component_id == 14:
+            if isinstance(reported_value, str):
+                is_running = reported_value.strip().upper() == "RUNNING"
+                device["pump_reported"] = is_running
+                device["is_running"] = is_running
+        elif component_id == 16:
+            if isinstance(reported_value, str):
+                auto_mode = reported_value.strip().upper() == "AUTO"
+                device["auto_reported"] = auto_mode
+                device["auto_mode_enabled"] = auto_mode
+                device["pump_mode"] = reported_value
+        elif component_id == 17:
+            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
+                device["pump_setpoint"] = reported_value
+        elif component_id == 18:
+            if isinstance(reported_value, str):
+                device["pump_setpoint_type"] = reported_value
+        elif component_id == 20:
+            if isinstance(reported_value, int) and not isinstance(reported_value, bool):
+                device["pump_preset_slot"] = reported_value
+        elif component_id == 21:
+            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
+                device["speed_percent"] = max(0, min(100, int(reported_value)))
+        elif component_id == 22:
+            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
+                device["pump_power"] = int(reported_value)
+        elif component_id == 24:
+            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
+                device["pump_head"] = round(float(reported_value) / 100.0, 2)
 
     def _track_schedule_count(self, pool_id: str, device_id: str, schedule_data: list[dict[str, Any]]) -> None:
         """Track schedule count changes for cleanup."""
@@ -652,7 +707,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # speed (component 11) is processed before the schedule (component 20)
             # in scan order, so the inline calculation at component 11 would read a
             # stale/empty schedule_data. Redo it once schedule_data is populated.
-            if device.get("auto_mode_enabled", False):
+            # Victoria VS pumps are excluded: they report the live output % on c21
+            # even under a schedule, which beats deriving it from schedule slots.
+            if device.get("auto_mode_enabled", False) and not DeviceIdentifier.has_feature(device, "victoria_vs_mode"):
                 device["speed_percent"] = (
                     calculate_auto_speed_from_schedules(device) if device.get("is_running", False) else 0
                 )
