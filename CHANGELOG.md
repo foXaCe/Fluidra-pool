@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.57.0] - 2026-07-18
+
+### Added
+- **Zodiac Ei2 pH Evo `CC25001311`** (Issue #157, @Stephox68) — added to the pH-only tecnoLC2 Ei2 iQ pH Evo profile. The generic profile read c172 (the water temperature, 31.9 °C) as pH → 3.19 while the app showed 7.4; the unit now reads pH on c165, water temperature on c172 and salinity on c174, with the pH setpoint on c16 and chlorination on c10, and the "unverified profile" warning clears.
+
 ## [2.56.0] - 2026-07-18
 
 ### Added
