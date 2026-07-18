@@ -380,7 +380,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # disinfection saltLowLevel with pH-minus dosing only. Standard tecnoLC2
         # layout minus everything ORP: pH c165, temperature c172, salinity c174,
         # setpoint c16, chlorination c10.
-        identifier_patterns=["CC26010842*"],
+        # CC25001311 (Issue #157, @Stephox68) — same Zodiac Ei2 pH Evo: the generic
+        # profile read c172 (water temperature, 319 → 31.9 °C) as pH → 3.19 while
+        # the app showed 7.4.
+        identifier_patterns=["CC26010842*", "CC25001311*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],

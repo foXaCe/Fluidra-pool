@@ -296,6 +296,18 @@ class TestDeviceConfigRegistry:
         for component in (9, 13, 14, 103, 154):
             assert component in config.features["specific_components"]
 
+    def test_cc25001311_ei2_ph_evo_same_ph_only_layout(self):
+        """Zodiac Ei2 pH Evo CC25001311 maps on the same pH-only profile (Issue #157):
+        the generic profile read c172 (water temperature, 319 → 31.9 °C) as pH 3.19."""
+        device = {
+            "device_id": "CC25001311.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+        }
+        assert DeviceIdentifier.identify_device(device) is DEVICE_CONFIGS["cc26010842_chlorinator"]
+
     def test_lc24008202_ducere21_uses_tecnolc2_layout(self):
         """Ducere 21 LC24008202 maps on the tecnoLC2 layout, not the generic profile (Issue #125)."""
         config = DEVICE_CONFIGS["lc24008202_chlorinator"]
