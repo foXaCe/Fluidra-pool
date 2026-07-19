@@ -292,7 +292,11 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # LC24009805 (@guilhem069) is the same Irripool iSalt; it fell back to the
         # generic profile, which read the water temperature (c172 = 32.2 °C) as pH and
         # the temperature from c183 (= 0 °C). Same standard tecnoLC2 layout below.
-        ["LC24013306*", "LC24009805*"],
+        # LC25029922 (Issue #156, @pierredf31-tech) — same Irripool iSalt, mapping
+        # confirmed by the reporter: c165 = pH (7.41), c170 = ORP (687 mV), c172 =
+        # water temperature (26.1 °C, misread as pH 2.61 by the generic profile),
+        # c16 = pH setpoint (7.40), c20 = ORP setpoint (690 mV), c10 = chlorination.
+        ["LC24013306*", "LC24009805*", "LC25029922*"],
         priority=86,
         boost_mode=103,
     ),

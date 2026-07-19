@@ -193,6 +193,24 @@ class TestDeviceConfigRegistry:
         assert config.features["sensors"]["temperature"] == 172
         assert config.features["sensors"]["ph"] == 165
 
+    def test_lc25029922_irripool_isalt_uses_teclc2_layout(self):
+        """Irripool iSalt LC25029922 maps to the Irripool iSALT tecnoLC2 profile (Issue #156).
+
+        The generic profile read c172 (water temperature, 261 = 26.1 °C) as pH 2.61.
+        """
+        config = DEVICE_CONFIGS["lc24013306_chlorinator"]
+        device = {
+            "device_id": "LC25029922.nn_1",
+            "name": "Chlorinator",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "model": "Chlorinator",
+            "components": {"172": {"reportedValue": 261}},
+        }
+        assert DeviceIdentifier.identify_device(device) is config
+        assert config.features["sensors"]["ph"] == 165
+        assert config.features["sensors"]["temperature"] == 172
+
     def test_lc24004804_irrijardin_isalt_uses_teclc2_layout(self):
         """Irrijardin iSalt (LC24004804) maps on the tecnoLC2 layout, like the Irripool iSALT (Issue #87)."""
         config = DEVICE_CONFIGS["lc24004804_chlorinator"]
