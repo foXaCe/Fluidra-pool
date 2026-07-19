@@ -316,6 +316,65 @@ def test_chlorinator_zero_non_orp_sensor_still_reads_zero() -> None:
     assert sensor.native_value == pytest.approx(0.0)
 
 
+def _device_with_sensors_feature(device_id: str, components: dict, sensors: dict) -> dict:
+    """Device pinned to a profile whose `sensors` feature maps the given components."""
+    device = _pinned_device(device_id, components=components)
+    device["_identify_cache"]["config"] = SimpleNamespace(
+        device_type="chlorinator",
+        features={"sensors": sensors},
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=[],
+    )
+    return device
+
+
+def test_chlorinator_sensor_follows_profile_reroute() -> None:
+    """A pH sensor built on the generic mapping (c172) follows the tecnoLC2 re-route.
+
+    Regression for Issue #156: an unknown tecnoLC2 chlorinator is first identified
+    as the generic catch-all (pH on c172) so its pH sensor is created with
+    component 172; once c8/c172 are scanned the device re-routes to the tecnoLC2
+    signature profile (pH on c165), but the entity is never rebuilt. The sensor
+    must resolve its component from the *current* profile and read c165 (7.41),
+    not keep reading the water temperature on c172 (2.61) forever.
+    """
+    device = _device_with_sensors_feature(
+        DEVICE_ID,
+        components={
+            "172": {"reportedValue": 261},  # water temperature, would read as pH 2.61
+            "165": {"reportedValue": 741},  # the real pH
+        },
+        sensors={"ph": 165, "orp": 170, "temperature": 172, "salinity": 174},
+    )
+    # Entity created with the stale generic component 172.
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 172)
+    assert sensor.native_value == pytest.approx(7.41)
+    assert sensor.extra_state_attributes["component_id"] == 165
+
+
+def test_chlorinator_sensor_stable_profile_uses_creation_component() -> None:
+    """When the profile maps the sensor to its creation component, nothing changes."""
+    device = _device_with_sensors_feature(
+        DEVICE_ID,
+        components={"165": {"reportedValue": 730}},
+        sensors={"ph": 165},
+    )
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "ph", 165)
+    assert sensor.native_value == pytest.approx(7.30)
+
+
+def test_chlorinator_sensor_falls_back_when_type_absent_from_profile() -> None:
+    """A sensor type missing from the current profile keeps its creation component."""
+    device = _device_with_sensors_feature(
+        DEVICE_ID,
+        components={"178": {"reportedValue": 150}},
+        sensors={"ph": 165},  # no free_chlorine mapping
+    )
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "free_chlorine", 178)
+    assert sensor.native_value == pytest.approx(1.5)
+
+
 def test_chlorinator_ph_zero_reads_unknown() -> None:
     """A pH of exactly 0 is impossible for real pool water (Issue #129).
 

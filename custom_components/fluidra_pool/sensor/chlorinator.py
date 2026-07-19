@@ -151,10 +151,29 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         return self.coordinator.last_update_success and bool(self.device_data.get("components"))
 
     @property
+    def _resolved_component_id(self) -> int:
+        """Resolve the measurement component from the CURRENT profile.
+
+        The component is captured at creation, but a tecnoLC2 chlorinator with an
+        unknown serial is first identified as the generic domoticS2 catch-all
+        (pH on c172) and only re-routed to the tecnoLC2 signature profile (pH on
+        c165) one poll later, once c8/c172 have been scanned — *after* its
+        entities were built, and they are never rebuilt. Re-resolving here lets
+        the already-created pH sensor follow the corrected mapping instead of
+        reading the water temperature as pH forever (Issue #156). This mirrors
+        the number setpoints, which already resolve their component per read.
+        A stable profile resolves to the same component, so dedicated-profile
+        devices are unaffected; the creation-time id stays as the fallback.
+        """
+        sensors = DeviceIdentifier.get_feature(self.device_data, "sensors", {})
+        mapped = sensors.get(self._sensor_type)
+        return mapped if isinstance(mapped, int) else self._component_id
+
+    @property
     def native_value(self) -> float | None:
         """Return the sensor value."""
         components = self.device_data.get("components", {})
-        component_data = components.get(str(self._component_id), {})
+        component_data = components.get(str(self._resolved_component_id), {})
         raw_value = component_data.get("reportedValue")
 
         if raw_value is None:
@@ -181,11 +200,12 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes."""
+        component_id = self._resolved_component_id
         components = self.device_data.get("components", {})
-        component_data = components.get(str(self._component_id), {})
+        component_data = components.get(str(component_id), {})
 
         return {
-            "component_id": self._component_id,
+            "component_id": component_id,
             "sensor_type": self._sensor_type,
             "raw_value": component_data.get("reportedValue"),
             "divisor": self._divisor,
