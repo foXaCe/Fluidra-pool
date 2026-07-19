@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.59.0] - 2026-07-19
+
+### Added
+- **Zodiac Ei2 pH Evo `CC25001311` — now with ORP** (Issue #157, @Stephox68). The unit was first mapped on the pH-only Ei2 profile, but the reporter confirmed the Fluidra app shows an ORP/Redox value for it, so it carries the ORP probe. It now maps on a dedicated standard tecnoLC2 profile with ORP: pH (c165), ORP (c170), water temperature (c172), salinity (c174), pH setpoint (c16), ORP setpoint (c20), chlorination (c10) and boost (c103).
+
 ## [2.58.0] - 2026-07-19
 
 ### Added
