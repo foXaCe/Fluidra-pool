@@ -314,9 +314,14 @@ class TestDeviceConfigRegistry:
         for component in (9, 13, 14, 103, 154):
             assert component in config.features["specific_components"]
 
-    def test_cc25001311_ei2_ph_evo_same_ph_only_layout(self):
-        """Zodiac Ei2 pH Evo CC25001311 maps on the same pH-only profile (Issue #157):
-        the generic profile read c172 (water temperature, 319 → 31.9 °C) as pH 3.19."""
+    def test_cc25001311_ei2_ph_evo_maps_with_orp(self):
+        """Zodiac Ei2 pH Evo CC25001311 maps on a tecnoLC2 profile WITH ORP (Issue #157).
+
+        The generic profile read c172 (water temperature, 319 → 31.9 °C) as pH 3.19.
+        First mapped pH-only, but the reporter confirmed the app shows an ORP/Redox
+        value, so this unit has the ORP probe (c170) and ORP setpoint (c20).
+        """
+        config = DEVICE_CONFIGS["cc25001311_chlorinator"]
         device = {
             "device_id": "CC25001311.nn_1",
             "name": "Chlorinator",
@@ -324,7 +329,12 @@ class TestDeviceConfigRegistry:
             "type": "chlorinator",
             "model": "Chlorinator",
         }
-        assert DeviceIdentifier.identify_device(device) is DEVICE_CONFIGS["cc26010842_chlorinator"]
+        assert DeviceIdentifier.identify_device(device) is config
+        assert config.features["sensors"]["ph"] == 165
+        assert config.features["sensors"]["orp"] == 170
+        assert config.features["sensors"]["temperature"] == 172
+        assert config.features["sensors"]["salinity"] == 174
+        assert config.features["orp_setpoint"] == 20
 
     def test_lc24008202_ducere21_uses_tecnolc2_layout(self):
         """Ducere 21 LC24008202 maps on the tecnoLC2 layout, not the generic profile (Issue #125)."""

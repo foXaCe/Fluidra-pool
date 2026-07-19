@@ -384,10 +384,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # disinfection saltLowLevel with pH-minus dosing only. Standard tecnoLC2
         # layout minus everything ORP: pH c165, temperature c172, salinity c174,
         # setpoint c16, chlorination c10.
-        # CC25001311 (Issue #157, @Stephox68) — same Zodiac Ei2 pH Evo: the generic
-        # profile read c172 (water temperature, 319 → 31.9 °C) as pH → 3.19 while
-        # the app showed 7.4.
-        identifier_patterns=["CC26010842*", "CC25001311*"],
+        identifier_patterns=["CC26010842*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
@@ -408,6 +405,17 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "specific_components": [9, 10, 13, 14, 16, 103, 154, 165, 172, 174],
         },
         priority=90,
+    ),
+    "cc25001311_chlorinator": _standard_tecnolc2(
+        # Zodiac Ei2 pH Evo (tecnoLC2) — Issue #157 (@Stephox68). The generic profile
+        # read c172 (water temperature, 319 → 31.9 °C) as pH 3.19. First mapped on the
+        # pH-only Ei2 profile, but the reporter then confirmed the Fluidra app *does*
+        # show an ORP/Redox value for this unit — so it carries the ORP probe. Standard
+        # tecnoLC2 layout WITH ORP: pH c165, ORP c170, water temperature c172, salinity
+        # c174, pH setpoint c16, ORP setpoint c20, chlorination c10, boost c103.
+        ["CC25001311*"],
+        priority=90,
+        boost_mode=103,
     ),
     "cc25102423_chlorinator": DeviceConfig(
         device_type="chlorinator",
