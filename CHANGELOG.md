@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.58.0] - 2026-07-19
+
+### Added
+- **Irripool iSalt `LC25029922`** (Issue #156, @pierredf31-tech) — added to the existing Irripool iSALT tecnoLC2 profile. pH now reads on c165 (7.41), ORP on c170 (687 mV), water temperature on c172 (26.1 °C — the generic profile misread it as pH 2.61), with the pH setpoint on c16, ORP setpoint on c20 and chlorination on c10, and the "unverified profile" warning clears.
+
+### Fixed
+- **Auto-detected tecnoLC2 chlorinators kept reading water temperature as pH.** A chlorinator with an unrecognised serial is first matched to the generic domoticS2 catch-all (pH on c172) and only re-routed to the correct tecnoLC2 profile (pH on c165) one poll later — after its entities were already built. Because the measurement sensors froze their component at creation and are never rebuilt, pH stayed on c172 and displayed the water temperature (e.g. 2.61 instead of 7.4) indefinitely, even after a full restart. The chlorinator sensors now resolve their component from the current profile on every read (as the pH/ORP setpoint controls already did), so the automatic tecnoLC2 detection added in v2.54.0 actually corrects the readings without a dedicated profile.
+
 ## [2.57.0] - 2026-07-18
 
 ### Added
