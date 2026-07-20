@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.59.1] - 2026-07-20
+
+### Fixed
+- **Victoria Smart Connect VS speed sensor showed "not running" while the pump was turning** (Issue #144, @renaatski). In AUTO / schedule mode the pump doesn't publish its live output % (c21 stays 0) even though it's running — the power (c22) and head (c24) telemetry confirm it turns. The speed sensor now reads a dedicated **running** state in that case instead of the misleading "not running". Pumps that do report a live % are unchanged.
+
 ## [2.59.0] - 2026-07-19
 
 ### Added
