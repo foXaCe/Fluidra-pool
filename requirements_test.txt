@@ -3,4 +3,4 @@
 # pytest and pytest-asyncio as transitive dependencies.
 pytest-homeassistant-custom-component==0.13.346
 pytest-cov==7.1.0
-mypy==2.2.0
+mypy==2.3.0
