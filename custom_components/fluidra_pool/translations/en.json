@@ -229,6 +229,7 @@
           "low": "Low",
           "medium": "Medium",
           "not_running": "Not Running",
+          "running": "Running",
           "stopped": "Stopped"
         }
       },

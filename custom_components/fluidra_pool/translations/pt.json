@@ -229,6 +229,7 @@
           "low": "Baixa",
           "medium": "Média",
           "not_running": "Sem funcionar",
+          "running": "Em funcionamento",
           "stopped": "Parada"
         }
       },

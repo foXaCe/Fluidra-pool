@@ -229,6 +229,7 @@
           "low": "Baja",
           "medium": "Media",
           "not_running": "Sin funcionar",
+          "running": "En funcionamiento",
           "stopped": "Detenida"
         }
       },

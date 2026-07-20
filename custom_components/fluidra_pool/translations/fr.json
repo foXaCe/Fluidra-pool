@@ -229,6 +229,7 @@
           "low": "Faible",
           "medium": "Moyenne",
           "not_running": "Pas en marche",
+          "running": "En marche",
           "stopped": "Arrêtée"
         }
       },

@@ -270,6 +270,41 @@ def test_pump_speed_native_value_classification(device_fields: dict, expected_mo
     assert sensor.native_value == expected_mode
 
 
+def test_pump_speed_victoria_running_without_percent_reads_running() -> None:
+    """A Victoria VS pump running under a schedule reports c21=0 (no live %); the
+    speed sensor must read "running", not the misleading "not_running" (Issue #144)."""
+    device = _pinned_device(
+        DEVICE_ID,
+        is_running=True,
+        speed_percent=0,
+        features={"victoria_vs_mode": True},
+        device_type="pump",
+    )
+    sensor = FluidraPumpSpeedSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value == "running"
+    assert sensor.icon == "mdi:pump"
+
+
+def test_pump_speed_non_victoria_running_without_percent_still_not_running() -> None:
+    """Non-Victoria pumps keep the historical "not_running" for is_running + 0 %."""
+    device = _pinned_device(DEVICE_ID, is_running=True, speed_percent=0, device_type="pump")
+    sensor = FluidraPumpSpeedSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value == "not_running"
+
+
+def test_pump_speed_victoria_with_percent_classifies_normally() -> None:
+    """A Victoria reporting a live % (e.g. QUICK FUNCTION) still classifies low/medium/high."""
+    device = _pinned_device(
+        DEVICE_ID,
+        is_running=True,
+        speed_percent=95,
+        features={"victoria_vs_mode": True},
+        device_type="pump",
+    )
+    sensor = FluidraPumpSpeedSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value == "high"
+
+
 def test_pump_speed_icon_off_when_stopped() -> None:
     """The icon switches to pump-off for the stopped/not-running states."""
     stopped = _pinned_device(DEVICE_ID, is_running=False)

@@ -13,6 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from ..api_resilience import FluidraError
 from ..const import LUMIPLUS_COMPONENT_BRIGHTNESS
+from ..device_registry import DeviceIdentifier
 from ..helpers import parse_cron_time
 from .base import FluidraPoolSensorEntity
 
@@ -132,7 +133,7 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
 
     _attr_translation_key = "speed_mode"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = ["stopped", "not_running", "low", "medium", "high"]
+    _attr_options = ["stopped", "not_running", "running", "low", "medium", "high"]
 
     def __init__(
         self,
@@ -165,6 +166,12 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         current_speed = self.device_data.get("speed_percent", 0)
 
         if current_speed == 0:
+            # Victoria VS pumps don't publish the live output % while running
+            # under a schedule (c21 stays 0 even though c22 power / c24 head show
+            # the pump is turning), so a running pump would misleadingly read
+            # "not_running". Report "running" instead (Issue #144).
+            if DeviceIdentifier.has_feature(self.device_data, "victoria_vs_mode"):
+                return "running"
             return "not_running"
 
         if current_speed <= 50:
