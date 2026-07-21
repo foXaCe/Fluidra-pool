@@ -46,6 +46,7 @@ PLATFORMS: Final = [
     Platform.SWITCH,
     Platform.SENSOR,
     Platform.BINARY_SENSOR,  # Pour l'état de production de la cellule de chloration
+    Platform.BUTTON,  # Pour l'arrêt (Stop) de la pompe Victoria VS
     Platform.SELECT,  # Pour modes d'opération pompe (OFF/ON/AUTO/TURBO)
     Platform.NUMBER,  # Pour contrôle vitesse pompe E30iQ (0-100%)
     Platform.TIME,  # Pour édition des heures de programmation

@@ -46,9 +46,13 @@ PUMP_CONFIGS: dict[str, DeviceConfig] = {
         model_patterns=["Victoria Smart Connect"],
         components_range=25,
         required_components=[0, 1, 2, 3],
+        # No plain on/off "switch": the Victoria is schedule-driven, so control is
+        # the auto-schedule toggle (switch_auto → c13) plus a momentary Stop button
+        # (button_stop → c15) that halts the motor without disarming the schedule,
+        # mirroring the app (Issue #144).
         entities=[
-            "switch",
             "switch_auto",
+            "button_stop",
             "sensor_speed",
             "sensor_power",
             "sensor_head",
@@ -58,6 +62,9 @@ PUMP_CONFIGS: dict[str, DeviceConfig] = {
         features={
             "auto_mode": True,
             "victoria_vs_mode": True,
+            # Speed-preset dry-contact inputs → diagnostic binary sensors so an
+            # external relay (e.g. an ice-guard interlock) can drive HA automations.
+            "speed_input_components": {"low": 29, "medium": 28, "high": 27},
             # Full VS-pump register window. Decoded (Issue #144): c14 state,
             # c16 mode, c17 setpoint, c18 speed/flow, c21 live %, c22 power (W),
             # c24 head (cm), c25 flow (m³/h), c27/c28/c29 speed-preset dry-contact

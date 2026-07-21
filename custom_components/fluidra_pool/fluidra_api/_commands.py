@@ -13,6 +13,7 @@ from ..const import (
     COMPONENT_PUMP_SPEED,
     COMPONENT_VICTORIA_AUTO_SCHEDULE,
     COMPONENT_VICTORIA_QUICK_FUNCTION,
+    COMPONENT_VICTORIA_STOP,
     PUMP_START_DELAY,
 )
 from ..device_registry import DeviceIdentifier
@@ -52,13 +53,6 @@ class CommandsMixin(FluidraAPIBase):
         if self._is_heat_pump(device_id):
             return await self.control_device_component(device_id, COMPONENT_HEAT_PUMP_ONOFF, 1)
 
-        if self._is_victoria(device_id):
-            # The Victoria has no direct "run" write (c15 can only stop). The safe
-            # "on" is to (re)enable the auto schedule so the pump resumes its
-            # programmed operation; immediate manual run is done via a quick
-            # function (see trigger_quick_function). Issue #144.
-            return await self.control_device_component(device_id, COMPONENT_VICTORIA_AUTO_SCHEDULE, 1)
-
         start_success = await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 1)
 
         if start_success:
@@ -72,17 +66,17 @@ class CommandsMixin(FluidraAPIBase):
         """Stop pump using the correct component based on device type."""
         if self._is_heat_pump(device_id):
             return await self.control_device_component(device_id, COMPONENT_HEAT_PUMP_ONOFF, 0)
-
-        if self._is_victoria(device_id):
-            # Stop = disarm the scheduler (c13=0). Confirmed on-device (Issue #144,
-            # @renaatski): this alone forces c16→STOP, c14→NOT RUNNING and drops
-            # power/flow to 0 — it's what the pump's own STOP dry-contact does. The
-            # earlier extra c15=1 write was redundant and made the state flip
-            # through intermediate values, so it's dropped. c15 is reserved for the
-            # distinct "abort the current cycle but keep auto armed" action.
-            return await self.control_device_component(device_id, COMPONENT_VICTORIA_AUTO_SCHEDULE, 0)
-
         return await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 0)
+
+    async def pause_pump(self, device_id: str) -> bool:
+        """Pause a Victoria pump via the STOP trigger (c15=1).
+
+        Mirrors the app's dedicated Stop button (Issue #144, @renaatski): it halts
+        the motor immediately WITHOUT disarming the auto schedule (c13), so future
+        scheduled blocks still trigger automatically. To fully park the pump (stop
+        + disarm), disable the auto-mode switch (c13=0) instead.
+        """
+        return await self.control_device_component(device_id, COMPONENT_VICTORIA_STOP, 1)
 
     async def trigger_quick_function(self, device_id: str, preset_index: int) -> bool:
         """Trigger a Victoria quick-function / preset by index (component 20).

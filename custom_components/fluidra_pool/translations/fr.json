@@ -54,6 +54,20 @@
     "binary_sensor": {
       "chlorinator_producing": {
         "name": "En production"
+      },
+      "speed_input_high": {
+        "name": "Entrée vitesse élevée"
+      },
+      "speed_input_low": {
+        "name": "Entrée vitesse basse"
+      },
+      "speed_input_medium": {
+        "name": "Entrée vitesse moyenne"
+      }
+    },
+    "button": {
+      "pump_stop": {
+        "name": "Arrêt"
       }
     },
     "climate": {

@@ -1356,23 +1356,8 @@ def test_pump_speed_attributes_omit_victoria_fields_for_other_pumps() -> None:
     assert "pump_mode" not in attrs
     assert "setpoint" not in attrs
     assert "setpoint_type" not in attrs
+    # Dry-contact inputs are now binary sensors, not speed-sensor attributes (Issue #144).
     assert "speed_input_low" not in attrs
-
-
-def test_pump_speed_attributes_include_dry_contact_inputs_when_present() -> None:
-    """Victoria speed-preset dry-contact inputs surface as attributes (Issue #144)."""
-    device = _pinned_device(
-        DEVICE_ID,
-        is_running=True,
-        speed_percent=50,
-        pump_speed_input_low=True,
-        pump_speed_input_medium=False,
-        pump_speed_input_high=False,
-    )
-    attrs = FluidraPumpSpeedSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID).extra_state_attributes
-    assert attrs["speed_input_low"] is True
-    assert attrs["speed_input_medium"] is False
-    assert attrs["speed_input_high"] is False
 
 
 async def test_setup_creates_power_and_head_sensors_when_configured() -> None:

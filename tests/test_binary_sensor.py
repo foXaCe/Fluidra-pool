@@ -249,3 +249,57 @@ async def test_setup_skips_devices_without_id(device_id: Any) -> None:
     device["device_id"] = device_id
     added, _, _ = await _run_setup([device])
     assert added == []
+
+
+# --- Victoria VS speed-preset digital-input binary sensors (Issue #144) ---
+
+from custom_components.fluidra_pool.binary_sensor import FluidraPumpSpeedInputBinarySensor  # noqa: E402
+
+
+def _input_sensor(device: dict, tier: str) -> FluidraPumpSpeedInputBinarySensor:
+    return FluidraPumpSpeedInputBinarySensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, tier)
+
+
+def test_speed_input_on_when_flag_true() -> None:
+    """The dry-contact input reads on when the coordinator flag is set."""
+    device = _device(pump_speed_input_low=True)
+    sensor = _input_sensor(device, "low")
+    assert sensor.is_on is True
+    assert sensor.unique_id == f"{DOMAIN}_{POOL_ID}_{DEVICE_ID}_speed_input_low"
+
+
+def test_speed_input_off_when_flag_false() -> None:
+    device = _device(pump_speed_input_medium=False)
+    assert _input_sensor(device, "medium").is_on is False
+
+
+def test_speed_input_none_when_flag_absent() -> None:
+    """Before the register is scanned there's no flag → unknown, not off."""
+    device = _device()
+    assert _input_sensor(device, "high").is_on is None
+
+
+async def test_setup_creates_speed_input_binary_sensors_for_victoria() -> None:
+    """A Victoria pump (speed_input_components feature) gets three input sensors."""
+    device = {
+        "device_id": DEVICE_ID,
+        "name": "Victoria Smart Connect VS",
+        "family": "Filtration Pumps",
+        "model": "Victoria Smart Connect VS",
+        "type": "pump",
+        "online": True,
+        "components": {},
+    }
+    coordinator = MagicMock()
+    pool = {"id": POOL_ID, "name": "Pool", "devices": [device]}
+    coordinator.data = {POOL_ID: pool}
+    coordinator.last_update_success = True
+    coordinator.api = SimpleNamespace(cached_pools=[pool], get_pools=AsyncMock(return_value=[pool]))
+    added: list[Any] = []
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(coordinator=coordinator),
+        async_on_unload=lambda _u: None,
+    )
+    await async_setup_entry(MagicMock(), entry, MagicMock(side_effect=lambda e, *a, **k: added.extend(list(e))))
+    input_sensors = [e for e in added if isinstance(e, FluidraPumpSpeedInputBinarySensor)]
+    assert {s._tier for s in input_sensors} == {"low", "medium", "high"}

@@ -679,6 +679,12 @@ class TestIdentifyDevice:
         # Read-side entities: state/speed/power/head/flow sensors.
         for entity in ("sensor_speed", "sensor_power", "sensor_head", "sensor_flow"):
             assert entity in config.entities
+        # Control: no plain on/off switch — the auto-schedule toggle (c13) + a Stop
+        # button (c15). Digital-input binary sensors declared via speed_input_components.
+        assert "switch_auto" in config.entities
+        assert "button_stop" in config.entities
+        assert "switch" not in config.entities
+        assert config.features["speed_input_components"] == {"low": 29, "medium": 28, "high": 27}
 
     def test_identify_chlorinator_bridged(self):
         device = {

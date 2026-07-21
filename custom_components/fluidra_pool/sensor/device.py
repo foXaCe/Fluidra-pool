@@ -230,13 +230,6 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
             attrs["setpoint_type"] = self.device_data.get("pump_setpoint_type")
             attrs["setpoint"] = self.device_data.get("pump_setpoint")
 
-        # Speed-preset dry-contact inputs (Victoria, Issue #144) — only present when
-        # an external relay is wired; surfaced here rather than as always-off entities.
-        for tier in ("low", "medium", "high"):
-            key = f"pump_speed_input_{tier}"
-            if key in self.device_data:
-                attrs[f"speed_input_{tier}"] = self.device_data[key]
-
         return attrs
 
 

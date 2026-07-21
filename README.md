@@ -51,7 +51,8 @@ Your contributions help me keep improving this project and adding new equipment.
 | `climate` | Heat-pump control (HVAC mode/action, target temperature, preset modes) |
 | `light`  | LumiPlus Connect RGBW (on/off, brightness, colour) |
 | `time`   | Schedule start/end time editing |
-| `sensor` | pH, ORP, free chlorine, salinity, temperatures, pump speed/mode, power & head (VS pumps), firmware, signal, status |
+| `button` | Victoria VS pump Stop (halt without disarming the schedule) |
+| `sensor` | pH, ORP, free chlorine, salinity, temperatures, pump speed/mode, power & head & flow (VS pumps), firmware, signal, status |
 
 ---
 
@@ -69,9 +70,10 @@ profile, so unknown equipment is usually still usable.
   - Up to 8 daily schedule slots (per-slot speed + start/end time)
 - **Victoria Smart Connect VS** (AstralPool, `mppvs`) — running state, live output %,
   AUTO / QUICK FUNCTION mode, speed or flow-rate setpoint, plus **power (W)**, **head (m)**
-  and **flow rate (m³/h)** sensors. On/off and auto-schedule control are wired (stop via
-  the motor STOP trigger, resume via the auto schedule); direct speed/quick-function
-  control is still being finalised — see
+  and **flow rate (m³/h)** sensors. Control mirrors the app: an **Auto-schedule toggle**
+  and a dedicated **Stop button** (halts the motor without disarming the schedule);
+  speed-preset dry-contact inputs are exposed as diagnostic binary sensors. Direct
+  speed/quick-function control is still being finalised — see
   [#144](https://github.com/foXaCe/Fluidra-pool/issues/144). Marked *unverified* pending
   on-device confirmation.
 - Generic variable-speed pump fallback

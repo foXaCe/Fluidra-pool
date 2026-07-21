@@ -8,6 +8,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN, FluidraPoolConfigEntry
@@ -105,6 +106,41 @@ class FluidraChlorinatorProducingBinarySensor(FluidraPoolEntity, BinarySensorEnt
         }
 
 
+class FluidraPumpSpeedInputBinarySensor(FluidraPoolEntity, BinarySensorEntity):
+    """Speed-preset dry-contact digital input on a Victoria VS pump (Issue #144).
+
+    These physical input terminals — Low (c29), Medium (c28), High (c27) — read
+    active only when an external relay is wired to them (e.g. an ice-guard
+    interlock forcing the pump on). Exposed as diagnostic binary sensors so users
+    can automate on them. Decoded by the coordinator into ``pump_speed_input_*``.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.RUNNING
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        tier: str,
+    ) -> None:
+        """Initialize the speed-input binary sensor for a given tier."""
+        super().__init__(coordinator, pool_id, device_id)
+        self._api = api
+        self._tier = tier
+        self._attr_unique_id = f"{DOMAIN}_{pool_id}_{device_id}_speed_input_{tier}"
+        self._attr_translation_key = f"speed_input_{tier}"
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True when this dry-contact input is active."""
+        value = self.device_data.get(f"pump_speed_input_{self._tier}")
+        return bool(value) if value is not None else None
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: FluidraPoolConfigEntry,
@@ -118,11 +154,6 @@ async def async_setup_entry(
         entities: list[BinarySensorEntity] = []
         device_id = device["device_id"]
 
-        config = DeviceIdentifier.identify_device(device)
-        device_type = config.device_type if config else device.get("type", "")
-        if device_type != "chlorinator":
-            return entities
-
         production_component = DeviceIdentifier.get_feature(device, "cell_production_state")
         if production_component is not None:
             entities.append(
@@ -134,6 +165,21 @@ async def async_setup_entry(
                     production_component,
                 )
             )
+
+        # Victoria VS speed-preset dry-contact inputs (Issue #144).
+        speed_inputs = DeviceIdentifier.get_feature(device, "speed_input_components")
+        if isinstance(speed_inputs, dict):
+            for tier in ("low", "medium", "high"):
+                if tier in speed_inputs:
+                    entities.append(
+                        FluidraPumpSpeedInputBinarySensor(
+                            coordinator,
+                            coordinator.api,
+                            pool_id,
+                            device_id,
+                            tier,
+                        )
+                    )
 
         return entities
 
