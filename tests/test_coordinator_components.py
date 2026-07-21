@@ -633,3 +633,22 @@ async def test_victoria_hardware_limits_c42_to_c45(coordinator: FluidraDataUpdat
     assert device["pump_speed_max"] == 100
     assert device["pump_flow_min"] == 4
     assert device["pump_flow_max"] == 25
+
+
+async def test_victoria_speed_preset_digital_inputs(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c29/c28/c27 = Low/Medium/High speed dry-contact inputs (Issue #144)."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 29, {"reportedValue": 1})
+    coordinator._process_component_state(device, "pool_001", 28, {"reportedValue": 0})
+    coordinator._process_component_state(device, "pool_001", 27, {"reportedValue": 0})
+    assert device["pump_speed_input_low"] is True
+    assert device["pump_speed_input_medium"] is False
+    assert device["pump_speed_input_high"] is False
+
+
+async def test_victoria_c28_not_treated_as_no_flow_alarm(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """On a Victoria, c28 is the Medium-speed input, NOT the Z260iQ no-flow alarm."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 28, {"reportedValue": 1})
+    assert device["pump_speed_input_medium"] is True
+    assert "no_flow_alarm" not in device

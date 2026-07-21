@@ -495,6 +495,16 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             num = _num(reported_value)
             if num is not None:
                 device["pump_flow"] = round(float(num), 1)
+        elif component_id in (27, 28, 29):
+            # Speed-preset dry-contact digital inputs, confirmed on-device by
+            # @renaatski (Issue #144): c29 = Low (50 %), c28 = Medium (75 %),
+            # c27 = High (100 %). Active (1) only when an external relay is wired
+            # to that terminal (e.g. an ice-guard interlock), so surfaced as speed
+            # attributes rather than always-off entities. NB these IDs mean other
+            # things on other families (c28 is the no-flow alarm on the Z260iQ),
+            # hence they're only decoded here under victoria_vs_mode.
+            tier = {29: "low", 28: "medium", 27: "high"}[component_id]
+            device[f"pump_speed_input_{tier}"] = bool(reported_value)
         elif component_id == 42:
             num = _num(reported_value)
             if num is not None:

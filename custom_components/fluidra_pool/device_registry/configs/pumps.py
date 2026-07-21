@@ -60,8 +60,9 @@ PUMP_CONFIGS: dict[str, DeviceConfig] = {
             "victoria_vs_mode": True,
             # Full VS-pump register window. Decoded (Issue #144): c14 state,
             # c16 mode, c17 setpoint, c18 speed/flow, c21 live %, c22 power (W),
-            # c24 head (cm), c25 flow (m³/h), c42/c43 min/max speed %, c44/c45
-            # min/max flow m³/h. c13/c23 still undeciphered (kept for diagnostics).
+            # c24 head (cm), c25 flow (m³/h), c27/c28/c29 speed-preset dry-contact
+            # inputs (High/Medium/Low), c42/c43 min/max speed %, c44/c45 min/max
+            # flow m³/h. c13/c23 still undeciphered (kept for diagnostics).
             "specific_components": [
                 9,
                 10,
@@ -80,6 +81,9 @@ PUMP_CONFIGS: dict[str, DeviceConfig] = {
                 23,
                 24,
                 25,
+                27,
+                28,
+                29,
                 42,
                 43,
                 44,
