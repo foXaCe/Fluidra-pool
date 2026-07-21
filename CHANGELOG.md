@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.63.0] - 2026-07-21
+
+### Added
+- **Victoria Smart Connect VS — app-like control** (Issue #144, @renaatski). The pump is schedule-driven, so control now mirrors the native app: an **Auto-schedule toggle** and a dedicated **Stop button** (a new `button` entity) that halts the motor *without* disarming the schedule — future scheduled blocks still run. To fully park the pump (stop + disarm), turn the Auto toggle off. The speed-preset dry-contact inputs (Low/Medium/High) are exposed as diagnostic **binary sensors** so an external relay (e.g. an ice-guard interlock) can drive Home Assistant automations.
+
+### Changed
+- **The Victoria's plain on/off switch is replaced** by the Auto toggle + Stop button above. The old pump on/off switch entity will disappear after updating (you can delete the leftover entity from Settings → Entities). This matches how the pump actually behaves and fixes the earlier stop action that wrongly disarmed the schedule.
+
 ## [2.62.0] - 2026-07-21
 
 ### Added
