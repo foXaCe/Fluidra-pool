@@ -454,7 +454,16 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             """Return value if it's a real number (not a bool), else None."""
             return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
-        if component_id == 14:
+        if component_id == 13:
+            # c13 is the auto-schedule armed flag — the true state of the Auto
+            # toggle, independent of the current running mode. A quick function
+            # runs with c16="QUICK FUNCTION" while c13 stays 1, so Auto must be
+            # derived from c13, not c16 (Issue #144, @renaatski: HA showed Auto
+            # off while c13=1 during a quick function).
+            auto = bool(reported_value)
+            device["auto_reported"] = auto
+            device["auto_mode_enabled"] = auto
+        elif component_id == 14:
             if isinstance(reported_value, str):
                 # PRIMING is the self-priming spin-up — the motor is turning, so it
                 # counts as running (only NOT RUNNING / STOP mean stopped).
@@ -463,11 +472,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 device["is_running"] = is_running
         elif component_id == 16:
             if isinstance(reported_value, str):
-                # AUTO and AUTO PRIMING are both schedule-driven; QUICK FUNCTION and
-                # STOP are not.
-                auto_mode = reported_value.strip().upper().startswith("AUTO")
-                device["auto_reported"] = auto_mode
-                device["auto_mode_enabled"] = auto_mode
+                # c16 is the current running mode (AUTO / QUICK FUNCTION / STOP /
+                # AUTO PRIMING / PUMP CALIBRATION) — info only. It does NOT drive the
+                # Auto toggle any more; that's c13 above.
                 device["pump_mode"] = reported_value
         elif component_id == 17:
             num = _num(reported_value)

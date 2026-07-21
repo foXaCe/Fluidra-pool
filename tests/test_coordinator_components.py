@@ -441,17 +441,30 @@ async def test_victoria_component_14_non_string_ignored(coordinator: FluidraData
     assert "pump_reported" not in device
 
 
-async def test_victoria_component_16_mode_string(coordinator: FluidraDataUpdateCoordinator) -> None:
-    """c16 is AUTO (schedule-driven) vs QUICK FUNCTION (manual)."""
+async def test_victoria_component_13_drives_auto_toggle(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c13 is the auto-schedule armed flag — the true Auto-toggle state (Issue #144)."""
     device = _victoria_device()
-    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "AUTO"})
+    coordinator._process_component_state(device, "pool_001", 13, {"reportedValue": 1})
     assert device["auto_mode_enabled"] is True
     assert device["auto_reported"] is True
-    assert device["pump_mode"] == "AUTO"
-    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "QUICK FUNCTION"})
+    coordinator._process_component_state(device, "pool_001", 13, {"reportedValue": 0})
     assert device["auto_mode_enabled"] is False
     assert device["auto_reported"] is False
+
+
+async def test_victoria_component_16_is_mode_info_only(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c16 is the running-mode label; it must NOT drive the Auto toggle any more.
+
+    Regression for Issue #144: a quick function runs with c16="QUICK FUNCTION"
+    while the schedule is still armed (c13=1), so Auto must stay on.
+    """
+    device = _victoria_device()
+    # Auto armed via c13.
+    coordinator._process_component_state(device, "pool_001", 13, {"reportedValue": 1})
+    # A quick function starts — c16 says QUICK FUNCTION but Auto stays armed.
+    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "QUICK FUNCTION"})
     assert device["pump_mode"] == "QUICK FUNCTION"
+    assert device["auto_mode_enabled"] is True  # c13 still 1 → Auto still on
 
 
 async def test_victoria_component_17_18_setpoint_value_and_type(
@@ -515,10 +528,10 @@ async def test_victoria_components_9_10_do_not_stomp_state(
     coordinator: FluidraDataUpdateCoordinator,
 ) -> None:
     """c9/c10 stay 0 on this family even at full speed; the numeric E30 mapping
-    must not override the c14/c16 string state."""
+    must not override the c13/c14 string/flag state."""
     device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 13, {"reportedValue": 1})
     coordinator._process_component_state(device, "pool_001", 14, {"reportedValue": "RUNNING"})
-    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "AUTO"})
     coordinator._process_component_state(device, "pool_001", 9, {"reportedValue": 0})
     coordinator._process_component_state(device, "pool_001", 10, {"reportedValue": 0})
     assert device["is_running"] is True
@@ -584,7 +597,8 @@ async def test_victoria_full_capture_replay(coordinator: FluidraDataUpdateCoordi
     assert device["firmware_version_component"] == "3.19.9"
     # Decoded pump state: running manually at 5 m³/h target, 62 % output.
     assert device["is_running"] is True
-    assert device["auto_mode_enabled"] is False
+    # c13=1 → Auto stays armed even though it's running a QUICK FUNCTION (Issue #144).
+    assert device["auto_mode_enabled"] is True
     assert device["pump_mode"] == "QUICK FUNCTION"
     assert device["pump_setpoint"] == 5
     assert device["pump_setpoint_type"] == "FLOW"
@@ -594,7 +608,7 @@ async def test_victoria_full_capture_replay(coordinator: FluidraDataUpdateCoordi
     assert device["pump_head"] == 4.57
     # Dead registers must not have stomped anything.
     assert device["pump_reported"] is True
-    assert device["auto_reported"] is False
+    assert device["auto_reported"] is True  # c13=1 in the capture
 
 
 async def test_victoria_component_14_priming_counts_as_running(coordinator: FluidraDataUpdateCoordinator) -> None:
@@ -606,13 +620,14 @@ async def test_victoria_component_14_priming_counts_as_running(coordinator: Flui
     assert device["is_running"] is False
 
 
-async def test_victoria_component_16_auto_priming_is_auto(coordinator: FluidraDataUpdateCoordinator) -> None:
-    """AUTO PRIMING is still schedule-driven; STOP is not."""
+async def test_victoria_component_16_transient_modes_are_info_only(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """Transient c16 modes are stored as pump_mode without touching the Auto toggle."""
     device = _victoria_device()
     coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "AUTO PRIMING"})
-    assert device["auto_mode_enabled"] is True
-    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "STOP"})
-    assert device["auto_mode_enabled"] is False
+    assert device["pump_mode"] == "AUTO PRIMING"
+    assert "auto_mode_enabled" not in device  # c16 doesn't set it; only c13 does
+    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "PUMP CALIBRATION"})
+    assert device["pump_mode"] == "PUMP CALIBRATION"
 
 
 async def test_victoria_component_25_flow_rate(coordinator: FluidraDataUpdateCoordinator) -> None:
