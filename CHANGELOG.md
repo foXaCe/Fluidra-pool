@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.61.0] - 2026-07-21
+
+### Added
+- **Victoria Smart Connect VS — on/off and auto-schedule control** (Issue #144, from @renaatski's verified write-path capture). The pump ignores the E30iQ on/off registers; control now routes through the real ones — the pump switch stops the motor (disable the auto schedule then fire the STOP trigger) and resumes it (re-enable the auto schedule), and the auto-mode switch toggles the schedule directly. Direct speed / quick-function control is the remaining piece. The profile stays *unverified* pending on-device confirmation, so please report how it behaves.
+
 ## [2.60.0] - 2026-07-21
 
 ### Added
