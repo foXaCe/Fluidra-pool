@@ -438,6 +438,11 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "chlorination_level": 10,
             "ph_setpoint": 16,
             "orp_setpoint": 20,
+            # Boost on c103 (Issue #162, @FoxP — IBASEL Evoflex LC26033146). The
+            # register was already scanned but not mapped, so no boost switch was
+            # created even though the app exposes it; c103 reads a plain bool here
+            # like every other tecnoLC2 boost.
+            "boost_mode": 103,
             "skip_mode_select": True,
             "sensors": {
                 "ph": 165,  # Confirmed by user (7.5).

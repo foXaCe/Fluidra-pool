@@ -482,6 +482,8 @@ class TestDeviceConfigRegistry:
             config = DeviceIdentifier.identify_device(device)
             assert config is DEVICE_CONFIGS["cc25102423_chlorinator"], serial
             assert config is not DEVICE_CONFIGS["cc25052635_chlorinator"], serial
+            # Boost on c103 must be mapped so the boost switch is created (Issue #162).
+            assert config.features["boost_mode"] == 103, serial
 
     def test_cc25009932_clear_connect_12_uses_g_h_profile(self):
         """Astralpool Clear Connect 12 (CC25009932) matches the Clear Connect 12 profile (Issue #81)."""
