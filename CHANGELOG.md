@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.61.1] - 2026-07-21
+
+### Fixed
+- **Removed the always-0 "chlorination actual" sensor on Irripool iSalt** (Issue #156). The c164 register added in v2.60.0 turned out to read 0 even while the cell is actively producing (confirmed by @pierredf31-tech's dump, salinity non-zero at the same moment), so it was never the live-output value. The misleading sensor is gone; on this family, salinity rising above 0 is the real "cell is producing" signal.
+
 ## [2.61.0] - 2026-07-21
 
 ### Added
