@@ -18,6 +18,7 @@ def _standard_tecnolc2(
     boost_mode: int | None = None,
     free_chlorine: int | None = None,
     cell_production_state: int | None = None,
+    chlorination_actual: int | None = None,
 ) -> DeviceConfig:
     """Build a DeviceConfig for the standard tecnoLC2 chlorinator layout.
 
@@ -28,7 +29,9 @@ def _standard_tecnolc2(
     c165 = pH measured (÷100), c170 = ORP measured (mV), c172 = water
     temperature (°C × 10), c174 = salinity (g/L × 100), c178 = free chlorine
     (mg/L, when present), c154 = cell actual-production register (when
-    present — drives the `chlorinator_producing` binary sensor, Issue #109).
+    present — drives the `chlorinator_producing` binary sensor, Issue #109),
+    c164 = live chlorination output % (when present — 0 while the cell is idle,
+    vs the c10 setpoint; drives the "chlorination actual" sensor, Issue #156).
     The OFF/ON/AUTO mode select does not drive these units (skip_mode_select).
     """
     features: dict[str, Any] = {
@@ -47,6 +50,8 @@ def _standard_tecnolc2(
     }
     if free_chlorine is not None:
         sensors["free_chlorine"] = free_chlorine
+    if chlorination_actual is not None:
+        sensors["chlorination_actual"] = chlorination_actual
     features["sensors"] = sensors
     if cell_production_state is not None:
         features["cell_production_state"] = cell_production_state
@@ -59,6 +64,8 @@ def _standard_tecnolc2(
         specific_components.append(free_chlorine)
     if cell_production_state is not None:
         specific_components.append(cell_production_state)
+    if chlorination_actual is not None:
+        specific_components.append(chlorination_actual)
     features["specific_components"] = specific_components
 
     return DeviceConfig(
@@ -296,9 +303,12 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # confirmed by the reporter: c165 = pH (7.41), c170 = ORP (687 mV), c172 =
         # water temperature (26.1 °C, misread as pH 2.61 by the generic profile),
         # c16 = pH setpoint (7.40), c20 = ORP setpoint (690 mV), c10 = chlorination.
+        # c164 = live chlorination output % (Issue #156): the reporter wanted to see
+        # the real production (0 when the cell is idle) vs the c10 setpoint (80).
         ["LC24013306*", "LC24009805*", "LC25029922*"],
         priority=86,
         boost_mode=103,
+        chlorination_actual=164,
     ),
     "lc24004804_chlorinator": _standard_tecnolc2(
         # Irrijardin iSalt — Issue #87 (@Math43). Same iSalt OEM cell as the Irripool
