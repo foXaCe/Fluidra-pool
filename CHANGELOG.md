@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.63.2] - 2026-07-21
+
+### Fixed
+- **Victoria auto-mode toggle wrongly showed "off" while a quick function ran** (Issue #144, @renaatski). The Auto state was read from the running-mode register (c16), which becomes `QUICK FUNCTION` / `PUMP CALIBRATION` etc. during a run — so starting a quick function made HA report Auto off even though the schedule was still armed. Auto is now read from c13 (the schedule-armed flag), matching the app.
+
 ## [2.63.1] - 2026-07-21
 
 ### Fixed
