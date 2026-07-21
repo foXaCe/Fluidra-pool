@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.63.1] - 2026-07-21
+
+### Fixed
+- **Boost switch missing on tecnoLC2 "Evo" chlorinators** (Issue #162, @FoxP). The shared Evo profile (Astralpool Clear Connect Evo, Zodiac Ei2 iQ Evo, IBASEL Evoflex) scanned the boost register c103 but never mapped it, so no boost switch was created even though the app exposes it. Boost (c103) is now mapped for all serials on this profile.
+
 ## [2.63.0] - 2026-07-21
 
 ### Added
