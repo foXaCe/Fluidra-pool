@@ -210,9 +210,9 @@ class TestDeviceConfigRegistry:
         assert DeviceIdentifier.identify_device(device) is config
         assert config.features["sensors"]["ph"] == 165
         assert config.features["sensors"]["temperature"] == 172
-        # Live chlorination output % on c164 (Issue #156): 0 when idle vs c10 setpoint.
-        assert config.features["sensors"]["chlorination_actual"] == 164
-        assert 164 in config.features["specific_components"]
+        # c164 was tried as a live-output register (Issue #156) but reads 0 even while
+        # the cell produces, so it is intentionally NOT mapped.
+        assert "chlorination_actual" not in config.features["sensors"]
 
     def test_lc24004804_irrijardin_isalt_uses_teclc2_layout(self):
         """Irrijardin iSalt (LC24004804) maps on the tecnoLC2 layout, like the Irripool iSALT (Issue #87)."""
