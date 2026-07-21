@@ -97,6 +97,17 @@ COMPONENT_PUMP_SPEED: Final = 11
 COMPONENT_HEAT_PUMP_ONOFF: Final = 13
 COMPONENT_HEAT_PUMP_SETPOINT: Final = 15
 COMPONENT_LIGHT_BRIGHTNESS: Final = 17
+
+# Victoria Smart Connect VS write path (Issue #144 — verified traffic capture by
+# @renaatski). This family ignores the E30iQ c9/c10 writes; control goes through:
+#   c13 (bool)  — enable/disable the auto schedule
+#   c15 (bool)  — stop trigger: with c13=0 it halts the motor (STOP), with c13=1
+#                 it only ends the current override and returns to AUTO. It cannot
+#                 command a *run* state — starting is done via c13 or a c20 preset.
+#   c20 (int)   — trigger a quick-function / preset index (write-side of the read reg)
+COMPONENT_VICTORIA_AUTO_SCHEDULE: Final = 13
+COMPONENT_VICTORIA_STOP: Final = 15
+COMPONENT_VICTORIA_QUICK_FUNCTION: Final = 20
 COMPONENT_SCHEDULE: Final = 20
 COMPONENT_LIGHT_COLOR: Final = 45
 COMPONENT_DM24049704_SCHEDULE: Final = 258

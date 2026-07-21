@@ -62,7 +62,7 @@ def test_is_heat_pump_returns_false_for_pump_device() -> None:
     api = _FakeAPI(is_heat_pump_device={"device_id": "PUMP-1", "family": "pump"})
     with patch(
         "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.identify_device",
-        return_value=SimpleNamespace(device_type="pump"),
+        return_value=SimpleNamespace(device_type="pump", features={}),
     ):
         assert api._is_heat_pump("PUMP-1") is False
 
@@ -75,7 +75,7 @@ async def test_start_pump_for_regular_pump_calls_pump_onoff_then_speed() -> None
     api = _FakeAPI(is_heat_pump_device={"device_id": "P1"})
     with patch(
         "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.identify_device",
-        return_value=SimpleNamespace(device_type="pump"),
+        return_value=SimpleNamespace(device_type="pump", features={}),
     ):
         success = await api.start_pump("P1")
 
@@ -104,7 +104,7 @@ async def test_start_pump_returns_false_when_initial_write_fails() -> None:
     api.control_device_component = AsyncMock(return_value=False)
     with patch(
         "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.identify_device",
-        return_value=SimpleNamespace(device_type="pump"),
+        return_value=SimpleNamespace(device_type="pump", features={}),
     ):
         success = await api.start_pump("P1")
 
@@ -121,6 +121,17 @@ async def test_stop_pump_routes_by_device_type() -> None:
     ):
         await api.stop_pump("HP-1")
     api.control_device_component.assert_awaited_once_with("HP-1", COMPONENT_HEAT_PUMP_ONOFF, 0)
+
+
+async def test_stop_pump_regular_pump_uses_pump_onoff() -> None:
+    """A regular (non-Victoria) pump stops via COMPONENT_PUMP_ONOFF (c9=0)."""
+    api = _FakeAPI(is_heat_pump_device={"device_id": "P1"})
+    with patch(
+        "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.identify_device",
+        return_value=SimpleNamespace(device_type="pump", features={}),
+    ):
+        await api.stop_pump("P1")
+    api.control_device_component.assert_awaited_once_with("P1", COMPONENT_PUMP_ONOFF, 0)
 
 
 # --- enable/disable auto mode --------------------------------------------
@@ -182,3 +193,80 @@ async def test_set_heat_pump_temperature_skips_cache_when_write_fails() -> None:
 
     assert success is False
     assert "target_temperature" not in device
+
+
+# --- Victoria Smart Connect VS write path (Issue #144) ------------------
+
+from contextlib import contextmanager  # noqa: E402
+
+from custom_components.fluidra_pool.const import (  # noqa: E402
+    COMPONENT_VICTORIA_AUTO_SCHEDULE,
+    COMPONENT_VICTORIA_QUICK_FUNCTION,
+    COMPONENT_VICTORIA_STOP,
+)
+
+
+@contextmanager
+def _as_victoria() -> Any:
+    """Make DeviceIdentifier see the device as a Victoria VS pump."""
+    with (
+        patch(
+            "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.get_feature",
+            side_effect=lambda _d, feat, *a: feat == "victoria_vs_mode",
+        ),
+        patch(
+            "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.identify_device",
+            return_value=SimpleNamespace(device_type="pump", features={}),
+        ),
+    ):
+        yield
+
+
+async def test_victoria_start_pump_enables_auto_schedule() -> None:
+    """Victoria has no direct run write — start (re)enables the auto schedule (c13=1)."""
+    api = _FakeAPI(is_heat_pump_device={"device_id": "VIC-1"})
+    with _as_victoria():
+        assert await api.start_pump("VIC-1") is True
+    api.control_device_component.assert_awaited_once_with("VIC-1", COMPONENT_VICTORIA_AUTO_SCHEDULE, 1)
+
+
+async def test_victoria_stop_pump_disables_schedule_then_fires_stop() -> None:
+    """Victoria full stop: c13=0 (so the stop halts the motor) then c15=1."""
+    api = _FakeAPI(is_heat_pump_device={"device_id": "VIC-1"})
+    with _as_victoria():
+        assert await api.stop_pump("VIC-1") is True
+    calls = [c.args for c in api.control_device_component.await_args_list]
+    assert calls == [("VIC-1", COMPONENT_VICTORIA_AUTO_SCHEDULE, 0), ("VIC-1", COMPONENT_VICTORIA_STOP, 1)]
+
+
+async def test_victoria_enable_auto_mode_writes_c13_once() -> None:
+    """Victoria auto mode is a single boolean on c13 — no separate power-on step."""
+    api = _FakeAPI(is_heat_pump_device={"device_id": "VIC-1"})
+    with _as_victoria():
+        assert await api.enable_auto_mode("VIC-1") is True
+    api.control_device_component.assert_awaited_once_with("VIC-1", COMPONENT_VICTORIA_AUTO_SCHEDULE, 1)
+
+
+async def test_victoria_disable_auto_mode_writes_c13_zero() -> None:
+    api = _FakeAPI(is_heat_pump_device={"device_id": "VIC-1"})
+    with _as_victoria():
+        assert await api.disable_auto_mode("VIC-1") is True
+    api.control_device_component.assert_awaited_once_with("VIC-1", COMPONENT_VICTORIA_AUTO_SCHEDULE, 0)
+
+
+async def test_victoria_trigger_quick_function_writes_c20_index() -> None:
+    """Quick function is triggered by writing the preset index to c20."""
+    api = _FakeAPI(is_heat_pump_device={"device_id": "VIC-1"})
+    assert await api.trigger_quick_function("VIC-1", 2) is True
+    api.control_device_component.assert_awaited_once_with("VIC-1", COMPONENT_VICTORIA_QUICK_FUNCTION, 2)
+
+
+async def test_non_victoria_pump_keeps_c9_c10_write_path() -> None:
+    """A non-Victoria pump still uses the E30iQ c9/c10 write path (regression guard)."""
+    api = _FakeAPI(is_heat_pump_device={"device_id": "P1"})
+    with patch(
+        "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.get_feature",
+        return_value=False,
+    ):
+        await api.disable_auto_mode("P1")
+    api.control_device_component.assert_awaited_once_with("P1", COMPONENT_AUTO_MODE, 0)

@@ -11,6 +11,9 @@ from ..const import (
     COMPONENT_HEAT_PUMP_SETPOINT,
     COMPONENT_PUMP_ONOFF,
     COMPONENT_PUMP_SPEED,
+    COMPONENT_VICTORIA_AUTO_SCHEDULE,
+    COMPONENT_VICTORIA_QUICK_FUNCTION,
+    COMPONENT_VICTORIA_STOP,
     PUMP_START_DELAY,
 )
 from ..device_registry import DeviceIdentifier
@@ -40,10 +43,22 @@ class CommandsMixin(FluidraAPIBase):
         device_config = DeviceIdentifier.identify_device(device)
         return bool(device_config and device_config.device_type == "heat_pump")
 
+    def _is_victoria(self, device_id: str) -> bool:
+        """Return True if the device uses the Victoria VS string-register write path."""
+        device = self.get_device_by_id(device_id)
+        return bool(device and DeviceIdentifier.get_feature(device, "victoria_vs_mode"))
+
     async def start_pump(self, device_id: str) -> bool:
         """Start pump using the correct component based on device type."""
         if self._is_heat_pump(device_id):
             return await self.control_device_component(device_id, COMPONENT_HEAT_PUMP_ONOFF, 1)
+
+        if self._is_victoria(device_id):
+            # The Victoria has no direct "run" write (c15 can only stop). The safe
+            # "on" is to (re)enable the auto schedule so the pump resumes its
+            # programmed operation; immediate manual run is done via a quick
+            # function (see trigger_quick_function). Issue #144.
+            return await self.control_device_component(device_id, COMPONENT_VICTORIA_AUTO_SCHEDULE, 1)
 
         start_success = await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 1)
 
@@ -58,7 +73,24 @@ class CommandsMixin(FluidraAPIBase):
         """Stop pump using the correct component based on device type."""
         if self._is_heat_pump(device_id):
             return await self.control_device_component(device_id, COMPONENT_HEAT_PUMP_ONOFF, 0)
+
+        if self._is_victoria(device_id):
+            # Full motor stop: disable the auto schedule first (c13=0) so the stop
+            # trigger halts the motor entirely (STOP) instead of only ending the
+            # current override and dropping back to AUTO, then fire the stop
+            # trigger (c15=1). Issue #144.
+            await self.control_device_component(device_id, COMPONENT_VICTORIA_AUTO_SCHEDULE, 0)
+            return await self.control_device_component(device_id, COMPONENT_VICTORIA_STOP, 1)
+
         return await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 0)
+
+    async def trigger_quick_function(self, device_id: str, preset_index: int) -> bool:
+        """Trigger a Victoria quick-function / preset by index (component 20).
+
+        The available indices are user-configured on the pump and must be read
+        from the pool schedulers rather than hardcoded (Issue #144).
+        """
+        return await self.control_device_component(device_id, COMPONENT_VICTORIA_QUICK_FUNCTION, preset_index)
 
     async def enable_auto_mode(self, device_id: str) -> bool:
         """Enable auto mode.
@@ -69,6 +101,11 @@ class CommandsMixin(FluidraAPIBase):
         off (the official app shows "equipment off, turn it on to start receiving
         data"). So power the pump on first, then enable auto mode.
         """
+        if self._is_victoria(device_id):
+            # Victoria: the auto schedule is a single boolean on c13, no separate
+            # power-on step (Issue #144).
+            return await self.control_device_component(device_id, COMPONENT_VICTORIA_AUTO_SCHEDULE, 1)
+
         if not await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 1):
             return False
         await asyncio.sleep(PUMP_START_DELAY)
@@ -76,4 +113,6 @@ class CommandsMixin(FluidraAPIBase):
 
     async def disable_auto_mode(self, device_id: str) -> bool:
         """Disable auto mode."""
+        if self._is_victoria(device_id):
+            return await self.control_device_component(device_id, COMPONENT_VICTORIA_AUTO_SCHEDULE, 0)
         return await self.control_device_component(device_id, COMPONENT_AUTO_MODE, 0)

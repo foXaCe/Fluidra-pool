@@ -67,10 +67,13 @@ profile, so unknown equipment is usually still usable.
   - Automatic / scheduled mode
   - Custom speed control (0–100%)
   - Up to 8 daily schedule slots (per-slot speed + start/end time)
-- **Victoria Smart Connect VS** (AstralPool, `mppvs`) — read-side support: running state,
-  live output %, AUTO / QUICK FUNCTION mode, speed or flow-rate setpoint, plus **power (W)**
-  and **head (m)** sensors. On/off and speed control from HA are not wired yet (the write
-  path is still being reverse-engineered — see [#144](https://github.com/foXaCe/Fluidra-pool/issues/144)).
+- **Victoria Smart Connect VS** (AstralPool, `mppvs`) — running state, live output %,
+  AUTO / QUICK FUNCTION mode, speed or flow-rate setpoint, plus **power (W)**, **head (m)**
+  and **flow rate (m³/h)** sensors. On/off and auto-schedule control are wired (stop via
+  the motor STOP trigger, resume via the auto schedule); direct speed/quick-function
+  control is still being finalised — see
+  [#144](https://github.com/foXaCe/Fluidra-pool/issues/144). Marked *unverified* pending
+  on-device confirmation.
 - Generic variable-speed pump fallback
 
 ### 🔥 Heat Pumps
