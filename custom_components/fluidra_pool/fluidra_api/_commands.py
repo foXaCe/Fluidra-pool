@@ -13,7 +13,6 @@ from ..const import (
     COMPONENT_PUMP_SPEED,
     COMPONENT_VICTORIA_AUTO_SCHEDULE,
     COMPONENT_VICTORIA_QUICK_FUNCTION,
-    COMPONENT_VICTORIA_STOP,
     PUMP_START_DELAY,
 )
 from ..device_registry import DeviceIdentifier
@@ -75,12 +74,13 @@ class CommandsMixin(FluidraAPIBase):
             return await self.control_device_component(device_id, COMPONENT_HEAT_PUMP_ONOFF, 0)
 
         if self._is_victoria(device_id):
-            # Full motor stop: disable the auto schedule first (c13=0) so the stop
-            # trigger halts the motor entirely (STOP) instead of only ending the
-            # current override and dropping back to AUTO, then fire the stop
-            # trigger (c15=1). Issue #144.
-            await self.control_device_component(device_id, COMPONENT_VICTORIA_AUTO_SCHEDULE, 0)
-            return await self.control_device_component(device_id, COMPONENT_VICTORIA_STOP, 1)
+            # Stop = disarm the scheduler (c13=0). Confirmed on-device (Issue #144,
+            # @renaatski): this alone forces c16→STOP, c14→NOT RUNNING and drops
+            # power/flow to 0 — it's what the pump's own STOP dry-contact does. The
+            # earlier extra c15=1 write was redundant and made the state flip
+            # through intermediate values, so it's dropped. c15 is reserved for the
+            # distinct "abort the current cycle but keep auto armed" action.
+            return await self.control_device_component(device_id, COMPONENT_VICTORIA_AUTO_SCHEDULE, 0)
 
         return await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 0)
 

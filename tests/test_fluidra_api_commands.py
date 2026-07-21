@@ -202,7 +202,6 @@ from contextlib import contextmanager  # noqa: E402
 from custom_components.fluidra_pool.const import (  # noqa: E402
     COMPONENT_VICTORIA_AUTO_SCHEDULE,
     COMPONENT_VICTORIA_QUICK_FUNCTION,
-    COMPONENT_VICTORIA_STOP,
 )
 
 
@@ -230,13 +229,16 @@ async def test_victoria_start_pump_enables_auto_schedule() -> None:
     api.control_device_component.assert_awaited_once_with("VIC-1", COMPONENT_VICTORIA_AUTO_SCHEDULE, 1)
 
 
-async def test_victoria_stop_pump_disables_schedule_then_fires_stop() -> None:
-    """Victoria full stop: c13=0 (so the stop halts the motor) then c15=1."""
+async def test_victoria_stop_pump_disarms_scheduler_only() -> None:
+    """Victoria stop = c13=0 only (confirmed on-device: forces STOP/NOT RUNNING).
+
+    The earlier extra c15=1 write was redundant and caused intermediate-state
+    flip-flop, so a single write is expected (Issue #144).
+    """
     api = _FakeAPI(is_heat_pump_device={"device_id": "VIC-1"})
     with _as_victoria():
         assert await api.stop_pump("VIC-1") is True
-    calls = [c.args for c in api.control_device_component.await_args_list]
-    assert calls == [("VIC-1", COMPONENT_VICTORIA_AUTO_SCHEDULE, 0), ("VIC-1", COMPONENT_VICTORIA_STOP, 1)]
+    api.control_device_component.assert_awaited_once_with("VIC-1", COMPONENT_VICTORIA_AUTO_SCHEDULE, 0)
 
 
 async def test_victoria_enable_auto_mode_writes_c13_once() -> None:
