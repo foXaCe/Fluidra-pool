@@ -210,6 +210,9 @@
           "winterized": "Winterized"
         }
       },
+      "pump_flow": {
+        "name": "Flow rate"
+      },
       "pump_head": {
         "name": "Head"
       },

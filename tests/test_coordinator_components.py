@@ -595,3 +595,41 @@ async def test_victoria_full_capture_replay(coordinator: FluidraDataUpdateCoordi
     # Dead registers must not have stomped anything.
     assert device["pump_reported"] is True
     assert device["auto_reported"] is False
+
+
+async def test_victoria_component_14_priming_counts_as_running(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """PRIMING is the self-priming spin-up — the motor turns, so it's running (Issue #144)."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 14, {"reportedValue": "PRIMING"})
+    assert device["is_running"] is True
+    coordinator._process_component_state(device, "pool_001", 14, {"reportedValue": "STOP"})
+    assert device["is_running"] is False
+
+
+async def test_victoria_component_16_auto_priming_is_auto(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """AUTO PRIMING is still schedule-driven; STOP is not."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "AUTO PRIMING"})
+    assert device["auto_mode_enabled"] is True
+    coordinator._process_component_state(device, "pool_001", 16, {"reportedValue": "STOP"})
+    assert device["auto_mode_enabled"] is False
+
+
+async def test_victoria_component_25_flow_rate(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c25 is the calculated flow rate in m³/h (Issue #144)."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 25, {"reportedValue": 7.2})
+    assert device["pump_flow"] == 7.2
+
+
+async def test_victoria_hardware_limits_c42_to_c45(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c42/c43 = min/max speed %, c44/c45 = min/max flow m³/h (Issue #144)."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 42, {"reportedValue": 40})
+    coordinator._process_component_state(device, "pool_001", 43, {"reportedValue": 100})
+    coordinator._process_component_state(device, "pool_001", 44, {"reportedValue": 4})
+    coordinator._process_component_state(device, "pool_001", 45, {"reportedValue": 25})
+    assert device["pump_speed_min"] == 40
+    assert device["pump_speed_max"] == 100
+    assert device["pump_flow_min"] == 4
+    assert device["pump_flow_max"] == 25

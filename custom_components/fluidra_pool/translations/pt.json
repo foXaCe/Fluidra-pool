@@ -210,6 +210,9 @@
           "winterized": "Hibernação"
         }
       },
+      "pump_flow": {
+        "name": "Caudal"
+      },
       "pump_head": {
         "name": "Altura manométrica"
       },

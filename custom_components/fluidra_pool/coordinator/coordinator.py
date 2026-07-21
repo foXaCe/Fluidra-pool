@@ -439,31 +439,40 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     ) -> None:
         """Decode one Victoria Smart Connect VS pump register (Issue #144).
 
-        Layout established from five captures (running / stopped / flow schedule /
-        quick-function 95 % / 100 %): the pump reports state and mode as strings
-        (c14/c16/c18), the setpoint on c17, the live output % on c21, and two
-        telemetry values cross-checked against the pump's local HMI — c22 tracks
-        the power display (W) and c24 the head display (cm). c9/c10/c15 stay 0 on
-        this family and c13/c23 are still undeciphered; their raw values are kept
-        in ``components`` for the ongoing write-path investigation.
+        Layout established from @renaatski's captures (running / stopped / flow /
+        speed / 95 % / 100 %) and later a full traffic capture of the write path:
+        the pump reports state and mode as strings (c14/c16/c18), the setpoint on
+        c17, the live output % on c21, the flow rate on c25 (m³/h), power on c22
+        (W) and head on c24 (cm — the HMI's "m" ×100), plus the hardware speed /
+        flow limits on c42-c45. c13/c23 are still undeciphered; their raw values
+        are kept in ``components``.
         """
         reported_value = component_state.get("reportedValue")
         device[f"component_{component_id}_data"] = component_state
 
+        def _num(value: Any) -> int | float | None:
+            """Return value if it's a real number (not a bool), else None."""
+            return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
         if component_id == 14:
             if isinstance(reported_value, str):
-                is_running = reported_value.strip().upper() == "RUNNING"
+                # PRIMING is the self-priming spin-up — the motor is turning, so it
+                # counts as running (only NOT RUNNING / STOP mean stopped).
+                is_running = reported_value.strip().upper() in ("RUNNING", "PRIMING")
                 device["pump_reported"] = is_running
                 device["is_running"] = is_running
         elif component_id == 16:
             if isinstance(reported_value, str):
-                auto_mode = reported_value.strip().upper() == "AUTO"
+                # AUTO and AUTO PRIMING are both schedule-driven; QUICK FUNCTION and
+                # STOP are not.
+                auto_mode = reported_value.strip().upper().startswith("AUTO")
                 device["auto_reported"] = auto_mode
                 device["auto_mode_enabled"] = auto_mode
                 device["pump_mode"] = reported_value
         elif component_id == 17:
-            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
-                device["pump_setpoint"] = reported_value
+            num = _num(reported_value)
+            if num is not None:
+                device["pump_setpoint"] = num
         elif component_id == 18:
             if isinstance(reported_value, str):
                 device["pump_setpoint_type"] = reported_value
@@ -471,14 +480,37 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if isinstance(reported_value, int) and not isinstance(reported_value, bool):
                 device["pump_preset_slot"] = reported_value
         elif component_id == 21:
-            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
-                device["speed_percent"] = max(0, min(100, int(reported_value)))
+            num = _num(reported_value)
+            if num is not None:
+                device["speed_percent"] = max(0, min(100, int(num)))
         elif component_id == 22:
-            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
-                device["pump_power"] = int(reported_value)
+            num = _num(reported_value)
+            if num is not None:
+                device["pump_power"] = int(num)
         elif component_id == 24:
-            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
-                device["pump_head"] = round(float(reported_value) / 100.0, 2)
+            num = _num(reported_value)
+            if num is not None:
+                device["pump_head"] = round(float(num) / 100.0, 2)
+        elif component_id == 25:
+            num = _num(reported_value)
+            if num is not None:
+                device["pump_flow"] = round(float(num), 1)
+        elif component_id == 42:
+            num = _num(reported_value)
+            if num is not None:
+                device["pump_speed_min"] = int(num)
+        elif component_id == 43:
+            num = _num(reported_value)
+            if num is not None:
+                device["pump_speed_max"] = int(num)
+        elif component_id == 44:
+            num = _num(reported_value)
+            if num is not None:
+                device["pump_flow_min"] = int(num)
+        elif component_id == 45:
+            num = _num(reported_value)
+            if num is not None:
+                device["pump_flow_max"] = int(num)
 
     def _track_schedule_count(self, pool_id: str, device_id: str, schedule_data: list[dict[str, Any]]) -> None:
         """Track schedule count changes for cleanup."""

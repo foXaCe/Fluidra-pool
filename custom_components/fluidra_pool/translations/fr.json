@@ -210,6 +210,9 @@
           "winterized": "Hivernage"
         }
       },
+      "pump_flow": {
+        "name": "Débit"
+      },
       "pump_head": {
         "name": "Hauteur manométrique"
       },

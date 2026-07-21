@@ -8,7 +8,14 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
-from homeassistant.const import PERCENTAGE, UnitOfLength, UnitOfPower, UnitOfTemperature, UnitOfTime
+from homeassistant.const import (
+    PERCENTAGE,
+    UnitOfLength,
+    UnitOfPower,
+    UnitOfTemperature,
+    UnitOfTime,
+    UnitOfVolumeFlowRate,
+)
 from homeassistant.util import dt as dt_util
 
 from ..api_resilience import FluidraError
@@ -278,6 +285,32 @@ class FluidraPumpHeadSensor(FluidraPoolSensorEntity):
     def native_value(self) -> float | None:
         """Return the reported hydraulic head in metres."""
         return self.device_data.get("pump_head")
+
+
+class FluidraPumpFlowSensor(FluidraPoolSensorEntity):
+    """Water flow rate reported by VS pumps that expose it (Victoria c25, m³/h)."""
+
+    _attr_translation_key = "pump_flow"
+    _attr_device_class = SensorDeviceClass.VOLUME_FLOW_RATE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR
+    _attr_suggested_display_precision = 1
+    _attr_icon = "mdi:pump"
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the pump flow sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "flow")
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the reported flow rate in m³/h."""
+        return self.device_data.get("pump_flow")
 
 
 class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):

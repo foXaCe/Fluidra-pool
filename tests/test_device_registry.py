@@ -210,6 +210,9 @@ class TestDeviceConfigRegistry:
         assert DeviceIdentifier.identify_device(device) is config
         assert config.features["sensors"]["ph"] == 165
         assert config.features["sensors"]["temperature"] == 172
+        # Live chlorination output % on c164 (Issue #156): 0 when idle vs c10 setpoint.
+        assert config.features["sensors"]["chlorination_actual"] == 164
+        assert 164 in config.features["specific_components"]
 
     def test_lc24004804_irrijardin_isalt_uses_teclc2_layout(self):
         """Irrijardin iSalt (LC24004804) maps on the tecnoLC2 layout, like the Irripool iSALT (Issue #87)."""
@@ -381,8 +384,11 @@ class TestDeviceConfigRegistry:
         assert sensors["temperature"] == 172
         assert sensors["salinity"] == 174
         assert config.features["ph_setpoint"] == 16
-        # Same layout as the sibling Irripool iSALT profile.
-        assert config.features["sensors"] == DEVICE_CONFIGS["lc24013306_chlorinator"].features["sensors"]
+        # Same measurement layout as the sibling Irripool iSALT profile (which also
+        # maps c164 live-output %, absent here — compare the shared sensors only).
+        isalt_sensors = DEVICE_CONFIGS["lc24013306_chlorinator"].features["sensors"]
+        for key in ("ph", "orp", "temperature", "salinity"):
+            assert config.features["sensors"][key] == isalt_sensors[key]
 
     def test_cc24047102_energy_connect_uses_teclc2_layout(self):
         """AstralPool Energy Connect serials map on the tecnoLC2 layout (Issues #85, #117, #121, #142)."""
@@ -667,11 +673,11 @@ class TestIdentifyDevice:
         assert config.device_type == "pump"
         assert config.verified is False  # write path not yet confirmed
         assert config.features["victoria_vs_mode"] is True
-        # Decoded read registers must all be scanned.
-        for component in (14, 16, 17, 18, 20, 21, 22, 24):
+        # Decoded read registers must all be scanned (incl. c25 flow + c42-45 limits).
+        for component in (14, 16, 17, 18, 20, 21, 22, 24, 25, 42, 43, 44, 45):
             assert component in config.features["specific_components"]
-        # Read-side entities: state/speed/power/head sensors.
-        for entity in ("sensor_speed", "sensor_power", "sensor_head"):
+        # Read-side entities: state/speed/power/head/flow sensors.
+        for entity in ("sensor_speed", "sensor_power", "sensor_head", "sensor_flow"):
             assert entity in config.entities
 
     def test_identify_chlorinator_bridged(self):
