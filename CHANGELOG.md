@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.60.0] - 2026-07-21
+
+### Added
+- **Victoria Smart Connect VS — flow-rate sensor and richer state** (Issue #144, @renaatski, from a full traffic capture). New **flow rate** sensor (c25, m³/h) alongside the existing power and head sensors. The pump's hardware limits (min/max speed % on c42/c43, min/max flow m³/h on c44/c45) are now read too — kept for the upcoming write-path work. The `PRIMING` motor state now counts as running, and the `AUTO PRIMING` / `STOP` operating states are recognised.
+- **Live chlorination output sensor for Irripool iSalt** (Issue #156, @pierredf31-tech). A new "chlorination actual" sensor reads the real production output (c164) — 0 when the cell is idle (ORP at target) — as opposed to the chlorination-level setpoint. Currently mapped on the Irripool iSalt profile.
+
 ## [2.59.1] - 2026-07-20
 
 ### Fixed
