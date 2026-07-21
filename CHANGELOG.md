@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.62.0] - 2026-07-21
+
+### Added
+- **Victoria Smart Connect VS speed-preset digital inputs** (Issue #144, @renaatski). The pump's physical dry-contact input terminals — Low (c29, 50 %), Medium (c28, 75 %), High (c27, 100 %) — are decoded and surfaced as attributes on the pump speed sensor. They're only active when an external relay is wired to a terminal (e.g. an ice-guard interlock), so they're attributes rather than always-off entities.
+
+### Fixed
+- **Victoria on/off toggle flipped through intermediate states** (Issue #144, @renaatski). Stopping the pump now writes only `c13=0` (disarm the scheduler), which on-device already forces the STOP / NOT-RUNNING state and cuts power — the extra `c15` write that followed was redundant and caused the toggle to bounce through several states before settling.
+
 ## [2.61.1] - 2026-07-21
 
 ### Fixed
