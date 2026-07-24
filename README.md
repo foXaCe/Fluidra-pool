@@ -72,10 +72,10 @@ profile, so unknown equipment is usually still usable.
   AUTO / QUICK FUNCTION mode, speed or flow-rate setpoint, plus **power (W)**, **head (m)**
   and **flow rate (m³/h)** sensors. Control mirrors the app: an **Auto-schedule toggle**
   and a dedicated **Stop button** (halts the motor without disarming the schedule);
-  speed-preset dry-contact inputs are exposed as diagnostic binary sensors. Direct
-  speed/quick-function control is still being finalised — see
-  [#144](https://github.com/foXaCe/Fluidra-pool/issues/144). Marked *unverified* pending
-  on-device confirmation.
+  speed-preset dry-contact inputs are exposed as diagnostic binary sensors. On/off +
+  auto control are confirmed on-device; direct speed/quick-function control (via
+  `/schedulers`) is still being added — see
+  [#144](https://github.com/foXaCe/Fluidra-pool/issues/144).
 - Generic variable-speed pump fallback
 
 ### 🔥 Heat Pumps

@@ -661,8 +661,8 @@ class TestIdentifyDevice:
     def test_identify_victoria_smart_connect_pump(self):
         """Victoria Smart Connect VS matches its own profile by model, with the
         string-register decoder flag and the read-side sensors wired from the
-        captures in Issue #144 (c14/c16/c17/c18/c21/c22/c24). Still unverified:
-        the write path (start/stop, speed) is unknown."""
+        captures in Issue #144 (c14/c16/c17/c18/c21/c22/c24). Verified on-device:
+        on/off + auto-schedule control confirmed by @renaatski."""
         device = {
             "device_id": "170125500054",  # numeric serial, no E30*/LE*/PUMP* prefix
             "name": "Victoria Smart Connect VS",
@@ -673,7 +673,7 @@ class TestIdentifyDevice:
         config = DeviceIdentifier.identify_device(device)
         assert config is not None
         assert config.device_type == "pump"
-        assert config.verified is False  # write path not yet confirmed
+        assert config.verified is True  # on/off + auto confirmed on-device (Issue #144)
         assert config.features["victoria_vs_mode"] is True
         # Decoded read registers must all be scanned (incl. c25 flow + c42-45 limits).
         for component in (14, 16, 17, 18, 20, 21, 22, 24, 25, 42, 43, 44, 45):

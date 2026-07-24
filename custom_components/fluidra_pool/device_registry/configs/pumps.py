@@ -40,9 +40,12 @@ PUMP_CONFIGS: dict[str, DeviceConfig] = {
         #   c17 setpoint value (% or m³/h), c18 "SPEED"/"FLOW", c21 live output %,
         #   c22 power (W, matches the HMI at high speed), c24 head (cm),
         #   c20 quick-function preset slot; c9/c10/c15 stay 0 (unused).
-        # The read side is wired via the victoria_vs_mode coordinator branch; the
-        # write path (how the app starts the pump / sets a speed) is still unknown,
-        # so control is not wired and the profile stays unverified until it is.
+        # The read side is wired via the victoria_vs_mode coordinator branch; control
+        # mirrors the app — an Auto-schedule toggle (c13) plus a Stop button (c15) —
+        # and the dry-contact speed inputs (c27/c28/c29) are diagnostic binary sensors.
+        # Verified on-device by @renaatski: on/off + auto behave correctly (the
+        # remaining work — direct speed via /schedulers, activity/telemetry polish —
+        # is additive, not a correctness gap).
         model_patterns=["Victoria Smart Connect"],
         components_range=25,
         required_components=[0, 1, 2, 3],
@@ -98,6 +101,6 @@ PUMP_CONFIGS: dict[str, DeviceConfig] = {
             ],
         },
         priority=50,
-        verified=False,
+        verified=True,
     ),
 }
