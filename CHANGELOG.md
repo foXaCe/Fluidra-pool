@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.64.0] - 2026-07-24
+
+### Changed
+- **The Victoria Smart Connect VS profile is now verified** (Issue #144, @renaatski). On-device testing confirmed the on/off + auto-schedule control behaves correctly, so the profile is no longer a best-guess and the "device profile not verified" warning no longer appears for Victoria pumps. Direct speed control (via the pump's `/schedulers` API) and activity/telemetry polish are still being added, but the core control and readings are solid.
+
 ## [2.63.2] - 2026-07-21
 
 ### Fixed
