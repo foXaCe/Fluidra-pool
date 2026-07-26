@@ -96,7 +96,7 @@ def _identify_device_uncached(
         if config.device_type in device_type_hint:
             score += 10
 
-        if config_name == "lg_heat_pump" and _match(comp7_value, ("BXWAA",)):
+        if config_name == "lg_heat_pump" and _match(comp7_value, ("BXWAA", "BXWAB")):
             score += 100
             signal += 100
 
