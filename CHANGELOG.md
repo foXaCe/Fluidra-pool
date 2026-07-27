@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.64.2] - 2026-07-27
+
+### Fixed
+- **Pool owner wrongly blocked as "viewer (read-only)"** (Issue #166, @HugoMontenegro). The read-only guard classified an account as viewer whenever every contract on the pool was viewer-only and the account wasn't matched in that list — but a legitimate owner whose consumer id doesn't equal `pool.owner` (multi-consumer or migrated accounts, or an unresolved user id) lands there too, with the contracts listing only the people they shared with. Because "viewer" actively blocks control commands, this locked such owners out of everything. Viewer is now only concluded from a positive per-account contract match, never inferred; an unmatched account is treated as unknown (non-blocking). Genuine viewers (whose own contract says viewer) are unaffected.
+
 ## [2.64.1] - 2026-07-27
 
 ### Fixed
