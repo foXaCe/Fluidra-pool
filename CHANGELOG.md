@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.64.1] - 2026-07-27
+
+### Fixed
+- **Swim & Fun inverter heat pump not recognised** (Issue #164, PR #165, @jens3105). This unit reports the component-7 signature `BXWAB` instead of the Eco Elyo's `BXWAA`, so it missed the score bonus that selects the LG heat-pump profile and fell through to the generic pump profile — no climate entity. `BXWAB` is now recognised as an LG heat pump (its component map is identical, verified against live values), so it gets the climate entity with setpoint, presets, water temperature and the 10-40 °C range.
+
 ## [2.64.0] - 2026-07-24
 
 ### Changed
