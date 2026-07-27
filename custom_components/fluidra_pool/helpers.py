@@ -72,14 +72,15 @@ def determine_pool_access(pool: dict[str, Any], user_id: str | None) -> str:
 
     Returns one of ``"owner"``, ``"viewer"``, ``"shared"`` or ``"unknown"``.
     The account owns the pool when its consumer id matches ``pool["owner"]``.
-    Otherwise the access level is read from the ``contracts`` list: the account's
-    own contract when it can be matched by id, else ``"viewer"`` when every
-    contract is viewer-only, else ``"shared"``. ``"unknown"`` when there is not
-    enough information.
+    Otherwise the level comes from the account's OWN contract, matched by id.
+    ``"unknown"`` when the account can't be located in the pool at all.
 
-    A ``"viewer"`` result matters because the Fluidra backend accepts control
-    writes from a viewer with an HTTP 200 that echoes the requested value but
-    never persists it, so commands silently have no effect (Issue #129).
+    A ``"viewer"`` result matters because it *blocks* control writes: the Fluidra
+    backend accepts writes from a viewer with an HTTP 200 that echoes the value
+    but never persists it, so commands silently have no effect (Issue #129).
+    Because it blocks, ``"viewer"`` is only ever returned on a positive
+    per-account match — never inferred — so a legitimate owner is never locked
+    out (Issue #166).
     """
     owner_id = pool.get("owner")
     if user_id and owner_id and owner_id == user_id:
@@ -89,8 +90,6 @@ def determine_pool_access(pool: dict[str, Any], user_id: str | None) -> str:
     if not isinstance(contracts, list) or not contracts:
         return "unknown"
 
-    levels = [c.get("accessLevel") for c in contracts if isinstance(c, dict)]
-
     if user_id:
         for contract in contracts:
             if isinstance(contract, dict) and contract.get("id") == user_id:
@@ -98,6 +97,11 @@ def determine_pool_access(pool: dict[str, Any], user_id: str | None) -> str:
                 if isinstance(level, str):
                     return level
 
-    if levels and all(level == "viewer" for level in levels):
-        return "viewer"
-    return "shared"
+    # The account's id isn't among the contracts. Do NOT infer "viewer" from
+    # "every contract is viewer-only" — an owner whose consumer id doesn't equal
+    # pool.owner (Issue #166: multi-consumer/migrated accounts, or a user_id the
+    # auth layer couldn't resolve) lands here too, and contracts[] then lists only
+    # the viewers they shared *with*. The old inference returned the blocking
+    # "viewer" verdict and locked those owners out of every control. Since viewer
+    # blocks, an unmatched account is "unknown" (non-blocking) instead.
+    return "unknown"

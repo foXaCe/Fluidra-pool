@@ -78,14 +78,26 @@ def test_pool_access_owner_by_user_id_match() -> None:
     assert determine_pool_access(pool, "user-1") == "owner"
 
 
-def test_pool_access_viewer_when_all_contracts_viewer_and_not_owner() -> None:
+def test_pool_access_viewer_only_on_positive_match() -> None:
+    """ "viewer" blocks writes, so it's only returned when the account's OWN contract
+    says viewer — never inferred from "all contracts are viewer" (Issue #166)."""
     from custom_components.fluidra_pool.helpers import determine_pool_access
 
-    pool = {
+    # Account IS one of the viewer contracts → viewer (correct, still blocks).
+    matched = {
+        "owner": "someone-else",
+        "contracts": [{"id": "user-1", "accessLevel": "viewer"}, {"id": "b", "accessLevel": "viewer"}],
+    }
+    assert determine_pool_access(matched, "user-1") == "viewer"
+
+    # Account is NOT among the (all-viewer) contracts → must NOT be blocked. This is
+    # the Issue #166 owner: its id ≠ pool.owner, and contracts[] lists only the
+    # people it shared with. Inferring "viewer" here locked the real owner out.
+    unmatched = {
         "owner": "someone-else",
         "contracts": [{"id": "a", "accessLevel": "viewer"}, {"id": "b", "accessLevel": "viewer"}],
     }
-    assert determine_pool_access(pool, "user-1") == "viewer"
+    assert determine_pool_access(unmatched, "user-1") == "unknown"
 
 
 def test_pool_access_reads_own_contract_level() -> None:
@@ -99,11 +111,16 @@ def test_pool_access_reads_own_contract_level() -> None:
     assert determine_pool_access(pool, "user-1") == "editor"
 
 
-def test_pool_access_shared_when_mixed_and_unmatched() -> None:
+def test_pool_access_unknown_when_unmatched() -> None:
+    """An account not found among the contracts is "unknown" (non-blocking), never
+    an inferred "viewer"/"shared" — it may well be the owner (Issue #166)."""
     from custom_components.fluidra_pool.helpers import determine_pool_access
 
     pool = {"owner": "owner-x", "contracts": [{"accessLevel": "viewer"}, {"accessLevel": "owner"}]}
-    assert determine_pool_access(pool, "user-1") == "shared"
+    assert determine_pool_access(pool, "user-1") == "unknown"
+    # user_id unresolved by the auth layer → also non-blocking, not a guessed viewer.
+    all_viewer = {"owner": "owner-x", "contracts": [{"id": "a", "accessLevel": "viewer"}]}
+    assert determine_pool_access(all_viewer, None) == "unknown"
 
 
 def test_pool_access_unknown_without_contracts() -> None:
