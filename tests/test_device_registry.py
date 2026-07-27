@@ -631,6 +631,26 @@ class TestIdentifyDevice:
         assert config is not None
         assert config.device_type == "heat_pump"
 
+    def test_bxwab_signature_wins_lg_heat_pump(self):
+        """The Swim & Fun inverter reports comp7=BXWAB and must resolve to lg_heat_pump
+        (PR #165 / Issue #164, @jens3105) — same LG component map, only the signature
+        differs from the BXWAA Eco Elyo. Its name/family/model don't match, so without
+        the signature bonus it would fall through to the generic pump (no climate)."""
+        device = {
+            "device_id": "LG24000000",
+            "name": "Inverter Heat Pumps by Swim & Fun",
+            "family": "Heat Pumps",
+            "model": "Inverter Heat Pumps by Swim & Fun",
+            "type": "heat_pump",
+            "components": {"7": {"reportedValue": "BXWAB0103544325004"}},
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is DEVICE_CONFIGS["lg_heat_pump"]
+        # BXWAD stays on the Z260iQ profile — the added signature must not steal it.
+        z260 = dict(device, components={"7": {"reportedValue": "BXWAD0103544325004"}})
+        # New device dict (no cached identify result) to force a fresh resolution.
+        assert DeviceIdentifier.identify_device(z260) is DEVICE_CONFIGS["z260iq_heat_pump"]
+
     def test_hpgic_gre_identified_over_lg_eco_elyo(self):
         """Gre HPGIC heat pump (LG-prefixed serial) matches its own profile, not LG Eco Elyo (Issue #92)."""
         device = {
