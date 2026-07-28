@@ -66,6 +66,10 @@ PUMP_CONFIGS: dict[str, DeviceConfig] = {
         features={
             "auto_mode": True,
             "victoria_vs_mode": True,
+            # The running schedule's name/target live only in the pool's /schedulers
+            # config (the device zeroes its setpoint registers under AUTO), so the
+            # coordinator fetches them for this family and joins on c19 (Issue #144).
+            "uses_pool_schedulers": True,
             # Speed-preset dry-contact inputs → diagnostic binary sensors so an
             # external relay (e.g. an ice-guard interlock) can drive HA automations.
             "speed_input_components": {"low": 29, "medium": 28, "high": 27},

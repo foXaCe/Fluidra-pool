@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import time
+from datetime import time, timedelta
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -365,6 +365,87 @@ class FluidraPumpActivitySensor(FluidraPoolSensorEntity):
             return "manual"
         return "running"
 
+    def _active_scheduler(self) -> dict[str, Any] | None:
+        """Find the scheduler entry currently driving the pump, if any.
+
+        Matched on c19 (the active entry's id) first, since that's the join key the
+        app itself uses; otherwise on the ``running`` flag the backend flips on the
+        entry's actions. Returns None when idle or when the pool's schedulers
+        haven't been fetched (Issue #144).
+        """
+        schedulers = self.pool_data.get("schedulers")
+        if not isinstance(schedulers, list):
+            return None
+
+        active_id = self.device_data.get("pump_active_schedule_id")
+        if active_id:
+            for entry in schedulers:
+                if isinstance(entry, dict) and str(entry.get("id")) == str(active_id):
+                    return entry
+
+        for entry in schedulers:
+            if not isinstance(entry, dict):
+                continue
+            actions = entry.get("actions")
+            if isinstance(actions, list) and any(
+                isinstance(action, dict) and action.get("running") for action in actions
+            ):
+                return entry
+        return None
+
+    @staticmethod
+    def _scheduler_target(entry: dict[str, Any]) -> tuple[str | None, Any]:
+        """Return the (mode, value) a scheduler entry commands.
+
+        ``deviceActions[].id`` is 0 for a speed percentage and 1 for a flow rate in
+        m³/h, with the value in ``arguments`` (Issue #144).
+        """
+        actions = entry.get("actions")
+        if not isinstance(actions, list):
+            return (None, None)
+        for action in actions:
+            if not isinstance(action, dict):
+                continue
+            for device_action in action.get("deviceActions", []) or []:
+                if not isinstance(device_action, dict):
+                    continue
+                arguments = device_action.get("arguments")
+                if not isinstance(arguments, list) or not arguments:
+                    continue
+                action_id = device_action.get("id")
+                mode = {0: "SPEED", 1: "FLOW"}.get(action_id) if isinstance(action_id, int) else None
+                if mode:
+                    return (mode, arguments[0])
+        return (None, None)
+
+    @staticmethod
+    def _schedule_remaining_seconds(entry: dict[str, Any]) -> int | None:
+        """Seconds left in the running schedule, computed client-side.
+
+        The device publishes no end time for a schedule, so this mirrors what the
+        app does: take the entry's cron ``startTime`` plus its ``duration``
+        (minutes). Overnight windows are handled by walking the start back a day
+        when the computed end already passed. Returns None when the entry lacks
+        usable timing or the result isn't plausible (Issue #144).
+        """
+        start = parse_cron_time(str(entry.get("startTime", "")))
+        duration = entry.get("duration")
+        if start is None or not isinstance(duration, (int, float)) or duration <= 0:
+            return None
+
+        now = dt_util.now()
+        start_dt = now.replace(hour=start.hour, minute=start.minute, second=0, microsecond=0)
+        end_dt = start_dt + timedelta(minutes=float(duration))
+        if end_dt <= now:
+            # The window likely began yesterday (overnight schedule).
+            end_dt -= timedelta(days=1)
+            if end_dt <= now:
+                return None
+
+        remaining = int((end_dt - now).total_seconds())
+        # Guard against a mismatched entry: never report more than the window itself.
+        return remaining if 0 < remaining <= duration * 60 else None
+
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Expose the raw pump strings plus the active quick-function, when any."""
@@ -373,6 +454,19 @@ class FluidraPumpActivitySensor(FluidraPoolSensorEntity):
             "motor_status": device.get("component_14_data", {}).get("reportedValue"),
             "operating_mode": device.get("pump_mode"),
         }
+
+        # A schedule-driven run: the target exists only in the pool's /schedulers
+        # config, so surface the matched entry's name and target (Issue #144).
+        scheduler = self._active_scheduler()
+        if scheduler is not None:
+            attrs["schedule_name"] = scheduler.get("name")
+            mode, value = self._scheduler_target(scheduler)
+            if mode:
+                attrs["schedule_mode"] = mode
+                attrs["schedule_setpoint"] = value
+            remaining = self._schedule_remaining_seconds(scheduler)
+            if remaining is not None:
+                attrs["schedule_remaining_seconds"] = remaining
 
         # c135 only reflects quick functions/presets — it goes stale during a
         # schedule-driven run, so only surface it while actually in QUICK FUNCTION

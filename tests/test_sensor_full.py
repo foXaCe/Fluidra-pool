@@ -11,6 +11,7 @@ availability, edge/None values and the setup wiring.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -1473,3 +1474,117 @@ async def test_setup_creates_activity_sensor_when_configured() -> None:
     coordinator = _setup_coordinator([device])
     added = await _run_setup(coordinator)
     assert any(isinstance(e, FluidraPumpActivitySensor) for e in added)
+
+
+# --------------------------------------------------------------------------- #
+# Schedule-driven runs: name/target/countdown from /schedulers (Issue #144)    #
+# --------------------------------------------------------------------------- #
+
+_SCHEDULER_ENTRY = {
+    "id": "s0",
+    "name": "Filtration matin",
+    "startTime": "0 8 * * 1,2,3,4,5",
+    "duration": 120,
+    "enabled": True,
+    "actions": [{"deviceActions": [{"id": 0, "arguments": [63.0]}]}],
+}
+
+
+def _scheduled_device(**extra: Any) -> dict:
+    device = _pinned_device(
+        DEVICE_ID,
+        is_running=True,
+        component_14_data={"reportedValue": "RUNNING"},
+        pump_mode="AUTO",
+    )
+    device.update(extra)
+    return device
+
+
+def _activity_with_schedulers(device: dict, schedulers: Any) -> FluidraPumpActivitySensor:
+    coord = _coord([device], {"schedulers": schedulers})
+    return FluidraPumpActivitySensor(coord, SimpleNamespace(), POOL_ID, DEVICE_ID)
+
+
+def test_schedule_matched_by_c19_exposes_name_and_target() -> None:
+    """c19 holds the running entry's id; its name and target come from /schedulers."""
+    device = _scheduled_device(pump_active_schedule_id="s0")
+    attrs = _activity_with_schedulers(device, [_SCHEDULER_ENTRY]).extra_state_attributes
+    assert attrs["schedule_name"] == "Filtration matin"
+    assert attrs["schedule_mode"] == "SPEED"
+    assert attrs["schedule_setpoint"] == 63.0
+
+
+def test_schedule_matched_by_running_flag_when_c19_absent() -> None:
+    """Without c19, the entry whose action carries running=true is used."""
+    entry = {**_SCHEDULER_ENTRY, "actions": [{"running": True, "deviceActions": [{"id": 1, "arguments": [6]}]}]}
+    attrs = _activity_with_schedulers(_scheduled_device(), [entry]).extra_state_attributes
+    assert attrs["schedule_name"] == "Filtration matin"
+    assert attrs["schedule_mode"] == "FLOW"  # deviceActions id 1 = flow m³/h
+    assert attrs["schedule_setpoint"] == 6
+
+
+def test_no_schedule_attributes_when_nothing_active() -> None:
+    """Idle (no c19, no running flag) → no schedule attributes at all."""
+    attrs = _activity_with_schedulers(_scheduled_device(), [_SCHEDULER_ENTRY]).extra_state_attributes
+    assert "schedule_name" not in attrs
+
+
+def test_no_schedule_attributes_without_scheduler_list() -> None:
+    """Pools whose schedulers weren't fetched degrade quietly."""
+    device = _scheduled_device(pump_active_schedule_id="s0")
+    attrs = _activity_with_schedulers(device, None).extra_state_attributes
+    assert "schedule_name" not in attrs
+
+
+def test_schedule_remaining_seconds_counts_down_within_the_window() -> None:
+    """Remaining time is computed client-side from startTime + duration."""
+    from homeassistant.util import dt as dt_util
+
+    now = dt_util.now()
+    # A 60 min window that started 10 min ago → ~50 min left.
+    entry = {
+        **_SCHEDULER_ENTRY,
+        "startTime": f"{(now - timedelta(minutes=10)).minute} {(now - timedelta(minutes=10)).hour} * * *",
+        "duration": 60,
+    }
+    device = _scheduled_device(pump_active_schedule_id="s0")
+    attrs = _activity_with_schedulers(device, [entry]).extra_state_attributes
+    assert 45 * 60 <= attrs["schedule_remaining_seconds"] <= 50 * 60
+
+
+def test_schedule_remaining_absent_for_unusable_timing() -> None:
+    """A malformed or zero-duration entry exposes no countdown rather than a wrong one."""
+    device = _scheduled_device(pump_active_schedule_id="s0")
+    for bad in ({"startTime": "", "duration": 60}, {"startTime": "0 8 * * *", "duration": 0}):
+        entry = {**_SCHEDULER_ENTRY, **bad}
+        attrs = _activity_with_schedulers(device, [entry]).extra_state_attributes
+        assert "schedule_remaining_seconds" not in attrs
+
+
+def test_schedule_target_absent_when_actions_malformed() -> None:
+    """A broken actions payload still yields the name, just no target."""
+    entry = {**_SCHEDULER_ENTRY, "actions": [{"deviceActions": [{"id": 99, "arguments": [1]}]}]}
+    device = _scheduled_device(pump_active_schedule_id="s0")
+    attrs = _activity_with_schedulers(device, [entry]).extra_state_attributes
+    assert attrs["schedule_name"] == "Filtration matin"
+    assert "schedule_mode" not in attrs
+
+
+def test_schedule_resolution_survives_malformed_entries() -> None:
+    """Junk in the schedulers list is skipped rather than crashing the sensor."""
+    device = _scheduled_device()
+    schedulers = [
+        "not-a-dict",
+        {"id": "s1", "actions": "not-a-list"},
+        {"id": "s2", "actions": ["not-a-dict"]},
+        {"id": "s3", "actions": [{"running": True, "deviceActions": ["junk", {"id": 0}, {"id": 0, "arguments": []}]}]},
+    ]
+    attrs = _activity_with_schedulers(device, schedulers).extra_state_attributes
+    # s3 matched on running=true, but none of its actions carry a usable target.
+    assert attrs["schedule_name"] is None or "schedule_mode" not in attrs
+
+
+def test_schedule_target_none_when_actions_not_a_list() -> None:
+    """A non-list actions payload yields no target instead of raising."""
+    assert FluidraPumpActivitySensor._scheduler_target({"actions": "nope"}) == (None, None)

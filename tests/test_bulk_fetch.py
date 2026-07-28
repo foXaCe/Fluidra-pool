@@ -140,3 +140,81 @@ async def test_bulk_success_resets_the_failure_streak(
     await coordinator._fetch_components("DEV-1", [9])
     assert coordinator._bulk_fetch_failures == 0
     assert coordinator._bulk_fetch_enabled is True
+
+
+# --- pool schedulers fetched only when a device needs them (Issue #144) ---
+
+
+async def _refresh_with_device(coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock, device: dict) -> dict:
+    mock_api.get_pool_details = AsyncMock(return_value={})
+    mock_api.poll_water_quality = AsyncMock(return_value=None)
+    mock_api.poll_pool_device_statuses = AsyncMock(return_value=None)
+    pool: dict[str, Any] = {"id": "pool_1", "name": "Pool", "devices": [device]}
+    await coordinator._refresh_pool(pool, {})
+    return pool
+
+
+def _victoria_device() -> dict[str, Any]:
+    """Device pinned to a profile that declares uses_pool_schedulers."""
+    from types import SimpleNamespace
+
+    return {
+        "device_id": "VIC-1",
+        "name": "Victoria Smart Connect VS",
+        "family": "",
+        "type": "pump",
+        "model": "",
+        "online": True,
+        "components": {},
+        "_identify_cache": {
+            "key": ("VIC-1", "", "", "pump", ""),
+            "config": SimpleNamespace(
+                device_type="pump",
+                features={"uses_pool_schedulers": True, "specific_components": [14]},
+                components_range=25,
+                required_components=[0, 1, 2, 3],
+                entities=[],
+                verified=True,
+            ),
+        },
+    }
+
+
+async def test_schedulers_fetched_and_stored_for_pumps_that_use_them(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+) -> None:
+    entries = [{"id": "s0", "name": "Filtration"}]
+    mock_api.get_pool_schedulers = AsyncMock(return_value=entries)
+    pool = await _refresh_with_device(coordinator, mock_api, _victoria_device())
+    mock_api.get_pool_schedulers.assert_awaited_once_with("pool_1")
+    assert pool["schedulers"] == entries
+
+
+async def test_schedulers_not_fetched_for_other_devices(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+) -> None:
+    """Pools without schedule-driven equipment must not pay an extra request."""
+    from types import SimpleNamespace
+
+    plain = _victoria_device()
+    plain["_identify_cache"]["config"] = SimpleNamespace(
+        device_type="pump",
+        features={"specific_components": [9]},
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=[],
+        verified=True,
+    )
+    mock_api.get_pool_schedulers = AsyncMock(return_value=[{"id": "s0"}])
+    pool = await _refresh_with_device(coordinator, mock_api, plain)
+    mock_api.get_pool_schedulers.assert_not_awaited()
+    assert "schedulers" not in pool
+
+
+async def test_scheduler_fetch_failure_leaves_pool_usable(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+) -> None:
+    """A failed scheduler read degrades quietly — the rest of the poll still works."""
+    mock_api.get_pool_schedulers = AsyncMock(return_value=None)
+    pool = await _refresh_with_device(coordinator, mock_api, _victoria_device())
+    assert "schedulers" not in pool

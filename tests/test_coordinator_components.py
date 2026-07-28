@@ -690,3 +690,21 @@ async def test_victoria_component_136_expiry(coordinator: FluidraDataUpdateCoord
     assert device["pump_quick_function_expiry"] == 1784596101
     coordinator._process_component_state(device, "pool_001", 136, {"reportedValue": 0})
     assert device["pump_quick_function_expiry"] is None
+
+
+async def test_victoria_component_19_active_schedule_id(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c19 is the running scheduler entry's id — the join key onto /schedulers."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 19, {"reportedValue": "s6"})
+    assert device["pump_active_schedule_id"] == "s6"
+
+
+@pytest.mark.parametrize("idle_value", ["0", 0, "", None])
+async def test_victoria_component_19_cleared_when_idle(
+    coordinator: FluidraDataUpdateCoordinator, idle_value: Any
+) -> None:
+    """ "0"/empty means no schedule is running — the stale id must be dropped."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 19, {"reportedValue": "s6"})
+    coordinator._process_component_state(device, "pool_001", 19, {"reportedValue": idle_value})
+    assert "pump_active_schedule_id" not in device

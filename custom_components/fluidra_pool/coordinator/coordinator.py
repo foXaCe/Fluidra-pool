@@ -523,6 +523,14 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         elif component_id == 18:
             if isinstance(reported_value, str):
                 device["pump_setpoint_type"] = reported_value
+        elif component_id == 19:
+            # Id/slug of the scheduler entry currently executing ("s0", a UUID, …),
+            # "0" when idle. This is the join key onto /schedulers — the only place
+            # a schedule-driven run's name and target exist (Issue #144, @renaatski).
+            if reported_value not in (None, "", "0", 0):
+                device["pump_active_schedule_id"] = str(reported_value)
+            else:
+                device.pop("pump_active_schedule_id", None)
         elif component_id == 20:
             if isinstance(reported_value, int) and not isinstance(reported_value, bool):
                 device["pump_preset_slot"] = reported_value
@@ -756,6 +764,14 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if isinstance(water_quality_result, dict):
             pool["water_quality"] = water_quality_result
+
+        # Pool automations, needed to describe a schedule-driven run (Issue #144).
+        # Only fetched when a device of this pool actually uses them, so pools
+        # without such equipment don't pay an extra request per poll.
+        if any(DeviceIdentifier.has_feature(device, "uses_pool_schedulers") for device in pool.get("devices", [])):
+            schedulers = await self.api.get_pool_schedulers(pool_id)
+            if isinstance(schedulers, list):
+                pool["schedulers"] = schedulers
 
         # Preserve previous component data with deep copy to avoid aliasing.
         for device in pool.get("devices", []):

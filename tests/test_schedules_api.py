@@ -18,6 +18,7 @@ from custom_components.fluidra_pool.const import (
     COMPONENT_SCHEDULE,
 )
 from custom_components.fluidra_pool.fluidra_api import FluidraPoolAPI
+from custom_components.fluidra_pool.fluidra_api._schedules import SchedulesMixin
 
 
 def _make_api(status: int = 200, raw_text: str = "") -> FluidraPoolAPI:
@@ -293,3 +294,43 @@ async def test_clear_schedule_passes_component_id_through() -> None:
     # Empty list converted to empty programs/dayPrograms structure.
     desired = kwargs["json_data"]["desiredValue"]
     assert desired["programs"] == []
+
+
+# --- get_pool_schedulers (Issue #144) ------------------------------------
+
+
+class _FakeAPI(SchedulesMixin):
+    """Stub exposing only what SchedulesMixin touches for the read path."""
+
+    def __init__(self) -> None:
+        self.access_token: str | None = "fake-token"
+        self._request = AsyncMock()
+        self._build_auth_headers = MagicMock(return_value={"Authorization": "Bearer fake-token"})
+        self.ensure_valid_token = AsyncMock(return_value=True)
+
+
+async def test_get_pool_schedulers_returns_list_on_200() -> None:
+    api = _FakeAPI()
+    api._request.return_value = (200, [{"id": "s0", "name": "Filtration"}, "junk"], "[]")
+    entries = await api.get_pool_schedulers("pool-1")
+    assert entries == [{"id": "s0", "name": "Filtration"}]  # non-dict entries dropped
+    assert api._request.await_args.args[1].endswith("/pools/pool-1/schedulers")
+
+
+async def test_get_pool_schedulers_accepts_wrapped_payload() -> None:
+    api = _FakeAPI()
+    api._request.return_value = (200, {"schedulers": [{"id": "s1"}]}, "{}")
+    assert await api.get_pool_schedulers("pool-1") == [{"id": "s1"}]
+
+
+@pytest.mark.parametrize("payload", [None, "nope", {"unexpected": 1}])
+async def test_get_pool_schedulers_returns_none_on_unusable_payload(payload: Any) -> None:
+    api = _FakeAPI()
+    api._request.return_value = (200, payload, "")
+    assert await api.get_pool_schedulers("pool-1") is None
+
+
+async def test_get_pool_schedulers_returns_none_on_error_status() -> None:
+    api = _FakeAPI()
+    api._request.return_value = (404, None, "")
+    assert await api.get_pool_schedulers("pool-1") is None

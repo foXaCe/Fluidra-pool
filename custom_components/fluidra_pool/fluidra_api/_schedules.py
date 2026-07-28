@@ -136,3 +136,36 @@ class SchedulesMixin(FluidraAPIBase):
     async def clear_schedule(self, device_id: str, component_id: int = COMPONENT_SCHEDULE) -> bool:
         """Clear all schedules for a device."""
         return await self.set_schedule(device_id, [], component_id=component_id)
+
+    async def get_pool_schedulers(self, pool_id: str) -> list[dict[str, Any]] | None:
+        """Fetch the pool's configured automations ("schedulers").
+
+        ``GET /generic/pools/{pool_id}/schedulers`` — the only source of truth for
+        what a schedule-driven run is doing (Issue #144, @renaatski): while a
+        schedule executes, the device zeroes its setpoint registers and never
+        publishes the target anywhere, so the name/target must come from here and
+        be matched to the active entry.
+
+        Returns the raw list of scheduler entries, or ``None`` when unavailable.
+        """
+        if not self.access_token:
+            raise FluidraAuthError("Not authenticated")
+
+        headers = self._build_auth_headers()
+        url = f"{FLUIDRA_EMEA_BASE}/generic/pools/{quote(str(pool_id), safe='')}/schedulers"
+
+        try:
+            status, data, _ = await self._request("GET", url, headers=headers)
+        except FluidraError as err:
+            _LOGGER.debug("Scheduler fetch failed for pool %s: %s", pool_id, err)
+            return None
+
+        if status != 200:
+            _LOGGER.debug("Scheduler fetch for pool %s returned HTTP %s", pool_id, status)
+            return None
+
+        if isinstance(data, list):
+            return [entry for entry in data if isinstance(entry, dict)]
+        if isinstance(data, dict) and isinstance(data.get("schedulers"), list):
+            return [entry for entry in data["schedulers"] if isinstance(entry, dict)]
+        return None
