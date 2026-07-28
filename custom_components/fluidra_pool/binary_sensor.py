@@ -141,6 +141,39 @@ class FluidraPumpSpeedInputBinarySensor(FluidraPoolEntity, BinarySensorEntity):
         return bool(value) if value is not None else None
 
 
+class FluidraHeatPumpAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity):
+    """A heat-pump fault reported by the unit itself (Issue #139).
+
+    Currently the Z260iQ family's error E13 — intake air above ~43 °C, which makes
+    the unit refuse to run (identified on a Z250iQ by @Kal42). Exposed as a problem
+    sensor so it can drive a notification instead of the pump silently not heating.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        alarm_key: str,
+    ) -> None:
+        """Initialize the heat-pump alarm sensor."""
+        super().__init__(coordinator, pool_id, device_id)
+        self._api = api
+        self._alarm_key = alarm_key
+        self._attr_unique_id = f"{DOMAIN}_{pool_id}_{device_id}_{alarm_key}"
+        self._attr_translation_key = alarm_key
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True while the fault is active, None before it's been reported."""
+        value = self.device_data.get(self._alarm_key)
+        return bool(value) if value is not None else None
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: FluidraPoolConfigEntry,
@@ -163,6 +196,18 @@ async def async_setup_entry(
                     pool_id,
                     device_id,
                     production_component,
+                )
+            )
+
+        # Z260iQ-family faults reported on their own registers (Issue #139).
+        if DeviceIdentifier.has_feature(device, "z260iq_mode"):
+            entities.append(
+                FluidraHeatPumpAlarmBinarySensor(
+                    coordinator,
+                    coordinator.api,
+                    pool_id,
+                    device_id,
+                    "air_temperature_alarm",
                 )
             )
 

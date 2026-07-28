@@ -303,3 +303,31 @@ async def test_setup_creates_speed_input_binary_sensors_for_victoria() -> None:
     await async_setup_entry(MagicMock(), entry, MagicMock(side_effect=lambda e, *a, **k: added.extend(list(e))))
     input_sensors = [e for e in added if isinstance(e, FluidraPumpSpeedInputBinarySensor)]
     assert {s._tier for s in input_sensors} == {"low", "medium", "high"}
+
+
+# --- Z260iQ-family fault sensors (Issue #139) ----------------------------
+
+from custom_components.fluidra_pool.binary_sensor import FluidraHeatPumpAlarmBinarySensor  # noqa: E402
+
+
+def _alarm(device: dict) -> FluidraHeatPumpAlarmBinarySensor:
+    return FluidraHeatPumpAlarmBinarySensor(
+        _coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "air_temperature_alarm"
+    )
+
+
+def test_heat_pump_alarm_on_when_faulted() -> None:
+    assert _alarm(_device(air_temperature_alarm=True)).is_on is True
+
+
+def test_heat_pump_alarm_off_when_clear() -> None:
+    assert _alarm(_device(air_temperature_alarm=False)).is_on is False
+
+
+def test_heat_pump_alarm_unknown_before_reported() -> None:
+    """Not yet polled → unknown rather than a reassuring but unfounded 'no fault'."""
+    assert _alarm(_device()).is_on is None
+
+
+def test_heat_pump_alarm_unique_id() -> None:
+    assert _alarm(_device()).unique_id == f"{DOMAIN}_{POOL_ID}_{DEVICE_ID}_air_temperature_alarm"

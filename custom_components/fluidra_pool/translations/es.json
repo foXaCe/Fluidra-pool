@@ -52,6 +52,9 @@
   },
   "entity": {
     "binary_sensor": {
+      "air_temperature_alarm": {
+        "name": "Fallo de temperatura del aire"
+      },
       "chlorinator_producing": {
         "name": "Produciendo"
       },

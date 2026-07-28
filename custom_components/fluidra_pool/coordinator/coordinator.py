@@ -451,6 +451,16 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     device["no_flow_alarm"] = int(reported_value) != 0
                 except (ValueError, TypeError):
                     pass
+        elif component_id == 39:
+            device["component_39_data"] = component_state
+            # Z260iQ-family error E13: intake air above ~43 °C, which makes the unit
+            # refuse to run (0 = OK, 1 = error). Identified on a Z250iQ by @Kal42
+            # (Issue #139).
+            if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
+                try:
+                    device["air_temperature_alarm"] = int(reported_value) != 0
+                except (ValueError, TypeError):
+                    pass
         elif component_id == 67:
             device["component_67_data"] = component_state
             # Air temperature on the Z260iQ family (incl. the Z250iQ, which

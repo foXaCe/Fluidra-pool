@@ -730,3 +730,19 @@ async def test_victoria_empty_preset_slot_removed(coordinator: FluidraDataUpdate
     assert 4 in device["pump_presets"]
     coordinator._process_component_state(device, "pool_001", 130, {"reportedValue": None})
     assert 4 not in device["pump_presets"]
+
+
+async def test_component_39_air_temperature_alarm_for_z260iq(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c39 is the E13 fault (intake air > ~43 °C) on the Z260iQ family (Issue #139)."""
+    device = _pinned_device(features={"z260iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 39, {"reportedValue": 1})
+    assert device["air_temperature_alarm"] is True
+    coordinator._process_component_state(device, "pool_001", 39, {"reportedValue": 0})
+    assert device["air_temperature_alarm"] is False
+
+
+async def test_component_39_ignored_without_z260iq_mode(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c39 means something else on other families, so it's only decoded for Z260iQ."""
+    device = _pinned_device(features={})
+    coordinator._process_component_state(device, "pool_001", 39, {"reportedValue": 1})
+    assert "air_temperature_alarm" not in device
