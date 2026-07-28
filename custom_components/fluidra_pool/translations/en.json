@@ -158,6 +158,9 @@
           "stopped": "Not Running"
         }
       },
+      "quick_function": {
+        "name": "Quick function"
+      },
       "schedule_mode": {
         "name": "Schedule {schedule_id} Mode",
         "state": {
@@ -390,6 +393,9 @@
     },
     "pump_speed_set_failed": {
       "message": "Failed to set the pump speed"
+    },
+    "quick_function_unknown": {
+      "message": "Unknown quick function: {option}"
     },
     "schedule_clear_failed": {
       "message": "Fluidra API call failed while clearing the schedule for {device_id}"

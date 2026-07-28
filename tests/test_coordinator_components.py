@@ -708,3 +708,25 @@ async def test_victoria_component_19_cleared_when_idle(
     coordinator._process_component_state(device, "pool_001", 19, {"reportedValue": "s6"})
     coordinator._process_component_state(device, "pool_001", 19, {"reportedValue": idle_value})
     assert "pump_active_schedule_id" not in device
+
+
+async def test_victoria_preset_slots_decoded_as_objects(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c126-c134 are the quick-function preset slots, keyed by their index (Issue #144)."""
+    device = _victoria_device()
+    coordinator._process_component_state(
+        device, "pool_001", 126, {"reportedValue": {"name": "CLEAN", "mode": "SPEED", "setpoint": 100}}
+    )
+    coordinator._process_component_state(
+        device, "pool_001", 128, {"reportedValue": {"name": "MID SPEED", "mode": "SPEED", "setpoint": 75}}
+    )
+    assert device["pump_presets"][0]["name"] == "CLEAN"
+    assert device["pump_presets"][2]["setpoint"] == 75
+
+
+async def test_victoria_empty_preset_slot_removed(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """A slot reporting null is an unconfigured tile and must not linger."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 130, {"reportedValue": {"name": "5 m3/h"}})
+    assert 4 in device["pump_presets"]
+    coordinator._process_component_state(device, "pool_001", 130, {"reportedValue": None})
+    assert 4 not in device["pump_presets"]

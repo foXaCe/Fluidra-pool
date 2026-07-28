@@ -16,7 +16,7 @@ from ..device_registry import DeviceIdentifier
 from ..platform_setup import async_setup_dynamic_platform
 from .chlorinator import FluidraChlorinatorModeSelect
 from .light import FluidraLightEffectSelect
-from .pump import FluidraPumpSpeedSelect
+from .pump import FluidraPumpSpeedSelect, FluidraVictoriaQuickFunctionSelect
 from .schedule import FluidraChlorinatorScheduleSpeedSelect, FluidraScheduleModeSelect
 
 if TYPE_CHECKING:
@@ -29,6 +29,7 @@ __all__ = [
     "FluidraLightEffectSelect",
     "FluidraPumpSpeedSelect",
     "FluidraScheduleModeSelect",
+    "FluidraVictoriaQuickFunctionSelect",
     "async_setup_entry",
 ]
 
@@ -66,6 +67,11 @@ async def async_setup_entry(
             and device.get("variable_speed")
         ):
             entities.append(FluidraPumpSpeedSelect(coordinator, coordinator.api, pool_id, device_id))
+
+        # Victoria quick functions: options are read live from the pump's preset
+        # slots, so the entity exists whenever the profile declares it (Issue #144).
+        if DeviceIdentifier.should_create_entity(device, "select_quick_function"):
+            entities.append(FluidraVictoriaQuickFunctionSelect(coordinator, coordinator.api, pool_id, device_id))
 
         if (
             device_type == DEVICE_TYPE_PUMP

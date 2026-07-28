@@ -118,6 +118,13 @@ COMPONENT_LIGHT_BRIGHTNESS: Final = 17
 COMPONENT_VICTORIA_AUTO_SCHEDULE: Final = 13
 COMPONENT_VICTORIA_STOP: Final = 15
 COMPONENT_VICTORIA_QUICK_FUNCTION: Final = 20
+# Quick-function preset slots as consolidated JSON objects (Issue #144). The pump
+# also exposes them as scalar quadruplets on c89-c124, but @renaatski found the
+# field offsets there inconsistent (c92 and c126 disagree on Clean's duration),
+# so the objects are used instead. Empty slots report null. The index written to
+# c20 is the slot's offset within this range.
+VICTORIA_PRESET_FIRST: Final = 126
+VICTORIA_PRESET_LAST: Final = 134
 COMPONENT_SCHEDULE: Final = 20
 COMPONENT_LIGHT_COLOR: Final = 45
 COMPONENT_DM24049704_SCHEDULE: Final = 258

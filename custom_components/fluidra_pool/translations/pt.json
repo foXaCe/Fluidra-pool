@@ -158,6 +158,9 @@
           "stopped": "Parada"
         }
       },
+      "quick_function": {
+        "name": "Função rápida"
+      },
       "schedule_mode": {
         "name": "Programação {schedule_id} Modo",
         "state": {
@@ -390,6 +393,9 @@
     },
     "pump_speed_set_failed": {
       "message": "Falha ao definir a velocidade da bomba"
+    },
+    "quick_function_unknown": {
+      "message": "Função rápida desconhecida: {option}"
     },
     "schedule_clear_failed": {
       "message": "A chamada à API Fluidra falhou ao limpar o programa para {device_id}"

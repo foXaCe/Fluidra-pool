@@ -158,6 +158,9 @@
           "stopped": "Pas en marche"
         }
       },
+      "quick_function": {
+        "name": "Fonction rapide"
+      },
       "schedule_mode": {
         "name": "Planning {schedule_id} Mode",
         "state": {
@@ -390,6 +393,9 @@
     },
     "pump_speed_set_failed": {
       "message": "Échec du réglage de la vitesse de la pompe"
+    },
+    "quick_function_unknown": {
+      "message": "Fonction rapide inconnue : {option}"
     },
     "schedule_clear_failed": {
       "message": "L'appel à l'API Fluidra a échoué lors de l'effacement du programme pour {device_id}"

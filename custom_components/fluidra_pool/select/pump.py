@@ -183,3 +183,92 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
         attrs["manual_control_disabled"] = auto_mode_enabled
 
         return attrs
+
+
+class FluidraVictoriaQuickFunctionSelect(FluidraPoolControlEntity, SelectEntity):
+    """Run one of the Victoria's configured quick functions (Issue #144).
+
+    The pump stores up to nine preset slots (Clean + eight user-configurable),
+    each a JSON object with its name, mode and setpoint. Selecting one writes its
+    slot index to c20, which is how the app fires a quick function.
+
+    Options are read live from the pump rather than hardcoded, since users rename
+    and reconfigure the slots. The index written is the slot's offset in the
+    preset component range — derived from the register layout, so if a pump ever
+    disagrees the mismatch shows up in the Activity sensor's reported
+    quick-function name.
+    """
+
+    _attr_translation_key = "quick_function"
+    _attr_icon = "mdi:play-speed"
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the quick-function select."""
+        super().__init__(coordinator, api, pool_id, device_id)
+        self._attr_unique_id = f"{DOMAIN}_{pool_id}_{device_id}_quick_function"
+
+    def _presets(self) -> dict[int, dict[str, Any]]:
+        """Return the configured preset slots, keyed by their index."""
+        presets = self.device_data.get("pump_presets")
+        if not isinstance(presets, dict):
+            return {}
+        return {index: slot for index, slot in presets.items() if isinstance(slot, dict) and slot.get("name")}
+
+    @staticmethod
+    def _label(slot: dict[str, Any]) -> str:
+        """Human label for a preset, e.g. "MID SPEED (75 %)" or "5 m3/h (5 m³/h)"."""
+        name = str(slot.get("name", "")).strip()
+        setpoint = slot.get("setpoint")
+        mode = str(slot.get("mode", "")).strip().upper()
+        if setpoint is None or not mode:
+            return name
+        unit = "%" if mode == "SPEED" else "m³/h"
+        return f"{name} ({setpoint} {unit})"
+
+    @property
+    def options(self) -> list[str]:
+        """Available quick functions, in slot order."""
+        return [self._label(slot) for _, slot in sorted(self._presets().items())]
+
+    @property
+    def current_option(self) -> str | None:
+        """The quick function currently running, if any.
+
+        Reported by c135 (the active preset object) and only meaningful while the
+        pump is in QUICK FUNCTION — during a schedule c135 holds a stale value.
+        """
+        if "QUICK" not in str(self.device_data.get("pump_mode") or "").upper():
+            return None
+        active = self.device_data.get("pump_quick_function")
+        if not isinstance(active, dict):
+            return None
+        label = self._label(active)
+        return label if label in self.options else None
+
+    async def async_select_option(self, option: str) -> None:
+        """Trigger the selected quick function by writing its slot index to c20."""
+        self._ensure_pool_writable()
+
+        index = next((idx for idx, slot in sorted(self._presets().items()) if self._label(slot) == option), None)
+        if index is None:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="quick_function_unknown",
+                translation_placeholders={"option": option},
+            )
+
+        try:
+            success = await self._api.trigger_quick_function(self._device_id, index)
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="pump_set_failed") from err
+        if not success:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="pump_set_failed")
+
+        await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
+        await self.coordinator.async_request_refresh()

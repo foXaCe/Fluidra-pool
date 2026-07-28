@@ -29,6 +29,8 @@ from ..const import (
     OFFLINE_GRACE_POLLS,
     PUMP_SPEED_PERCENTAGES,
     STALE_DEVICE_THRESHOLD,
+    VICTORIA_PRESET_FIRST,
+    VICTORIA_PRESET_LAST,
     FluidraPoolConfigEntry,
 )
 from ..device_registry import DeviceIdentifier
@@ -576,6 +578,19 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             num = _num(reported_value)
             if num is not None:
                 device["pump_flow_max"] = int(num)
+        elif VICTORIA_PRESET_FIRST <= component_id <= VICTORIA_PRESET_LAST:
+            # Quick-function preset slots, stored as consolidated JSON objects
+            # ({"name", "mode", "setpoint", "duration"}) — the same shape as c135.
+            # @renaatski also decoded the equivalent scalar range (c89-c124) but
+            # flagged a field-offset inconsistency there (c92 vs c126 disagree on
+            # Clean's duration), so the objects are the trustworthy source.
+            # An empty slot reports null, matching the app's "Not set up" tiles.
+            presets = device.setdefault("pump_presets", {})
+            index = component_id - VICTORIA_PRESET_FIRST
+            if isinstance(reported_value, dict):
+                presets[index] = reported_value
+            else:
+                presets.pop(index, None)
         elif component_id == 135:
             # Active quick-function / preset profile, e.g.
             # {"duration": "P0", "mode": "SPEED", "name": "MID SPEED", "setpoint": 75}.
