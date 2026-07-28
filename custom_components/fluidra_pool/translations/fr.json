@@ -224,6 +224,18 @@
           "winterized": "Hivernage"
         }
       },
+      "pump_activity": {
+        "name": "Activité",
+        "state": {
+          "calibrating": "Calibration",
+          "manual": "En marche (manuel)",
+          "priming": "Amorçage",
+          "running": "En marche",
+          "scheduled": "En marche (programmation)",
+          "stopped": "Arrêtée",
+          "unknown": "Inconnu"
+        }
+      },
       "pump_flow": {
         "name": "Débit"
       },

@@ -224,6 +224,18 @@
           "winterized": "Winterized"
         }
       },
+      "pump_activity": {
+        "name": "Activity",
+        "state": {
+          "calibrating": "Calibrating",
+          "manual": "Running (manual)",
+          "priming": "Priming",
+          "running": "Running",
+          "scheduled": "Running (schedule)",
+          "stopped": "Stopped",
+          "unknown": "Unknown"
+        }
+      },
       "pump_flow": {
         "name": "Flow rate"
       },

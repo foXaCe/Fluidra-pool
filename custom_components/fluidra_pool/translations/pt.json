@@ -224,6 +224,18 @@
           "winterized": "Hibernação"
         }
       },
+      "pump_activity": {
+        "name": "Atividade",
+        "state": {
+          "calibrating": "A calibrar",
+          "manual": "Em funcionamento (manual)",
+          "priming": "Escorva",
+          "running": "Em funcionamento",
+          "scheduled": "Em funcionamento (programação)",
+          "stopped": "Parada",
+          "unknown": "Desconhecido"
+        }
+      },
       "pump_flow": {
         "name": "Caudal"
       },

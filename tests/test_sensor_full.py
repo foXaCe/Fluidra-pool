@@ -26,6 +26,7 @@ from custom_components.fluidra_pool.sensor import (
     FluidraPoolStatusSensor,
     FluidraPoolWaterQualitySensor,
     FluidraPoolWeatherSensor,
+    FluidraPumpActivitySensor,
     FluidraPumpFlowSensor,
     FluidraPumpHeadSensor,
     FluidraPumpPowerSensor,
@@ -1379,3 +1380,96 @@ async def test_setup_creates_flow_sensor_when_configured() -> None:
     coordinator = _setup_coordinator([device])
     added = await _run_setup(coordinator)
     assert any(isinstance(e, FluidraPumpFlowSensor) for e in added)
+
+
+# --------------------------------------------------------------------------- #
+# FluidraPumpActivitySensor — transient phases kept out of the speed reading   #
+# --------------------------------------------------------------------------- #
+
+
+def _activity(device: dict) -> FluidraPumpActivitySensor:
+    return FluidraPumpActivitySensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        # Transient phases win over the steady-state mode (Issue #144).
+        ({"component_14_data": {"reportedValue": "PRIMING"}, "pump_mode": "AUTO PRIMING"}, "priming"),
+        ({"component_14_data": {"reportedValue": "CALIBRATION"}, "pump_mode": "PUMP CALIBRATION"}, "calibrating"),
+        # Steady states.
+        ({"component_14_data": {"reportedValue": "RUNNING"}, "pump_mode": "AUTO", "is_running": True}, "scheduled"),
+        (
+            {"component_14_data": {"reportedValue": "RUNNING"}, "pump_mode": "QUICK FUNCTION", "is_running": True},
+            "manual",
+        ),
+        ({"component_14_data": {"reportedValue": "NOT RUNNING"}, "pump_mode": "STOP"}, "stopped"),
+        # Running but an unrecognised mode string → generic running.
+        ({"component_14_data": {"reportedValue": "RUNNING"}, "pump_mode": "SOMETHING", "is_running": True}, "running"),
+    ],
+)
+def test_pump_activity_states(fields: dict, expected: str) -> None:
+    device = _pinned_device(DEVICE_ID, **fields)
+    assert _activity(device).native_value == expected
+
+
+def test_pump_activity_none_without_data() -> None:
+    """No pump strings at all → unknown (None), not a guessed state."""
+    assert _activity(_pinned_device(DEVICE_ID)).native_value is None
+
+
+def test_pump_activity_exposes_quick_function_while_manual() -> None:
+    """c135 name/mode/setpoint surface only while actually in QUICK FUNCTION."""
+    device = _pinned_device(
+        DEVICE_ID,
+        is_running=True,
+        component_14_data={"reportedValue": "RUNNING"},
+        pump_mode="QUICK FUNCTION",
+        pump_quick_function={"duration": "P0", "mode": "SPEED", "name": "MID SPEED", "setpoint": 75},
+    )
+    attrs = _activity(device).extra_state_attributes
+    assert attrs["quick_function"] == "MID SPEED"
+    assert attrs["quick_function_mode"] == "SPEED"
+    assert attrs["quick_function_setpoint"] == 75
+    assert "quick_function_remaining_seconds" not in attrs  # untimed (P0), no expiry
+
+
+def test_pump_activity_hides_stale_quick_function_during_schedule() -> None:
+    """c135 goes stale during an AUTO run, so it must NOT be surfaced then (Issue #144)."""
+    device = _pinned_device(
+        DEVICE_ID,
+        is_running=True,
+        component_14_data={"reportedValue": "RUNNING"},
+        pump_mode="AUTO",
+        pump_quick_function={"duration": "P0", "mode": "FLOW", "name": "5 m3/h", "setpoint": 5},
+    )
+    attrs = _activity(device).extra_state_attributes
+    assert "quick_function" not in attrs
+    assert attrs["operating_mode"] == "AUTO"
+
+
+def test_pump_activity_timed_quick_function_countdown() -> None:
+    """A timed quick function exposes its end time and remaining seconds."""
+    from homeassistant.util import dt as dt_util
+
+    expiry = int(dt_util.utcnow().timestamp()) + 600
+    device = _pinned_device(
+        DEVICE_ID,
+        is_running=True,
+        component_14_data={"reportedValue": "RUNNING"},
+        pump_mode="QUICK FUNCTION",
+        pump_quick_function={"duration": "PT60M", "mode": "SPEED", "name": "CLEAN", "setpoint": 100},
+        pump_quick_function_expiry=expiry,
+    )
+    attrs = _activity(device).extra_state_attributes
+    assert attrs["quick_function"] == "CLEAN"
+    assert 0 < attrs["quick_function_remaining_seconds"] <= 600
+    assert attrs["quick_function_ends_at"].startswith(str(dt_util.utc_from_timestamp(expiry).year))
+
+
+async def test_setup_creates_activity_sensor_when_configured() -> None:
+    """The sensor_activity entity key wires the activity sensor."""
+    device = _pinned_device(DEVICE_ID, entities=["sensor_activity"], device_type="pump")
+    coordinator = _setup_coordinator([device])
+    added = await _run_setup(coordinator)
+    assert any(isinstance(e, FluidraPumpActivitySensor) for e in added)

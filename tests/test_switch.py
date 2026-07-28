@@ -368,3 +368,52 @@ async def test_setup_adds_new_device_dynamically() -> None:
     new_uids = {e.unique_id for e in added} - uids_after_setup
     assert new_uids, "new device entities should be added without a reload"
     assert all("dev2" in u for u in new_uids), "only the newly-added device's entities are created"
+
+
+# --- Victoria settle window (Issue #144) ---------------------------------
+
+
+def test_auto_mode_optimistic_timeout_is_longer_for_victoria() -> None:
+    """Victoria pumps hold the optimistic state far longer than the default.
+
+    The cloud lags 15-30 s behind a command and arming the schedule runs a ~1 min
+    PRIMING/CALIBRATION sequence, so the default 10 s made the toggle drop its
+    optimistic state and flap through intermediate values (Issue #144).
+    """
+    from unittest.mock import patch
+
+    from custom_components.fluidra_pool.const import OPTIMISTIC_ACTION_TIMEOUT, VICTORIA_OPTIMISTIC_TIMEOUT
+
+    assert VICTORIA_OPTIMISTIC_TIMEOUT > OPTIMISTIC_ACTION_TIMEOUT
+
+    auto = _auto()
+    with patch(
+        "custom_components.fluidra_pool.switch.pump.DeviceIdentifier.has_feature",
+        side_effect=lambda _d, feat: feat == "victoria_vs_mode",
+    ):
+        assert auto._optimistic_timeout == VICTORIA_OPTIMISTIC_TIMEOUT
+
+    with patch(
+        "custom_components.fluidra_pool.switch.pump.DeviceIdentifier.has_feature",
+        return_value=False,
+    ):
+        assert auto._optimistic_timeout == OPTIMISTIC_ACTION_TIMEOUT
+
+
+def test_auto_mode_victoria_holds_optimistic_state_past_default_timeout() -> None:
+    """A Victoria toggle keeps showing the requested state while the pump settles."""
+    import time
+    from unittest.mock import patch
+
+    from custom_components.fluidra_pool.const import OPTIMISTIC_ACTION_TIMEOUT
+
+    auto = _auto({"auto_reported": 0})  # cloud still says off
+    auto._set_pending_state(True)  # user just switched it on
+    # Simulate the default timeout having elapsed but the pump still priming.
+    auto._last_action_time = time.time() - (OPTIMISTIC_ACTION_TIMEOUT + 5)
+
+    with patch(
+        "custom_components.fluidra_pool.switch.pump.DeviceIdentifier.has_feature",
+        side_effect=lambda _d, feat: feat == "victoria_vs_mode",
+    ):
+        assert auto.is_on is True  # still optimistic, not flipped back to off

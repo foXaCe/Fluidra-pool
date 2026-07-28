@@ -173,10 +173,11 @@ class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
         current_speed = self.device_data.get("speed_percent", 0)
 
         if current_speed == 0:
-            # Victoria VS pumps don't publish the live output % while running
-            # under a schedule (c21 stays 0 even though c22 power / c24 head show
-            # the pump is turning), so a running pump would misleadingly read
-            # "not_running". Report "running" instead (Issue #144).
+            # Victoria VS pumps don't publish the live output % while running under a
+            # schedule or in FLOW mode (c21/c17 zero out), even though the pump is
+            # turning — c25 flow / c22 power / c24 head stay live and prove it. So a
+            # running pump would misleadingly read "not_running": report "running"
+            # instead, rather than inventing a low/medium/high from a 0 % (Issue #144).
             if DeviceIdentifier.has_feature(self.device_data, "victoria_vs_mode"):
                 return "running"
             return "not_running"
@@ -311,6 +312,83 @@ class FluidraPumpFlowSensor(FluidraPoolSensorEntity):
     def native_value(self) -> float | None:
         """Return the reported flow rate in m³/h."""
         return self.device_data.get("pump_flow")
+
+
+class FluidraPumpActivitySensor(FluidraPoolSensorEntity):
+    """What a VS pump is doing right now, including transient phases (Issue #144).
+
+    The Victoria cycles through PRIMING → CALIBRATION before settling into its run,
+    and reports that on c14 (motor status) / c16 (operating mode). Those phases used
+    to leak into the speed reading; here they get their own state so the speed sensor
+    can stay a speed. Mapped from the pump's own strings, with the transient phases
+    taking precedence over the steady-state mode.
+    """
+
+    _attr_translation_key = "pump_activity"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["stopped", "priming", "calibrating", "scheduled", "manual", "running", "unknown"]
+    _attr_icon = "mdi:pump"
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the pump activity sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "activity")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the current activity phase."""
+        device = self.device_data
+        status = str(device.get("component_14_data", {}).get("reportedValue") or "").strip().upper()
+        mode = str(device.get("pump_mode") or "").strip().upper()
+
+        # Nothing reported yet (first poll): unknown rather than a misleading
+        # "stopped" — we genuinely don't know what the pump is doing.
+        if not status and not mode:
+            return None
+
+        # Transient phases first — they describe what the pump is busy doing.
+        if "PRIMING" in status or "PRIMING" in mode:
+            return "priming"
+        if "CALIBRATION" in status or "CALIBRATION" in mode:
+            return "calibrating"
+
+        if not device.get("is_running", False):
+            return "stopped"
+        if mode == "AUTO":
+            return "scheduled"
+        if "QUICK" in mode:
+            return "manual"
+        return "running"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose the raw pump strings plus the active quick-function, when any."""
+        device = self.device_data
+        attrs: dict[str, Any] = {
+            "motor_status": device.get("component_14_data", {}).get("reportedValue"),
+            "operating_mode": device.get("pump_mode"),
+        }
+
+        # c135 only reflects quick functions/presets — it goes stale during a
+        # schedule-driven run, so only surface it while actually in QUICK FUNCTION
+        # (Issue #144). Schedule runs get their name from /schedulers later.
+        quick = device.get("pump_quick_function")
+        if isinstance(quick, dict) and "QUICK" in str(device.get("pump_mode") or "").upper():
+            attrs["quick_function"] = quick.get("name")
+            attrs["quick_function_mode"] = quick.get("mode")
+            attrs["quick_function_setpoint"] = quick.get("setpoint")
+            expiry = device.get("pump_quick_function_expiry")
+            if expiry:
+                attrs["quick_function_ends_at"] = dt_util.utc_from_timestamp(expiry).isoformat()
+                remaining = int(expiry - dt_util.utcnow().timestamp())
+                attrs["quick_function_remaining_seconds"] = max(0, remaining)
+
+        return attrs
 
 
 class FluidraPumpScheduleSensor(FluidraPoolSensorEntity):

@@ -70,12 +70,12 @@ profile, so unknown equipment is usually still usable.
   - Up to 8 daily schedule slots (per-slot speed + start/end time)
 - **Victoria Smart Connect VS** (AstralPool, `mppvs`) — running state, live output %,
   AUTO / QUICK FUNCTION mode, speed or flow-rate setpoint, plus **power (W)**, **head (m)**
-  and **flow rate (m³/h)** sensors. Control mirrors the app: an **Auto-schedule toggle**
-  and a dedicated **Stop button** (halts the motor without disarming the schedule);
-  speed-preset dry-contact inputs are exposed as diagnostic binary sensors. On/off +
-  auto control are confirmed on-device; direct speed/quick-function control (via
-  `/schedulers`) is still being added — see
-  [#144](https://github.com/foXaCe/Fluidra-pool/issues/144).
+  and **flow rate (m³/h)** sensors, and an **activity** sensor that reports the transient
+  priming / calibration phases separately from the speed. Control mirrors the app: an
+  **Auto-schedule toggle** and a dedicated **Stop button** (halts the motor without
+  disarming the schedule); speed-preset dry-contact inputs are exposed as diagnostic
+  binary sensors. Direct speed/quick-function control (via `/schedulers`) is still being
+  added — see [#144](https://github.com/foXaCe/Fluidra-pool/issues/144).
 - Generic variable-speed pump fallback
 
 ### 🔥 Heat Pumps

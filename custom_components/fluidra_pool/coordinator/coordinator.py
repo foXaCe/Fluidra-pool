@@ -528,6 +528,20 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             num = _num(reported_value)
             if num is not None:
                 device["pump_flow_max"] = int(num)
+        elif component_id == 135:
+            # Active quick-function / preset profile, e.g.
+            # {"duration": "P0", "mode": "SPEED", "name": "MID SPEED", "setpoint": 75}.
+            # Populated only for quick functions and numbered presets — a schedule-driven
+            # AUTO run never touches it, so the value goes stale and must be ignored
+            # unless the pump is actually in QUICK FUNCTION (Issue #144, @renaatski).
+            if isinstance(reported_value, dict):
+                device["pump_quick_function"] = reported_value
+        elif component_id == 136:
+            # Expiry timestamp (unix epoch) of a *timed* quick function; 0 when the
+            # active function is untimed ("duration": "P0") or nothing is running.
+            num = _num(reported_value)
+            if num is not None:
+                device["pump_quick_function_expiry"] = int(num) or None
 
     def _track_schedule_count(self, pool_id: str, device_id: str, schedule_data: list[dict[str, Any]]) -> None:
         """Track schedule count changes for cleanup."""

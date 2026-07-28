@@ -224,6 +224,18 @@
           "winterized": "Invernaje"
         }
       },
+      "pump_activity": {
+        "name": "Actividad",
+        "state": {
+          "calibrating": "Calibrando",
+          "manual": "En marcha (manual)",
+          "priming": "Cebado",
+          "running": "En marcha",
+          "scheduled": "En marcha (programación)",
+          "stopped": "Detenida",
+          "unknown": "Desconocido"
+        }
+      },
       "pump_flow": {
         "name": "Caudal"
       },

@@ -10,7 +10,13 @@ import aiohttp
 from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
-from ..const import DOMAIN, OPTIMISTIC_ACTION_TIMEOUT, SWITCH_CONFIRMATION_DELAY
+from ..const import (
+    DOMAIN,
+    OPTIMISTIC_ACTION_TIMEOUT,
+    SWITCH_CONFIRMATION_DELAY,
+    VICTORIA_OPTIMISTIC_TIMEOUT,
+)
+from ..device_registry import DeviceIdentifier
 from .base import FluidraPoolSwitchEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -134,12 +140,25 @@ class FluidraAutoModeSwitch(FluidraPoolSwitchEntity):
         return "mdi:autorenew-off"
 
     @property
+    def _optimistic_timeout(self) -> float:
+        """How long to hold the optimistic state before trusting the poll again.
+
+        Victoria VS pumps need far longer than the default: the cloud lags 15-30 s
+        behind a command and arming the schedule runs a ~1 min PRIMING/CALIBRATION
+        sequence first, during which the reported value hasn't caught up yet
+        (Issue #144).
+        """
+        if DeviceIdentifier.has_feature(self.device_data, "victoria_vs_mode"):
+            return VICTORIA_OPTIMISTIC_TIMEOUT
+        return OPTIMISTIC_ACTION_TIMEOUT
+
+    @property
     def is_on(self) -> bool:
         """Return true if auto mode is on using optimistic UI or real-time reported value."""
         auto_reported = self.device_data.get("auto_reported")
         actual = bool(auto_reported) if auto_reported is not None else self.device_data.get("auto_mode_enabled", False)
         if self._pending_state is not None:
-            if actual == self._pending_state or self._pending_state_expired(OPTIMISTIC_ACTION_TIMEOUT):
+            if actual == self._pending_state or self._pending_state_expired(self._optimistic_timeout):
                 self._clear_pending_state()
                 return actual
             return self._pending_state

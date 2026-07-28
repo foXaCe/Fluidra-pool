@@ -667,3 +667,26 @@ async def test_victoria_c28_not_treated_as_no_flow_alarm(coordinator: FluidraDat
     coordinator._process_component_state(device, "pool_001", 28, {"reportedValue": 1})
     assert device["pump_speed_input_medium"] is True
     assert "no_flow_alarm" not in device
+
+
+async def test_victoria_component_135_quick_function_profile(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c135 carries the active quick-function profile as a JSON object (Issue #144)."""
+    device = _victoria_device()
+    payload = {"duration": "P0", "mode": "SPEED", "name": "MID SPEED", "setpoint": 75}
+    coordinator._process_component_state(device, "pool_001", 135, {"reportedValue": payload})
+    assert device["pump_quick_function"] == payload
+
+
+async def test_victoria_component_135_ignores_non_dict(coordinator: FluidraDataUpdateCoordinator) -> None:
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 135, {"reportedValue": None})
+    assert "pump_quick_function" not in device
+
+
+async def test_victoria_component_136_expiry(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c136 is the expiry epoch of a timed quick function; 0 means untimed/idle."""
+    device = _victoria_device()
+    coordinator._process_component_state(device, "pool_001", 136, {"reportedValue": 1784596101})
+    assert device["pump_quick_function_expiry"] == 1784596101
+    coordinator._process_component_state(device, "pool_001", 136, {"reportedValue": 0})
+    assert device["pump_quick_function_expiry"] is None
