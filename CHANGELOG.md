@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.67.0] - 2026-07-28
+
+### Added
+- **See which schedule is running your Victoria pump, and for how long** (Issue #144, @renaatski). While a pump runs under one of its automations, the **Activity** sensor now shows the schedule's **name**, its **target** (speed % or flow m³/h) and a **remaining-time countdown**. The pump itself publishes none of this while a schedule drives it — its setpoint registers read zero — so the integration reads the pool's automation list and matches the entry that's actually running, exactly like the official app does. Pools without schedule-driven equipment don't make the extra request.
+
 ## [2.66.0] - 2026-07-28
 
 ### Changed
