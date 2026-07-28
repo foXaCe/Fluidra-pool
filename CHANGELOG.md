@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.69.0] - 2026-07-28
+
+### Added
+- **Air-temperature fault sensor for Z250iQ / Z260iQ heat pumps** (Issue #139, @Kal42). These units raise error **E13** when the intake air goes above ~43 °C and then refuse to run. That fault is now exposed as a problem sensor, so you can be notified instead of wondering why the pool isn't heating.
+
 ## [2.68.0] - 2026-07-28
 
 ### Added
