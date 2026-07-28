@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.65.0] - 2026-07-28
+
+### Added
+- **Victoria Smart Connect VS activity sensor** (Issue #144, @renaatski). A new **Activity** sensor reports what the pump is actually doing — including the transient **priming** and **calibration** phases it cycles through when starting — instead of those phases leaking into the speed reading. It also distinguishes a scheduled run from a manual (quick-function) one.
+- **Active quick-function details.** When the pump runs a quick function or preset, the activity sensor exposes its name, mode (speed vs flow) and setpoint; for a *timed* function (e.g. Clean) it also exposes the end time and a live remaining-seconds countdown. These are deliberately hidden during a schedule-driven run, where the underlying register goes stale.
+
+### Fixed
+- **Auto toggle no longer flaps while the pump settles** (Issue #144). Victoria pumps take 15-30 s for the cloud to reflect a command, and arming the schedule kicks off a ~1 minute priming/calibration sequence. The toggle now holds the state you selected for up to 2 minutes instead of 10 seconds, so it no longer bounces through intermediate values before the pump catches up.
+
 ## [2.64.2] - 2026-07-27
 
 ### Fixed
