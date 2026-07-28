@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.68.0] - 2026-07-28
+
+### Added
+- **Run your Victoria pump's quick functions from Home Assistant** (Issue #144, @renaatski). A new **Quick function** select lists the presets configured on the pump itself — Clean, High/Mid/Low speed, your flow-rate presets — with their targets, and selecting one starts it, exactly as the app's quick-function tiles do. The list is read from the pump, so renaming or reconfiguring a preset is reflected automatically, and the select shows which one is currently running.
+
 ## [2.67.0] - 2026-07-28
 
 ### Added
