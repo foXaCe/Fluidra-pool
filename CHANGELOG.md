@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.66.0] - 2026-07-28
+
+### Changed
+- **Far fewer requests to the Fluidra cloud** (Issue #144, endpoint discovered by @renaatski). Each poll used to issue one request *per component per device* — dozens per cycle on a well-equipped pool, which is what triggered the cloud's rate limiting (HTTP 429) in the first place. The integration now fetches every component of a device in a **single request**, using the same endpoint the official app uses. Expect noticeably less traffic and fewer rate-limit hiccups, with no change to what you see in Home Assistant.
+- The bulk fetch is best-effort: if it fails or returns something unexpected, that poll transparently falls back to the previous per-component reads, and after a few consecutive failures the integration stops trying it for the session. Installations whose backend doesn't support it keep working exactly as before.
+
 ## [2.65.0] - 2026-07-28
 
 ### Added
