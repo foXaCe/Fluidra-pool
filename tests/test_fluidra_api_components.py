@@ -259,3 +259,47 @@ async def test_set_component_generic_requires_auth_token() -> None:
     api.access_token = None
     with pytest.raises(FluidraAuthError):
         await api.set_component_value("DEV-1", 18, 5)
+
+
+# --- get_all_components (bulk fetch, Issue #144) --------------------------
+
+
+async def test_get_all_components_raises_when_not_authenticated() -> None:
+    api = _FakeAPI()
+    api.access_token = None
+    with pytest.raises(FluidraAuthError):
+        await api.get_all_components("DEV-1")
+
+
+async def test_get_all_components_requests_details_and_parses_list() -> None:
+    """One GET with details=true returns every component, keyed by id."""
+    api = _FakeAPI()
+    api._request.return_value = (
+        200,
+        [{"id": 14, "reportedValue": "RUNNING"}, {"id": 25, "reportedValue": 7.0}],
+        "[]",
+    )
+    states = await api.get_all_components("DEV-1")
+    assert states is not None
+    assert states[14]["reportedValue"] == "RUNNING"
+    assert states[25]["reportedValue"] == 7.0
+
+    # Hits /components (not /components/<id>) with the details flag set.
+    url = api._request.await_args.args[1]
+    params = api._request.await_args.kwargs["params"]
+    assert url.endswith("/components")
+    assert params["details"] == "true"
+    assert params["deviceType"] == "connected"
+
+
+async def test_get_all_components_returns_none_on_non_200() -> None:
+    api = _FakeAPI()
+    api._request.return_value = (404, None, "")
+    assert await api.get_all_components("DEV-1") is None
+
+
+async def test_get_all_components_returns_none_on_request_error() -> None:
+    """A transport error degrades to None so the caller falls back."""
+    api = _FakeAPI()
+    api._request.side_effect = FluidraConnectionError("boom")
+    assert await api.get_all_components("DEV-1") is None

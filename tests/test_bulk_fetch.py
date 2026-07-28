@@ -1,0 +1,142 @@
+"""Tests for the bulk component fetch (Issue #144).
+
+One request per device replaces the per-component fan-out. The bulk path is
+optional: anything unexpected falls back to per-component reads, and repeated
+failures disable it for the session so an unsupported backend can't double the
+request count forever.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+from unittest.mock import AsyncMock
+
+from homeassistant.core import HomeAssistant
+import pytest
+
+from custom_components.fluidra_pool.const import BULK_FETCH_FAILURE_LIMIT
+from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordinator
+from custom_components.fluidra_pool.fluidra_api._components import ComponentsMixin
+
+
+@pytest.fixture
+def coordinator(hass: HomeAssistant, mock_api: AsyncMock) -> FluidraDataUpdateCoordinator:
+    return FluidraDataUpdateCoordinator(hass, mock_api)
+
+
+# --- payload parsing ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        # A bare list of component objects (the shape the app's endpoint returns).
+        ([{"id": 14, "reportedValue": "RUNNING"}, {"id": 21, "reportedValue": 75}], {14, 21}),
+        # Wrapped in a "components" key.
+        ({"components": [{"id": 9, "reportedValue": 1}]}, {9}),
+        # Already an id-keyed mapping.
+        ({"9": {"reportedValue": 1}, "10": {"reportedValue": 0}}, {9, 10}),
+    ],
+)
+def test_parse_bulk_components_accepts_known_shapes(payload: Any, expected: set[int]) -> None:
+    parsed = ComponentsMixin._parse_bulk_components(payload)
+    assert parsed is not None
+    assert set(parsed) == expected
+
+
+@pytest.mark.parametrize("payload", [None, "nonsense", 42, [], {}, [{"no_id": 1}], {"components": "bad"}])
+def test_parse_bulk_components_rejects_unusable_payloads(payload: Any) -> None:
+    """Unrecognised or empty payloads return None so the caller falls back.
+
+    Returning {} instead would look like "this device has no components" and
+    silently blank every entity.
+    """
+    assert ComponentsMixin._parse_bulk_components(payload) is None
+
+
+def test_parse_bulk_components_skips_malformed_entries() -> None:
+    """A bad entry is dropped without losing the good ones."""
+    parsed = ComponentsMixin._parse_bulk_components(
+        [{"id": 14, "reportedValue": "RUNNING"}, {"id": "oops"}, "junk", {"id": 21, "reportedValue": 1}]
+    )
+    assert parsed is not None
+    assert set(parsed) == {14, 21}
+
+
+def test_parse_bulk_components_mapping_skips_bad_keys_and_values() -> None:
+    """In an id-keyed mapping, non-numeric keys and non-dict values are dropped."""
+    parsed = ComponentsMixin._parse_bulk_components(
+        {"14": {"reportedValue": "RUNNING"}, "notanumber": {"reportedValue": 1}, "21": "not-a-dict"}
+    )
+    assert parsed is not None
+    assert set(parsed) == {14}
+
+
+# --- coordinator integration ---------------------------------------------
+
+
+async def test_bulk_fetch_used_and_filtered_to_requested(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+) -> None:
+    """The bulk result is used, restricted to the profile's requested components."""
+    mock_api.get_all_components = AsyncMock(
+        return_value={
+            9: {"reportedValue": 1},
+            14: {"reportedValue": "RUNNING"},
+            99: {"reportedValue": "not requested"},
+        }
+    )
+    states = await coordinator._fetch_components("DEV-1", [9, 14])
+    assert set(states) == {9, 14}  # c99 dropped — the profile didn't ask for it
+    mock_api.get_component_state.assert_not_awaited()  # no per-component fan-out
+
+
+async def test_bulk_failure_falls_back_to_per_component(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+) -> None:
+    """A failed bulk read still returns data via the per-component path."""
+    mock_api.get_all_components = AsyncMock(return_value=None)
+    mock_api.get_component_state = AsyncMock(return_value={"reportedValue": 7})
+    states = await coordinator._fetch_components("DEV-1", [9, 10])
+    assert set(states) == {9, 10}
+    assert mock_api.get_component_state.await_count == 2
+
+
+async def test_non_dict_bulk_result_falls_back(coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock) -> None:
+    """A bulk return that isn't an id-keyed mapping is treated as a failure."""
+    mock_api.get_all_components = AsyncMock(return_value=["unexpected"])
+    mock_api.get_component_state = AsyncMock(return_value={"reportedValue": 1})
+    states = await coordinator._fetch_components("DEV-1", [9])
+    assert set(states) == {9}
+    assert mock_api.get_component_state.await_count == 1
+
+
+async def test_bulk_disabled_after_repeated_failures(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+) -> None:
+    """After the failure limit the bulk endpoint is no longer attempted."""
+    mock_api.get_all_components = AsyncMock(return_value=None)
+    mock_api.get_component_state = AsyncMock(return_value={"reportedValue": 1})
+
+    for _ in range(BULK_FETCH_FAILURE_LIMIT):
+        await coordinator._fetch_components("DEV-1", [9])
+
+    assert coordinator._bulk_fetch_enabled is False
+    calls_so_far = mock_api.get_all_components.await_count
+    await coordinator._fetch_components("DEV-1", [9])
+    # No further bulk attempts, but data still flows through the fallback.
+    assert mock_api.get_all_components.await_count == calls_so_far
+
+
+async def test_bulk_success_resets_the_failure_streak(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+) -> None:
+    """Transient failures must not accumulate towards disabling the bulk path."""
+    mock_api.get_all_components = AsyncMock(return_value=None)
+    await coordinator._fetch_components("DEV-1", [9])
+    assert coordinator._bulk_fetch_failures == 1
+
+    mock_api.get_all_components = AsyncMock(return_value={9: {"reportedValue": 1}})
+    await coordinator._fetch_components("DEV-1", [9])
+    assert coordinator._bulk_fetch_failures == 0
+    assert coordinator._bulk_fetch_enabled is True

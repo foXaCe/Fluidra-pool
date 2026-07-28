@@ -83,6 +83,11 @@ SWITCH_CONFIRMATION_DELAY: Final = 2  # seconds - delay after switch toggle befo
 UI_UPDATE_DELAY: Final = 0.1  # seconds - small delay for UI responsiveness
 PUMP_START_DELAY: Final = 1  # seconds - delay after pump start before setting speed
 OPTIMISTIC_ACTION_TIMEOUT: Final = 10  # seconds - timeout for optimistic local state
+# Consecutive bulk-component-fetch failures before falling back to per-component
+# polling for the rest of the session (Issue #144). A few retries absorb transient
+# network errors; a backend that genuinely lacks the endpoint stops costing an
+# extra request per device per poll.
+BULK_FETCH_FAILURE_LIMIT: Final = 3
 # Victoria VS pumps need much longer: the cloud takes 15-30 s to reflect a command,
 # and arming the schedule kicks off a PRIMING → CALIBRATION sequence lasting ~1 min
 # before the pump settles. With the default 10 s the toggle dropped its optimistic

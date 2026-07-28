@@ -56,6 +56,10 @@ def mock_api() -> AsyncMock:
     api.poll_device_status = AsyncMock(return_value={"connectivity": {"online": True}})
     api.poll_pool_device_statuses = AsyncMock(return_value={"E30-001": {"connectivity": {"online": True}}})
     api.get_component_state = AsyncMock(return_value={"reportedValue": 0})
+    # No bulk payload by default: these fixtures exercise the per-component path,
+    # and an AsyncMock's default truthy return would otherwise look like a
+    # successful bulk fetch. Tests that want the bulk path set it explicitly.
+    api.get_all_components = AsyncMock(return_value=None)
     api.set_component_value = AsyncMock(return_value=True)
     api.set_component_string_value = AsyncMock(return_value=True)
     api.close = AsyncMock()

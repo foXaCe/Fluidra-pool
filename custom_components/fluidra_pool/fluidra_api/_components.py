@@ -37,6 +37,82 @@ class ComponentsMixin(FluidraAPIBase):
             return data
         return None
 
+    async def get_all_components(self, device_id: str) -> dict[int, dict[str, Any]] | None:
+        """Fetch every component of a device in one request.
+
+        This is the endpoint the official app uses (Issue #144, @renaatski):
+        ``GET /generic/devices/{id}/components?deviceType=connected&details=true``.
+        One call replaces the per-component fan-out, which cuts request volume
+        (and the HTTP 429 rate-limiting it caused — Issue #63) and makes the wider
+        register ranges affordable to poll.
+
+        Returns ``{component_id: state}``, or ``None`` when the request failed or
+        the payload wasn't in a shape we recognise, so callers can fall back to
+        per-component reads.
+        """
+        if not self.access_token:
+            raise FluidraAuthError("Not authenticated")
+
+        headers = self._build_auth_headers()
+        url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}/components"
+        params = dict(CONNECTED_PARAMS) | {"details": "true"}
+
+        try:
+            status, data, _ = await self._request("GET", url, headers=headers, params=params)
+        except FluidraError as err:
+            _LOGGER.debug("Bulk component fetch failed for %s: %s", mask_device_id(device_id), err)
+            return None
+
+        if status != 200:
+            _LOGGER.debug(
+                "Bulk component fetch for %s returned HTTP %s",
+                mask_device_id(device_id),
+                status,
+            )
+            return None
+
+        return self._parse_bulk_components(data)
+
+    @staticmethod
+    def _parse_bulk_components(data: Any) -> dict[int, dict[str, Any]] | None:
+        """Normalise a bulk-components payload into ``{component_id: state}``.
+
+        The exact envelope isn't contractually documented, so accept the shapes it
+        can plausibly take — a bare list of component objects, a ``{"components":
+        [...]}`` wrapper, or an id-keyed mapping — and return ``None`` for anything
+        unrecognised rather than silently yielding an empty scan (which the caller
+        would mistake for "device has no components").
+        """
+        entries: Any = data
+        if isinstance(data, dict):
+            # Either a wrapper around the list, or already an id-keyed mapping.
+            if isinstance(data.get("components"), list):
+                entries = data["components"]
+            else:
+                mapping: dict[int, dict[str, Any]] = {}
+                for key, value in data.items():
+                    if not isinstance(value, dict):
+                        continue
+                    try:
+                        mapping[int(key)] = value
+                    except (TypeError, ValueError):
+                        continue
+                return mapping or None
+
+        if not isinstance(entries, list):
+            return None
+
+        states: dict[int, dict[str, Any]] = {}
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            raw_id = entry.get("id")
+            try:
+                states[int(raw_id)] = entry  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                continue
+        return states or None
+
     async def control_device_component(
         self, device_id: str, component_id: int, value: int | str | dict[str, Any]
     ) -> bool:

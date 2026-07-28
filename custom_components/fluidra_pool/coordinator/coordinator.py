@@ -19,6 +19,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from ..api_resilience import FluidraError
 from ..const import (
+    BULK_FETCH_FAILURE_LIMIT,
     CONNECTION_ISSUE_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
     DEVICE_TYPE_CHLORINATOR,
@@ -67,6 +68,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._read_only_pools_warned: set[str] = set()
         # Devices already flagged for an unverified profile — raise once, not every poll.
         self._unverified_profile_flagged: set[str] = set()
+        # Bulk component fetch (one request per device instead of N — Issue #144).
+        # Disabled for the session after repeated failures so an unsupported backend
+        # can't keep costing an extra request per device per poll.
+        self._bulk_fetch_enabled = True
+        self._bulk_fetch_failures = 0
 
         # Honour the user-configured polling interval.
         scan_interval = DEFAULT_SCAN_INTERVAL
@@ -173,6 +179,40 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _calculate_auto_speed_from_schedules(self, device: dict[str, Any]) -> int:
         """Calculate current speed based on active schedules in auto mode."""
         return calculate_auto_speed_from_schedules(device)
+
+    async def _fetch_components(self, device_id: str, components_to_scan: list[int]) -> dict[int, dict[str, Any]]:
+        """Fetch the requested components, preferring the single bulk request.
+
+        The bulk endpoint returns every component in one call (Issue #144), which
+        replaces N requests per device per poll and removes the rate-limit pressure
+        that the fan-out created (Issue #63). It is *not* assumed to work: if it
+        fails or returns an unusable payload we fall back to the per-component
+        scan for this poll, and after BULK_FETCH_FAILURE_LIMIT consecutive failures
+        we stop attempting it for the rest of the session so a backend that doesn't
+        support it can't double our request count forever.
+        """
+        if self._bulk_fetch_enabled:
+            bulk = await self.api.get_all_components(device_id)
+            # Only trust a real id-keyed mapping: anything else counts as a failure
+            # and falls through to the per-component scan.
+            if isinstance(bulk, dict) and bulk:
+                self._bulk_fetch_failures = 0
+                # Keep only what this device's profile asks for: the bulk response
+                # carries every register, and processing unrequested ones would feed
+                # the per-family decoders components they don't expect.
+                wanted = set(components_to_scan)
+                return {cid: state for cid, state in bulk.items() if cid in wanted}
+
+            self._bulk_fetch_failures += 1
+            if self._bulk_fetch_failures >= BULK_FETCH_FAILURE_LIMIT:
+                self._bulk_fetch_enabled = False
+                _LOGGER.info(
+                    "Bulk component fetch failed %d times in a row — falling back to "
+                    "per-component polling for this session",
+                    self._bulk_fetch_failures,
+                )
+
+        return await self._fetch_components_parallel(device_id, components_to_scan)
 
     async def _fetch_components_parallel(
         self, device_id: str, components_to_scan: list[int]
@@ -762,7 +802,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 component_range = DeviceIdentifier.get_components_range(device)
                 components_to_scan = list(range(component_range))
-            component_states = await self._fetch_components_parallel(device_id, components_to_scan)
+            component_states = await self._fetch_components(device_id, components_to_scan)
             for component_id, component_state in component_states.items():
                 self._process_component_state(device, pool_id, component_id, component_state)
 
