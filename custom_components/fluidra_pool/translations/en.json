@@ -55,6 +55,9 @@
       "air_temperature_alarm": {
         "name": "Air temperature fault"
       },
+      "chlorinator_alarm": {
+        "name": "Alarm"
+      },
       "chlorinator_producing": {
         "name": "Producing"
       },

@@ -106,6 +106,81 @@ class FluidraChlorinatorProducingBinarySensor(FluidraPoolEntity, BinarySensorEnt
         }
 
 
+class FluidraChlorinatorAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity):
+    """Binary sensor for active chlorinator alarms (e.g. "PUMPSTOP PH").
+
+    Fluidra's cloud reports per-device alarms in the raw ``status.alarms``
+    array returned by ``GET .../generic/devices?format=tree`` — not in any of
+    the numbered ``specific_components`` the rest of the integration scans,
+    so they are otherwise invisible to Home Assistant. Each entry has an
+    ``errorCode``, a ``default.title``/``default.text`` pair, and a boolean
+    ``value`` marking whether that specific alarm is currently active. The
+    coordinator copies this list verbatim onto ``device["alarms"]``.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the chlorinator alarm binary sensor."""
+        super().__init__(coordinator, pool_id, device_id)
+
+        self._attr_unique_id = f"fluidra_{self._device_id}_alarm"
+        self._attr_translation_key = "chlorinator_alarm"
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available.
+
+        Mirrors the chlorinator measurement sensors, not the control
+        entities: bridged children can report ``online=False`` on a
+        transient MQTT_KEEP_ALIVE_TIMEOUT while polling keeps succeeding
+        (Issue #63) — the alarm state is diagnostic information like
+        pH/ORP/temperature, not a control surface, so it should keep
+        showing its last known value through those blips rather than
+        disappear exactly when an operator might want to check it.
+        """
+        return self.coordinator.last_update_success and bool(self.device_data)
+
+    def _active_alarms(self) -> list[dict[str, Any]]:
+        """Return the alarm entries whose ``value`` is currently truthy."""
+        alarms = self.device_data.get("alarms") or []
+        return [alarm for alarm in alarms if isinstance(alarm, dict) and alarm.get("value")]
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True when at least one alarm is active."""
+        if not self.coordinator.last_update_success:
+            return None
+        return bool(self._active_alarms())
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional state attributes.
+
+        Only the first active alarm is surfaced as top-level attributes
+        (matching how the official app highlights one alarm at a time);
+        ``active_alarm_count`` tells you if there is more than one.
+        """
+        active = self._active_alarms()
+        attributes: dict[str, Any] = {
+            "device_id": self._device_id,
+            "active_alarm_count": len(active),
+        }
+        if active:
+            first = active[0]
+            default = first.get("default") or {}
+            attributes["error_code"] = first.get("errorCode")
+            attributes["title"] = default.get("title")
+            attributes["text"] = default.get("text")
+        return attributes
+
+
 class FluidraPumpSpeedInputBinarySensor(FluidraPoolEntity, BinarySensorEntity):
     """Speed-preset dry-contact digital input on a Victoria VS pump (Issue #144).
 
@@ -196,6 +271,17 @@ async def async_setup_entry(
                     pool_id,
                     device_id,
                     production_component,
+                )
+            )
+
+            # Alarms live in the raw status tree (device["alarms"]), not in
+            # any specific_components feature, so every chlorinator gets this
+            # sensor unconditionally alongside the producing sensor.
+            entities.append(
+                FluidraChlorinatorAlarmBinarySensor(
+                    coordinator,
+                    pool_id,
+                    device_id,
                 )
             )
 

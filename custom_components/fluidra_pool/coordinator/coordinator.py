@@ -825,6 +825,12 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         device["connectivity"] = connectivity
                         if "connected" in connectivity:
                             self._apply_online_flag(device, device_id, bool(connectivity["connected"]))
+                        # Device alarms (e.g. "PUMPSTOP PH") live only in this raw
+                        # status tree, not in any numbered component — the
+                        # specific_components scan never sees them (Piscina finding,
+                        # 2026-07-10/11). Surface the raw list as-is for entities to
+                        # interpret; an empty list means no active alarms.
+                        device["alarms"] = status.get("alarms", [])
 
         for device in pool.get("devices", []):
             device_id = device.get("device_id")
