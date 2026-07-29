@@ -216,7 +216,8 @@ async def test_setup_adds_new_device_dynamically() -> None:
     listeners[0]()
 
     new_uids = {e.unique_id for e in added} - uids_after_setup
-    assert new_uids == {"fluidra_dev2_producing"}
+    # Each chlorinator gets both its producing sensor and its alarm sensor.
+    assert new_uids == {"fluidra_dev2_producing", "fluidra_dev2_alarm"}
 
 
 async def test_setup_falls_back_to_get_pools_when_no_cache() -> None:
@@ -239,7 +240,7 @@ async def test_setup_falls_back_to_get_pools_when_no_cache() -> None:
     await async_setup_entry(MagicMock(), entry, async_add)
 
     coordinator.api.get_pools.assert_awaited_once()
-    assert {e.unique_id for e in added} == {"fluidra_dev1_producing"}
+    assert {e.unique_id for e in added} == {"fluidra_dev1_producing", "fluidra_dev1_alarm"}
 
 
 @pytest.mark.parametrize("device_id", ["", None])
@@ -381,3 +382,79 @@ def test_chlorinator_alarm_last_known_state_freezes_when_offline() -> None:
     assert sensor._last_known_state is True
     assert sensor._last_known_at == frozen_at
     assert sensor.is_on is None
+
+
+def test_chlorinator_alarm_on_with_active_alarm() -> None:
+    """A trustworthy poll carrying an active alarm reads on."""
+    sensor = _chlorinator_alarm(_device(online=True, alarms=[PH_ALARM]))
+    assert sensor.is_on is True
+    attrs = sensor.extra_state_attributes
+    assert attrs["error_code"] == "PUMPSTOP_PH"
+    assert attrs["title"] == "pH dosing stop"
+    assert attrs["active_alarm_count"] == 1
+    assert attrs["device_offline"] is False
+
+
+def test_chlorinator_alarm_off_without_active_alarms() -> None:
+    """Entries whose value is falsy don't count as active."""
+    cleared = {**PH_ALARM, "value": False}
+    sensor = _chlorinator_alarm(_device(online=True, alarms=[cleared]))
+    assert sensor.is_on is False
+    assert sensor.extra_state_attributes["active_alarm_count"] == 0
+    assert "error_code" not in sensor.extra_state_attributes
+
+
+def test_chlorinator_alarm_counts_multiple_and_surfaces_the_first() -> None:
+    """With several active alarms the count reflects all, details show the first."""
+    second = {"errorCode": "SALT_LOW", "default": {"title": "Low salt", "text": "Add salt"}, "value": True}
+    sensor = _chlorinator_alarm(_device(online=True, alarms=[PH_ALARM, second]))
+    attrs = sensor.extra_state_attributes
+    assert attrs["active_alarm_count"] == 2
+    assert attrs["error_code"] == "PUMPSTOP_PH"
+
+
+def test_chlorinator_alarm_ignores_malformed_entries() -> None:
+    """Junk in alarms[] is skipped rather than crashing or counting."""
+    sensor = _chlorinator_alarm(_device(online=True, alarms=["junk", None, 42, {"no_value": 1}, PH_ALARM]))
+    assert sensor.is_on is True
+    assert sensor.extra_state_attributes["active_alarm_count"] == 1
+
+
+def test_chlorinator_alarm_handles_missing_alarms_key() -> None:
+    """A device the cloud never sent alarms for reads off, not unknown."""
+    sensor = _chlorinator_alarm(_device(online=True))
+    assert sensor.is_on is False
+
+
+def test_chlorinator_alarm_unknown_when_coordinator_failed() -> None:
+    """A failed poll can't be trusted either, even with the device online."""
+    device = _device(online=True, alarms=[PH_ALARM])
+    coord = _coord([device])
+    coord.last_update_success = False
+    sensor = FluidraChlorinatorAlarmBinarySensor(coord, POOL_ID, DEVICE_ID)
+    assert sensor.is_on is None
+
+
+def test_chlorinator_alarm_exposes_last_known_while_offline() -> None:
+    """Offline: is_on is unknown, but the last confirmed state stays visible.
+
+    Without this a dashboard can only show a bare "unknown"; with it, it can say
+    "last known: alarm active, confirmed at <time>".
+    """
+    device = _device(online=True, alarms=[PH_ALARM])
+    sensor = _chlorinator_alarm(device)
+    sensor._update_last_known()  # a trustworthy poll happened
+
+    device["online"] = False
+    assert sensor.is_on is None  # refuses to trust the cached snapshot
+    attrs = sensor.extra_state_attributes
+    assert attrs["device_offline"] is True
+    assert attrs["last_known_state"] is True
+    assert attrs["last_known_at"] is not None
+
+
+def test_chlorinator_alarm_last_known_absent_before_any_trustworthy_poll() -> None:
+    """Never confirmed yet → the attributes exist but stay empty, not fabricated."""
+    attrs = _chlorinator_alarm(_device(online=False, alarms=[PH_ALARM])).extra_state_attributes
+    assert attrs["last_known_state"] is None
+    assert attrs["last_known_at"] is None

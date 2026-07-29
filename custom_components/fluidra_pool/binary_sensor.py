@@ -218,11 +218,19 @@ class FluidraChlorinatorAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity)
         Only the first active alarm is surfaced as top-level attributes
         (matching how the official app highlights one alarm at a time);
         ``active_alarm_count`` tells you if there is more than one.
+
+        ``last_known_*`` and ``device_offline`` are always present so a
+        dashboard can show something better than a bare "unknown" while the
+        device is offline — e.g. "last known: no alarm, confirmed 12 min ago"
+        — since ``is_on`` deliberately refuses to guess from stale data.
         """
         active = self._active_alarms()
         attributes: dict[str, Any] = {
             "device_id": self._device_id,
             "active_alarm_count": len(active),
+            "device_offline": self.device_data.get("online") is False,
+            "last_known_state": self._last_known_state,
+            "last_known_at": self._last_known_at.isoformat() if self._last_known_at else None,
         }
         if active:
             first = active[0]
