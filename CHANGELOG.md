@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **AstralPool Energy Connect chlorinator `CC26027341`** — the unit fell back to the generic profile, which read the water temperature (c172) as pH (2.59-2.60 instead of 25.9-26.0 °C) and did not surface a working ORP/salinity reading matching the app. Added to the Energy Connect tecnoLC2 profile: pH (c165), ORP (c170) and salinity (c174) now report live values matching the Fluidra app. This unit's c8 was non-blank (720), so the automatic tecnoLC2-signature detection never routed it here on its own.
+
 ## [2.69.0] - 2026-07-28
 
 ### Added

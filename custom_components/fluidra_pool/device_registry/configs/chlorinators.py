@@ -246,7 +246,16 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # CC26002143 (Issue #153, @Squallium) — Astra Pool Energy Connect, same layout;
         # app screenshot shows pH 7.3, ORP 706 mV (setpoint 700 on c20), water 28.8 °C
         # (c172 = 288, misread as pH 2.88 by the catch-all) and salinity 0.0 g/L.
-        ["CC24047102*", "CC25010924*", "CC25008731*", "CC25017029*", "CC25059122*", "CC26002143.nn_*"],
+        # CC26027341 — same family: app shows pH 7.3, ORP current 630 mV / setpoint 680
+        # mV (c20 = 680, exact match), water 25.9-26.0 °C (c172 = 259-260, misread as pH
+        # 2.59-2.60 by the catch-all). After switching to this profile, pH (c165), ORP
+        # (c170) and salinity (c174) all report live values matching the app (in
+        # diagnostics taken under the catch-all profile, c185 — its salinity slot —
+        # read 0, though it may just have been stale at that moment rather than always
+        # wrong). c8 was non-blank (720) on this unit, so the automatic
+        # tecnoLC2-signature detection (which requires a blank c8) never routed it
+        # to this profile on its own — pinning the serial directly instead.
+        ["CC24047102*", "CC25010924*", "CC25008731*", "CC25017029*", "CC25059122*", "CC26002143.nn_*", "CC26027341*"],
         priority=88,
         boost_mode=103,
     ),
