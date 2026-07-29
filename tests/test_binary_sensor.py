@@ -331,3 +331,53 @@ def test_heat_pump_alarm_unknown_before_reported() -> None:
 
 def test_heat_pump_alarm_unique_id() -> None:
     assert _alarm(_device()).unique_id == f"{DOMAIN}_{POOL_ID}_{DEVICE_ID}_air_temperature_alarm"
+
+
+# --- Chlorinator alarm offline guard (Issue #163) -------------------------
+
+from custom_components.fluidra_pool.binary_sensor import FluidraChlorinatorAlarmBinarySensor  # noqa: E402
+
+PH_ALARM = {
+    "errorCode": "PUMPSTOP_PH",
+    "default": {"title": "pH dosing stop", "text": "pH pump stopped dosing"},
+    "value": True,
+}
+
+
+def _chlorinator_alarm(device: dict) -> FluidraChlorinatorAlarmBinarySensor:
+    return FluidraChlorinatorAlarmBinarySensor(_coord([device]), POOL_ID, DEVICE_ID)
+
+
+def test_chlorinator_alarm_is_on_none_when_device_offline_with_cached_alarm() -> None:
+    """Fluidra's cloud can keep serving a cached alarms[] snapshot for a
+    disconnected device (confirmed 2026-07-20: PUMPSTOP PH stayed reported
+    True for 8+ hours after the chlorinator was physically powered off,
+    alongside a frozen ORP reading) -- online=False must make is_on
+    unknown rather than trust that stale True.
+    """
+    sensor = _chlorinator_alarm(_device(online=False, alarms=[PH_ALARM]))
+    assert sensor.is_on is None
+
+
+def test_chlorinator_alarm_last_known_state_freezes_when_offline() -> None:
+    """last_known_state should mirror the last *trustworthy* poll and stay
+    frozen once the device goes offline, rather than being cleared or
+    reflecting the (untrustworthy) cached alarms[] content.
+    """
+    online_device = _device(online=True, alarms=[PH_ALARM])
+    sensor = _chlorinator_alarm(online_device)
+
+    # A trustworthy poll while online confirms the alarm is active.
+    sensor._update_last_known()
+    assert sensor._last_known_state is True
+    frozen_at = sensor._last_known_at
+    assert frozen_at is not None
+
+    # Device goes offline; cloud keeps echoing the same cached alarms[].
+    # A further update must NOT treat this poll as trustworthy.
+    sensor.coordinator.data[POOL_ID]["devices"][0]["online"] = False
+    sensor._update_last_known()
+
+    assert sensor._last_known_state is True
+    assert sensor._last_known_at == frozen_at
+    assert sensor.is_on is None

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import (
@@ -9,7 +10,9 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.const import EntityCategory
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
@@ -133,6 +136,13 @@ class FluidraChlorinatorAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity)
         self._attr_unique_id = f"fluidra_{self._device_id}_alarm"
         self._attr_translation_key = "chlorinator_alarm"
 
+        # Last alarm state confirmed on a trustworthy (online) poll, frozen
+        # while the device stays offline. In-memory only — reset to None on
+        # every integration reload/HA restart until the next trustworthy
+        # poll (see _update_last_known).
+        self._last_known_state: bool | None = None
+        self._last_known_at: datetime | None = None
+
     @property
     def available(self) -> bool:
         """Return True if entity is available.
@@ -152,10 +162,52 @@ class FluidraChlorinatorAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity)
         alarms = self.device_data.get("alarms") or []
         return [alarm for alarm in alarms if isinstance(alarm, dict) and alarm.get("value")]
 
+    def _poll_is_trustworthy(self) -> bool:
+        """Return True when this poll's ``alarms[]`` content can be trusted.
+
+        False whenever the coordinator update itself failed, or the device
+        reports ``online=False`` — Fluidra's cloud can keep serving a cached
+        ``alarms[]`` snapshot for a disconnected device (confirmed
+        2026-07-20 — PUMPSTOP PH stayed reported ``True`` for 8+ hours after
+        the chlorinator was physically powered off, alongside a frozen ORP
+        reading).
+        """
+        return self.coordinator.last_update_success and self.device_data.get("online") is not False
+
+    def _update_last_known(self) -> None:
+        """Snapshot the confirmed alarm state, once per trustworthy poll.
+
+        Kept separate from ``_handle_coordinator_update`` so it can be
+        exercised in tests without a real ``hass``/entity_id (which
+        ``async_write_ha_state`` — called by the base
+        ``_handle_coordinator_update`` — requires).
+        """
+        if self._poll_is_trustworthy():
+            self._last_known_state = bool(self._active_alarms())
+            self._last_known_at = dt_util.utcnow()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator.
+
+        Runs once per coordinator refresh (unlike ``is_on``/
+        ``extra_state_attributes``, which HA may read multiple times per
+        update), so this is the right place for the last-known-good
+        bookkeeping rather than a side effect inside those properties.
+        """
+        self._update_last_known()
+        super()._handle_coordinator_update()
+
     @property
     def is_on(self) -> bool | None:
-        """Return True when at least one alarm is active."""
-        if not self.coordinator.last_update_success:
+        """Return True when at least one alarm is active.
+
+        Returns None (unknown) whenever the current poll can't be trusted
+        (see ``_poll_is_trustworthy``) — neither True nor False can be
+        trusted from stale data, not even False, since that could hide an
+        alarm that was genuinely active in the last real read.
+        """
+        if not self._poll_is_trustworthy():
             return None
         return bool(self._active_alarms())
 
