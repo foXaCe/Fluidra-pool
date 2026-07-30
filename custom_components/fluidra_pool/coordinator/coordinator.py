@@ -922,6 +922,5 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # handler and eventually the connection_error repair issue,
             # instead of freezing silently forever.
             raise FluidraConnectionError(
-                f"No component data received for any device in pool {pool_id} "
-                f"(stuck: {', '.join(chronically_stuck)})"
+                f"No component data received for any device in pool {pool_id} (stuck: {', '.join(chronically_stuck)})"
             )
