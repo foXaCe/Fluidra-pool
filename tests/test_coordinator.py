@@ -622,6 +622,42 @@ class TestEmptyComponentFetchDetection:
 
         assert coord._consecutive_update_failures > 0
 
+    async def test_one_chronically_stuck_device_does_not_block_healthy_ones(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """Reproduces the standardTestStrip incident (2026-07-30): a pool can contain
+        a virtual/manual-input pseudo device (e.g. a photo-based test-strip entry)
+        that never answers component polls by design, alongside real hardware that
+        polls fine. That one permanently-stuck device must not raise and revert the
+        whole pool's refresh — the healthy device's fresh data must survive, and no
+        exception should propagate as long as at least one device got real data.
+        """
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value=None)
+
+        async def fake_component_state(device_id: str, component_id: int):
+            return None if device_id == "STUCK" else {"reportedValue": 42}
+
+        mock_api.get_component_state = AsyncMock(side_effect=fake_component_state)
+
+        pool = {
+            "id": "pool_1",
+            "name": "Pool",
+            "devices": [
+                {"device_id": "STUCK", "name": "Test Strip", "online": True, "components": {}},
+                {"device_id": "HEALTHY", "name": "Chlorinator", "online": True, "components": {}},
+            ],
+        }
+
+        for _ in range(EMPTY_COMPONENT_FETCH_THRESHOLD + 2):
+            await coordinator._refresh_pool(pool, {})  # must not raise
+
+        assert coordinator._empty_component_fetch_counts["STUCK"] >= EMPTY_COMPONENT_FETCH_THRESHOLD
+        assert "HEALTHY" not in coordinator._empty_component_fetch_counts
+        healthy_device = next(d for d in pool["devices"] if d["device_id"] == "HEALTHY")
+        assert healthy_device["components"]
+
 
 class TestUnverifiedProfileIssue:
     """Devices resolved on a catch-all/legacy profile raise a repair issue once (Plan 004)."""

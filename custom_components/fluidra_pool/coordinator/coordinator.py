@@ -836,6 +836,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         # interpret; an empty list means no active alarms.
                         device["alarms"] = status.get("alarms", [])
 
+        chronically_stuck: list[str] = []
+        any_device_got_data = False
+
         for device in pool.get("devices", []):
             device_id = device.get("device_id")
             if not device_id:
@@ -859,15 +862,29 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 strikes = self._empty_component_fetch_counts.get(device_id, 0) + 1
                 self._empty_component_fetch_counts[device_id] = strikes
                 if strikes >= EMPTY_COMPONENT_FETCH_THRESHOLD:
-                    # Every individual component request failed again: raise so this
-                    # propagates to _async_update_data's per-pool handler instead of
-                    # silently keeping stale data forever (Issue: sensors frozen 6h+
-                    # after a transient DNS failure, with no visible error anywhere).
-                    raise FluidraConnectionError(
-                        f"No component data received for device {device_id} after {strikes} consecutive polls"
+                    # Every individual component request failed again for this
+                    # device. Don't raise here directly: some pools contain a
+                    # mix of real hardware and virtual/manual-input pseudo
+                    # devices (e.g. a photo-based test-strip entry) that never
+                    # answer component polls by design — raising per-device
+                    # would abort the whole pool's refresh and freeze healthy
+                    # devices right along with the permanently-stuck one.
+                    # Instead, collect it here and only fail the pool below if
+                    # *every* device struck out this cycle, which is the actual
+                    # "nothing is coming through" signal (e.g. the DNS outage
+                    # this was built for) rather than one quirky device.
+                    _LOGGER.warning(
+                        "No component data received for device %s after %d consecutive "
+                        "polls — device may be unreachable or not support live polling",
+                        device_id,
+                        strikes,
                     )
+                    chronically_stuck.append(device_id)
             else:
                 self._empty_component_fetch_counts.pop(device_id, None)
+
+            if component_states:
+                any_device_got_data = True
 
             for component_id, component_state in component_states.items():
                 self._process_component_state(device, pool_id, component_id, component_state)
@@ -896,3 +913,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # A code update added a verified profile for this device.
                 self._unverified_profile_flagged.discard(device_id)
                 async_delete_unverified_profile_issue(self.hass, device_id)
+
+        if chronically_stuck and not any_device_got_data:
+            # Every device in the pool struck out this cycle — that's the
+            # "nothing is coming through" signal (transient DNS/API outage,
+            # auth issue, etc.), as opposed to a single chronically-quirky
+            # device. Propagate so it reaches _async_update_data's per-pool
+            # handler and eventually the connection_error repair issue,
+            # instead of freezing silently forever.
+            raise FluidraConnectionError(
+                f"No component data received for any device in pool {pool_id} "
+                f"(stuck: {', '.join(chronically_stuck)})"
+            )
