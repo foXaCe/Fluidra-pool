@@ -61,6 +61,9 @@
       "chlorinator_producing": {
         "name": "En production"
       },
+      "no_flow_alarm": {
+        "name": "Défaut absence de débit"
+      },
       "speed_input_high": {
         "name": "Entrée vitesse élevée"
       },

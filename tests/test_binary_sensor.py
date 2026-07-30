@@ -458,3 +458,50 @@ def test_chlorinator_alarm_last_known_absent_before_any_trustworthy_poll() -> No
     attrs = _chlorinator_alarm(_device(online=False, alarms=[PH_ALARM])).extra_state_attributes
     assert attrs["last_known_state"] is None
     assert attrs["last_known_at"] is None
+
+
+def test_no_flow_alarm_sensor_exposes_c28_state() -> None:
+    """E03 no-flow (c28) gets its own entity, not just a climate attribute (Issue #139)."""
+    sensor = FluidraHeatPumpAlarmBinarySensor(
+        _coord([_device(no_flow_alarm=True)]), SimpleNamespace(), POOL_ID, DEVICE_ID, "no_flow_alarm"
+    )
+    assert sensor.is_on is True
+    assert sensor.unique_id == f"{DOMAIN}_{POOL_ID}_{DEVICE_ID}_no_flow_alarm"
+
+
+async def test_setup_creates_both_heat_pump_alarm_sensors() -> None:
+    """A Z260iQ-family unit gets both the air-temperature and no-flow fault sensors."""
+    from types import SimpleNamespace as SN
+
+    device = {
+        "device_id": "HP-1",
+        "name": "Z250iQ",
+        "family": "Heat Pumps",
+        "type": "heat_pump",
+        "model": "Z250iQ",
+        "online": True,
+        "components": {},
+        "_identify_cache": {
+            "key": ("HP-1", "Heat Pumps", "Z250iQ", "heat_pump", ""),
+            "config": SN(
+                device_type="heat_pump",
+                features={"z260iq_mode": True},
+                components_range=25,
+                required_components=[0, 1, 2, 3],
+                entities=[],
+            ),
+        },
+    }
+    coordinator = MagicMock()
+    pool = {"id": POOL_ID, "name": "Pool", "devices": [device]}
+    coordinator.data = {POOL_ID: pool}
+    coordinator.last_update_success = True
+    coordinator.api = SimpleNamespace(cached_pools=[pool], get_pools=AsyncMock(return_value=[pool]))
+    added: list[Any] = []
+    entry = SimpleNamespace(
+        runtime_data=SimpleNamespace(coordinator=coordinator),
+        async_on_unload=lambda _u: None,
+    )
+    await async_setup_entry(MagicMock(), entry, MagicMock(side_effect=lambda e, *a, **k: added.extend(list(e))))
+    keys = {e._alarm_key for e in added if isinstance(e, FluidraHeatPumpAlarmBinarySensor)}
+    assert keys == {"air_temperature_alarm", "no_flow_alarm"}

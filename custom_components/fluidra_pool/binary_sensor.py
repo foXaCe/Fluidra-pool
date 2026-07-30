@@ -346,15 +346,18 @@ async def async_setup_entry(
             )
 
         # Z260iQ-family faults reported on their own registers (Issue #139).
+        # E03 no-flow (c28) was only ever an attribute on the climate entity, so it
+        # couldn't drive an automation — @Kal42 rightly flagged it as missing.
         if DeviceIdentifier.has_feature(device, "z260iq_mode"):
-            entities.append(
+            entities.extend(
                 FluidraHeatPumpAlarmBinarySensor(
                     coordinator,
                     coordinator.api,
                     pool_id,
                     device_id,
-                    "air_temperature_alarm",
+                    alarm_key,
                 )
+                for alarm_key in ("air_temperature_alarm", "no_flow_alarm")
             )
 
         # Victoria VS speed-preset dry-contact inputs (Issue #144).

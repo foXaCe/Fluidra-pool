@@ -61,6 +61,9 @@
       "chlorinator_producing": {
         "name": "Producing"
       },
+      "no_flow_alarm": {
+        "name": "No flow fault"
+      },
       "speed_input_high": {
         "name": "High speed input"
       },
