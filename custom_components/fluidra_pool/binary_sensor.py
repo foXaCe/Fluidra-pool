@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import (
@@ -9,7 +10,9 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.const import EntityCategory
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
@@ -106,6 +109,138 @@ class FluidraChlorinatorProducingBinarySensor(FluidraPoolEntity, BinarySensorEnt
         }
 
 
+class FluidraChlorinatorAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity):
+    """Binary sensor for active chlorinator alarms (e.g. "PUMPSTOP PH").
+
+    Fluidra's cloud reports per-device alarms in the raw ``status.alarms``
+    array returned by ``GET .../generic/devices?format=tree`` — not in any of
+    the numbered ``specific_components`` the rest of the integration scans,
+    so they are otherwise invisible to Home Assistant. Each entry has an
+    ``errorCode``, a ``default.title``/``default.text`` pair, and a boolean
+    ``value`` marking whether that specific alarm is currently active. The
+    coordinator copies this list verbatim onto ``device["alarms"]``.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the chlorinator alarm binary sensor."""
+        super().__init__(coordinator, pool_id, device_id)
+
+        self._attr_unique_id = f"fluidra_{self._device_id}_alarm"
+        self._attr_translation_key = "chlorinator_alarm"
+
+        # Last alarm state confirmed on a trustworthy (online) poll, frozen
+        # while the device stays offline. In-memory only — reset to None on
+        # every integration reload/HA restart until the next trustworthy
+        # poll (see _update_last_known).
+        self._last_known_state: bool | None = None
+        self._last_known_at: datetime | None = None
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available.
+
+        Mirrors the chlorinator measurement sensors, not the control
+        entities: bridged children can report ``online=False`` on a
+        transient MQTT_KEEP_ALIVE_TIMEOUT while polling keeps succeeding
+        (Issue #63) — the alarm state is diagnostic information like
+        pH/ORP/temperature, not a control surface, so it should keep
+        showing its last known value through those blips rather than
+        disappear exactly when an operator might want to check it.
+        """
+        return self.coordinator.last_update_success and bool(self.device_data)
+
+    def _active_alarms(self) -> list[dict[str, Any]]:
+        """Return the alarm entries whose ``value`` is currently truthy."""
+        alarms = self.device_data.get("alarms") or []
+        return [alarm for alarm in alarms if isinstance(alarm, dict) and alarm.get("value")]
+
+    def _poll_is_trustworthy(self) -> bool:
+        """Return True when this poll's ``alarms[]`` content can be trusted.
+
+        False whenever the coordinator update itself failed, or the device
+        reports ``online=False`` — Fluidra's cloud can keep serving a cached
+        ``alarms[]`` snapshot for a disconnected device (confirmed
+        2026-07-20 — PUMPSTOP PH stayed reported ``True`` for 8+ hours after
+        the chlorinator was physically powered off, alongside a frozen ORP
+        reading).
+        """
+        return self.coordinator.last_update_success and self.device_data.get("online") is not False
+
+    def _update_last_known(self) -> None:
+        """Snapshot the confirmed alarm state, once per trustworthy poll.
+
+        Kept separate from ``_handle_coordinator_update`` so it can be
+        exercised in tests without a real ``hass``/entity_id (which
+        ``async_write_ha_state`` — called by the base
+        ``_handle_coordinator_update`` — requires).
+        """
+        if self._poll_is_trustworthy():
+            self._last_known_state = bool(self._active_alarms())
+            self._last_known_at = dt_util.utcnow()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator.
+
+        Runs once per coordinator refresh (unlike ``is_on``/
+        ``extra_state_attributes``, which HA may read multiple times per
+        update), so this is the right place for the last-known-good
+        bookkeeping rather than a side effect inside those properties.
+        """
+        self._update_last_known()
+        super()._handle_coordinator_update()
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True when at least one alarm is active.
+
+        Returns None (unknown) whenever the current poll can't be trusted
+        (see ``_poll_is_trustworthy``) — neither True nor False can be
+        trusted from stale data, not even False, since that could hide an
+        alarm that was genuinely active in the last real read.
+        """
+        if not self._poll_is_trustworthy():
+            return None
+        return bool(self._active_alarms())
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional state attributes.
+
+        Only the first active alarm is surfaced as top-level attributes
+        (matching how the official app highlights one alarm at a time);
+        ``active_alarm_count`` tells you if there is more than one.
+
+        ``last_known_*`` and ``device_offline`` are always present so a
+        dashboard can show something better than a bare "unknown" while the
+        device is offline — e.g. "last known: no alarm, confirmed 12 min ago"
+        — since ``is_on`` deliberately refuses to guess from stale data.
+        """
+        active = self._active_alarms()
+        attributes: dict[str, Any] = {
+            "device_id": self._device_id,
+            "active_alarm_count": len(active),
+            "device_offline": self.device_data.get("online") is False,
+            "last_known_state": self._last_known_state,
+            "last_known_at": self._last_known_at.isoformat() if self._last_known_at else None,
+        }
+        if active:
+            first = active[0]
+            default = first.get("default") or {}
+            attributes["error_code"] = first.get("errorCode")
+            attributes["title"] = default.get("title")
+            attributes["text"] = default.get("text")
+        return attributes
+
+
 class FluidraPumpSpeedInputBinarySensor(FluidraPoolEntity, BinarySensorEntity):
     """Speed-preset dry-contact digital input on a Victoria VS pump (Issue #144).
 
@@ -196,6 +331,17 @@ async def async_setup_entry(
                     pool_id,
                     device_id,
                     production_component,
+                )
+            )
+
+            # Alarms live in the raw status tree (device["alarms"]), not in
+            # any specific_components feature, so every chlorinator gets this
+            # sensor unconditionally alongside the producing sensor.
+            entities.append(
+                FluidraChlorinatorAlarmBinarySensor(
+                    coordinator,
+                    pool_id,
+                    device_id,
                 )
             )
 

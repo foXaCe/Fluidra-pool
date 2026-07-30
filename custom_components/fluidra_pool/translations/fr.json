@@ -55,6 +55,9 @@
       "air_temperature_alarm": {
         "name": "Défaut température d'air"
       },
+      "chlorinator_alarm": {
+        "name": "Alarme"
+      },
       "chlorinator_producing": {
         "name": "En production"
       },
