@@ -873,12 +873,16 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     # *every* device struck out this cycle, which is the actual
                     # "nothing is coming through" signal (e.g. the DNS outage
                     # this was built for) rather than one quirky device.
-                    _LOGGER.warning(
-                        "No component data received for device %s after %d consecutive "
-                        "polls — device may be unreachable or not support live polling",
-                        device_id,
-                        strikes,
-                    )
+                    if strikes == EMPTY_COMPONENT_FETCH_THRESHOLD:
+                        # Log once, right when it crosses the threshold — not on
+                        # every subsequent poll, or a permanently-stuck device
+                        # (like the test-strip one above) spams a warning forever.
+                        _LOGGER.warning(
+                            "No component data received for device %s after %d consecutive "
+                            "polls — device may be unreachable or not support live polling",
+                            device_id,
+                            strikes,
+                        )
                     chronically_stuck.append(device_id)
             else:
                 self._empty_component_fetch_counts.pop(device_id, None)
