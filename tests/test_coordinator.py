@@ -10,7 +10,11 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
 
 from custom_components.fluidra_pool.api_resilience import FluidraConnectionError
-from custom_components.fluidra_pool.const import OFFLINE_GRACE_POLLS, STALE_DEVICE_THRESHOLD
+from custom_components.fluidra_pool.const import (
+    EMPTY_COMPONENT_FETCH_THRESHOLD,
+    OFFLINE_GRACE_POLLS,
+    STALE_DEVICE_THRESHOLD,
+)
 from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordinator
 from custom_components.fluidra_pool.device_registry import DeviceIdentifier
 
@@ -523,6 +527,136 @@ class TestOnlineDebounce:
         mock_api.poll_pool_device_statuses = AsyncMock(return_value={"D1": {"connectivity": {"connected": True}}})
         await coordinator._refresh_pool(pool, {})
         assert device["online"] is True  # immediate recovery
+
+
+class TestEmptyComponentFetchDetection:
+    """A device whose component fetch keeps coming back empty must eventually
+    surface as a real failure instead of silently freezing forever.
+
+    Reproduces the incident where a transient DNS failure tripped the API
+    circuit breaker; every per-component request then failed individually
+    inside _fetch_components_parallel (which only debug-logs those, so one bad
+    component can't sink an otherwise-fine poll), component_states came back
+    empty every cycle, and the sensors sat frozen on stale data for 6+ hours
+    with no repair issue, no reauth prompt, and no visible error anywhere —
+    only a manual Home Assistant restart fixed it.
+    """
+
+    def _pool(self, device_id: str = "D1") -> dict:
+        device = {"device_id": device_id, "name": "Chlorinator", "online": True, "components": {}}
+        return {"id": "pool_1", "name": "Pool", "devices": [device]}
+
+    async def test_tolerates_fewer_than_threshold_empty_fetches(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """A blip under the threshold must not raise — matches existing partial-failure tolerance."""
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value=None)
+        mock_api.get_component_state = AsyncMock(return_value=None)
+        pool = self._pool()
+
+        for _ in range(EMPTY_COMPONENT_FETCH_THRESHOLD - 1):
+            await coordinator._refresh_pool(pool, {})
+
+        assert coordinator._empty_component_fetch_counts["D1"] == EMPTY_COMPONENT_FETCH_THRESHOLD - 1
+
+    async def test_raises_after_threshold_consecutive_empty_fetches(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """Hitting the threshold must raise FluidraConnectionError so it reaches _async_update_data."""
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value=None)
+        mock_api.get_component_state = AsyncMock(return_value=None)
+        pool = self._pool()
+
+        for _ in range(EMPTY_COMPONENT_FETCH_THRESHOLD - 1):
+            await coordinator._refresh_pool(pool, {})
+
+        with pytest.raises(FluidraConnectionError, match="No component data received"):
+            await coordinator._refresh_pool(pool, {})
+
+    async def test_successful_fetch_resets_the_strike_counter(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """A single good poll between blips must reset the streak, not accumulate towards it."""
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value=None)
+        mock_api.get_component_state = AsyncMock(return_value=None)
+        pool = self._pool()
+
+        for _ in range(EMPTY_COMPONENT_FETCH_THRESHOLD - 1):
+            await coordinator._refresh_pool(pool, {})
+        assert "D1" in coordinator._empty_component_fetch_counts
+
+        mock_api.get_component_state = AsyncMock(return_value={"reportedValue": 1})
+        await coordinator._refresh_pool(pool, {})
+        assert "D1" not in coordinator._empty_component_fetch_counts
+
+    async def test_end_to_end_surfaces_as_connection_repair_issue(self, hass: HomeAssistant, mock_api: AsyncMock):
+        """The whole path: coordinator._async_update_data must count this towards
+        CONNECTION_ISSUE_THRESHOLD, exactly like a raw network failure would —
+        this is the actual bug fix, not just the low-level counter."""
+        mock_api.ensure_valid_token = AsyncMock(return_value=True)
+        mock_api.get_pools = AsyncMock(
+            return_value=[
+                {
+                    "id": "pool_1",
+                    "name": "Pool",
+                    "devices": [{"device_id": "D1", "name": "Chlorinator", "online": True, "components": {}}],
+                }
+            ]
+        )
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value=None)
+        mock_api.get_component_state = AsyncMock(return_value=None)
+        coord = FluidraDataUpdateCoordinator(hass, mock_api)
+
+        await coord._async_update_data()  # first update: minimal, no component fetch yet
+
+        for _ in range(EMPTY_COMPONENT_FETCH_THRESHOLD):
+            await coord._async_update_data()
+
+        assert coord._consecutive_update_failures > 0
+
+    async def test_one_chronically_stuck_device_does_not_block_healthy_ones(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """Reproduces the standardTestStrip incident (2026-07-30): a pool can contain
+        a virtual/manual-input pseudo device (e.g. a photo-based test-strip entry)
+        that never answers component polls by design, alongside real hardware that
+        polls fine. That one permanently-stuck device must not raise and revert the
+        whole pool's refresh — the healthy device's fresh data must survive, and no
+        exception should propagate as long as at least one device got real data.
+        """
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value=None)
+
+        async def fake_component_state(device_id: str, component_id: int):
+            return None if device_id == "STUCK" else {"reportedValue": 42}
+
+        mock_api.get_component_state = AsyncMock(side_effect=fake_component_state)
+
+        pool = {
+            "id": "pool_1",
+            "name": "Pool",
+            "devices": [
+                {"device_id": "STUCK", "name": "Test Strip", "online": True, "components": {}},
+                {"device_id": "HEALTHY", "name": "Chlorinator", "online": True, "components": {}},
+            ],
+        }
+
+        for _ in range(EMPTY_COMPONENT_FETCH_THRESHOLD + 2):
+            await coordinator._refresh_pool(pool, {})  # must not raise
+
+        assert coordinator._empty_component_fetch_counts["STUCK"] >= EMPTY_COMPONENT_FETCH_THRESHOLD
+        assert "HEALTHY" not in coordinator._empty_component_fetch_counts
+        healthy_device = next(d for d in pool["devices"] if d["device_id"] == "HEALTHY")
+        assert healthy_device["components"]
 
 
 class TestUnverifiedProfileIssue:

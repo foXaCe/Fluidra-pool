@@ -70,6 +70,23 @@ HEAT_COOL_ACTION_DEADBAND: Final = 2.0
 # Recovery is immediate on the first online report.
 OFFLINE_GRACE_POLLS: Final = 2
 
+# A device's component fetch (_fetch_components) can come back completely
+# empty every poll — e.g. every per-component request failing individually —
+# without ever raising: _fetch_components_parallel catches each task's
+# exception via asyncio.gather(return_exceptions=True) and only debug-logs it
+# (a single bad component must not sink the whole poll). That's correct for an
+# occasional partial miss, but if it happens for every requested component on
+# every poll, the device's sensors silently freeze on stale data forever: no
+# exception ever reaches _async_update_data, so _note_update_failure() is never
+# called, no connection_error repair issue is raised, and the entities keep
+# reporting "successful" stale state indefinitely. This threshold bounds how
+# many consecutive fully-empty polls a device gets before that silence is
+# turned into a real failure that surfaces to the user (see coordinator.py
+# _refresh_pool). Observed in the wild: a transient DNS failure tripped the
+# circuit breaker, and a device sat frozen for 6+ hours with zero visible
+# error until a manual HA restart.
+EMPTY_COMPONENT_FETCH_THRESHOLD: Final = 3
+
 # Attributes
 ATTR_BRIGHTNESS: Final = "brightness"
 
