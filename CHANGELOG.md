@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.70.0] - 2026-07-29
+
+### Added
+- **Chlorinator alarm sensor** (Issue #163, PR #170, @luistf76) — the alarms Fluidra's cloud reports for a chlorinator (e.g. a stopped pH pump) were only visible in the official app. They now appear as a problem sensor, with the error code and description as attributes. It deliberately reports *unknown* rather than "no alarm" when the device is offline, because the cloud keeps serving a cached alarm snapshot for disconnected equipment — the last confirmed state stays available as an attribute so a dashboard can still show something useful.
+- **No-flow fault sensor for Z250iQ / Z260iQ heat pumps** (Issue #139, @Kal42) — error **E03** (no water flow) was already detected but only surfaced as an attribute of the climate entity, so it couldn't trigger an automation. It now has its own problem sensor, alongside the air-temperature fault added in v2.69.0.
+
 ### Fixed
-- **AstralPool Energy Connect chlorinator `CC26027341`** — the unit fell back to the generic profile, which read the water temperature (c172) as pH (2.59-2.60 instead of 25.9-26.0 °C) and did not surface a working ORP/salinity reading matching the app. Added to the Energy Connect tecnoLC2 profile: pH (c165), ORP (c170) and salinity (c174) now report live values matching the Fluidra app. This unit's c8 was non-blank (720), so the automatic tecnoLC2-signature detection never routed it here on its own.
+- **AstralPool Energy Connect chlorinator `CC26027341`** (PR #171, @fredfrazao) — the unit fell back to the generic profile, which read the water temperature (c172) as pH (2.59-2.60 instead of 25.9-26.0 °C) and did not surface a working ORP/salinity reading matching the app. Added to the Energy Connect tecnoLC2 profile: pH (c165), ORP (c170) and salinity (c174) now report live values matching the Fluidra app. This unit's c8 was non-blank (720), so the automatic tecnoLC2-signature detection never routed it here on its own.
 
 ## [2.69.0] - 2026-07-28
 
