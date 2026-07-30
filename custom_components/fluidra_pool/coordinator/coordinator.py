@@ -864,8 +864,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     # silently keeping stale data forever (Issue: sensors frozen 6h+
                     # after a transient DNS failure, with no visible error anywhere).
                     raise FluidraConnectionError(
-                        f"No component data received for device {device_id} after "
-                        f"{strikes} consecutive polls"
+                        f"No component data received for device {device_id} after {strikes} consecutive polls"
                     )
             else:
                 self._empty_component_fetch_counts.pop(device_id, None)

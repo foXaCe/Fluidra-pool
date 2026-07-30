@@ -595,9 +595,7 @@ class TestEmptyComponentFetchDetection:
         await coordinator._refresh_pool(pool, {})
         assert "D1" not in coordinator._empty_component_fetch_counts
 
-    async def test_end_to_end_surfaces_as_connection_repair_issue(
-        self, hass: HomeAssistant, mock_api: AsyncMock
-    ):
+    async def test_end_to_end_surfaces_as_connection_repair_issue(self, hass: HomeAssistant, mock_api: AsyncMock):
         """The whole path: coordinator._async_update_data must count this towards
         CONNECTION_ISSUE_THRESHOLD, exactly like a raw network failure would —
         this is the actual bug fix, not just the low-level counter."""
