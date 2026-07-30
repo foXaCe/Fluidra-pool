@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.70.1] - 2026-07-30
+
 ### Fixed
-- **A device whose component fetch keeps failing now surfaces a real error instead of freezing silently forever** (@fredfrazao) — `_fetch_components_parallel` catches each per-component request's exception via `asyncio.gather(return_exceptions=True)` and only debug-logs it, so one bad component can't sink an otherwise-healthy poll (by design). But if *every* requested component fails on *every* poll, that same swallowing meant the failure never reached the coordinator's own failure tracking: no `connection_error` repair issue, no reauth prompt, nothing — the device's sensors just kept reporting their last successfully-fetched state, indefinitely, with zero visible sign anything was wrong. Found via a real incident: a transient DNS failure tripped the API circuit breaker, and a chlorinator sat frozen on stale data for 6+ hours until a manual Home Assistant restart. Now tracks consecutive fully-empty component fetches per device and raises after 3 in a row, so it's treated exactly like a raw network failure and surfaces normally.
+- **Sensors could freeze on old values indefinitely after a network problem** (PR #172, @fredfrazao). If every component read for a device kept failing — as happened after a brief DNS outage tripped the API circuit breaker — the integration had no way to tell "nothing changed" from "everything is broken". The affected device's sensors quietly kept showing their last known values, with no error, no repair notification and no reauthentication prompt; only restarting Home Assistant recovered it (observed frozen for 6+ hours). Repeated empty reads for a device are now treated as the failure they are, so the usual connection warning appears instead of stale data pretending to be current.
 
 ## [2.70.0] - 2026-07-29
 
