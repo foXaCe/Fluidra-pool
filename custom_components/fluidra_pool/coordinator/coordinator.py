@@ -17,7 +17,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from ..api_resilience import FluidraError
+from ..api_resilience import FluidraConnectionError, FluidraError
 from ..const import (
     BULK_FETCH_FAILURE_LIMIT,
     CONNECTION_ISSUE_THRESHOLD,
@@ -26,6 +26,7 @@ from ..const import (
     DEVICE_TYPE_HEAT_PUMP,
     DEVICE_TYPE_LIGHT,
     DOMAIN,
+    EMPTY_COMPONENT_FETCH_THRESHOLD,
     OFFLINE_GRACE_POLLS,
     PUMP_SPEED_PERCENTAGES,
     STALE_DEVICE_THRESHOLD,
@@ -62,6 +63,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._missing_device_counts: dict[str, int] = {}
         # Consecutive offline connectivity reports per device (Issue #140 debounce).
         self._offline_poll_counts: dict[str, int] = {}
+        # Consecutive fully-empty component fetches per device — see
+        # EMPTY_COMPONENT_FETCH_THRESHOLD for why this must not stay silent.
+        self._empty_component_fetch_counts: dict[str, int] = {}
         # Skip heavy polling on first update for faster startup.
         self._first_update = True
         # Consecutive failed poll cycles; drives the connection_error repair issue.
@@ -850,6 +854,22 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 component_range = DeviceIdentifier.get_components_range(device)
                 components_to_scan = list(range(component_range))
             component_states = await self._fetch_components(device_id, components_to_scan)
+
+            if components_to_scan and not component_states:
+                strikes = self._empty_component_fetch_counts.get(device_id, 0) + 1
+                self._empty_component_fetch_counts[device_id] = strikes
+                if strikes >= EMPTY_COMPONENT_FETCH_THRESHOLD:
+                    # Every individual component request failed again: raise so this
+                    # propagates to _async_update_data's per-pool handler instead of
+                    # silently keeping stale data forever (Issue: sensors frozen 6h+
+                    # after a transient DNS failure, with no visible error anywhere).
+                    raise FluidraConnectionError(
+                        f"No component data received for device {device_id} after "
+                        f"{strikes} consecutive polls"
+                    )
+            else:
+                self._empty_component_fetch_counts.pop(device_id, None)
+
             for component_id, component_state in component_states.items():
                 self._process_component_state(device, pool_id, component_id, component_state)
 
