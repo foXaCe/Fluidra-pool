@@ -203,8 +203,20 @@ async def test_setup_creates_producing_sensor_only_when_feature_present() -> Non
 
     uids = {e.unique_id for e in added}
     assert "fluidra_dev1_producing" in uids
-    assert not any("dev2" in u for u in uids)
+    assert "fluidra_dev2_producing" not in uids
     assert listeners, "a coordinator update listener must be registered for dynamic devices"
+
+
+async def test_setup_creates_alarm_sensor_regardless_of_production_feature() -> None:
+    """The alarm sensor lives in the raw status tree, not cell_production_state -- every
+    chlorinator gets it, even ones that never report cell production (Issue #163 follow-up
+    to CodeRabbit finding: the alarm sensor was previously nested inside the
+    production_component guard and silently skipped for these devices)."""
+    without_feature = _pinned_chlorinator("dev1", production_component=None)
+    added, _, _ = await _run_setup([without_feature])
+
+    uids = {e.unique_id for e in added}
+    assert uids == {"fluidra_dev1_alarm"}
 
 
 async def test_setup_adds_new_device_dynamically() -> None:

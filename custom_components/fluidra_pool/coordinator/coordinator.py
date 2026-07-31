@@ -802,13 +802,20 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if isinstance(schedulers, list):
                 pool["schedulers"] = schedulers
 
-        # Preserve previous component data with deep copy to avoid aliasing.
+        # Preserve previous component and alarm data with deep copy to avoid
+        # aliasing. Alarms are seeded from the last known state so that a
+        # failed poll_pool_device_statuses call, or a status tree that omits
+        # this device for a cycle, doesn't overwrite an active alarm with an
+        # empty list -- it's overwritten below with fresh data whenever the
+        # status poll actually returns something for this device.
         for device in pool.get("devices", []):
             device_id = device.get("device_id")
             if device_id and device_id in prev_devices_by_id:
                 prev_device = prev_devices_by_id[device_id]
                 if "components" in prev_device:
                     device["components"] = copy.deepcopy(prev_device["components"])
+                if "alarms" in prev_device:
+                    device["alarms"] = copy.deepcopy(prev_device["alarms"])
 
         devices_with_ids = [(d, d.get("device_id")) for d in pool.get("devices", []) if d.get("device_id")]
         if devices_with_ids:
