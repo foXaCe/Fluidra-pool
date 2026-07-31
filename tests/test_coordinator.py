@@ -774,3 +774,58 @@ class TestUnverifiedProfileIssue:
             delete.assert_called_once_with(coordinator.hass, "ZZ99999999.nn_1")
 
         assert coordinator._unverified_profile_flagged == set()
+
+
+class TestAlarmPreservation:
+    """A failed or partial device-status poll must not silently clear an active
+    alarm (CodeRabbit finding on PR #170, mirrors how `components` was already
+    preserved from `prev_devices_by_id` -- `alarms` had the same gap)."""
+
+    async def test_failed_status_poll_preserves_previous_alarms(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """poll_pool_device_statuses raising must not wipe an active alarm."""
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(side_effect=FluidraConnectionError("cloud down"))
+        device = {"device_id": "D1", "name": "Chlorinator", "online": True, "components": {}}
+        pool = {"id": "pool_1", "name": "Pool", "devices": [device]}
+        prev_device = {"device_id": "D1", "alarms": [{"error_code": 42, "title": "PUMPSTOP PH"}]}
+        previous_data = {"pool_1": {"devices": [prev_device]}}
+
+        await coordinator._refresh_pool(pool, previous_data)
+
+        assert device["alarms"] == [{"error_code": 42, "title": "PUMPSTOP PH"}]
+
+    async def test_status_missing_for_device_preserves_previous_alarms(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """A response that omits this device's entry must not read as 'no alarms'."""
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        # Statuses come back, but with no entry at all for D1 this cycle.
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value={})
+        device = {"device_id": "D1", "name": "Chlorinator", "online": True, "components": {}}
+        pool = {"id": "pool_1", "name": "Pool", "devices": [device]}
+        prev_device = {"device_id": "D1", "alarms": [{"error_code": 42, "title": "PUMPSTOP PH"}]}
+        previous_data = {"pool_1": {"devices": [prev_device]}}
+
+        await coordinator._refresh_pool(pool, previous_data)
+
+        assert device["alarms"] == [{"error_code": 42, "title": "PUMPSTOP PH"}]
+
+    async def test_successful_status_poll_still_overwrites_alarms(
+        self, coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+    ):
+        """A successful poll must still replace stale alarms with fresh data (including clearing them)."""
+        mock_api.get_pool_details = AsyncMock(return_value={})
+        mock_api.poll_water_quality = AsyncMock(return_value=None)
+        mock_api.poll_pool_device_statuses = AsyncMock(return_value={"D1": {"alarms": []}})
+        device = {"device_id": "D1", "name": "Chlorinator", "online": True, "components": {}}
+        pool = {"id": "pool_1", "name": "Pool", "devices": [device]}
+        prev_device = {"device_id": "D1", "alarms": [{"error_code": 42, "title": "PUMPSTOP PH"}]}
+        previous_data = {"pool_1": {"devices": [prev_device]}}
+
+        await coordinator._refresh_pool(pool, previous_data)
+
+        assert device["alarms"] == []

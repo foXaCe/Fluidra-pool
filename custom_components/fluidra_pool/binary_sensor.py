@@ -14,7 +14,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, FluidraPoolConfigEntry
+from .const import DEVICE_TYPE_CHLORINATOR, DOMAIN, FluidraPoolConfigEntry
 from .device_registry import DeviceIdentifier
 from .entity import FluidraPoolEntity
 from .platform_setup import async_setup_dynamic_platform
@@ -334,9 +334,12 @@ async def async_setup_entry(
                 )
             )
 
-            # Alarms live in the raw status tree (device["alarms"]), not in
-            # any specific_components feature, so every chlorinator gets this
-            # sensor unconditionally alongside the producing sensor.
+        # Alarms live in the raw status tree (device["alarms"]), not in any
+        # specific_components feature, so every chlorinator gets this sensor
+        # regardless of which feature registers its profile declares.
+        config = DeviceIdentifier.identify_device(device)
+        device_type = config.device_type if config else device.get("type", "")
+        if device_type == DEVICE_TYPE_CHLORINATOR:
             entities.append(
                 FluidraChlorinatorAlarmBinarySensor(
                     coordinator,
