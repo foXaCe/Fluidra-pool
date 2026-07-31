@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.70.2] - 2026-07-31
+
+### Fixed
+- **The chlorinator alarm sensor was missing on almost every chlorinator** (PR #173, @luistf76). The sensor added in v2.70.0 was accidentally created only for the two profiles that also report cell production, so 50 of the 52 chlorinator profiles never got it. It is now created for every chlorinator, as intended.
+- **An active alarm could be cleared by a failed status poll** (PR #173, @luistf76). If the cloud request that carries the alarm list failed or came back without that device, the alarm silently reset to "no alarm" instead of keeping the last known state — the same stale-data trap the sensor's offline guard already protects against. Alarms are now preserved across a failed poll, exactly like the component readings already were.
+
 ## [2.70.1] - 2026-07-30
 
 ### Fixed
