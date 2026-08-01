@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.71.0] - 2026-08-01
+
+### Added
+- **Easier reporting of unsupported features** (Issues #174/#175). When debug logging is enabled, the integration now lists once per device the registers your equipment reports but no profile understands, with their current values. If a feature works in the Fluidra app but is missing in Home Assistant, enabling debug logging and toggling that feature in the app makes the responsible register visible directly — much quicker than sending several diagnostics exports that can only contain the already-supported values.
+
 ## [2.70.3] - 2026-08-01
 
 ### Fixed
