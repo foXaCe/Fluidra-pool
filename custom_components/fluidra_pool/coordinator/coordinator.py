@@ -79,6 +79,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # the same account answer it fine (Issue #175), and a shared counter was
         # reset by their successes so the unsupported one was retried every poll.
         self._bulk_fetch_failures: dict[str, int] = {}
+        # Devices whose unmapped registers have already been dumped at DEBUG — see
+        # _log_unmapped_components; log once per session, not on every poll.
+        self._unmapped_logged: set[str] = set()
 
         # Honour the user-configured polling interval.
         scan_interval = DEFAULT_SCAN_INTERVAL
@@ -212,6 +215,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # carries every register, and processing unrequested ones would feed
                 # the per-family decoders components they don't expect.
                 wanted = set(components_to_scan)
+                self._log_unmapped_components(device_id, bulk, wanted)
                 return {cid: state for cid, state in bulk.items() if cid in wanted}
 
             failures = self._bulk_fetch_failures.get(device_id, 0) + 1
@@ -225,6 +229,31 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 )
 
         return await self._fetch_components_parallel(device_id, components_to_scan)
+
+    def _log_unmapped_components(self, device_id: str, bulk: dict[int, dict[str, Any]], wanted: set[int]) -> None:
+        """Log, once per device, the registers the bulk response carries but no profile maps.
+
+        Adding support for a missing feature (a boost mode, an aux output, a
+        schedule slot) means finding which register carries it, and the bulk
+        endpoint already returns every one of them — they're just filtered out.
+        Dumping the unmapped ones at DEBUG turns "enable debug logging and toggle
+        the feature in the app" into a complete answer, instead of asking users
+        for repeated diagnostics exports that only ever contain the registers we
+        already know about (Issues #174/#175, where every requested register was
+        unrelated to the missing boost/aux/schedule features).
+        """
+        if not _LOGGER.isEnabledFor(logging.DEBUG) or device_id in self._unmapped_logged:
+            return
+        self._unmapped_logged.add(device_id)
+        unmapped = {cid: bulk[cid].get("reportedValue") for cid in sorted(bulk) if cid not in wanted}
+        if unmapped:
+            _LOGGER.debug(
+                "Device %s reports %d component(s) no profile maps — toggle a missing "
+                "feature in the Fluidra app and compare to find its register: %s",
+                device_id,
+                len(unmapped),
+                unmapped,
+            )
 
     async def _fetch_components_parallel(
         self, device_id: str, components_to_scan: list[int]

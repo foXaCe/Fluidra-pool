@@ -8,6 +8,7 @@ request count forever.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -259,3 +260,51 @@ async def test_scheduler_fetch_failure_leaves_pool_usable(
     mock_api.get_pool_schedulers = AsyncMock(return_value=None)
     pool = await _refresh_with_device(coordinator, mock_api, _victoria_device())
     assert "schedulers" not in pool
+
+
+# --- unmapped-register discovery aid (Issues #174/#175) -------------------
+
+
+async def test_unmapped_components_logged_once_at_debug(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Registers the device reports but no profile maps are dumped at DEBUG.
+
+    Users asking for a missing feature (boost, aux, schedules) can enable debug
+    logging, toggle it in the app, and read off which register moved — instead of
+    sending diagnostics that only ever contain the already-known registers.
+    """
+    mock_api.get_all_components = AsyncMock(
+        return_value={9: {"reportedValue": 1}, 77: {"reportedValue": True}, 88: {"reportedValue": "AUTO"}}
+    )
+    with caplog.at_level(logging.DEBUG, logger="custom_components.fluidra_pool.coordinator.coordinator"):
+        await coordinator._fetch_components("DEV-1", [9])
+        await coordinator._fetch_components("DEV-1", [9])  # second poll must stay quiet
+
+    dumps = [r for r in caplog.records if "no profile maps" in r.getMessage()]
+    assert len(dumps) == 1, "should log once per device per session, not every poll"
+    message = dumps[0].getMessage()
+    assert "77" in message  # the unmapped ones
+    assert "88" in message
+    assert "'reportedValue'" not in message  # values, not raw wrappers
+
+
+async def test_unmapped_logging_skipped_when_everything_is_mapped(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Nothing to report when the profile already covers every register."""
+    mock_api.get_all_components = AsyncMock(return_value={9: {"reportedValue": 1}})
+    with caplog.at_level(logging.DEBUG, logger="custom_components.fluidra_pool.coordinator.coordinator"):
+        await coordinator._fetch_components("DEV-1", [9])
+    assert not [r for r in caplog.records if "no profile maps" in r.getMessage()]
+
+
+async def test_unmapped_logging_tracked_per_device(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Each device gets its own one-shot dump."""
+    mock_api.get_all_components = AsyncMock(return_value={9: {"reportedValue": 1}, 77: {"reportedValue": 2}})
+    with caplog.at_level(logging.DEBUG, logger="custom_components.fluidra_pool.coordinator.coordinator"):
+        await coordinator._fetch_components("DEV-1", [9])
+        await coordinator._fetch_components("DEV-2", [9])
+    assert len([r for r in caplog.records if "no profile maps" in r.getMessage()]) == 2
