@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.70.3] - 2026-08-01
+
+### Fixed
+- **Wasted repeated requests for devices that don't support the fast component fetch** (Issue #175, @Inervo). Some accounts include virtual devices (such as a manual test-strip entry) that reject the bulk endpoint introduced in v2.66.0. The integration is meant to give up on that endpoint per device after a few failures, but the counter was shared: every other device's success reset it, so the unsupported one was retried on every single poll forever. Each device now tracks its own failures, so it falls back once and stays there while everything else keeps the faster path.
+
 ## [2.70.2] - 2026-07-31
 
 ### Fixed
