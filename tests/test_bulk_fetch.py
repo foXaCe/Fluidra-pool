@@ -111,35 +111,76 @@ async def test_non_dict_bulk_result_falls_back(coordinator: FluidraDataUpdateCoo
     assert mock_api.get_component_state.await_count == 1
 
 
-async def test_bulk_disabled_after_repeated_failures(
+async def test_bulk_disabled_per_device_after_repeated_failures(
     coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
 ) -> None:
-    """After the failure limit the bulk endpoint is no longer attempted."""
+    """After the failure limit the bulk endpoint is no longer attempted for THAT device."""
     mock_api.get_all_components = AsyncMock(return_value=None)
     mock_api.get_component_state = AsyncMock(return_value={"reportedValue": 1})
 
     for _ in range(BULK_FETCH_FAILURE_LIMIT):
         await coordinator._fetch_components("DEV-1", [9])
 
-    assert coordinator._bulk_fetch_enabled is False
+    assert coordinator._bulk_fetch_failures["DEV-1"] == BULK_FETCH_FAILURE_LIMIT
     calls_so_far = mock_api.get_all_components.await_count
     await coordinator._fetch_components("DEV-1", [9])
-    # No further bulk attempts, but data still flows through the fallback.
+    # No further bulk attempts for it, but data still flows through the fallback.
     assert mock_api.get_all_components.await_count == calls_so_far
 
 
-async def test_bulk_success_resets_the_failure_streak(
+async def test_bulk_giving_up_on_one_device_does_not_affect_others(
     coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
 ) -> None:
-    """Transient failures must not accumulate towards disabling the bulk path."""
+    """A device that 404s the bulk endpoint must not disable it for the rest.
+
+    Issue #175: a virtual `standardTestStrip` device answers 404 while the real
+    hardware on the same account answers fine.
+    """
+
+    async def _bulk(device_id: str) -> dict | None:
+        return None if device_id == "STRIP" else {9: {"reportedValue": 1}}
+
+    mock_api.get_all_components = AsyncMock(side_effect=_bulk)
+    mock_api.get_component_state = AsyncMock(return_value={"reportedValue": 1})
+
+    for _ in range(BULK_FETCH_FAILURE_LIMIT + 2):
+        await coordinator._fetch_components("STRIP", [9])
+        await coordinator._fetch_components("REAL", [9])
+
+    # The healthy device keeps using the bulk path...
+    assert "REAL" not in coordinator._bulk_fetch_failures
+    # ...while the 404-ing one is capped and stops being retried.
+    assert coordinator._bulk_fetch_failures["STRIP"] == BULK_FETCH_FAILURE_LIMIT
+
+
+async def test_healthy_device_success_does_not_reset_another_devices_streak(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+) -> None:
+    """The regression itself: a shared counter was zeroed by other devices' successes,
+    so the unsupported device was retried on every poll forever (Issue #175)."""
+
+    async def _bulk(device_id: str) -> dict | None:
+        return None if device_id == "STRIP" else {9: {"reportedValue": 1}}
+
+    mock_api.get_all_components = AsyncMock(side_effect=_bulk)
+    mock_api.get_component_state = AsyncMock(return_value={"reportedValue": 1})
+
+    await coordinator._fetch_components("STRIP", [9])
+    await coordinator._fetch_components("REAL", [9])  # would previously reset the count
+    assert coordinator._bulk_fetch_failures["STRIP"] == 1
+
+
+async def test_bulk_success_resets_that_devices_failure_streak(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock
+) -> None:
+    """Transient failures must not accumulate towards giving up on the bulk path."""
     mock_api.get_all_components = AsyncMock(return_value=None)
     await coordinator._fetch_components("DEV-1", [9])
-    assert coordinator._bulk_fetch_failures == 1
+    assert coordinator._bulk_fetch_failures["DEV-1"] == 1
 
     mock_api.get_all_components = AsyncMock(return_value={9: {"reportedValue": 1}})
     await coordinator._fetch_components("DEV-1", [9])
-    assert coordinator._bulk_fetch_failures == 0
-    assert coordinator._bulk_fetch_enabled is True
+    assert "DEV-1" not in coordinator._bulk_fetch_failures
 
 
 # --- pool schedulers fetched only when a device needs them (Issue #144) ---

@@ -74,11 +74,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._read_only_pools_warned: set[str] = set()
         # Devices already flagged for an unverified profile — raise once, not every poll.
         self._unverified_profile_flagged: set[str] = set()
-        # Bulk component fetch (one request per device instead of N — Issue #144).
-        # Disabled for the session after repeated failures so an unsupported backend
-        # can't keep costing an extra request per device per poll.
-        self._bulk_fetch_enabled = True
-        self._bulk_fetch_failures = 0
+        # Consecutive bulk-fetch failures per device (Issue #144). Tracked per
+        # device, not globally: some devices 404 the bulk endpoint while others on
+        # the same account answer it fine (Issue #175), and a shared counter was
+        # reset by their successes so the unsupported one was retried every poll.
+        self._bulk_fetch_failures: dict[str, int] = {}
 
         # Honour the user-configured polling interval.
         scan_interval = DEFAULT_SCAN_INTERVAL
@@ -194,28 +194,34 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         that the fan-out created (Issue #63). It is *not* assumed to work: if it
         fails or returns an unusable payload we fall back to the per-component
         scan for this poll, and after BULK_FETCH_FAILURE_LIMIT consecutive failures
-        we stop attempting it for the rest of the session so a backend that doesn't
-        support it can't double our request count forever.
+        we stop attempting it *for that device* for the rest of the session.
+
+        The failure count is per device, not global: some devices answer the bulk
+        endpoint with a 404 while others on the same account answer it fine (Issue
+        #175 — a virtual ``standardTestStrip`` device does exactly this). A shared
+        counter was reset by every other device's success, so the unsupported one
+        was retried on every single poll forever.
         """
-        if self._bulk_fetch_enabled:
+        if self._bulk_fetch_failures.get(device_id, 0) < BULK_FETCH_FAILURE_LIMIT:
             bulk = await self.api.get_all_components(device_id)
             # Only trust a real id-keyed mapping: anything else counts as a failure
             # and falls through to the per-component scan.
             if isinstance(bulk, dict) and bulk:
-                self._bulk_fetch_failures = 0
+                self._bulk_fetch_failures.pop(device_id, None)
                 # Keep only what this device's profile asks for: the bulk response
                 # carries every register, and processing unrequested ones would feed
                 # the per-family decoders components they don't expect.
                 wanted = set(components_to_scan)
                 return {cid: state for cid, state in bulk.items() if cid in wanted}
 
-            self._bulk_fetch_failures += 1
-            if self._bulk_fetch_failures >= BULK_FETCH_FAILURE_LIMIT:
-                self._bulk_fetch_enabled = False
+            failures = self._bulk_fetch_failures.get(device_id, 0) + 1
+            self._bulk_fetch_failures[device_id] = failures
+            if failures == BULK_FETCH_FAILURE_LIMIT:
                 _LOGGER.info(
-                    "Bulk component fetch failed %d times in a row — falling back to "
-                    "per-component polling for this session",
-                    self._bulk_fetch_failures,
+                    "Bulk component fetch failed %d times in a row for device %s — "
+                    "using per-component polling for it for the rest of this session",
+                    failures,
+                    device_id,
                 )
 
         return await self._fetch_components_parallel(device_id, components_to_scan)
