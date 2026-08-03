@@ -787,10 +787,11 @@ class TestIdentifyDevice:
         specific = config.features["specific_components"]
         # ON/OFF (10), setpoint (12), water temp (13), compressor hours (39),
         # outdoor air (44) and power (48) all have a decoder + entity.
-        for component in (10, 12, 13, 39, 44, 48):
+        for component in (10, 12, 13, 32, 39, 44, 48):
             assert component in specific
         assert "sensor_power" in config.entities
         assert "sensor_compressor_hours" in config.entities
+        assert "sensor_compressor_modulation" in config.entities
         # Undecoded candidates must NOT be scanned.
         for undecoded in (31, 111, 130, 115, 116, 118):
             assert undecoded not in specific

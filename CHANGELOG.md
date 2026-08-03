@@ -13,9 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   history across full on/off cycles): climate entity (HVAC modes, Smart+/Smart/
   Ecosilence/Boost presets, target/water/air temperature), on/off switch,
   instantaneous power sensor (Watts), running-hours and compressor-running-hours
-  sensors, and a WiFi signal sensor. Only registers whose meaning is confirmed
-  are polled — the rest stay visible through the unmapped-register debug log
-  added in 2.71.0, for whoever decodes them next.
+  sensors, a compressor-modulation sensor (percent) and a WiFi signal sensor.
+  Only registers whose meaning is confirmed are polled — the rest stay visible
+  through the unmapped-register debug log added in 2.71.0, for whoever decodes
+  them next.
 
 ### Fixed
 - **`start_pump`/`stop_pump` hardcoded component 13 as the on/off register for

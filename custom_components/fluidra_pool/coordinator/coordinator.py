@@ -531,6 +531,12 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # profile's register map for the confidence note.
             if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
                 device["pump_power"] = int(reported_value)
+        elif component_id == 32 and DeviceIdentifier.has_feature(device, "z650iq_mode"):
+            device["component_32_data"] = component_state
+            # Compressor modulation level in percent — see the profile's
+            # register map for the confidence note.
+            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
+                device["compressor_modulation"] = int(reported_value)
         elif component_id == 44 and DeviceIdentifier.has_feature(device, "z650iq_mode"):
             device["component_44_data"] = component_state
             # Outdoor air on the Z650iQ — c40 is the evaporator temperature there.

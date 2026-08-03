@@ -186,6 +186,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             "sensor_compressor_hours",
             "sensor_wifi_signal",
             "sensor_power",
+            "sensor_compressor_modulation",
         ],
         features={
             "z260iq_mode": True,
@@ -209,13 +210,19 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             #   0  running hours         4  firmware       6/7 SKU/signature
             #   9  generic running flag  10 ON/OFF          12 setpoint (write)
             #  13  water temperature     14 preset/mode     28 no-flow alarm
-            #  39  compressor hours      44 outdoor air     48 power (W)
+            #  32  compressor modulation 39 compressor hrs  44 outdoor air
+            #  48  power (W)
             # Confirmed against the official app: c12 by writing, c13 (275 ==
             # 27.5 degC), c44 (395 == 39.5 degC) and c39's compressor counter
             # by reading. c48 tracked the compressor across a full day (3 W
             # idle, ~640 W at start-up, ~455-525 W settled) but is not
             # meter-verified — treat the absolute value as approximate.
-            "specific_components": [0, 4, 6, 7, 9, 10, 12, 13, 14, 28, 39, 44, 48],
+            # c32 is the compressor's modulation level in percent: 0 when it
+            # is off, and otherwise linear in the power draw at a consistent
+            # ~13 W per unit, from idling in the 30s up to 92-93 under a
+            # Boost/max-load test — a 0-100 range, not an arbitrary Hz figure.
+            # c31/c111 carry a coarser version of the same signal.
+            "specific_components": [0, 4, 6, 7, 9, 10, 12, 13, 14, 28, 32, 39, 44, 48],
         },
         priority=98,
         verified=True,

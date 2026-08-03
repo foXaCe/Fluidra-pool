@@ -360,6 +360,25 @@ async def test_component_44_air_temperature_for_z650iq(coordinator: FluidraDataU
     assert device["air_temperature"] == 39.5
 
 
+async def test_component_32_compressor_modulation_for_z650iq(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """c32 is the compressor modulation level (0 = compressor off)."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 32, {"reportedValue": 52})
+    assert device["compressor_modulation"] == 52
+
+    coordinator._process_component_state(device, "pool_001", 32, {"reportedValue": 0})
+    assert device["compressor_modulation"] == 0
+
+
+async def test_component_32_ignored_without_z650iq_mode(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c32 means something else on other families — don't decode it there."""
+    device = _pinned_device(device_type="heat_pump")
+    coordinator._process_component_state(device, "pool_001", 32, {"reportedValue": 52})
+    assert "compressor_modulation" not in device
+
+
 async def test_component_48_power_for_z650iq(coordinator: FluidraDataUpdateCoordinator) -> None:
     """c48 is the instantaneous power draw in Watts."""
     device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True})

@@ -13,6 +13,7 @@ from .base import FluidraPoolSensorBase, FluidraPoolSensorEntity
 from .chlorinator import FluidraChlorinatorSensor
 from .device import (
     FluidraCompressorHoursSensor,
+    FluidraCompressorModulationSensor,
     FluidraDeviceInfoSensor,
     FluidraLightBrightnessSensor,
     FluidraPumpActivitySensor,
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
 __all__ = [
     "FluidraChlorinatorSensor",
     "FluidraCompressorHoursSensor",
+    "FluidraCompressorModulationSensor",
     "FluidraDeviceInfoSensor",
     "FluidraLightBrightnessSensor",
     "FluidraPoolLocationSensor",
@@ -119,6 +121,9 @@ async def async_setup_entry(
 
         if DeviceIdentifier.should_create_entity(device, "sensor_compressor_hours"):
             entities.append(FluidraCompressorHoursSensor(coordinator, coordinator.api, pool_id, device_id))
+
+        if DeviceIdentifier.should_create_entity(device, "sensor_compressor_modulation"):
+            entities.append(FluidraCompressorModulationSensor(coordinator, coordinator.api, pool_id, device_id))
 
         if DeviceIdentifier.should_create_entity(device, "sensor_wifi_signal"):
             entities.append(FluidraWifiSignalSensor(coordinator, coordinator.api, pool_id, device_id))
