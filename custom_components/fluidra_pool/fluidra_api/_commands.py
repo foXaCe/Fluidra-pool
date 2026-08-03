@@ -26,11 +26,14 @@ class CommandsMixin(FluidraAPIBase):
     """Convenience commands wrapping ``control_device_component`` calls."""
 
     async def set_heat_pump_temperature(self, device_id: str, temperature: float) -> bool:
-        """Set heat pump target temperature on component 15 (setpoint × 10)."""
+        """Set heat pump target temperature on setpoint component (setpoint × 10)."""
         temperature_value = int(temperature * 10)
-        success = await self.control_device_component(device_id, COMPONENT_HEAT_PUMP_SETPOINT, temperature_value)
+        device = self.get_device_by_id(device_id)
+        setpoint_comp = COMPONENT_HEAT_PUMP_SETPOINT
+        if device:
+            setpoint_comp = DeviceIdentifier.get_feature(device, "setpoint_component", COMPONENT_HEAT_PUMP_SETPOINT)
+        success = await self.control_device_component(device_id, setpoint_comp, temperature_value)
         if success:
-            device = self.get_device_by_id(device_id)
             if device:
                 device["target_temperature"] = temperature
         return success
@@ -48,10 +51,23 @@ class CommandsMixin(FluidraAPIBase):
         device = self.get_device_by_id(device_id)
         return bool(device and DeviceIdentifier.get_feature(device, "victoria_vs_mode"))
 
+    def _heat_pump_on_off_component(self, device_id: str) -> int:
+        """Resolve the on/off component for a heat pump, honoring a per-family override.
+
+        This used to hardcode component 13 for every heat pump. That register
+        is the water temperature on the Z650iQ, so the write corrupted the
+        reading instead of switching the unit.
+        """
+        device = self.get_device_by_id(device_id)
+        if device:
+            component = DeviceIdentifier.get_feature(device, "on_off_component", COMPONENT_HEAT_PUMP_ONOFF)
+            return int(component)
+        return COMPONENT_HEAT_PUMP_ONOFF
+
     async def start_pump(self, device_id: str) -> bool:
         """Start pump using the correct component based on device type."""
         if self._is_heat_pump(device_id):
-            return await self.control_device_component(device_id, COMPONENT_HEAT_PUMP_ONOFF, 1)
+            return await self.control_device_component(device_id, self._heat_pump_on_off_component(device_id), 1)
 
         start_success = await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 1)
 
@@ -65,7 +81,7 @@ class CommandsMixin(FluidraAPIBase):
     async def stop_pump(self, device_id: str) -> bool:
         """Stop pump using the correct component based on device type."""
         if self._is_heat_pump(device_id):
-            return await self.control_device_component(device_id, COMPONENT_HEAT_PUMP_ONOFF, 0)
+            return await self.control_device_component(device_id, self._heat_pump_on_off_component(device_id), 0)
         return await self.control_device_component(device_id, COMPONENT_PUMP_ONOFF, 0)
 
     async def pause_pump(self, device_id: str) -> bool:

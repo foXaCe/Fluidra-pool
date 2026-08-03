@@ -86,16 +86,40 @@ async def test_start_pump_for_regular_pump_calls_pump_onoff_then_speed() -> None
 
 
 async def test_start_pump_for_heat_pump_calls_heat_pump_onoff_only() -> None:
-    """Heat pump: a single write to COMPONENT_HEAT_PUMP_ONOFF."""
+    """Heat pump: a single write to COMPONENT_HEAT_PUMP_ONOFF (the default on_off_component)."""
     api = _FakeAPI(is_heat_pump_device={"device_id": "HP-1"})
     with patch(
         "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.identify_device",
-        return_value=SimpleNamespace(device_type="heat_pump"),
+        return_value=SimpleNamespace(device_type="heat_pump", features={}),
     ):
         success = await api.start_pump("HP-1")
 
     assert success is True
     api.control_device_component.assert_awaited_once_with("HP-1", COMPONENT_HEAT_PUMP_ONOFF, 1)
+
+
+async def test_heat_pump_on_off_component_falls_back_when_device_unknown() -> None:
+    """No device in cache -> the historic default (component 13) is still used."""
+    api = _FakeAPI()
+    assert api._heat_pump_on_off_component("MISSING") == COMPONENT_HEAT_PUMP_ONOFF
+
+
+async def test_start_pump_respects_on_off_component_override() -> None:
+    """A family with a non-default on/off register (e.g. Z650iQ's c10) must use it.
+
+    start_pump/stop_pump used to hardcode COMPONENT_HEAT_PUMP_ONOFF (13) for
+    every heat pump — a live water-temperature register on the Z650iQ, so the
+    write silently corrupted the reading instead of turning the unit on/off.
+    """
+    api = _FakeAPI(is_heat_pump_device={"device_id": "HP-1"})
+    with patch(
+        "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.identify_device",
+        return_value=SimpleNamespace(device_type="heat_pump", features={"on_off_component": 10}),
+    ):
+        success = await api.start_pump("HP-1")
+
+    assert success is True
+    api.control_device_component.assert_awaited_once_with("HP-1", 10, 1)
 
 
 async def test_start_pump_returns_false_when_initial_write_fails() -> None:
@@ -117,10 +141,21 @@ async def test_stop_pump_routes_by_device_type() -> None:
     api = _FakeAPI(is_heat_pump_device={"device_id": "HP-1"})
     with patch(
         "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.identify_device",
-        return_value=SimpleNamespace(device_type="heat_pump"),
+        return_value=SimpleNamespace(device_type="heat_pump", features={}),
     ):
         await api.stop_pump("HP-1")
     api.control_device_component.assert_awaited_once_with("HP-1", COMPONENT_HEAT_PUMP_ONOFF, 0)
+
+
+async def test_stop_pump_respects_on_off_component_override() -> None:
+    """Same on_off_component override, on the stop path."""
+    api = _FakeAPI(is_heat_pump_device={"device_id": "HP-1"})
+    with patch(
+        "custom_components.fluidra_pool.fluidra_api._commands.DeviceIdentifier.identify_device",
+        return_value=SimpleNamespace(device_type="heat_pump", features={"on_off_component": 10}),
+    ):
+        await api.stop_pump("HP-1")
+    api.control_device_component.assert_awaited_once_with("HP-1", 10, 0)
 
 
 async def test_stop_pump_regular_pump_uses_pump_onoff() -> None:
