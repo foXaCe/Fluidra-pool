@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.73.0] - 2026-08-03
+
+### Added
+
+- **Zodiac eXO iQ: Boost, Low, Freeze protection and boost countdown** — the unmapped-register
+  logger paid off: @Inervo pinned each control by toggling it in the app and diffing the full
+  register dump, which isolated `c46` (boost), `c45` (Low), `c48` (freeze protection) and `c51`
+  (boost minutes remaining, 1438 on a fresh 24 h cycle). Boost had previously been marked
+  unsupported on the eXO because the first attempt targeted `c14`, which is unreadable there and
+  403s on write. Unlike the CC/tecnoLC2 units the eXO accepts boost while in AUTO, so its switch
+  no longer forces the unit to ON first — which would have silently dropped the user's mode
+  (Issue #175, @Inervo).
+
 ## [2.72.0] - 2026-08-03
 
 ### Added
