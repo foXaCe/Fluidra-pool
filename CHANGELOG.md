@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.71.1] - 2026-08-03
+
+### Fixed
+- **Schedules were being corrupted when changed from Home Assistant** (Issue #175, @Inervo). Enabling or disabling a schedule — or using the `set_schedule` action — could scramble its times, days and mode, with the damage carried back into the official Fluidra app. The integration rebuilt the whole schedule payload on every write, assuming one particular format; on equipment using a different one (such as the eXO iQ) that silently reset the mode and shifted the configured days. Toggling a schedule now changes only the on/off flag and leaves everything else exactly as the device reported it, and the `set_schedule` action writes whichever format your equipment actually uses.
+
 ## [2.71.0] - 2026-08-01
 
 ### Added
