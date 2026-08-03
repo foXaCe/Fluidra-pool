@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.72.0] - 2026-08-03
+
 ### Added
-- **Z650iQ heat pump support** — new device profile, added and reverse-engineered
+- **Z650iQ heat pump support** (PR #180, @jheizmann) — new device profile, added and reverse-engineered
   from ~24h of live-unit captures (bulk-fetch snapshots plus Home Assistant
   history across full on/off cycles): climate entity (HVAC modes, Smart+/Smart/
   Ecosilence/Boost presets, target/water/air temperature), on/off switch,
@@ -17,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Only registers whose meaning is confirmed are polled — the rest stay visible
   through the unmapped-register debug log added in 2.71.0, for whoever decodes
   them next.
+
+- **All active chlorinator alarms are now listed** (PR #179, @luistf76). The alarm sensor previously exposed only the first active alarm; it now also carries the complete list as an `active_alarms` attribute, so simultaneous alarms can all be identified. The existing single-alarm attributes are unchanged.
 
 ### Fixed
 - **`start_pump`/`stop_pump` hardcoded component 13 as the on/off register for
