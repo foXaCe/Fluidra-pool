@@ -413,6 +413,7 @@ def test_chlorinator_alarm_off_without_active_alarms() -> None:
     sensor = _chlorinator_alarm(_device(online=True, alarms=[cleared]))
     assert sensor.is_on is False
     assert sensor.extra_state_attributes["active_alarm_count"] == 0
+    assert sensor.extra_state_attributes["active_alarms"] == []
     assert "error_code" not in sensor.extra_state_attributes
 
 
@@ -423,6 +424,36 @@ def test_chlorinator_alarm_counts_multiple_and_surfaces_the_first() -> None:
     attrs = sensor.extra_state_attributes
     assert attrs["active_alarm_count"] == 2
     assert attrs["error_code"] == "PUMPSTOP_PH"
+    assert attrs["title"] == "pH dosing stop"
+    assert attrs["text"] == "pH pump stopped dosing"
+    assert attrs["active_alarms"] == [
+        {"error_code": "PUMPSTOP_PH", "title": "pH dosing stop", "text": "pH pump stopped dosing"},
+        {"error_code": "SALT_LOW", "title": "Low salt", "text": "Add salt"},
+    ]
+
+
+def test_chlorinator_alarm_active_alarms_covers_unlisted_error_codes() -> None:
+    """active_alarms doesn't assume a closed set of alarm types."""
+    third = {"errorCode": "SALT_HIGH", "default": {"title": "High salt", "text": "Salt too high"}, "value": True}
+    sensor = _chlorinator_alarm(_device(online=True, alarms=[PH_ALARM, third]))
+    attrs = sensor.extra_state_attributes
+    assert attrs["active_alarm_count"] == 2
+    assert attrs["active_alarms"] == [
+        {"error_code": "PUMPSTOP_PH", "title": "pH dosing stop", "text": "pH pump stopped dosing"},
+        {"error_code": "SALT_HIGH", "title": "High salt", "text": "Salt too high"},
+    ]
+
+
+def test_chlorinator_alarm_active_alarms_excludes_malformed_entries() -> None:
+    """Junk mixed in among valid alarms is excluded from active_alarms too."""
+    second = {"errorCode": "SALT_LOW", "default": {"title": "Low salt", "text": "Add salt"}, "value": True}
+    sensor = _chlorinator_alarm(_device(online=True, alarms=["junk", None, 42, {"no_value": 1}, PH_ALARM, second]))
+    attrs = sensor.extra_state_attributes
+    assert attrs["active_alarm_count"] == 2
+    assert attrs["active_alarms"] == [
+        {"error_code": "PUMPSTOP_PH", "title": "pH dosing stop", "text": "pH pump stopped dosing"},
+        {"error_code": "SALT_LOW", "title": "Low salt", "text": "Add salt"},
+    ]
 
 
 def test_chlorinator_alarm_ignores_malformed_entries() -> None:

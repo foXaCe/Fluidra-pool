@@ -162,6 +162,16 @@ class FluidraChlorinatorAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity)
         alarms = self.device_data.get("alarms") or []
         return [alarm for alarm in alarms if isinstance(alarm, dict) and alarm.get("value")]
 
+    @staticmethod
+    def _flatten_alarm(alarm: dict[str, Any]) -> dict[str, Any]:
+        """Flatten a raw alarm entry to the {error_code, title, text} shape."""
+        default = alarm.get("default") or {}
+        return {
+            "error_code": alarm.get("errorCode"),
+            "title": default.get("title"),
+            "text": default.get("text"),
+        }
+
     def _poll_is_trustworthy(self) -> bool:
         """Return True when this poll's ``alarms[]`` content can be trusted.
 
@@ -215,9 +225,16 @@ class FluidraChlorinatorAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity)
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional state attributes.
 
-        Only the first active alarm is surfaced as top-level attributes
-        (matching how the official app highlights one alarm at a time);
-        ``active_alarm_count`` tells you if there is more than one.
+        Only the first active alarm is surfaced as top-level ``error_code``/
+        ``title``/``text`` attributes (matching how the official app
+        highlights one alarm at a time, and kept for dashboard
+        compatibility); ``active_alarms`` carries the full flattened list so
+        multiple simultaneous alarms can be identified (follow-up to PR
+        #170), and ``active_alarm_count`` tells you its length.
+
+        ``active_alarms`` is always present, defaulting to ``[]`` — like
+        ``last_known_*``/``device_offline`` below — so the attribute's shape
+        never changes between updates.
 
         ``last_known_*`` and ``device_offline`` are always present so a
         dashboard can show something better than a bare "unknown" while the
@@ -228,16 +245,16 @@ class FluidraChlorinatorAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity)
         attributes: dict[str, Any] = {
             "device_id": self._device_id,
             "active_alarm_count": len(active),
+            "active_alarms": [self._flatten_alarm(alarm) for alarm in active],
             "device_offline": self.device_data.get("online") is False,
             "last_known_state": self._last_known_state,
             "last_known_at": self._last_known_at.isoformat() if self._last_known_at else None,
         }
         if active:
-            first = active[0]
-            default = first.get("default") or {}
-            attributes["error_code"] = first.get("errorCode")
-            attributes["title"] = default.get("title")
-            attributes["text"] = default.get("text")
+            first = self._flatten_alarm(active[0])
+            attributes["error_code"] = first["error_code"]
+            attributes["title"] = first["title"]
+            attributes["text"] = first["text"]
         return attributes
 
 
