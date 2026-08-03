@@ -183,6 +183,9 @@
       "air_temperature": {
         "name": "Air Temperature"
       },
+      "boost_remaining": {
+        "name": "Boost Remaining"
+      },
       "brightness": {
         "name": "Brightness"
       },
@@ -311,11 +314,17 @@
       "chlorinator": {
         "name": "Chlorinator"
       },
+      "freeze_protection": {
+        "name": "Freeze Protection"
+      },
       "heat_pump": {
         "name": "Heat Pump"
       },
       "heater": {
         "name": "Heater"
+      },
+      "low_mode": {
+        "name": "Low Mode"
       },
       "pump": {
         "name": "Pump"
@@ -432,6 +441,9 @@
     },
     "schedule_set_rejected": {
       "message": "Fluidra API rejected the schedule update for {device_id}"
+    },
+    "switch_set_failed": {
+      "message": "Failed to change the switch state"
     },
     "temperature_out_of_range": {
       "message": "Temperature {temperature}°C is out of range ({min_temp}°C - {max_temp}°C)"

@@ -15,6 +15,7 @@ from homeassistant.const import (
     EntityCategory,
     UnitOfElectricPotential,
     UnitOfTemperature,
+    UnitOfTime,
 )
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -27,6 +28,69 @@ if TYPE_CHECKING:
     from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class FluidraBoostRemainingSensor(FluidraPoolEntity, SensorEntity):
+    """Minutes left on a running boost cycle (eXO iQ c51).
+
+    The register counts down from the boost duration (1438 for a 24 h cycle)
+    and sits at 0 whenever boost is off — 0 is a real reading here, not a
+    missing one, so it is reported as-is rather than as unknown.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "boost_remaining"
+    _attr_icon = "mdi:timer-sand"
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the boost countdown sensor."""
+        super().__init__(coordinator, pool_id, device_id)
+        self._api = api
+        self._attr_unique_id = f"fluidra_{device_id}_boost_remaining"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        firmware = self.device_data.get("firmware_version_component")
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device_name,
+            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+            model="Chlorinator",
+            sw_version=str(firmware) if firmware is not None else None,
+            via_device=(DOMAIN, self._pool_id),
+        )
+
+    @property
+    def available(self) -> bool:
+        """Return True once the device has reported component data."""
+        return self.coordinator.last_update_success and bool(self.device_data.get("components"))
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the remaining boost minutes."""
+        component = DeviceIdentifier.get_feature(self.device_data, "boost_remaining", None)
+        if component is None:
+            return None
+        components = self.device_data.get("components", {})
+        raw = components.get(str(component), {}).get("reportedValue")
+        if raw is None:
+            return None
+        try:
+            return int(raw)
+        except (ValueError, TypeError):
+            _LOGGER.debug("Unparsable boost countdown value %s on component %s", raw, component)
+            return None
 
 
 class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):

@@ -16,7 +16,11 @@ from ..const import (
 from ..device_registry import DeviceIdentifier
 from ..platform_setup import async_setup_dynamic_platform
 from .base import FluidraPoolSwitchEntity
-from .chlorinator import FluidraChlorinatorBoostSwitch, FluidraChlorinatorSwitch
+from .chlorinator import (
+    FluidraChlorinatorBoostSwitch,
+    FluidraChlorinatorSwitch,
+    FluidraChlorinatorToggleSwitch,
+)
 from .heater import FluidraHeaterSwitch, FluidraHeatPumpSwitch
 from .pump import FluidraAutoModeSwitch, FluidraPumpSwitch
 from .schedule import FluidraScheduleEnableSwitch
@@ -29,6 +33,7 @@ __all__ = [
     "FluidraAutoModeSwitch",
     "FluidraChlorinatorBoostSwitch",
     "FluidraChlorinatorSwitch",
+    "FluidraChlorinatorToggleSwitch",
     "FluidraHeatPumpSwitch",
     "FluidraHeaterSwitch",
     "FluidraPoolSwitchEntity",
@@ -38,6 +43,12 @@ __all__ = [
 ]
 
 PARALLEL_UPDATES = 0  # Coordinator handles all updates
+
+# (profile feature, translation key, icon) for single-register boolean switches.
+TOGGLE_SWITCHES = (
+    ("low_mode", "low_mode", "mdi:speedometer-slow"),
+    ("freeze_protection", "freeze_protection", "mdi:snowflake-alert"),
+)
 
 
 async def async_setup_entry(
@@ -83,6 +94,21 @@ async def async_setup_entry(
 
         if DeviceIdentifier.has_feature(device, "boost_mode"):
             entities.append(FluidraChlorinatorBoostSwitch(coordinator, coordinator.api, pool_id, device_id))
+
+        # Plain boolean registers a profile can opt into by declaring the feature.
+        for feature, translation_key, icon in TOGGLE_SWITCHES:
+            if DeviceIdentifier.has_feature(device, feature):
+                entities.append(
+                    FluidraChlorinatorToggleSwitch(
+                        coordinator,
+                        coordinator.api,
+                        pool_id,
+                        device_id,
+                        feature,
+                        translation_key,
+                        icon,
+                    )
+                )
 
         return entities
 

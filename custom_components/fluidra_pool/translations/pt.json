@@ -183,6 +183,9 @@
       "air_temperature": {
         "name": "Temperatura do Ar"
       },
+      "boost_remaining": {
+        "name": "Turbo restante"
+      },
       "brightness": {
         "name": "Brilho"
       },
@@ -311,11 +314,17 @@
       "chlorinator": {
         "name": "Clorador"
       },
+      "freeze_protection": {
+        "name": "Proteção antigelo"
+      },
       "heat_pump": {
         "name": "Bomba de Calor"
       },
       "heater": {
         "name": "Aquecedor"
+      },
+      "low_mode": {
+        "name": "Modo Low"
       },
       "pump": {
         "name": "Bomba"
@@ -432,6 +441,9 @@
     },
     "schedule_set_rejected": {
       "message": "A API Fluidra rejeitou a atualização do programa para {device_id}"
+    },
+    "switch_set_failed": {
+      "message": "Falha ao alterar o estado do interruptor"
     },
     "temperature_out_of_range": {
       "message": "A temperatura {temperature}°C está fora do intervalo ({min_temp}°C - {max_temp}°C)"

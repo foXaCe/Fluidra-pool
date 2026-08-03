@@ -66,6 +66,8 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             return False
         if DeviceIdentifier.has_feature(self.device_data, "skip_mode_select"):
             return True
+        if not DeviceIdentifier.get_feature(self.device_data, "boost_requires_on_mode", True):
+            return True
         return self._get_current_mode() == "on"
 
     @property
@@ -103,6 +105,7 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
 
             if (
                 not DeviceIdentifier.has_feature(self.device_data, "skip_mode_select")
+                and DeviceIdentifier.get_feature(self.device_data, "boost_requires_on_mode", True)
                 and self._get_current_mode() != "on"
             ):
                 await self._api.control_device_component(self._device_id, mode_comp, on_value)
@@ -175,6 +178,111 @@ class FluidraChlorinatorBoostSwitch(FluidraPoolSwitchEntity):
             "component": boost_component,
             "device_id": self._device_id,
             "current_mode": self._get_current_mode(),
+            "pending_action": self._pending_state is not None,
+        }
+
+
+class FluidraChlorinatorToggleSwitch(FluidraPoolSwitchEntity):
+    """Generic on/off switch backed by a single boolean chlorinator register.
+
+    The component id comes from a device-profile feature, so a profile opts in
+    simply by declaring it (e.g. ``"low_mode": 45``). Used for the eXO iQ's Low
+    and Freeze-protection registers, which are plain booleans with no companion
+    mode handling — unlike boost, which may have to flip the unit to ON first.
+    """
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        feature: str,
+        translation_key: str,
+        icon: str,
+    ) -> None:
+        """Initialize the toggle around the register named by ``feature``."""
+        super().__init__(coordinator, api, pool_id, device_id)
+
+        self._feature = feature
+        self._attr_unique_id = f"fluidra_{self._device_id}_{translation_key}"
+        self._attr_translation_key = translation_key
+        self._attr_icon = icon
+
+    @property
+    def unique_id(self) -> str:
+        """Return unique ID (override base class to use _attr_unique_id)."""
+        return self._attr_unique_id or f"{DOMAIN}_{self._pool_id}_{self._device_id}_{self._feature}"
+
+    def _component(self) -> int | None:
+        """Return the register this switch drives, if the profile declares one."""
+        component = DeviceIdentifier.get_feature(self.device_data, self._feature, None)
+        return int(component) if component is not None else None
+
+    @property
+    def is_on(self) -> bool:
+        """Return the register state, honouring a pending optimistic write."""
+        components = self.device_data.get("components", {})
+        component_data = components.get(str(self._component()), {})
+        actual_state = bool(component_data.get("reportedValue", False))
+
+        if self._pending_state is not None:
+            if actual_state == self._pending_state or self._pending_state_expired(OPTIMISTIC_ACTION_TIMEOUT):
+                self._clear_pending_state()
+                return actual_state
+            return self._pending_state
+
+        return actual_state
+
+    async def _async_set(self, state: bool) -> None:
+        """Write ``state`` to the register with optimistic feedback."""
+        self._ensure_pool_writable()
+        component = self._component()
+        if component is None:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="switch_set_failed")
+
+        try:
+            self._set_pending_state(state)
+
+            success = await self._api.control_device_component(self._device_id, component, state)
+
+            if success:
+                await asyncio.sleep(SWITCH_CONFIRMATION_DELAY)
+                await self.coordinator.async_request_refresh()
+            else:
+                self._clear_pending_state()
+                raise HomeAssistantError(translation_domain=DOMAIN, translation_key="switch_set_failed")
+
+        except HomeAssistantError:
+            raise
+        except (
+            aiohttp.ClientError,
+            TimeoutError,
+            FluidraError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+        ) as err:
+            _LOGGER.debug("Failed to set %s to %s: %s", self._feature, state, err)
+            self._clear_pending_state()
+            self.async_write_ha_state()
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="switch_set_failed") from err
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the register on."""
+        await self._async_set(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the register off."""
+        await self._async_set(False)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional state attributes."""
+        return {
+            "component": self._component(),
+            "device_id": self._device_id,
             "pending_action": self._pending_state is not None,
         }
 

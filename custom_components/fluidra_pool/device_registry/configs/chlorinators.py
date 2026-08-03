@@ -938,7 +938,17 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "chlorination_level": 38,  # Production percentage (0-100%).
             "chlorination_max": 100,  # EXO uses 0-100% range.
             "chlorination_step": 5,  # Step 5% for EXO.
-            # boost_mode: NOT supported on EXO (c14 unreadable + API 403 on write).
+            # Boost/Low/Freeze live on c46/c45/c48, not on the c14 the first
+            # attempt used (c14 is unreadable here and 403s on write). Each was
+            # pinned by a capture where that register was the ONLY one to move
+            # while the feature was toggled in the app (Issue #175, @Inervo).
+            "boost_mode": 46,
+            "boost_remaining": 51,  # Minutes left, 1438 on a fresh 24 h boost.
+            # Unlike the CC/tecnoLC2 units, the eXO takes boost while it is in
+            # AUTO — forcing it to ON first would silently drop the user's mode.
+            "boost_requires_on_mode": False,
+            "low_mode": 45,
+            "freeze_protection": 48,
             "mode_component": 13,
             "mode_mapping": {0: "off", 1: "auto", 2: "on"},  # EXO: 1=AUTO (confirmed).
             "orp_setpoint": 39,  # mV — e.g. 770.
@@ -964,7 +974,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "orp": 63,  # mV — 738 = 738 mV.
                 "temperature": 64,  # Direct °C — 14 = 14°C.
             },
-            "specific_components": [9, 13, 14, 15, 17, 20, 35, 38, 39, 40, 62, 63, 64],
+            "specific_components": [9, 13, 14, 15, 17, 20, 35, 38, 39, 40, 45, 46, 48, 51, 62, 63, 64],
         },
         priority=85,
     ),

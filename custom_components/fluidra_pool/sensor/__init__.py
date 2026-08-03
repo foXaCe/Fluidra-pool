@@ -10,7 +10,7 @@ from ..const import DEVICE_TYPE_CHLORINATOR, FluidraPoolConfigEntry
 from ..device_registry import DeviceIdentifier
 from ..platform_setup import async_setup_dynamic_platform
 from .base import FluidraPoolSensorBase, FluidraPoolSensorEntity
-from .chlorinator import FluidraChlorinatorSensor
+from .chlorinator import FluidraBoostRemainingSensor, FluidraChlorinatorSensor
 from .device import (
     FluidraCompressorHoursSensor,
     FluidraCompressorModulationSensor,
@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 __all__ = [
+    "FluidraBoostRemainingSensor",
     "FluidraChlorinatorSensor",
     "FluidraCompressorHoursSensor",
     "FluidraCompressorModulationSensor",
@@ -132,6 +133,9 @@ async def async_setup_entry(
         config = DeviceIdentifier.identify_device(device)
         device_type = config.device_type if config else device.get("type", "")
         if device_type == DEVICE_TYPE_CHLORINATOR:
+            if DeviceIdentifier.has_feature(device, "boost_remaining"):
+                entities.append(FluidraBoostRemainingSensor(coordinator, coordinator.api, pool_id, device_id))
+
             sensors_config = DeviceIdentifier.get_feature(device, "sensors", {})
 
             for sensor_type in (

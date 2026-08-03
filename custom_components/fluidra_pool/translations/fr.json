@@ -183,6 +183,9 @@
       "air_temperature": {
         "name": "Température de l'Air"
       },
+      "boost_remaining": {
+        "name": "Boost restant"
+      },
       "brightness": {
         "name": "Luminosité"
       },
@@ -311,11 +314,17 @@
       "chlorinator": {
         "name": "Chlorinateur"
       },
+      "freeze_protection": {
+        "name": "Protection antigel"
+      },
       "heat_pump": {
         "name": "Pompe à Chaleur"
       },
       "heater": {
         "name": "Chauffage"
+      },
+      "low_mode": {
+        "name": "Mode Low"
       },
       "pump": {
         "name": "Pompe"
@@ -432,6 +441,9 @@
     },
     "schedule_set_rejected": {
       "message": "L'API Fluidra a refusé la mise à jour du programme pour {device_id}"
+    },
+    "switch_set_failed": {
+      "message": "Échec du changement d'état de l'interrupteur"
     },
     "temperature_out_of_range": {
       "message": "La température {temperature}°C est hors plage ({min_temp}°C - {max_temp}°C)"

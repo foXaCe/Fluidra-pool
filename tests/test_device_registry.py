@@ -859,8 +859,16 @@ class TestIdentifyDevice:
         # on_off_component removed - mode select (AUTO/ON/OFF) replaces ON/OFF switch
         assert config.features.get("on_off_component") is None
         assert config.features.get("chlorination_level") == 38
-        # boost_mode removed - API returns 403 + unreadable for EXO
-        assert config.features.get("boost_mode") is None
+        # Boost/Low/Freeze sit on c46/c45/c48, not the c14 the first attempt used
+        # (c14 is unreadable and 403s on write here) — Issue #175.
+        assert config.features.get("boost_mode") == 46
+        assert config.features.get("boost_remaining") == 51
+        assert config.features.get("low_mode") == 45
+        assert config.features.get("freeze_protection") == 48
+        # The eXO accepts boost while in AUTO, so the switch must not force ON.
+        assert config.features.get("boost_requires_on_mode") is False
+        for component in (45, 46, 48, 51):
+            assert component in config.features["specific_components"]
         assert config.features.get("mode_component") == 13
         assert config.features.get("schedules") is True
         assert config.features.get("orp_setpoint") == 39
