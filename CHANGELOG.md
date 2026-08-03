@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Z650iQ heat pump support** — new device profile, added and reverse-engineered
+  from ~24h of live-unit captures (bulk-fetch snapshots plus Home Assistant
+  history across full on/off cycles): climate entity (HVAC modes, Smart+/Smart/
+  Ecosilence/Boost presets, target/water/air temperature), on/off switch,
+  instantaneous power sensor (Watts), running-hours and compressor-running-hours
+  sensors, and a WiFi signal sensor. Only registers whose meaning is confirmed
+  are polled — the rest stay visible through the unmapped-register debug log
+  added in 2.71.0, for whoever decodes them next.
+
+### Fixed
+- **`start_pump`/`stop_pump` hardcoded component 13 as the on/off register for
+  every heat pump family.** That's a live water-temperature register on the
+  Z650iQ, so writing 0/1 to it silently corrupted the reading instead of
+  turning the unit on/off. Both now resolve the on/off component per-family
+  via a new `on_off_component` device-config feature (still defaults to
+  component 13 for existing families, so no behavior changes for them).
+
 ## [2.71.1] - 2026-08-03
 
 ### Fixed

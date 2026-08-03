@@ -351,7 +351,14 @@ async def async_setup_entry(
         # Z260iQ-family faults reported on their own registers (Issue #139).
         # E03 no-flow (c28) was only ever an attribute on the climate entity, so it
         # couldn't drive an automation — @Kal42 rightly flagged it as missing.
+        # Z650iQ uses c39 for compressor hours (not the air-temp alarm), so
+        # that alarm key is skipped for it — the coordinator never populates
+        # "air_temperature_alarm" for this family, which would otherwise leave
+        # a permanently-off, meaningless binary_sensor entity.
         if DeviceIdentifier.has_feature(device, "z260iq_mode"):
+            alarm_keys = ["no_flow_alarm"]
+            if not DeviceIdentifier.has_feature(device, "z650iq_mode"):
+                alarm_keys.append("air_temperature_alarm")
             entities.extend(
                 FluidraHeatPumpAlarmBinarySensor(
                     coordinator,
@@ -360,7 +367,7 @@ async def async_setup_entry(
                     device_id,
                     alarm_key,
                 )
-                for alarm_key in ("air_temperature_alarm", "no_flow_alarm")
+                for alarm_key in alarm_keys
             )
 
         # Victoria VS speed-preset dry-contact inputs (Issue #144).

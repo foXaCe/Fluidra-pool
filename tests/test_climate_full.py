@@ -43,6 +43,11 @@ from custom_components.fluidra_pool.const import (
     Z550_STATE_HEATING,
     Z550_STATE_IDLE,
     Z550_STATE_NO_FLOW,
+    Z650_PRESET_BOOST,
+    Z650_PRESET_ECOSILENCE,
+    Z650_PRESET_MODES,
+    Z650_PRESET_SMART,
+    Z650_PRESET_SMART_PLUS,
 )
 
 POOL_ID = "pool-1"
@@ -860,6 +865,88 @@ async def test_set_preset_mode_api_exception_wrapped() -> None:
     with pytest.raises(HomeAssistantError):
         await climate.async_set_preset_mode(LG_PRESET_SMART_HEATING)
     assert climate._pending_preset_mode is None
+
+
+# --- Z650iQ family (Issue: new profile) --------------------------------
+
+_Z650 = {"z650iq_mode": True, "z260iq_mode": True, "preset_modes": True}
+
+
+def test_z650iq_preset_modes_are_the_app_four() -> None:
+    """Z650iQ exposes its own four presets, not the seven LG ones."""
+    assert _make(_pin(features=_Z650)).preset_modes == Z650_PRESET_MODES
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (0, Z650_PRESET_SMART_PLUS),
+        (1, Z650_PRESET_BOOST),
+        (2, Z650_PRESET_SMART),
+        (3, Z650_PRESET_ECOSILENCE),
+    ],
+)
+def test_z650iq_preset_mode_from_component_14(raw: int, expected: str) -> None:
+    """c14 uses a different mapping than the Z260iQ (1=Cool/3=Heat there)."""
+    climate = _make(_pin(features=_Z650, components={"14": {"reportedValue": raw}}))
+    assert climate.preset_mode == expected
+
+
+def test_z650iq_preset_mode_defaults_without_component_14() -> None:
+    """No c14 reading yet -> fall back to the family default, not the LG one."""
+    assert _make(_pin(features=_Z650)).preset_mode == Z650_PRESET_SMART_PLUS
+
+
+def test_z650iq_preset_mode_unknown_raw_falls_back() -> None:
+    """An unmapped c14 value must not raise."""
+    climate = _make(_pin(features=_Z650, components={"14": {"reportedValue": 99}}))
+    assert climate.preset_mode == Z650_PRESET_SMART_PLUS
+
+
+async def test_z650iq_set_preset_mode_writes_component_14() -> None:
+    api = _api()
+    climate = _make(_pin(features=_Z650), api)
+    await climate.async_set_preset_mode(Z650_PRESET_BOOST)
+    api.control_device_component.assert_awaited_once_with(DEVICE_ID, 14, 1)
+
+
+async def test_z650iq_set_preset_mode_ignores_unknown_preset() -> None:
+    """An LG-only preset name is not writable on this family."""
+    api = _api()
+    climate = _make(_pin(features=_Z650), api)
+    await climate.async_set_preset_mode(LG_PRESET_SMART_HEATING)
+    api.control_device_component.assert_not_awaited()
+    assert climate._pending_preset_mode is None
+
+
+def test_extra_state_attributes_z650iq_branch() -> None:
+    """The Z650iQ branch reports coordinator-decoded values, not raw registers."""
+    climate = _make(
+        _pin(
+            features=_Z650,
+            heat_pump_reported=1,
+            water_temperature=27.5,
+            air_temperature=23.0,
+            running_hours=72,
+            compressor_running_hours=15,
+            pump_power=642,
+            signal_strength_component=-52,
+            firmware_version_component="1.5.0",
+            no_flow_alarm=False,
+            components={"14": {"reportedValue": 3}},
+        )
+    )
+    attrs = climate.extra_state_attributes
+    assert attrs["heat_pump_on"] is True
+    assert attrs["preset_mode_raw"] == 3
+    assert attrs["water_temperature"] == 27.5
+    assert attrs["air_temperature"] == 23.0
+    assert attrs["running_hours"] == 72
+    assert attrs["compressor_running_hours"] == 15
+    assert attrs["power_w"] == 642
+    assert attrs["rssi_dbm"] == -52
+    assert attrs["firmware"] == "1.5.0"
+    assert attrs["no_flow_alarm"] is False
 
 
 # --- extra_state_attributes --------------------------------------------

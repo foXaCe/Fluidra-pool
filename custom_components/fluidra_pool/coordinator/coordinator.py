@@ -20,6 +20,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from ..api_resilience import FluidraConnectionError, FluidraError
 from ..const import (
     BULK_FETCH_FAILURE_LIMIT,
+    COMPONENT_HEAT_PUMP_SETPOINT,
     CONNECTION_ISSUE_THRESHOLD,
     DEFAULT_SCAN_INTERVAL,
     DEVICE_TYPE_CHLORINATOR,
@@ -319,7 +320,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if bc_info_layout:
                 if not DeviceIdentifier.has_feature(device, "skip_signal"):
                     device["signal_strength_component"] = reported_value
-            else:
+            elif not DeviceIdentifier.has_feature(device, "z650iq_mode"):
+                # Z650iQ uses c0 for running hours, not a device-id string.
                 device["device_id_component"] = reported_value
             if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
                 try:
@@ -329,29 +331,55 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         elif component_id == 1:
             if bc_info_layout:
                 device["device_id_component"] = reported_value
+            elif DeviceIdentifier.has_feature(device, "z650iq_mode"):
+                # Z650iQ uses c1 for WiFi RSSI (standard layout uses c2).
+                if not DeviceIdentifier.has_feature(device, "skip_signal"):
+                    device["signal_strength_component"] = reported_value
             else:
                 device["part_numbers_component"] = reported_value
         elif component_id == 2:
             if bc_info_layout:
                 # Hardware UID on Blue Connect — not an RSSI value.
                 device["part_numbers_component"] = reported_value
+            elif DeviceIdentifier.has_feature(device, "z650iq_mode"):
+                # Z650iQ c2 is empty — c1 already holds the RSSI, don't overwrite.
+                pass
             elif not DeviceIdentifier.has_feature(device, "skip_signal"):
                 device["signal_strength_component"] = reported_value
         elif component_id == 3:
-            if not DeviceIdentifier.has_feature(device, "skip_firmware"):
+            if DeviceIdentifier.has_feature(device, "z650iq_mode"):
+                # Z650iQ: c3 is the device serial number, not firmware (c4 = firmware).
+                device["device_id_component"] = reported_value
+            elif not DeviceIdentifier.has_feature(device, "skip_firmware"):
                 device["firmware_version_component"] = reported_value
         elif component_id == 4:
-            device["hardware_errors_component"] = reported_value
+            if DeviceIdentifier.has_feature(device, "z650iq_mode"):
+                # Z650iQ uses c4 for firmware version (standard layout uses c3).
+                if not DeviceIdentifier.has_feature(device, "skip_firmware"):
+                    device["firmware_version_component"] = reported_value
+            else:
+                device["hardware_errors_component"] = reported_value
         elif component_id == 5:
             device["comm_errors_component"] = reported_value
         elif component_id == 9:
             device["pump_reported"] = reported_value
             device["pump_desired"] = component_state.get("desiredValue")
             device["is_running"] = bool(reported_value)
+            # Not the heat-pump on/off flag on the Z650iQ — see that profile's
+            # register map in device_registry/configs/heat_pumps.py.
         elif component_id == 10:
             device["auto_reported"] = reported_value
             device["auto_desired"] = component_state.get("desiredValue")
             device["auto_mode_enabled"] = bool(reported_value)
+            # Z650iQ: c10 is the heat-pump on/off state (1=on, 0=off), not
+            # c9 or c13. Kept in sync with the write path through the
+            # profile's `on_off_component`.
+            if (
+                DeviceIdentifier.has_feature(device, "z650iq_mode")
+                and device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP
+            ):
+                device["heat_pump_reported"] = reported_value
+                device["is_heating"] = bool(reported_value)
         elif component_id == 11:
             device["speed_level_reported"] = reported_value
             device["speed_level_desired"] = component_state.get("desiredValue")
@@ -365,13 +393,48 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     device["speed_percent"] = PUMP_SPEED_PERCENTAGES.get(reported_value, 0)
                 else:
                     device["speed_percent"] = 0
+        elif component_id == 12:
+            device["component_12_data"] = component_state
+            # Only use c12 as the setpoint when the device config designates it
+            # as such (e.g. Z650iQ with setpoint_component=12). Other heat pumps
+            # use c15 — reading c12 as a temperature for them would be wrong.
+            if (
+                device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP
+                and DeviceIdentifier.get_feature(device, "setpoint_component", COMPONENT_HEAT_PUMP_SETPOINT) == 12
+                and reported_value is not None
+            ):
+                try:
+                    temp_val = float(reported_value) / 10.0
+                    if 10.0 <= temp_val <= 50.0:
+                        device["target_temperature"] = temp_val
+                except (ValueError, TypeError):
+                    pass
         elif component_id == 13:
             device["component_13_data"] = component_state
             if device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP and not DeviceIdentifier.has_feature(
                 device, "z550_mode"
             ):
-                device["heat_pump_reported"] = reported_value
-                device["is_heating"] = bool(reported_value)
+                if DeviceIdentifier.has_feature(device, "z650iq_mode"):
+                    # Z650iQ: c13 is the water temperature (decidegrees), not an
+                    # on/off flag — writing 0/1 here would corrupt the reading.
+                    if reported_value is not None:
+                        try:
+                            temp_val = float(reported_value) / 10.0
+                            if 5.0 <= temp_val <= 50.0:
+                                device["water_temperature"] = temp_val
+                        except (ValueError, TypeError):
+                            pass
+                else:
+                    # Z260iQ family: c13 is the on/off control (0=off, 1=on).
+                    device["heat_pump_reported"] = reported_value
+                    device["is_heating"] = bool(reported_value)
+                    if reported_value is not None:
+                        try:
+                            temp_val = float(reported_value) / 10.0
+                            if 5.0 <= temp_val <= 50.0:
+                                device["water_temperature"] = temp_val
+                        except (ValueError, TypeError):
+                            pass
         elif component_id == 14:
             device["component_14_data"] = component_state
             if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
@@ -386,7 +449,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raw_value = reported_value if reported_value is not None else desired_value
             device["component_15_speed"] = raw_value if raw_value is not None else 0
             temp_raw = raw_value
-            if device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP and temp_raw is not None:
+            # Skip if this device uses a different setpoint component (e.g. Z650iQ uses c12).
+            if (
+                device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP
+                and DeviceIdentifier.get_feature(device, "setpoint_component", COMPONENT_HEAT_PUMP_SETPOINT)
+                == COMPONENT_HEAT_PUMP_SETPOINT
+                and temp_raw is not None
+            ):
                 try:
                     temp_value = float(temp_raw) / 10.0
                     if 10.0 <= temp_value <= 50.0:
@@ -440,6 +509,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         elif component_id == 40:
             device[f"component_{component_id}_data"] = component_state
             if DeviceIdentifier.has_feature(device, "z550_mode") and reported_value:
+                # Z550iQ: c40 = outdoor air temperature.
                 try:
                     air_temp = float(reported_value) / 10.0
                     if -20.0 <= air_temp <= 60.0:
@@ -447,12 +517,30 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 except (ValueError, TypeError):
                     pass
             else:
+                # Left undecoded for the Z650iQ: c40 is the evaporator
+                # temperature there, and c44 carries its outdoor air reading.
                 config = DeviceIdentifier.identify_device(device)
                 device_type = config.device_type if config else device.get("type", "")
                 if device_type == DEVICE_TYPE_LIGHT:
                     schedule_data = reported_value if isinstance(reported_value, list) else []
                     device["schedule_data"] = schedule_data
                     self._track_schedule_count(pool_id, device_id, schedule_data)
+        elif component_id == 48 and DeviceIdentifier.has_feature(device, "z650iq_mode"):
+            device["component_48_data"] = component_state
+            # Instantaneous power draw in Watts. Not meter-verified — see the
+            # profile's register map for the confidence note.
+            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
+                device["pump_power"] = int(reported_value)
+        elif component_id == 44 and DeviceIdentifier.has_feature(device, "z650iq_mode"):
+            device["component_44_data"] = component_state
+            # Outdoor air on the Z650iQ — c40 is the evaporator temperature there.
+            if reported_value is not None:
+                try:
+                    air_temp = float(reported_value) / 10.0
+                    if -30.0 <= air_temp <= 60.0:
+                        device["air_temperature"] = air_temp
+                except (ValueError, TypeError):
+                    pass
         elif component_id == 60:
             device["component_60_data"] = component_state
             # Z550iQ+ total running hours (raw integer h, matches
@@ -492,14 +580,22 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     pass
         elif component_id == 39:
             device["component_39_data"] = component_state
-            # Z260iQ-family error E13: intake air above ~43 °C, which makes the unit
-            # refuse to run (0 = OK, 1 = error). Identified on a Z250iQ by @Kal42
-            # (Issue #139).
-            if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
-                try:
-                    device["air_temperature_alarm"] = int(reported_value) != 0
-                except (ValueError, TypeError):
-                    pass
+            if reported_value is not None:
+                if DeviceIdentifier.has_feature(device, "z650iq_mode"):
+                    # Compressor runtime while actively heating — not wall-clock
+                    # hours since power-on (that is c0 / running_hours).
+                    try:
+                        device["compressor_running_hours"] = int(reported_value)
+                    except (ValueError, TypeError):
+                        pass
+                elif DeviceIdentifier.has_feature(device, "z260iq_mode"):
+                    # Z260iQ-family error E13: intake air above ~43 °C, which
+                    # makes the unit refuse to run (0=OK, 1=error). Identified
+                    # on a Z250iQ by @Kal42 (Issue #139).
+                    try:
+                        device["air_temperature_alarm"] = int(reported_value) != 0
+                    except (ValueError, TypeError):
+                        pass
         elif component_id == 67:
             device["component_67_data"] = component_state
             # Air temperature on the Z260iQ family (incl. the Z250iQ, which

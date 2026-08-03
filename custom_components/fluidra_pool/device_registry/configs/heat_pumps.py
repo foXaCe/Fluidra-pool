@@ -163,4 +163,61 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=101,
     ),
+    "z650iq_heat_pump": DeviceConfig(
+        # Canonical register map for this family — the decoders in
+        # coordinator.py, climate.py and climate_behaviors.py refer back here
+        # instead of repeating it. Derived from live-unit captures (raw bulk
+        # snapshots across on/off/compressor cycles plus a day of Home
+        # Assistant history), not from vendor documentation. Its thingType
+        # signature on c5 reads "nhpp".
+        device_type="heat_pump",
+        identifier_patterns=["ZB*"],
+        name_patterns=["z650", "z65"],
+        model_patterns=["z650", "z65"],
+        family_patterns=["heat pump"],
+        components_range=5,
+        required_components=[0, 1, 2, 3],
+        entities=[
+            "climate",
+            "switch",
+            "sensor_info",
+            "sensor_temperature",
+            "sensor_running_hours",
+            "sensor_compressor_hours",
+            "sensor_wifi_signal",
+            "sensor_power",
+        ],
+        features={
+            "z260iq_mode": True,
+            "z650iq_mode": True,
+            "preset_modes": True,
+            "temperature_control": True,
+            "hvac_modes": ["off", "heat", "cool", "heat_cool"],
+            "skip_auto_mode": True,
+            "skip_schedules": True,
+            "min_temp": 15.0,
+            "max_temp": 35.0,
+            "temp_step": 0.5,
+            "setpoint_component": 12,
+            # c9 looks like the on/off flag by analogy with other families but
+            # stays constant through real on/off toggles; c10 tracks the state
+            # exactly. Read in coordinator.py, written by start_pump/stop_pump.
+            "on_off_component": 10,
+            # Only registers with a confirmed meaning are polled, so the
+            # unmapped-register debug log (Issues #174/#175) keeps surfacing
+            # the rest for whoever decodes them next.
+            #   0  running hours         4  firmware       6/7 SKU/signature
+            #   9  generic running flag  10 ON/OFF          12 setpoint (write)
+            #  13  water temperature     14 preset/mode     28 no-flow alarm
+            #  39  compressor hours      44 outdoor air     48 power (W)
+            # Confirmed against the official app: c12 by writing, c13 (275 ==
+            # 27.5 degC), c44 (395 == 39.5 degC) and c39's compressor counter
+            # by reading. c48 tracked the compressor across a full day (3 W
+            # idle, ~640 W at start-up, ~455-525 W settled) but is not
+            # meter-verified — treat the absolute value as approximate.
+            "specific_components": [0, 4, 6, 7, 9, 10, 12, 13, 14, 28, 39, 44, 48],
+        },
+        priority=98,
+        verified=True,
+    ),
 }
