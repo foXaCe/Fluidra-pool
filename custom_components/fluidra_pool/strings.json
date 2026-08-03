@@ -364,6 +364,9 @@
     "hvac_mode_set_failed": {
       "message": "Failed to set heat-pump mode to {hvac_mode}"
     },
+    "invalid_schedule_mode": {
+      "message": "Invalid schedule mode: {value}. This device expects a numeric mode."
+    },
     "invalid_time_format": {
       "message": "Invalid time {value}, expected HH:MM"
     },

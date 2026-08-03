@@ -13,7 +13,6 @@ from ..api_resilience import FluidraError
 from ..const import DOMAIN
 from ..device_registry import DeviceIdentifier
 from ..helpers import get_schedule_data
-from ..utils import convert_cron_days
 from .base import FluidraPoolSwitchEntity
 
 if TYPE_CHECKING:
@@ -21,6 +20,34 @@ if TYPE_CHECKING:
     from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _with_enabled(schedules: list[dict[str, Any]], schedule_id: Any, enabled: bool) -> list[dict[str, Any]]:
+    """Return the schedules unchanged except for the target slot's ``enabled`` flag.
+
+    Toggling a slot must not rewrite anything else. The previous implementation
+    rebuilt each entry from scratch, which corrupted schedules on devices whose
+    payload differs from the one it assumed (Issue #175):
+
+    * ``startActions`` was re-read as ``operationName`` with a ``"0"`` default, so
+      on units that carry the mode in ``componentActions`` (eXO iQ) merely enabling
+      a slot silently replaced its mode with 0.
+    * the cron day fields were run through a 0→7 conversion on every write, even
+      though the values had just been read back from the API in that same format,
+      shifting the configured days.
+
+    Copying the entry verbatim and touching only the one field being changed avoids
+    the whole class of problem, and keeps working for payload shapes we've never seen.
+    """
+    updated: list[dict[str, Any]] = []
+    for sched in schedules:
+        entry = dict(sched)
+        if str(entry.get("id")) == str(schedule_id):
+            entry["enabled"] = enabled
+        # The API rejects a payload without groupId; mirror id when it's absent.
+        entry.setdefault("groupId", entry.get("id"))
+        updated.append(entry)
+    return updated
 
 
 class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
@@ -109,20 +136,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 return
             schedule_component = self._get_schedule_component()
 
-            updated_schedules = []
-            for sched in current_schedules:
-                start_time = convert_cron_days(sched.get("startTime", ""))
-                end_time = convert_cron_days(sched.get("endTime", ""))
-
-                scheduler = {
-                    "id": sched.get("id"),
-                    "groupId": sched.get("id"),
-                    "enabled": True if str(sched.get("id")) == str(self._schedule_id) else sched.get("enabled", False),
-                    "startTime": start_time,
-                    "endTime": end_time,
-                    "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
-                }
-                updated_schedules.append(scheduler)
+            updated_schedules = _with_enabled(current_schedules, self._schedule_id, True)
 
             # No padding — Fluidra fills the remaining slots; padding to 8 with
             # identical placeholder windows is rejected as "OVERLAP in sched" (Issue #105).
@@ -174,20 +188,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                 return
             schedule_component = self._get_schedule_component()
 
-            updated_schedules = []
-            for sched in current_schedules:
-                start_time = convert_cron_days(sched.get("startTime", ""))
-                end_time = convert_cron_days(sched.get("endTime", ""))
-
-                scheduler = {
-                    "id": sched.get("id"),
-                    "groupId": sched.get("id"),
-                    "enabled": False if str(sched.get("id")) == str(self._schedule_id) else sched.get("enabled", False),
-                    "startTime": start_time,
-                    "endTime": end_time,
-                    "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
-                }
-                updated_schedules.append(scheduler)
+            updated_schedules = _with_enabled(current_schedules, self._schedule_id, False)
 
             # No padding — see the OVERLAP-in-sched note in async_turn_on (Issue #105).
             success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)

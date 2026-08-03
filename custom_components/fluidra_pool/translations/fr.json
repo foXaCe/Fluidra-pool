@@ -364,6 +364,9 @@
     "hvac_mode_set_failed": {
       "message": "Impossible de régler le mode de la pompe à chaleur sur {hvac_mode}"
     },
+    "invalid_schedule_mode": {
+      "message": "Mode de programmation invalide : {value}. Cet appareil attend un mode numérique."
+    },
     "invalid_time_format": {
       "message": "Heure « {value} » invalide, format attendu HH:MM"
     },

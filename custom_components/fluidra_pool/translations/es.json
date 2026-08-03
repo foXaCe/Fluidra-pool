@@ -364,6 +364,9 @@
     "hvac_mode_set_failed": {
       "message": "No se pudo establecer el modo de la bomba de calor en {hvac_mode}"
     },
+    "invalid_schedule_mode": {
+      "message": "Modo de programación no válido: {value}. Este dispositivo espera un modo numérico."
+    },
     "invalid_time_format": {
       "message": "Hora {value} no válida, se esperaba HH:MM"
     },

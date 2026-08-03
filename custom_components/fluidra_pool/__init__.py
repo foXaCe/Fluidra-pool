@@ -358,7 +358,25 @@ def _parse_service_time(value: str) -> tuple[int, int]:
     return hour, minute
 
 
-def _service_schedule_to_fluidra(schedule: dict[str, Any], schedule_id: int) -> dict[str, Any]:
+def _device_uses_component_actions(coordinator: Any, device_id: str) -> bool:
+    """Return True when this device carries a schedule's mode in ``componentActions``.
+
+    Two payload shapes exist in the wild: ``startActions.operationName`` (a string
+    mode) and ``startActions.componentActions`` (a list, used by the eXO family).
+    Writing the wrong one doesn't fail loudly — the backend accepts it and the
+    schedule ends up mangled (Issue #175) — so mirror whatever the device already
+    reports rather than assuming.
+    """
+    device = coordinator.api.get_device_by_id(device_id) if coordinator else None
+    for sched in (device or {}).get("schedule_data") or []:
+        if isinstance(sched, dict) and isinstance(sched.get("startActions"), dict):
+            return "componentActions" in sched["startActions"]
+    return False
+
+
+def _service_schedule_to_fluidra(
+    schedule: dict[str, Any], schedule_id: int, *, use_component_actions: bool = False
+) -> dict[str, Any]:
     """Convert service schedule input to the Fluidra CRON schedule shape."""
     start_hour, start_minute = _parse_service_time(schedule["start_time"])
     end_hour, end_minute = _parse_service_time(schedule["end_time"])
@@ -381,10 +399,23 @@ def _service_schedule_to_fluidra(schedule: dict[str, Any], schedule_id: int) -> 
         "enabled": schedule["enabled"],
         "startTime": f"{start_minute:02d} {start_hour:02d} * * {days_str}",
         "endTime": f"{end_minute:02d} {end_hour:02d} * * {days_str}",
-        "startActions": {
-            "operationName": schedule["mode"],
-        },
+        "startActions": _schedule_start_actions(schedule["mode"], use_component_actions),
     }
+
+
+def _schedule_start_actions(mode: Any, use_component_actions: bool) -> dict[str, Any]:
+    """Build ``startActions`` in the shape the target device uses (Issue #175)."""
+    if use_component_actions:
+        try:
+            value = int(mode)
+        except (TypeError, ValueError):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="invalid_schedule_mode",
+                translation_placeholders={"value": str(mode)},
+            ) from None
+        return {"componentActions": [{"id": 0, "reportedValue": value}]}
+    return {"operationName": mode}
 
 
 async def _async_register_services(hass: HomeAssistant) -> None:
@@ -406,8 +437,10 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         _ensure_device_pool_writable(coordinator, device_id)
 
         # Convert HA format to Fluidra API format
+        component_actions = _device_uses_component_actions(coordinator, device_id)
         fluidra_schedules = [
-            _service_schedule_to_fluidra(schedule, i) for i, schedule in enumerate(schedules_data, start=1)
+            _service_schedule_to_fluidra(schedule, i, use_component_actions=component_actions)
+            for i, schedule in enumerate(schedules_data, start=1)
         ]
 
         try:
@@ -535,7 +568,10 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
         # Build schedules in Fluidra format
         fluidra_schedules = [
-            _service_schedule_to_fluidra(schedule, i) for i, schedule in enumerate(presets[preset], start=1)
+            _service_schedule_to_fluidra(
+                schedule, i, use_component_actions=_device_uses_component_actions(coordinator, device_id)
+            )
+            for i, schedule in enumerate(presets[preset], start=1)
         ]
 
         try:
