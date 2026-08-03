@@ -19,7 +19,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
-from .climate_behaviors import Z260iqBehavior, Z550Behavior, resolve_behavior
+from .climate_behaviors import Z260iqBehavior, Z550Behavior, Z650iqBehavior, resolve_behavior
 from .const import (
     CLIMATE_OPTIMISTIC_TIMEOUT,
     DOMAIN,
@@ -29,6 +29,10 @@ from .const import (
     LG_PRESET_SMART_HEATING,
     LG_VALUE_TO_MODE,
     Z550_STATE_NO_FLOW,
+    Z650_MODE_TO_VALUE,
+    Z650_PRESET_MODES,
+    Z650_PRESET_SMART_PLUS,
+    Z650_VALUE_TO_MODE,
     FluidraPoolConfigEntry,
 )
 from .device_registry import DeviceIdentifier
@@ -177,6 +181,8 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         """Return available preset modes for heat pumps with this feature."""
         # Z550iQ+ has no controllable preset: component 17 is read-only and its
         # values don't match a silence/smart/boost scheme (Issue #88).
+        if DeviceIdentifier.has_feature(self.device_data, "z650iq_mode"):
+            return Z650_PRESET_MODES
         if DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
             return LG_PRESET_MODES
         return []
@@ -195,8 +201,10 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             else:
                 return self._pending_preset_mode
 
-        # LG preset modes (Z550iQ+ has no controllable preset — see preset_modes).
-        if not DeviceIdentifier.has_feature(device_data, "preset_modes"):
+        # No controllable preset for devices without preset_modes (e.g. Z550iQ+).
+        if not DeviceIdentifier.has_feature(device_data, "preset_modes") and not DeviceIdentifier.has_feature(
+            device_data, "z650iq_mode"
+        ):
             return None
 
         # Get current mode from component 14 value
@@ -204,9 +212,13 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         if isinstance(components, dict) and "14" in components:
             reported_value = components["14"].get("reportedValue")
             if reported_value is not None:
+                if DeviceIdentifier.has_feature(device_data, "z650iq_mode"):
+                    return Z650_VALUE_TO_MODE.get(reported_value, Z650_PRESET_SMART_PLUS)
                 return LG_VALUE_TO_MODE.get(reported_value, LG_PRESET_SMART_HEATING)
 
-        # Fallback to smart heating
+        # Fallback to family default
+        if DeviceIdentifier.has_feature(device_data, "z650iq_mode"):
+            return Z650_PRESET_SMART_PLUS
         return LG_PRESET_SMART_HEATING
 
     @property
@@ -272,15 +284,19 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             self.async_write_ha_state()
 
             behavior = resolve_behavior(self.device_data)
-            # Only the Z260iQ family needs the current preset (to keep the
-            # specific Smart/Boost/Silence variant), and only on a non-OFF
-            # write — its OFF branch ignores current_preset, and the original
-            # never read self.preset_mode on OFF either. Reading it more widely
-            # would needlessly trigger the property's optimistic-preset expiry
-            # side effect (clearing an expired _pending_preset_mode) on paths
-            # where the original left it untouched.
+            # Only the Z260iQ and Z650iQ families need the current preset (to
+            # keep the specific Smart/Boost/Silence/Ecosilence variant instead
+            # of resetting to their default on every mode write), and only on
+            # a non-OFF write — their OFF branch ignores current_preset, and
+            # the original never read self.preset_mode on OFF either. Reading
+            # it more widely would needlessly trigger the property's
+            # optimistic-preset expiry side effect (clearing an expired
+            # _pending_preset_mode) on paths where the original left it
+            # untouched.
             current_preset = (
-                self.preset_mode if isinstance(behavior, Z260iqBehavior) and hvac_mode != HVACMode.OFF else None
+                self.preset_mode
+                if isinstance(behavior, (Z260iqBehavior, Z650iqBehavior)) and hvac_mode != HVACMode.OFF
+                else None
             )
             success = await behavior.async_set_hvac_mode(
                 self._api, self._pool_id, self._device_id, hvac_mode, current_preset
@@ -401,7 +417,14 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
 
             success = False
 
-            if DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
+            if DeviceIdentifier.has_feature(self.device_data, "z650iq_mode"):
+                if preset_mode not in Z650_MODE_TO_VALUE:
+                    self._pending_preset_mode = None
+                    self._last_preset_action_time = None
+                    return
+                mode_value = Z650_MODE_TO_VALUE[preset_mode]
+                success = await self._api.control_device_component(self._device_id, 14, mode_value)
+            elif DeviceIdentifier.has_feature(self.device_data, "preset_modes"):
                 # LG heat pumps use component 14 (Z550iQ+ has no controllable preset).
                 if preset_mode not in LG_MODE_TO_VALUE:
                     self._pending_preset_mode = None
@@ -530,8 +553,26 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             attrs["component_60_raw"] = device_data.get("components", {}).get("60", {}).get("reportedValue")
             attrs["component_61_raw"] = device_data.get("components", {}).get("61", {}).get("reportedValue")
 
-        # Z260iQ specific attributes
-        if isinstance(behavior, Z260iqBehavior):
+        # Z650iQ specific attributes
+        if DeviceIdentifier.has_feature(device_data, "z650iq_mode"):
+            components = device_data.get("components", {})
+
+            def _raw(comp_id: int) -> object:
+                return components.get(str(comp_id), {}).get("reportedValue") if isinstance(components, dict) else None
+
+            attrs["heat_pump_on"] = bool(device_data.get("heat_pump_reported"))
+            attrs["preset_mode_raw"] = _raw(14)
+            attrs["water_temperature"] = device_data.get("water_temperature")
+            attrs["air_temperature"] = device_data.get("air_temperature")
+            attrs["no_flow_alarm"] = device_data.get("no_flow_alarm")
+            attrs["running_hours"] = device_data.get("running_hours")
+            attrs["compressor_running_hours"] = device_data.get("compressor_running_hours")
+            attrs["power_w"] = device_data.get("pump_power")
+            attrs["rssi_dbm"] = device_data.get("signal_strength_component")
+            attrs["firmware"] = device_data.get("firmware_version_component")
+
+        # Z260iQ specific attributes (not Z650iQ — separate branch above)
+        elif isinstance(behavior, Z260iqBehavior):
             air_temp = device_data.get("air_temperature")
             if air_temp is not None:
                 attrs["air_temperature"] = air_temp

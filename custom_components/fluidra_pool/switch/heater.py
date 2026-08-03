@@ -71,6 +71,8 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
                 success = await self._api.control_device_component(self._device_id, 21, 1)
                 _LOGGER.debug("Z550iQ+ turn ON result: %s", success)
             else:
+                # start_pump() resolves the correct on/off component itself via
+                # the device's "on_off_component" feature (defaults to c13).
                 success = await self._api.start_pump(self._device_id)
 
             if success:
@@ -101,6 +103,8 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
                 success = await self._api.control_device_component(self._device_id, 21, 0)
                 _LOGGER.debug("Z550iQ+ turn OFF result: %s", success)
             else:
+                # stop_pump() resolves the correct on/off component itself via
+                # the device's "on_off_component" feature (defaults to c13).
                 success = await self._api.stop_pump(self._device_id)
 
             if success:
@@ -122,7 +126,7 @@ class FluidraHeatPumpSwitch(FluidraPoolSwitchEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         attrs: dict[str, Any] = {
-            "component_id": 9,
+            "component_id": DeviceIdentifier.get_feature(self.device_data, "on_off_component", 13),
             "operation": "heat_pump_control",
             "device_type": "heat_pump",
             "heat_pump_reported": self.device_data.get("heat_pump_reported"),

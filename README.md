@@ -83,6 +83,12 @@ profile, so unknown equipment is usually still usable.
 - **Z250iQ / Z25iQ** — on/off, target temperature, current temperature
 - **Z260iQ** — HVAC modes (heat / cool / heat-cool), presets, no-flow alarm, water/air temperatures
 - **Z550iQ+** — HVAC modes (heat / cool / auto), presets, HVAC action (heating/cooling/idle/no-flow), water/air temperatures
+- **Z650iQ** — HVAC modes (heat / cool / heat-cool), Smart+/Smart/Ecosilence/Boost presets,
+  on/off switch, water/air temperatures, running hours, compressor running hours, WiFi
+  signal, instantaneous power (Watts) and compressor modulation (percent). Reverse-
+  engineered from live captures; some registers remain undecoded and show up in
+  the unmapped-register
+  debug log.
 - **Gre HPGIC** — on/off, target temperature, water temperature
 - Generic heat-pump fallback
 

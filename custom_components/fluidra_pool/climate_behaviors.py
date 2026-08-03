@@ -34,6 +34,10 @@ from .const import (
     Z550_STATE_IDLE,
     Z550_STATE_NO_FLOW,
     Z550_TEMP_STEP,
+    Z650_MODE_TO_VALUE,
+    Z650_PRESET_BOOST,
+    Z650_PRESET_SMART,
+    Z650_PRESET_SMART_PLUS,
 )
 from .device_registry import DeviceIdentifier
 
@@ -325,9 +329,94 @@ class LgBehavior(HeatPumpBehavior):
         return HVACAction.HEATING
 
 
+class Z650iqBehavior(HeatPumpBehavior):
+    """Z650iQ command set: component 10 (on/off), 14 (mode/preset).
+
+    Shares the mode register with the Z260iQ but not its meaning: here c14 is
+    0 = Smart+ (Heat), 1 = Boost (Cool), 2 = Smart (Heat/Cool),
+    3 = Ecosilence (Heat), whereas the Z260iQ maps 1 → Heat and 3 → Cool. A
+    shared behavior would therefore invert this unit's modes and actions.
+    """
+
+    hvac_modes: list[HVACMode] = [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL]
+    min_temp: float = 15.0
+    max_temp: float = 35.0
+    temp_step: float = 0.5
+
+    def hvac_mode(self, device_data: dict[str, Any]) -> HVACMode:
+        """ON/OFF from the coordinator-decoded state, direction from component 14."""
+        heat_pump_reported = device_data.get("heat_pump_reported")
+        if heat_pump_reported is not None and not bool(heat_pump_reported):
+            return HVACMode.OFF
+        mode_value = device_data.get("z260iq_mode_value")
+        if mode_value is not None:
+            # 0=Smart+ Heat, 3=Ecosilence Heat → HEAT
+            # 1=Boost Cool → COOL
+            # 2=Smart Heat/Cool → HEAT_COOL
+            if mode_value in (0, 3):
+                return HVACMode.HEAT
+            if mode_value == 1:
+                return HVACMode.COOL
+            if mode_value == 2:
+                return HVACMode.HEAT_COOL
+        return HVACMode.HEAT if bool(heat_pump_reported) else HVACMode.OFF
+
+    def hvac_action(self, device_data: dict[str, Any], infer_heat_cool: InferHeatCoolAction) -> HVACAction:
+        """Derive the action from ON/OFF + mode direction (component 14)."""
+        heat_pump_reported = device_data.get("heat_pump_reported")
+        if heat_pump_reported is not None and not bool(heat_pump_reported):
+            return HVACAction.OFF
+        if device_data.get("no_flow_alarm"):
+            return HVACAction.IDLE
+        mode_value = device_data.get("z260iq_mode_value")
+        if mode_value == 1:  # Boost Cool
+            return HVACAction.COOLING
+        if mode_value in (0, 3):  # Smart+ Heat / Ecosilence Heat
+            return HVACAction.HEATING
+        if mode_value == 2:  # Smart Heat+Cool: infer direction from temps
+            return infer_heat_cool()
+        return HVACAction.HEATING if bool(heat_pump_reported) else HVACAction.OFF
+
+    async def async_set_hvac_mode(
+        self,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        hvac_mode: HVACMode,
+        current_preset: str | None,
+    ) -> bool | None:
+        """Z650iQ: ON/OFF via start/stop_pump, mode via component 14.
+
+        start_pump/stop_pump resolve the on/off register from the profile's
+        "on_off_component" (c10 here), so this stays family-agnostic.
+        """
+        if hvac_mode == HVACMode.OFF:
+            return await api.stop_pump(device_id)
+
+        if hvac_mode == HVACMode.HEAT:
+            # Keep current preset if it's already a heat preset, else default to Smart+
+            mode_value = Z650_MODE_TO_VALUE.get(
+                current_preset or Z650_PRESET_SMART_PLUS, Z650_MODE_TO_VALUE[Z650_PRESET_SMART_PLUS]
+            )
+            if mode_value not in (0, 3):
+                mode_value = Z650_MODE_TO_VALUE[Z650_PRESET_SMART_PLUS]
+        elif hvac_mode == HVACMode.COOL:
+            mode_value = Z650_MODE_TO_VALUE[Z650_PRESET_BOOST]
+        elif hvac_mode == HVACMode.HEAT_COOL:
+            mode_value = Z650_MODE_TO_VALUE[Z650_PRESET_SMART]
+        else:
+            return None
+
+        success = await api.control_device_component(device_id, 14, mode_value)
+        if success:
+            success = await api.start_pump(device_id)
+        return success
+
+
 # Behaviors are stateless: one singleton per family is enough.
 Z550_BEHAVIOR = Z550Behavior()
 Z260IQ_BEHAVIOR = Z260iqBehavior()
+Z650IQ_BEHAVIOR = Z650iqBehavior()
 LG_BEHAVIOR = LgBehavior()
 STANDARD_BEHAVIOR = StandardBehavior()
 
@@ -339,11 +428,14 @@ def resolve_behavior(device_data: dict[str, Any]) -> HeatPumpBehavior:
     comp-7 signature yet) and later ones; DeviceIdentifier.identify_device is
     cached, so re-resolving on every property/action access is cheap and
     mirrors the pre-refactor per-property has_feature() checks. Precedence
-    order matches the original dispatch: z550_mode, then z260iq_mode, then
+    order matches the original dispatch: z550_mode, then z650iq_mode (before
+    z260iq_mode since it also sets z260iq_mode=True), then z260iq_mode, then
     preset_modes, else standard.
     """
     if DeviceIdentifier.has_feature(device_data, "z550_mode"):
         return Z550_BEHAVIOR
+    if DeviceIdentifier.has_feature(device_data, "z650iq_mode"):
+        return Z650IQ_BEHAVIOR
     if DeviceIdentifier.has_feature(device_data, "z260iq_mode"):
         return Z260IQ_BEHAVIOR
     if DeviceIdentifier.has_feature(device_data, "preset_modes"):

@@ -135,6 +135,93 @@ class FluidraRunningHoursSensor(FluidraPoolSensorEntity):
         return self.device_data.get("running_hours")
 
 
+class FluidraCompressorHoursSensor(FluidraPoolSensorEntity):
+    """Compressor running hours for Z650iQ (component 39)."""
+
+    _attr_translation_key = "compressor_running_hours"
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_icon = "mdi:clock-outline"
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize compressor running hours sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "compressor_hours")
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the compressor running hours."""
+        return self.device_data.get("compressor_running_hours")
+
+
+class FluidraCompressorModulationSensor(FluidraPoolSensorEntity):
+    """Compressor modulation level for the Z650iQ (component 32), in percent.
+
+    Reads 0 while the compressor is off and rises with the power draw
+    otherwise, at a consistent ~13 W per unit whether the compressor is
+    idling near 30 or driven to 92-93 under a Boost/max-load test — a range
+    that fits a 0-100 percent scale rather than an arbitrary Hz figure.
+    """
+
+    _attr_translation_key = "compressor_modulation"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_icon = "mdi:gauge"
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the compressor modulation sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "compressor_modulation")
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the raw modulation level."""
+        value: int | None = self.device_data.get("compressor_modulation")
+        return value
+
+
+class FluidraWifiSignalSensor(FluidraPoolSensorEntity):
+    """WiFi signal strength sensor (RSSI in dBm)."""
+
+    _attr_translation_key = "wifi_signal"
+    _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "dBm"
+    _attr_entity_category = None  # visible by default, not diagnostic-only
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize WiFi signal sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "wifi_signal")
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the WiFi RSSI in dBm."""
+        raw = self.device_data.get("signal_strength_component")
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except (ValueError, TypeError):
+            return None
+
+
 class FluidraPumpSpeedSensor(FluidraPoolSensorEntity):
     """Speed sensor for pool pumps with mode detection."""
 

@@ -16,11 +16,14 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.const import PERCENTAGE
 import pytest
 
 from custom_components.fluidra_pool.const import DOMAIN
 from custom_components.fluidra_pool.sensor import (
     FluidraChlorinatorSensor,
+    FluidraCompressorHoursSensor,
+    FluidraCompressorModulationSensor,
     FluidraDeviceInfoSensor,
     FluidraLightBrightnessSensor,
     FluidraPoolLocationSensor,
@@ -35,6 +38,7 @@ from custom_components.fluidra_pool.sensor import (
     FluidraPumpSpeedSensor,
     FluidraRunningHoursSensor,
     FluidraTemperatureSensor,
+    FluidraWifiSignalSensor,
     async_setup_entry,
 )
 
@@ -243,6 +247,79 @@ def test_running_hours_none_when_absent() -> None:
     """Absent running_hours -> None."""
     device = _pinned_device(DEVICE_ID)
     sensor = FluidraRunningHoursSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value is None
+
+
+# --------------------------------------------------------------------------- #
+# FluidraCompressorHoursSensor (Z650iQ, component 39)                          #
+# --------------------------------------------------------------------------- #
+
+
+def test_compressor_hours_reads_field() -> None:
+    """Compressor hours sensor surfaces the ``compressor_running_hours`` field."""
+    device = _pinned_device(DEVICE_ID, compressor_running_hours=15)
+    sensor = FluidraCompressorHoursSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value == 15
+    assert sensor._attr_translation_key == "compressor_running_hours"
+
+
+def test_compressor_hours_none_when_absent() -> None:
+    """Absent compressor_running_hours -> None (not confused with running_hours)."""
+    device = _pinned_device(DEVICE_ID, running_hours=999)
+    sensor = FluidraCompressorHoursSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value is None
+
+
+# --------------------------------------------------------------------------- #
+# FluidraCompressorModulationSensor (Z650iQ, component 32)                     #
+# --------------------------------------------------------------------------- #
+
+
+def test_compressor_modulation_reads_field() -> None:
+    """Modulation surfaces the raw level as a percentage."""
+    device = _pinned_device(DEVICE_ID, compressor_modulation=52)
+    sensor = FluidraCompressorModulationSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value == 52
+    assert sensor.native_unit_of_measurement == PERCENTAGE
+
+
+def test_compressor_modulation_zero_is_preserved() -> None:
+    """0 means 'compressor off' and must not be swallowed as missing data."""
+    device = _pinned_device(DEVICE_ID, compressor_modulation=0)
+    sensor = FluidraCompressorModulationSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value == 0
+
+
+def test_compressor_modulation_none_when_absent() -> None:
+    device = _pinned_device(DEVICE_ID)
+    sensor = FluidraCompressorModulationSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value is None
+
+
+# --------------------------------------------------------------------------- #
+# FluidraWifiSignalSensor                                                      #
+# --------------------------------------------------------------------------- #
+
+
+def test_wifi_signal_reads_rssi() -> None:
+    """RSSI is surfaced as a float in dBm."""
+    device = _pinned_device(DEVICE_ID, signal_strength_component=-52)
+    sensor = FluidraWifiSignalSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value == -52.0
+    assert sensor._attr_native_unit_of_measurement == "dBm"
+
+
+def test_wifi_signal_none_when_absent() -> None:
+    """No RSSI reported -> None."""
+    device = _pinned_device(DEVICE_ID)
+    sensor = FluidraWifiSignalSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
+    assert sensor.native_value is None
+
+
+def test_wifi_signal_none_for_non_numeric() -> None:
+    """A non-numeric reading must not raise, just report unavailable."""
+    device = _pinned_device(DEVICE_ID, signal_strength_component="n/a")
+    sensor = FluidraWifiSignalSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID)
     assert sensor.native_value is None
 
 
@@ -1098,6 +1175,9 @@ async def test_setup_creates_device_level_sensors_per_entities_flags() -> None:
             "sensor_speed",
             "sensor_brightness",
             "sensor_running_hours",
+            "sensor_compressor_hours",
+            "sensor_compressor_modulation",
+            "sensor_wifi_signal",
         ],
     )
     coordinator = _setup_coordinator([device])
@@ -1108,6 +1188,9 @@ async def test_setup_creates_device_level_sensors_per_entities_flags() -> None:
     assert FluidraPumpSpeedSensor in classes
     assert FluidraLightBrightnessSensor in classes
     assert FluidraRunningHoursSensor in classes
+    assert FluidraCompressorHoursSensor in classes
+    assert FluidraCompressorModulationSensor in classes
+    assert FluidraWifiSignalSensor in classes
 
 
 async def test_setup_temperature_target_only() -> None:

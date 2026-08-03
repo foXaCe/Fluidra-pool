@@ -284,6 +284,108 @@ async def test_component_19_out_of_range_ignored(coordinator: FluidraDataUpdateC
     assert "water_temperature" not in device
 
 
+# --- Z650iQ-specific paths (components 9, 10, 12, 13, 39, 44, 48, 31/111, 130) ---
+
+
+async def test_component_9_does_not_set_heat_pump_reported_for_z650iq(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """c9 stayed constant across real on/off toggles — it must NOT drive on/off."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True, "z260iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 9, {"reportedValue": 1})
+    assert "heat_pump_reported" not in device
+    assert device["pump_reported"] == 1  # still recorded generically
+
+
+async def test_component_10_heat_pump_on_off_for_z650iq(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c10 is the confirmed on/off register for this family."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True, "z260iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 10, {"reportedValue": 1})
+    assert device["heat_pump_reported"] == 1
+    assert device["is_heating"] is True
+
+    coordinator._process_component_state(device, "pool_001", 10, {"reportedValue": 0})
+    assert device["heat_pump_reported"] == 0
+    assert device["is_heating"] is False
+
+
+async def test_component_10_auto_mode_unaffected_for_non_z650iq_devices(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """c10 keeps its generic auto-mode meaning for pumps and other families."""
+    device = _pinned_device(device_type="pump")
+    coordinator._process_component_state(device, "pool_001", 10, {"reportedValue": 1})
+    assert device["auto_mode_enabled"] is True
+    assert "heat_pump_reported" not in device
+
+
+async def test_component_12_setpoint_for_z650iq(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c12 raw 280 → 28.0°C target when setpoint_component=12 (Z650iQ)."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True, "setpoint_component": 12})
+    coordinator._process_component_state(device, "pool_001", 12, {"reportedValue": 280})
+    assert device["target_temperature"] == 28.0
+
+
+async def test_component_15_ignored_when_setpoint_component_is_12(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """The generic c15 setpoint path must defer to a family's setpoint_component override."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True, "setpoint_component": 12})
+    coordinator._process_component_state(device, "pool_001", 15, {"reportedValue": 500})
+    assert "target_temperature" not in device
+
+
+async def test_component_13_water_temperature_for_z650iq(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c13 is the current water temperature on this family, NOT on/off (unlike Z260iQ)."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 13, {"reportedValue": 275})
+    assert device["water_temperature"] == 27.5
+    assert "heat_pump_reported" not in device
+
+
+async def test_component_39_compressor_running_hours_for_z650iq(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """c39 is compressor running hours here, not the Z260iQ air-temperature alarm."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True, "z260iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 39, {"reportedValue": 12})
+    assert device["compressor_running_hours"] == 12
+    assert "air_temperature_alarm" not in device
+
+
+async def test_component_44_air_temperature_for_z650iq(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c44 raw 395 → 39.5°C outdoor air (Z650iQ only — c40 is refrigerant temp)."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 44, {"reportedValue": 395})
+    assert device["air_temperature"] == 39.5
+
+
+async def test_component_32_compressor_modulation_for_z650iq(
+    coordinator: FluidraDataUpdateCoordinator,
+) -> None:
+    """c32 is the compressor modulation level (0 = compressor off)."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 32, {"reportedValue": 52})
+    assert device["compressor_modulation"] == 52
+
+    coordinator._process_component_state(device, "pool_001", 32, {"reportedValue": 0})
+    assert device["compressor_modulation"] == 0
+
+
+async def test_component_32_ignored_without_z650iq_mode(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c32 means something else on other families — don't decode it there."""
+    device = _pinned_device(device_type="heat_pump")
+    coordinator._process_component_state(device, "pool_001", 32, {"reportedValue": 52})
+    assert "compressor_modulation" not in device
+
+
+async def test_component_48_power_for_z650iq(coordinator: FluidraDataUpdateCoordinator) -> None:
+    """c48 is the instantaneous power draw in Watts."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 48, {"reportedValue": 642})
+    assert device["pump_power"] == 642
+
+
 async def test_component_62_heat_pump_water_temp(coordinator: FluidraDataUpdateCoordinator) -> None:
     """Components 62 and 65 are alternate water-temp paths used by some heat pumps."""
     device = _pinned_device(device_type="heat_pump")

@@ -12,6 +12,8 @@ from ..platform_setup import async_setup_dynamic_platform
 from .base import FluidraPoolSensorBase, FluidraPoolSensorEntity
 from .chlorinator import FluidraChlorinatorSensor
 from .device import (
+    FluidraCompressorHoursSensor,
+    FluidraCompressorModulationSensor,
     FluidraDeviceInfoSensor,
     FluidraLightBrightnessSensor,
     FluidraPumpActivitySensor,
@@ -22,6 +24,7 @@ from .device import (
     FluidraPumpSpeedSensor,
     FluidraRunningHoursSensor,
     FluidraTemperatureSensor,
+    FluidraWifiSignalSensor,
 )
 from .pool import (
     FluidraPoolLocationSensor,
@@ -36,6 +39,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "FluidraChlorinatorSensor",
+    "FluidraCompressorHoursSensor",
+    "FluidraCompressorModulationSensor",
     "FluidraDeviceInfoSensor",
     "FluidraLightBrightnessSensor",
     "FluidraPoolLocationSensor",
@@ -52,6 +57,7 @@ __all__ = [
     "FluidraPumpSpeedSensor",
     "FluidraRunningHoursSensor",
     "FluidraTemperatureSensor",
+    "FluidraWifiSignalSensor",
     "async_setup_entry",
 ]
 
@@ -112,6 +118,15 @@ async def async_setup_entry(
 
         if DeviceIdentifier.should_create_entity(device, "sensor_running_hours"):
             entities.append(FluidraRunningHoursSensor(coordinator, coordinator.api, pool_id, device_id))
+
+        if DeviceIdentifier.should_create_entity(device, "sensor_compressor_hours"):
+            entities.append(FluidraCompressorHoursSensor(coordinator, coordinator.api, pool_id, device_id))
+
+        if DeviceIdentifier.should_create_entity(device, "sensor_compressor_modulation"):
+            entities.append(FluidraCompressorModulationSensor(coordinator, coordinator.api, pool_id, device_id))
+
+        if DeviceIdentifier.should_create_entity(device, "sensor_wifi_signal"):
+            entities.append(FluidraWifiSignalSensor(coordinator, coordinator.api, pool_id, device_id))
 
         # Chlorinator sensors - create based on sensors_config from device registry
         config = DeviceIdentifier.identify_device(device)

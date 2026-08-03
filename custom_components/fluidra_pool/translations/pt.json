@@ -207,6 +207,12 @@
       "chlorinator_water_temperature": {
         "name": "Temperatura da Água"
       },
+      "compressor_modulation": {
+        "name": "Modulação do compressor"
+      },
+      "compressor_running_hours": {
+        "name": "Horas de funcionamento do compressor"
+      },
       "current_temperature": {
         "name": "Temperatura Atual"
       },
@@ -290,6 +296,9 @@
       },
       "weather_temperature": {
         "name": "Temperatura Clima"
+      },
+      "wifi_signal": {
+        "name": "Sinal Wi-Fi"
       }
     },
     "switch": {

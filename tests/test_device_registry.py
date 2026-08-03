@@ -755,6 +755,47 @@ class TestIdentifyDevice:
         # Presets stay disabled for this unit (component 17 is read-only).
         assert config.features.get("preset_modes") is not True
 
+    def test_identify_z650iq_heat_pump(self):
+        device = {
+            "device_id": "ZB25230029",
+            "name": "Z650iQ",
+            "family": "heat pump",
+            "model": "",
+            "type": "heat_pump",
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is not None
+        assert config.device_type == "heat_pump"
+        assert config.features.get("z650iq_mode") is True
+        # Reuses the Z260iQ info-block layout (c0 running hours, c1 RSSI, ...).
+        assert config.features.get("z260iq_mode") is True
+
+    def test_z650iq_heat_pump_on_off_and_setpoint_components(self):
+        """On/off lives on c10 (not c9, despite other families) and setpoint on c12."""
+        config = DEVICE_CONFIGS["z650iq_heat_pump"]
+        assert config.features.get("on_off_component") == 10
+        assert config.features.get("setpoint_component") == 12
+
+    def test_z650iq_heat_pump_scans_only_decoded_components(self):
+        """Scan the confirmed registers, and deliberately nothing else.
+
+        Anything still undecoded is left out on purpose so the unmapped-register
+        debug log (Issues #174/#175) keeps surfacing it for future decoding,
+        rather than being polled for no benefit.
+        """
+        config = DEVICE_CONFIGS["z650iq_heat_pump"]
+        specific = config.features["specific_components"]
+        # ON/OFF (10), setpoint (12), water temp (13), compressor hours (39),
+        # outdoor air (44) and power (48) all have a decoder + entity.
+        for component in (10, 12, 13, 32, 39, 44, 48):
+            assert component in specific
+        assert "sensor_power" in config.entities
+        assert "sensor_compressor_hours" in config.entities
+        assert "sensor_compressor_modulation" in config.entities
+        # Undecoded candidates must NOT be scanned.
+        for undecoded in (31, 111, 130, 115, 116, 118):
+            assert undecoded not in specific
+
     def test_skip_bridge_devices(self):
         device = {
             "device_id": "BR123",
