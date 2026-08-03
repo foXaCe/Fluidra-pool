@@ -19,7 +19,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
-from .climate_behaviors import Z260iqBehavior, Z550Behavior, resolve_behavior
+from .climate_behaviors import Z260iqBehavior, Z550Behavior, Z650iqBehavior, resolve_behavior
 from .const import (
     CLIMATE_OPTIMISTIC_TIMEOUT,
     DOMAIN,
@@ -284,15 +284,19 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             self.async_write_ha_state()
 
             behavior = resolve_behavior(self.device_data)
-            # Only the Z260iQ family needs the current preset (to keep the
-            # specific Smart/Boost/Silence variant), and only on a non-OFF
-            # write — its OFF branch ignores current_preset, and the original
-            # never read self.preset_mode on OFF either. Reading it more widely
-            # would needlessly trigger the property's optimistic-preset expiry
-            # side effect (clearing an expired _pending_preset_mode) on paths
-            # where the original left it untouched.
+            # Only the Z260iQ and Z650iQ families need the current preset (to
+            # keep the specific Smart/Boost/Silence/Ecosilence variant instead
+            # of resetting to their default on every mode write), and only on
+            # a non-OFF write — their OFF branch ignores current_preset, and
+            # the original never read self.preset_mode on OFF either. Reading
+            # it more widely would needlessly trigger the property's
+            # optimistic-preset expiry side effect (clearing an expired
+            # _pending_preset_mode) on paths where the original left it
+            # untouched.
             current_preset = (
-                self.preset_mode if isinstance(behavior, Z260iqBehavior) and hvac_mode != HVACMode.OFF else None
+                self.preset_mode
+                if isinstance(behavior, (Z260iqBehavior, Z650iqBehavior)) and hvac_mode != HVACMode.OFF
+                else None
             )
             success = await behavior.async_set_hvac_mode(
                 self._api, self._pool_id, self._device_id, hvac_mode, current_preset

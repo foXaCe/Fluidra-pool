@@ -919,6 +919,23 @@ async def test_z650iq_set_preset_mode_ignores_unknown_preset() -> None:
     assert climate._pending_preset_mode is None
 
 
+async def test_z650iq_set_hvac_mode_heat_preserves_ecosilence_preset() -> None:
+    """Re-selecting HEAT while already on Ecosilence must not reset to Smart+.
+
+    async_set_hvac_mode passes the climate entity's *current* preset into the
+    behavior so it can keep it; the caller has to recognize Z650iqBehavior for
+    that plumbing to actually reach it (CodeRabbit finding).
+    """
+    api = _api()
+    climate = _make(_pin(features=_Z650, components={"14": {"reportedValue": 3}}), api)
+    assert climate.preset_mode == Z650_PRESET_ECOSILENCE  # sanity: currently on Ecosilence
+
+    await climate.async_set_hvac_mode(HVACMode.HEAT)
+
+    api.control_device_component.assert_awaited_once_with(DEVICE_ID, 14, 3)  # Ecosilence, not Smart+
+    api.start_pump.assert_awaited_once_with(DEVICE_ID)
+
+
 def test_extra_state_attributes_z650iq_branch() -> None:
     """The Z650iQ branch reports coordinator-decoded values, not raw registers."""
     climate = _make(
