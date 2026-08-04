@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.74.0] - 2026-08-04
+
+### Added
+
+- **Zodiac eXO iQ: Aux 1 / Aux 2 outputs** — each auxiliary output is now a three-state select
+  (Off / On / Auto) on `c30` and `c31`. Both values were observed directly in @Inervo's captures:
+  `c30` went 0 → 1 when Aux 1's light was switched on, and `c31` sat at 2 with Aux 2 on Auto,
+  dropping to 0 when switched off. The eXO can wire an aux to a light, a backwash valve, heating
+  or a plain relay — that assignment is made on the unit and only changes what the official app
+  offers, not how the register behaves, so this stays a neutral three-state select rather than
+  guessing at a light or a switch. What the output is actually wired to (`c90`/`c91`, e.g.
+  `Lighting`) is exposed as an `assigned_function` attribute (Issue #175, @Inervo).
+
 ## [2.73.1] - 2026-08-03
 
 ### Fixed
