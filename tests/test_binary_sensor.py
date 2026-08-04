@@ -456,6 +456,34 @@ def test_chlorinator_alarm_active_alarms_excludes_malformed_entries() -> None:
     ]
 
 
+def test_chlorinator_alarm_active_alarms_excludes_malformed_default() -> None:
+    """An active alarm with a non-dict `default` is excluded, not raised."""
+    valid = {"errorCode": "SALT_LOW", "default": {"title": "Low salt", "text": "Add salt"}, "value": True}
+    malformed = {"errorCode": "WEIRD", "default": "invalid", "value": True}
+    sensor = _chlorinator_alarm(_device(online=True, alarms=[valid, malformed]))
+    attrs = sensor.extra_state_attributes
+    assert attrs["active_alarm_count"] == 1
+    assert attrs["active_alarms"] == [
+        {"error_code": "SALT_LOW", "title": "Low salt", "text": "Add salt"},
+    ]
+
+
+def test_chlorinator_alarm_active_alarms_treats_none_default_as_missing() -> None:
+    """An explicit `default: None` is treated the same as a missing `default` key --
+    intentional: it doesn't crash, it just yields title/text as None, same as any
+    other alarm with partial data. Rejecting it would silently drop a real active
+    alarm just because detail fields are absent (see PR discussion)."""
+    valid = {"errorCode": "SALT_LOW", "default": {"title": "Low salt", "text": "Add salt"}, "value": True}
+    none_default = {"errorCode": "UNKNOWN_CODE", "default": None, "value": True}
+    sensor = _chlorinator_alarm(_device(online=True, alarms=[valid, none_default]))
+    attrs = sensor.extra_state_attributes
+    assert attrs["active_alarm_count"] == 2
+    assert attrs["active_alarms"] == [
+        {"error_code": "SALT_LOW", "title": "Low salt", "text": "Add salt"},
+        {"error_code": "UNKNOWN_CODE", "title": None, "text": None},
+    ]
+
+
 def test_chlorinator_alarm_ignores_malformed_entries() -> None:
     """Junk in alarms[] is skipped rather than crashing or counting."""
     sensor = _chlorinator_alarm(_device(online=True, alarms=["junk", None, 42, {"no_value": 1}, PH_ALARM]))

@@ -158,9 +158,17 @@ class FluidraChlorinatorAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity)
         return self.coordinator.last_update_success and bool(self.device_data)
 
     def _active_alarms(self) -> list[dict[str, Any]]:
-        """Return the alarm entries whose ``value`` is currently truthy."""
+        """Return raw alarm entries currently active, filtering out malformed ones."""
         alarms = self.device_data.get("alarms") or []
-        return [alarm for alarm in alarms if isinstance(alarm, dict) and alarm.get("value")]
+        valid = []
+        for alarm in alarms:
+            if not isinstance(alarm, dict) or not alarm.get("value"):
+                continue
+            default = alarm.get("default")
+            if default is not None and not isinstance(default, dict):
+                continue
+            valid.append(alarm)
+        return valid
 
     @staticmethod
     def _flatten_alarm(alarm: dict[str, Any]) -> dict[str, Any]:
