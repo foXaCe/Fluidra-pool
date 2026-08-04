@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.73.1] - 2026-08-03
+
+### Fixed
+
+- **Crash when a chlorinator reports a malformed alarm entry** (PR #182, @luistf76) — an active
+  alarm whose `default` field was a truthy non-dict (a bare string, a list, a number) went
+  straight through `alarm.get("default") or {}` and raised `AttributeError` on the following
+  `.get()`. Such entries are now rejected before flattening. An explicit `default: None` is
+  deliberately still accepted: it cannot crash, and dropping it would hide a genuinely active
+  alarm just because its display strings are missing. Affected v2.72.0 and v2.73.0.
+
+### Changed
+
+- **Corrected the eXO iQ `c36` documentation** — it was recorded as the low-salt threshold; it is
+  in fact the pump RPM setpoint, tracking 2750 → 2748 → 2413 as the pump is reconfigured. 2750 is
+  the default speed, which is why it read as a static, salinity-plausible value. The conclusion it
+  supported is unchanged and now proven rather than inferred: a complete 76-register dump from an
+  NS25 contains no salinity-shaped value at all, so the eXO iQ correctly maps no salinity sensor
+  (Issue #143, @AminShAT / Issue #175, @Inervo).
+
 ## [2.73.0] - 2026-08-03
 
 ### Added
