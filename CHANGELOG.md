@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.75.0] - 2026-08-05
+
+### Added
+
+- **Zodiac eXO iQ: heating setpoint** — when an aux output is assigned to heating, the target
+  temperature (`c43`, whole °C) is now a number entity. Proven by an isolated capture: changing
+  only the setpoint in the app moved `c43` from 27 to 23, with nothing else shifting but the RSSI
+  and the clock. The entity stays unavailable until `c88` reports heating as configured, since an
+  aux has to be assigned to heating on the unit itself first (Issue #175, @Inervo).
+- **Zodiac Z250iQ / Z260iQ: WiFi signal sensor** — the RSSI was already being decoded from `c2`
+  under the standard info layout; the profile simply never exposed an entity for it. This is the
+  same value Fluidra support reads in the cloud (Issue #183, @paradox37).
+
 ## [2.74.0] - 2026-08-04
 
 ### Added
