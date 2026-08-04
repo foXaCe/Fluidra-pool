@@ -66,6 +66,10 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             "sensor_info",
             "sensor_temperature",
             "sensor_running_hours",
+            # c2 already decodes to signal_strength_component under the standard
+            # info layout, so the RSSI Fluidra support reads in the cloud only
+            # needed an entity to surface it (Issue #183, @paradox37).
+            "sensor_wifi_signal",
             # No-flow is surfaced on the climate entity (no_flow_alarm attribute /
             # hvac_action "no_flow"), not as a separate binary_sensor: there is no
             # binary_sensor platform, so "binary_sensor_no_flow" was a dead token.
