@@ -949,6 +949,11 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "boost_requires_on_mode": False,
             "low_mode": 45,
             "freeze_protection": 48,
+            # Auxiliary outputs: 0=OFF, 1=ON, 2=AUTO on both. c90/c91 carry what
+            # each one is wired to as a plain string ('Lighting', 'Other', ...),
+            # surfaced as an attribute (Issue #175, @Inervo).
+            "aux_outputs": {"1": 30, "2": 31},
+            "aux_labels": {"1": 90, "2": 91},
             "mode_component": 13,
             "mode_mapping": {0: "off", 1: "auto", 2: "on"},  # EXO: 1=AUTO (confirmed).
             "orp_setpoint": 39,  # mV — e.g. 770.
@@ -977,7 +982,29 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "orp": 63,  # mV — 738 = 738 mV.
                 "temperature": 64,  # Direct °C — 14 = 14°C.
             },
-            "specific_components": [9, 13, 14, 15, 17, 20, 35, 38, 39, 40, 45, 46, 48, 51, 62, 63, 64],
+            "specific_components": [
+                9,
+                13,
+                14,
+                15,
+                17,
+                20,
+                30,
+                31,
+                35,
+                38,
+                39,
+                40,
+                45,
+                46,
+                48,
+                51,
+                62,
+                63,
+                64,
+                90,
+                91,
+            ],
         },
         priority=85,
     ),

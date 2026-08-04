@@ -120,6 +120,14 @@
       }
     },
     "select": {
+      "aux_output": {
+        "name": "Aux {number}",
+        "state": {
+          "auto": "Auto",
+          "off": "Off",
+          "on": "On"
+        }
+      },
       "chlorinator_mode": {
         "name": "Mode",
         "state": {
@@ -354,6 +362,9 @@
     },
     "auto_mode_set_failed": {
       "message": "Failed to change auto mode"
+    },
+    "aux_set_failed": {
+      "message": "Failed to set the auxiliary output"
     },
     "boost_set_failed": {
       "message": "Failed to set boost mode"

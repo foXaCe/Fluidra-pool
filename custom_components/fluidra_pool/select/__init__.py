@@ -14,6 +14,7 @@ from ..const import (
 )
 from ..device_registry import DeviceIdentifier
 from ..platform_setup import async_setup_dynamic_platform
+from .aux import FluidraAuxOutputSelect
 from .chlorinator import FluidraChlorinatorModeSelect
 from .light import FluidraLightEffectSelect
 from .pump import FluidraPumpSpeedSelect, FluidraVictoriaQuickFunctionSelect
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 __all__ = [
+    "FluidraAuxOutputSelect",
     "FluidraChlorinatorModeSelect",
     "FluidraChlorinatorScheduleSpeedSelect",
     "FluidraLightEffectSelect",
@@ -56,6 +58,14 @@ async def async_setup_entry(
             skip_mode = DeviceIdentifier.has_feature(device, "skip_mode_select")
             if not skip_mode:
                 entities.append(FluidraChlorinatorModeSelect(coordinator, coordinator.api, pool_id, device_id))
+
+            # Auxiliary outputs (OFF/ON/AUTO), for units that expose them.
+            for aux_number, component in sorted(DeviceIdentifier.get_feature(device, "aux_outputs", {}).items()):
+                entities.append(
+                    FluidraAuxOutputSelect(
+                        coordinator, coordinator.api, pool_id, device_id, str(aux_number), int(component)
+                    )
+                )
 
         # Heat pumps don't expose speed or schedule controls.
         if DeviceIdentifier.has_feature(device, "skip_schedules"):
