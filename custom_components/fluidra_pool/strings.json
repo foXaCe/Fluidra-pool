@@ -112,6 +112,9 @@
       "effect_speed": {
         "name": "Effect Speed"
       },
+      "heating_setpoint": {
+        "name": "Heating Setpoint"
+      },
       "orp_setpoint": {
         "name": "ORP Setpoint"
       },

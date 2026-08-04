@@ -101,7 +101,7 @@ profile, so unknown equipment is usually still usable.
   auto-recognised from its component signature and reads pH, ORP, water temperature and
   salinity on the right registers, so unknown units work correctly without waiting for
   their serial to be added by hand
-- **Zodiac EXO iQ** (e.g. iQ35 / NS25) — 0–100% chlorination in 5% steps, output schedules, Boost (with remaining-time countdown), Low and freeze protection, Aux 1 / Aux 2 outputs (Off/On/Auto)
+- **Zodiac EXO iQ** (e.g. iQ35 / NS25) — 0–100% chlorination in 5% steps, output schedules, Boost (with remaining-time countdown), Low and freeze protection, Aux 1 / Aux 2 outputs (Off/On/Auto), heating setpoint
 - **DM24049704** (Domotic S2) — program/slot schedule format
 - Typical capabilities (model-dependent): chlorination level (0–100%), **pH setpoint**,
   **ORP/Redox setpoint**, boost mode, schedules, and sensors (pH, ORP, free chlorine,

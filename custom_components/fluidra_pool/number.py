@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
-from homeassistant.const import PERCENTAGE, UnitOfElectricPotential
+from homeassistant.const import PERCENTAGE, UnitOfElectricPotential, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -53,6 +53,8 @@ async def async_setup_entry(
                 entities.append(FluidraChlorinatorPhSetpoint(coordinator, coordinator.api, pool_id, device_id))
             if DeviceIdentifier.get_feature(device, "orp_setpoint"):
                 entities.append(FluidraChlorinatorOrpSetpoint(coordinator, coordinator.api, pool_id, device_id))
+            if DeviceIdentifier.get_feature(device, "heating_setpoint"):
+                entities.append(FluidraHeatingSetpoint(coordinator, coordinator.api, pool_id, device_id))
 
         # LumiPlus Connect effect speed control
         if device_type == DEVICE_TYPE_LIGHT:
@@ -253,6 +255,96 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
             "current_ph_reading": current_ph,
             "device_id": self._device_id,
         }
+
+
+class FluidraHeatingSetpoint(FluidraPoolControlEntity, NumberEntity):
+    """Heating setpoint for a chlorinator driving a heater through an aux output.
+
+    The eXO iQ carries this on c43 in whole degrees Celsius. Proven by an
+    isolated capture: changing only the setpoint in the app moved c43 from 27 to
+    23 and nothing else but the RSSI and the clock (Issue #175, @Inervo).
+    """
+
+    _attr_translation_key = "heating_setpoint"
+    _attr_icon = "mdi:thermometer-water"
+    _attr_mode = NumberMode.SLIDER
+    _attr_device_class = NumberDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_native_step = 1
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the heating setpoint control."""
+        super().__init__(coordinator, api, pool_id, device_id)
+        self._attr_unique_id = f"fluidra_{self._device_id}_heating_setpoint"
+        self._attr_native_min_value = DeviceIdentifier.get_feature(self.device_data, "heating_min_temp", 15)
+        self._attr_native_max_value = DeviceIdentifier.get_feature(self.device_data, "heating_max_temp", 32)
+
+    def _component(self) -> int | None:
+        """Return the setpoint register, if the profile declares one."""
+        component = DeviceIdentifier.get_feature(self.device_data, "heating_setpoint", None)
+        return int(component) if component is not None else None
+
+    @property
+    def available(self) -> bool:
+        """Only available once the unit reports heating as configured.
+
+        An aux output has to be assigned to heating on the device itself before
+        this setpoint means anything; c88 flips to True when it is. The register
+        stays readable either way, so this reflects a real state rather than
+        hiding a broken entity.
+        """
+        if not super().available:
+            return False
+        flag = DeviceIdentifier.get_feature(self.device_data, "heating_configured", None)
+        if flag is None:
+            return True
+        components = self.device_data.get("components", {})
+        return bool(components.get(str(flag), {}).get("reportedValue"))
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current heating setpoint."""
+        component = self._component()
+        if component is None:
+            return None
+        components = self.device_data.get("components", {})
+        data = components.get(str(component), {})
+        raw = data.get("desiredValue", data.get("reportedValue"))
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except (ValueError, TypeError):
+            _LOGGER.debug("Failed to parse heating setpoint %s for %s", raw, self._device_id)
+            return None
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set the heating setpoint."""
+        self._ensure_pool_writable()
+        component = self._component()
+        if component is None:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="number_set_failed")
+
+        try:
+            success = await self._api.control_device_component(self._device_id, component, int(value))
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="number_set_failed") from err
+        if success:
+            await self.coordinator.async_request_refresh()
+        else:
+            _LOGGER.debug("Failed to set heating setpoint for %s", self._device_id)
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="number_set_failed")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return additional state attributes."""
+        return {"component": self._component(), "device_id": self._device_id}
 
 
 class FluidraChlorinatorOrpSetpoint(FluidraPoolControlEntity, NumberEntity):

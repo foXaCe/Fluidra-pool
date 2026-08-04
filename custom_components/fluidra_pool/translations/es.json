@@ -112,6 +112,9 @@
       "effect_speed": {
         "name": "Velocidad de Efecto"
       },
+      "heating_setpoint": {
+        "name": "Consigna de calefacción"
+      },
       "orp_setpoint": {
         "name": "Consigna ORP"
       },

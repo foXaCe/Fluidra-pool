@@ -954,6 +954,11 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             # surfaced as an attribute (Issue #175, @Inervo).
             "aux_outputs": {"1": 30, "2": 31},
             "aux_labels": {"1": 90, "2": 91},
+            # Heating, available once an aux output is assigned to it (c88).
+            # c43 is the setpoint in whole °C: an isolated capture moved it
+            # 27 -> 23 with nothing else changing (Issue #175, @Inervo).
+            "heating_setpoint": 43,
+            "heating_configured": 88,
             "mode_component": 13,
             "mode_mapping": {0: "off", 1: "auto", 2: "on"},  # EXO: 1=AUTO (confirmed).
             "orp_setpoint": 39,  # mV — e.g. 770.
@@ -995,6 +1000,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 38,
                 39,
                 40,
+                43,
                 45,
                 46,
                 48,
@@ -1002,6 +1008,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 62,
                 63,
                 64,
+                88,
                 90,
                 91,
             ],
