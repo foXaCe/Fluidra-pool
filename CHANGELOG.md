@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.75.1] - 2026-08-05
+
+### Fixed
+
+- **WiFi signal sensor now actually reaches Z250iQ units** — v2.75.0 declared the sensor only on
+  the Z260iQ profile, but LF* heat pumps split across two profiles by reported name and a real
+  Z250iQ resolves to its own. The entity is now declared on both. The test that let this ship
+  asserted against one profile's entity list rather than following a device through identification,
+  so it passed while the feature was unreachable; it now starts from a device (Issue #183,
+  @paradox37).
+- **CC24018506: live pH (c165) and salinity (c174) are mapped** (PR #184, @luistf76) — the earlier
+  "no live pH/salinity on this bridge" conclusion compared `c165` against `c8`, itself only a
+  setpoint write echo, and both registers sat outside the scan list so they never reached
+  diagnostics to be checked. Live reads compared against the official app confirm both. This
+  brings the profile back in line with the standard tecnoLC2 layout used by its sibling profiles.
+
 ## [2.75.0] - 2026-08-05
 
 ### Added
