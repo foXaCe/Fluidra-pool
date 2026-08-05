@@ -595,13 +595,23 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         #   c172 = 315 → water temperature 31.5 °C
         #   c16  = 740 → pH setpoint 7.40   c20 = 710 → ORP setpoint 710 mV
         #   c4/c164     → chlorination level write/read (legacy slots; no c10)
-        # This bridge exposes no live pH-measured component (c165 absent; c8 is
-        # only the pH-setpoint write echo, dropping to 0 when the dosing pump is
-        # idle) and no live salinity (c185 stays 0; the app reads it from a
-        # different endpoint), so neither sensor is mapped rather than surfacing a
-        # misleading value. c20 is the ORP setpoint, not a 0/1/2 mode register, so
-        # the mode select is skipped (it would map 710 → "off" and clobber the
-        # setpoint on write).
+        # Live pH (c165) and salinity (c174) confirmed 2026-08-04 by calling
+        # get_component_state() directly for these ids and comparing against the
+        # official app in real time: c165 tracked a deliberate setpoint change
+        # (747→746 while correcting toward a new 7.2 target, distinct from the
+        # setpoint registers c8/c16 themselves) and matched app readings within
+        # normal drift (7.46-7.47 vs the app's 7.5); c174 matched exactly on a
+        # second read (460 vs the app's 4.6) after an initial spurious spike (680)
+        # that doesn't reflect a real salinity change — a transient glitch, not a
+        # mapping error (same category as the c8==0 glitch the existing value==0
+        # guard already handles for ph/orp).
+        # The earlier "c165 absent / no live salinity" conclusion (2026-07-04) was
+        # reached by comparing c165 against c8 — itself only a write echo, not a
+        # real reading — and by c165/c174 sitting outside specific_components at
+        # the time, so they never reached coordinator.data/diagnostics. Not a
+        # per-account read restriction; that earlier comparison was circular.
+        # c20 is the ORP setpoint, not a 0/1/2 mode register, so the mode select is
+        # skipped (it would map 710 → "off" and clobber the setpoint on write).
         identifier_patterns=["CC24018506*"],
         family_patterns=["chlorinator"],
         components_range=25,
@@ -616,8 +626,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "sensors": {
                 "orp": 170,  # Calibrated ORP — matches the app (c177 is raw).
                 "temperature": 172,  # 315 = 31.5 °C.
+                "ph": 165,  # Confirmed live pH probe reading — see profile comment.
+                "salinity": 174,  # Confirmed live salinity — see profile comment.
             },
-            "specific_components": [4, 8, 11, 16, 20, 164, 170, 172, 245],
+            "specific_components": [4, 8, 11, 16, 20, 164, 165, 170, 172, 174, 245],
         },
         priority=90,
     ),

@@ -265,8 +265,13 @@ class TestDeviceConfigRegistry:
         }
         assert DeviceIdentifier.identify_device(device) is config
 
-    def test_cc24018506_energy_connect_calibrated_orp_no_fake_ph_salinity(self):
-        """Energy Connect CC24018506 uses calibrated ORP (c170) and drops the fake pH/salinity (Issue #129)."""
+    def test_cc24018506_energy_connect_calibrated_orp_ph_salinity(self):
+        """Energy Connect CC24018506 uses calibrated ORP (c170) plus confirmed live pH
+        (c165) and salinity (c174), corrected 2026-08-04 after comparing live reads
+        against the official app disproved the earlier 2026-07-04 "fake sensor"
+        conclusion — which had compared c165 against c8 (itself only a write echo,
+        not a real reading), a circular comparison, not evidence the components
+        were actually absent from the device."""
         config = DEVICE_CONFIGS["cc24018506_chlorinator"]
         device = {
             "device_id": "CC24018506.nn_1",
@@ -282,14 +287,15 @@ class TestDeviceConfigRegistry:
         # Calibrated ORP (c170), not the raw/uncalibrated c177 the generic profile used.
         assert sensors["orp"] == 170
         assert sensors["temperature"] == 172  # 315 = 31.5 °C, not read as pH.
-        # No live pH-measured / salinity component on this bridge -> no misleading sensor.
-        assert "ph" not in sensors
-        assert "salinity" not in sensors
+        # Confirmed live pH probe (c165) and salinity (c174) — see profile comment.
+        assert sensors["ph"] == 165
+        assert sensors["salinity"] == 174
         # c20 is the ORP setpoint, not a mode register -> the broken mode select is skipped.
         assert config.features["skip_mode_select"] is True
         assert config.features["ph_setpoint"] == {"write": 8, "read": 16}
         assert config.features["orp_setpoint"] == {"write": 11, "read": 20}
         assert config.features["chlorination_level"] == {"write": 4, "read": 164}
+        assert set(config.features["specific_components"]) >= {165, 174}
 
     def test_cc26010842_ei2_iq_20_ph_evo_ph_only_layout(self):
         """Ei2 iQ 20 pH Evo CC26010842 maps on the pH-only tecnoLC2 layout (Issue #104)."""
