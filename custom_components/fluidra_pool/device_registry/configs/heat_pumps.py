@@ -32,7 +32,19 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         family_patterns=["heat pump"],
         components_range=5,
         required_components=[0, 1, 2, 3],
-        entities=["climate", "switch", "sensor_info", "sensor_temperature", "sensor_running_hours"],
+        entities=[
+            "climate",
+            "switch",
+            "sensor_info",
+            "sensor_temperature",
+            "sensor_running_hours",
+            # Same as the Z260iQ: c2 already decodes to signal_strength_component and
+            # is already scanned, so only the entity declaration was missing. A unit
+            # whose name matches "z250"/"z25" lands on THIS profile rather than the
+            # Z260iQ one, so declaring it there alone left the sensor unreachable for
+            # every Z250iQ owner (Issue #183, @paradox37).
+            "sensor_wifi_signal",
+        ],
         features={
             # Same firmware family as the Z260iQ — full register-by-register
             # validation from a live Z250iQ dump (Issue #139, @Kal42): c0=161 h

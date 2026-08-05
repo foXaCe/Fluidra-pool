@@ -85,6 +85,32 @@ def test_exo_profile_declares_the_heating_registers() -> None:
     assert 88 in scanned
 
 
-def test_z260iq_exposes_the_wifi_signal_sensor() -> None:
-    """Issue #183: c2 already decodes to the RSSI; the profile only lacked the entity."""
-    assert "sensor_wifi_signal" in DEVICE_CONFIGS["z260iq_heat_pump"].entities
+@pytest.mark.parametrize("name", ["Z250iQ", "Zodiac Z250iQ", "Z260iQ", "Heat pump"])
+def test_lf_heat_pumps_route_to_a_profile_exposing_the_wifi_signal(name: str) -> None:
+    """Issue #183: c2 already decodes to the RSSI; the entity was the missing piece.
+
+    Asserted through device identification rather than against a single profile
+    by name: LF* units split across the Z250iQ and Z260iQ profiles depending on
+    their reported name, so checking one profile's entity list passes while real
+    hardware still gets nothing. That is exactly how the first fix shipped broken.
+    """
+    device = {
+        "device_id": "LF25012345",
+        "name": name,
+        "family": "heat pump",
+        "type": "heat_pump",
+        "model": "",
+        "components": {},
+    }
+    config = DeviceIdentifier.identify_device(device)
+    assert config is not None
+    assert "sensor_wifi_signal" in config.entities
+    # The RSSI only reaches the entity if c2 is actually polled and not skipped.
+    assert config.components_range > 2
+    assert config.features.get("skip_signal") is not True
+
+
+def test_both_lf_profiles_expose_the_wifi_signal() -> None:
+    """Neither Z250iQ nor Z260iQ may regress, whichever one identification picks."""
+    for profile in ("z250iq_heat_pump", "z260iq_heat_pump"):
+        assert "sensor_wifi_signal" in DEVICE_CONFIGS[profile].entities, profile
