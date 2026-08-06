@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.75.2] - 2026-08-06
+
+### Fixed
+
+- **Z250iQ WiFi signal reported unknown** — v2.75.1 made the sensor appear but it read the wrong
+  register. The iQ heat pumps use a second info layout — `c0`=running hours, `c1`=RSSI, `c2`=IP
+  address, `c3`=serial, `c4`=firmware — not Fluidra's standard `0`=id/`1`=parts/`2`=RSSI/`3`=firmware
+  slots, so the sensor was being handed an IP string that `float()` could not parse. Confirmed by
+  @Kal42's live Z250iQ register map on #139 ("c1: Wi-Fi RSSI", "c2: IP address"). The Z650iQ already
+  had this layout hardcoded behind its own flag; it is now a shared `info_layout` the LF* profiles
+  declare too, which also corrects their serial and firmware readings (Issue #183, @paradox37).
+- **CC24018506: chlorination level, boost, pH and ORP setpoints now reach the device** (PR #185,
+  @luistf76) — four write/read pairs inherited from the generic catch-all were never verified against
+  real hardware. `c8` and `c11` turned out to be dead write sinks (writes landed and stayed, the
+  device never consumed them) and the declared boost component did not exist on this model. All four
+  now use the single component the official app reads and writes, matching the rest of the tecnoLC2
+  family. `c103` was also added to the scan set: that list is exhaustive, so a mapped-but-unlisted
+  register is written and never read back — the boost switch would have snapped to off after each poll.
+
 ## [2.75.1] - 2026-08-05
 
 ### Fixed
