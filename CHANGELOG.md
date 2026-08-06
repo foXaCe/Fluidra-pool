@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.76.0] - 2026-08-06
+
+### Added
+
+- **Blue Connect: WiFi signal sensor** — the BC3 reorders the info slots and the integration was
+  already decoding `c0` as the RSSI, but neither the Silver nor the Gold profile declared an entity
+  for it, so the value arrived with nowhere to go. Confirmed against a Blue Connect Gold dump
+  reading `-67` on `c0`. Declared on both profiles, since a Gold can resolve to either depending on
+  the serial it reports (Issue #186, @Kal42).
+
 ## [2.75.2] - 2026-08-06
 
 ### Fixed
