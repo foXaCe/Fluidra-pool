@@ -54,6 +54,10 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             # offers the full Smart/Boost/Silence heating AND cooling presets.
             # Identification (LF* + z250/z25 name, priority 95) is untouched.
             "z260iq_mode": True,
+            # c0=running hours, c1=RSSI, c2=IP, c3=serial, c4=firmware —
+            # not the standard 0=id/1=parts/2=RSSI/3=firmware slots
+            # (Issue #139 register map, Issue #183).
+            "info_layout": "iq_heat_pump",
             "preset_modes": True,
             "temperature_control": True,
             "hvac_modes": ["off", "heat", "cool", "heat_cool"],
@@ -87,7 +91,11 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             # binary_sensor platform, so "binary_sensor_no_flow" was a dead token.
         ],
         features={
-            "z260iq_mode": True,  # Flag for Z260iQ-specific handling.
+            "z260iq_mode": True,
+            # c0=running hours, c1=RSSI, c2=IP, c3=serial, c4=firmware —
+            # not the standard 0=id/1=parts/2=RSSI/3=firmware slots
+            # (Issue #139 register map, Issue #183).
+            "info_layout": "iq_heat_pump",  # Flag for Z260iQ-specific handling.
             "preset_modes": True,
             "temperature_control": True,
             "hvac_modes": ["off", "heat", "cool", "heat_cool"],

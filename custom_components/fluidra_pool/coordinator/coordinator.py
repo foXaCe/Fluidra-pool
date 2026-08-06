@@ -316,11 +316,21 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # everyone else keeps the default.
         bc_info_layout = DeviceIdentifier.get_feature(device, "info_layout") == "blue_connect"
 
+        # The iQ heat pumps share a second layout — 0=running hours, 1=RSSI,
+        # 2=IP address, 3=serial, 4=firmware. Confirmed on a Z650iQ (PR #180)
+        # and on a live Z250iQ dump: "c1: Wi-Fi RSSI", "c2: IP address",
+        # "c3: serial number", "c4: firmware version" (Issue #139, @Kal42).
+        # Reading c2 as the RSSI there yields the IP string, which is why the
+        # signal sensor reported unknown on a Z250iQ (Issue #183, @paradox37).
+        iq_info_layout = DeviceIdentifier.has_feature(device, "z650iq_mode") or (
+            DeviceIdentifier.get_feature(device, "info_layout") == "iq_heat_pump"
+        )
+
         if component_id == 0:
             if bc_info_layout:
                 if not DeviceIdentifier.has_feature(device, "skip_signal"):
                     device["signal_strength_component"] = reported_value
-            elif not DeviceIdentifier.has_feature(device, "z650iq_mode"):
+            elif not iq_info_layout:
                 # Z650iQ uses c0 for running hours, not a device-id string.
                 device["device_id_component"] = reported_value
             if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
@@ -331,7 +341,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         elif component_id == 1:
             if bc_info_layout:
                 device["device_id_component"] = reported_value
-            elif DeviceIdentifier.has_feature(device, "z650iq_mode"):
+            elif iq_info_layout:
                 # Z650iQ uses c1 for WiFi RSSI (standard layout uses c2).
                 if not DeviceIdentifier.has_feature(device, "skip_signal"):
                     device["signal_strength_component"] = reported_value
@@ -341,19 +351,19 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if bc_info_layout:
                 # Hardware UID on Blue Connect — not an RSSI value.
                 device["part_numbers_component"] = reported_value
-            elif DeviceIdentifier.has_feature(device, "z650iq_mode"):
+            elif iq_info_layout:
                 # Z650iQ c2 is empty — c1 already holds the RSSI, don't overwrite.
                 pass
             elif not DeviceIdentifier.has_feature(device, "skip_signal"):
                 device["signal_strength_component"] = reported_value
         elif component_id == 3:
-            if DeviceIdentifier.has_feature(device, "z650iq_mode"):
+            if iq_info_layout:
                 # Z650iQ: c3 is the device serial number, not firmware (c4 = firmware).
                 device["device_id_component"] = reported_value
             elif not DeviceIdentifier.has_feature(device, "skip_firmware"):
                 device["firmware_version_component"] = reported_value
         elif component_id == 4:
-            if DeviceIdentifier.has_feature(device, "z650iq_mode"):
+            if iq_info_layout:
                 # Z650iQ uses c4 for firmware version (standard layout uses c3).
                 if not DeviceIdentifier.has_feature(device, "skip_firmware"):
                     device["firmware_version_component"] = reported_value
