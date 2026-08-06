@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.77.0] - 2026-08-06
+
+### Added
+
+- **Blue Connect Gold: conductivity sensor** — `c15` reports water conductivity in µS/cm. It had
+  already been identified in passing while pinning salinity on #75 (`c15` ≈ 8461, which is why
+  salinity is `c16`), and is now confirmed independently against the app's Information page reading
+  1362 µS/cm (Issue #186, @Kal42).
+
+### Fixed
+
+- **Blue Connect: the ESP32 firmware version was reported as a hardware fault** — the BC3 carries
+  two firmwares, nRF on `c3` and ESP32 on `c4`, both shown on the app's Information page. `c4` fell
+  through to the standard layout's `hardware_errors` slot, so a version string surfaced as a fault
+  on the device-info sensor. It is now a `secondary_firmware` attribute (Issue #186, @Kal42).
+
 ## [2.76.0] - 2026-08-06
 
 ### Added
