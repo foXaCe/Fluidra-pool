@@ -265,13 +265,18 @@ class TestDeviceConfigRegistry:
         }
         assert DeviceIdentifier.identify_device(device) is config
 
-    def test_cc24018506_energy_connect_calibrated_orp_ph_salinity(self):
-        """Energy Connect CC24018506 uses calibrated ORP (c170) plus confirmed live pH
-        (c165) and salinity (c174), corrected 2026-08-04 after comparing live reads
-        against the official app disproved the earlier 2026-07-04 "fake sensor"
-        conclusion — which had compared c165 against c8 (itself only a write echo,
-        not a real reading), a circular comparison, not evidence the components
-        were actually absent from the device."""
+    def test_cc24018506_energy_connect_full_profile_fix(self):
+        """Energy Connect CC24018506 profile fix, covering four write/read pairs
+        inherited from the generic catch-all and never verified against real
+        hardware: chlorination_level, boost_mode, ph_setpoint, and orp_setpoint
+        all moved from broken/nonexistent components to the single component
+        that the official app actually uses (2026-08-05). Sensors (calibrated
+        ORP c170, live pH c165, live salinity c174) were fixed earlier
+        (2026-08-04, #184) after comparing live reads against the official app
+        disproved the earlier 2026-07-04 "fake sensor" conclusion — which had
+        compared c165 against c8 (itself only a write echo, not a real
+        reading), a circular comparison, not evidence the components were
+        actually absent from the device."""
         config = DEVICE_CONFIGS["cc24018506_chlorinator"]
         device = {
             "device_id": "CC24018506.nn_1",
@@ -292,10 +297,22 @@ class TestDeviceConfigRegistry:
         assert sensors["salinity"] == 174
         # c20 is the ORP setpoint, not a mode register -> the broken mode select is skipped.
         assert config.features["skip_mode_select"] is True
-        assert config.features["ph_setpoint"] == {"write": 8, "read": 16}
-        assert config.features["orp_setpoint"] == {"write": 11, "read": 20}
-        assert config.features["chlorination_level"] == {"write": 4, "read": 164}
-        assert set(config.features["specific_components"]) >= {165, 174}
+        # Single-component fixes (2026-08-05): the declared write/read pairs and the
+        # nonexistent boost component were all inherited from the generic catch-all
+        # and never verified against real hardware — see profile comment.
+        assert config.features["ph_setpoint"] == 16
+        assert config.features["orp_setpoint"] == 20
+        assert config.features["chlorination_level"] == 10
+        assert config.features["boost_mode"] == 103
+        # specific_components is the exhaustive scan set ([0,1,2,3] + this list), so a
+        # mapped-but-unlisted register is written and never read back — the boost switch
+        # would snap to off after every poll. Assert every mapping is scanned, not just
+        # the ones this change happened to touch (CodeRabbit, PR #185).
+        scanned = set(config.features["specific_components"])
+        for feature in ("chlorination_level", "ph_setpoint", "orp_setpoint", "boost_mode"):
+            assert config.features[feature] in scanned, feature
+        assert scanned >= set(config.features["sensors"].values())
+        assert set(config.features["specific_components"]) >= {10, 165, 174}
 
     def test_cc26010842_ei2_iq_20_ph_evo_ph_only_layout(self):
         """Ei2 iQ 20 pH Evo CC26010842 maps on the pH-only tecnoLC2 layout (Issue #104)."""

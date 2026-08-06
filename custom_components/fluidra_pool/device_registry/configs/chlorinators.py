@@ -612,16 +612,37 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # per-account read restriction; that earlier comparison was circular.
         # c20 is the ORP setpoint, not a 0/1/2 mode register, so the mode select is
         # skipped (it would map 710 → "off" and clobber the setpoint on write).
+        # Four additional write/read pairs in this profile were inherited from the
+        # generic catch-all and never verified against the real hardware -- same
+        # root cause as the pH/salinity sensor gap fixed above. Verified 2026-08-05
+        # against v2.75.1 by writing directly to each candidate component and
+        # confirming the change in the official app in real time:
+        #   - chlorination_level: {write: 4, read: 164} -> single component 10
+        #     (the declared pair was a dead write sink; the app never reflected it)
+        #   - boost_mode: 245 (component doesn't exist on this device) -> 103
+        #   - ph_setpoint: {write: 8, read: 16} -> single component 16
+        #     (c8 was a dead write sink -- writes landed there and stayed, but the
+        #     device and app never consumed it; c16 is both the live reading the
+        #     app already showed and the component that actually accepts writes)
+        #   - orp_setpoint: {write: 11, read: 20} -> single component 20 (same
+        #     dead-sink pattern as ph_setpoint, confirmed with the same method)
+        # All four match the pattern nearly every other tecnoLC2 profile already
+        # uses (single component, not a write/read pair) -- this profile was the
+        # outlier, not the norm. Tested locally against v2.75.1 with this exact
+        # patch applied on production hardware: all four controls (chlorination
+        # level, boost mode, pH setpoint, ORP setpoint) now write correctly and
+        # the official app reflects each change within seconds, in both
+        # directions (HA->app and app->HA).
         identifier_patterns=["CC24018506*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
         features={
-            "chlorination_level": {"write": 4, "read": 164},
-            "ph_setpoint": {"write": 8, "read": 16},
-            "orp_setpoint": {"write": 11, "read": 20},
-            "boost_mode": 245,
+            "chlorination_level": 10,
+            "ph_setpoint": 16,
+            "orp_setpoint": 20,
+            "boost_mode": 103,
             "skip_mode_select": True,
             "sensors": {
                 "orp": 170,  # Calibrated ORP — matches the app (c177 is raw).
@@ -629,7 +650,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "ph": 165,  # Confirmed live pH probe reading — see profile comment.
                 "salinity": 174,  # Confirmed live salinity — see profile comment.
             },
-            "specific_components": [4, 8, 11, 16, 20, 164, 165, 170, 172, 174, 245],
+            # 103 must be listed: specific_components is the exhaustive scan set
+            # ([0,1,2,3] + this list), so an unlisted boost register is written but
+            # never read back, leaving the switch snapping to off after each poll.
+            "specific_components": [4, 8, 10, 11, 16, 20, 103, 164, 165, 170, 172, 174, 245],
         },
         priority=90,
     ),
