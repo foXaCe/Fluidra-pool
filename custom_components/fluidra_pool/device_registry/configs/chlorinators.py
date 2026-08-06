@@ -650,7 +650,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "ph": 165,  # Confirmed live pH probe reading — see profile comment.
                 "salinity": 174,  # Confirmed live salinity — see profile comment.
             },
-            "specific_components": [4, 8, 10, 11, 16, 20, 164, 165, 170, 172, 174, 245],
+            # 103 must be listed: specific_components is the exhaustive scan set
+            # ([0,1,2,3] + this list), so an unlisted boost register is written but
+            # never read back, leaving the switch snapping to off after each poll.
+            "specific_components": [4, 8, 10, 11, 16, 20, 103, 164, 165, 170, 172, 174, 245],
         },
         priority=90,
     ),

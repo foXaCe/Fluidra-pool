@@ -304,6 +304,14 @@ class TestDeviceConfigRegistry:
         assert config.features["orp_setpoint"] == 20
         assert config.features["chlorination_level"] == 10
         assert config.features["boost_mode"] == 103
+        # specific_components is the exhaustive scan set ([0,1,2,3] + this list), so a
+        # mapped-but-unlisted register is written and never read back — the boost switch
+        # would snap to off after every poll. Assert every mapping is scanned, not just
+        # the ones this change happened to touch (CodeRabbit, PR #185).
+        scanned = set(config.features["specific_components"])
+        for feature in ("chlorination_level", "ph_setpoint", "orp_setpoint", "boost_mode"):
+            assert config.features[feature] in scanned, feature
+        assert scanned >= set(config.features["sensors"].values())
         assert set(config.features["specific_components"]) >= {10, 165, 174}
 
     def test_cc26010842_ei2_iq_20_ph_evo_ph_only_layout(self):
