@@ -600,6 +600,20 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     device["no_flow_alarm"] = int(reported_value) != 0
                 except (ValueError, TypeError):
                     pass
+        elif component_id == 75:
+            device["component_75_data"] = component_state
+            if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
+                # Live compressor state, which the mode register (c14) cannot
+                # give: c14 says what the unit was *told* to do, c75 says what
+                # it is *doing*. Confirmed on a Z250iQ by driving Boost/Silent
+                # and Heating/Cooling: 0=idle, 16=heating, 24=cooling. A value
+                # of 8 was seen for a few seconds right after a mode change,
+                # so unknown values fall through to the mode-derived action
+                # rather than being guessed at (Issue #139, @Kal42).
+                try:
+                    device["compressor_state"] = int(reported_value)
+                except (ValueError, TypeError):
+                    pass
         elif component_id == 39:
             device["component_39_data"] = component_state
             if reported_value is not None:

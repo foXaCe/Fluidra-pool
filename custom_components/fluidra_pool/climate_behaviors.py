@@ -198,6 +198,17 @@ class Z550Behavior(HeatPumpBehavior):
         return success
 
 
+# Live compressor state on c75, confirmed on a Z250iQ across Boost/Silent and
+# Heating/Cooling (Issue #139, @Kal42). Only these three values are mapped: a
+# transient 8 was observed right after a mode change and never explained, so
+# anything else falls through to the mode-derived action.
+COMPRESSOR_STATE_ACTIONS = {
+    0: HVACAction.IDLE,
+    16: HVACAction.HEATING,
+    24: HVACAction.COOLING,
+}
+
+
 class Z260iqBehavior(HeatPumpBehavior):
     """Z260iQ/Z250iQ command set: components 13 (on/off), 14 (mode/preset), 28 (no-flow), 67 (air temp)."""
 
@@ -226,15 +237,23 @@ class Z260iqBehavior(HeatPumpBehavior):
         return HVACMode.HEAT if bool(heat_pump_reported) else HVACMode.OFF
 
     def hvac_action(self, device_data: dict[str, Any], infer_heat_cool: InferHeatCoolAction) -> HVACAction:
-        """Derive the action from ON/OFF + mode direction (component 14).
+        """Report the live compressor state (c75), falling back to the mode.
 
-        Not is_heating — otherwise an actively-cooling unit reports HEATING.
+        c14 only says which mode the unit was set to, so deriving the action
+        from it reports HEATING while the unit sits idle at its setpoint —
+        the original complaint on Issue #139. c75 reports what the compressor
+        is actually doing, so it wins whenever it holds a value confirmed on
+        hardware. Not is_heating either — that reports HEATING on a unit that
+        is actively cooling.
         """
         heat_pump_reported = device_data.get("heat_pump_reported")
         if heat_pump_reported is not None and not bool(heat_pump_reported):
             return HVACAction.OFF
         if device_data.get("no_flow_alarm"):
             return HVACAction.IDLE
+        compressor_state = device_data.get("compressor_state")
+        if compressor_state in COMPRESSOR_STATE_ACTIONS:
+            return COMPRESSOR_STATE_ACTIONS[compressor_state]
         mode_value = device_data.get("z260iq_mode_value")
         if mode_value in (1, 5, 6):  # Smart/Boost/Silence Cool
             return HVACAction.COOLING

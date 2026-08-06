@@ -66,7 +66,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             "min_temp": 7.0,
             "max_temp": 40.0,
             "temp_step": 1.0,
-            "specific_components": [0, 7, 13, 14, 15, 17, 19, 28, 39, 67, 81, 82],
+            "specific_components": [0, 7, 13, 14, 15, 17, 19, 28, 39, 67, 75, 81, 82],
         },
         priority=95,
     ),
@@ -117,7 +117,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             # - 67: Air temperature (×0.1)
             # - 81: Min setpoint (15°C, informational)
             # - 82: Max setpoint (40°C, informational)
-            "specific_components": [0, 7, 13, 14, 15, 17, 19, 28, 39, 67, 81, 82],
+            "specific_components": [0, 7, 13, 14, 15, 17, 19, 28, 39, 67, 75, 81, 82],
         },
         priority=97,  # Higher than z250iq (95) and z550iq (96); component-7 check elevates further.
     ),
