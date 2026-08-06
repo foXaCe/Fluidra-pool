@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.78.1] - 2026-08-06
+
+### Fixed
+
+- **Zodiac eXO iQ: schedule entities were unavailable for anything but a simple pump** — the eXO
+  keeps chlorination-only schedules on `c19`, simple-pump ones on `c20` and variable-speed ones on
+  `c21`, honouring only the register that matches its configured pump. The integration always read
+  `c20`. Reading "whichever register has entries" is not an option either: stale schedules survive a
+  configuration change, so two registers can hold data at once with one of them dead, which would
+  show a schedule the device ignores and write edits into a register nothing reads. Six captures pin
+  the discriminator instead — no pump leaves `c82`/`c83` both false, a simple pump sets `c82`, a
+  variable-speed pump sets `c83` — and the register now follows from those. Profiles that declare no
+  such map are unaffected (Issue #174, @Inervo).
+
+### Changed
+
+- **Zodiac eXO iQ: six schedule slots instead of four**, matching what the app offers
+  (Issue #174, @Inervo).
+
 ## [2.78.0] - 2026-08-06
 
 ### Added
