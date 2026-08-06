@@ -93,3 +93,47 @@ def test_standard_layout_still_reads_the_rssi_from_c2() -> None:
     assert device["signal_strength_component"] == -55
     assert device["device_id_component"] == "DM24008702"
     assert device["firmware_version_component"] == "2.1.0"
+
+
+# --- Blue Connect (Issue #186) -----------------------------------------------
+
+BLUE_CONNECT_INFO = {0: -67, 1: "QX2500XXXX", 2: "AXR080700452XXXXX", 3: "0.13.5"}
+
+
+def _blue_connect(name: str = "Blue Connect Gold") -> dict[str, Any]:
+    return {
+        "device_id": "QX2500XXXX",
+        "name": name,
+        "family": "data collectors",
+        "type": "probe",
+        "model": "",
+        "components": {},
+    }
+
+
+def test_blue_connect_reads_the_rssi_from_c0() -> None:
+    """The BC3 layout puts the RSSI first: c0=RSSI, c1=cloud id, c2=serial."""
+    from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordinator
+
+    device = _blue_connect()
+    for component_id, value in BLUE_CONNECT_INFO.items():
+        FluidraDataUpdateCoordinator._process_component_state(
+            MagicMock(), device, "pool-1", component_id, {"reportedValue": value}
+        )
+
+    assert device["signal_strength_component"] == -67
+    assert device["device_id_component"] == "QX2500XXXX"
+
+
+@pytest.mark.parametrize("profile", ["blue_connect_silver", "blue_connect_gold"])
+def test_blue_connect_profiles_expose_the_wifi_signal(profile: str) -> None:
+    """Both, since a Gold can resolve to either depending on its reported serial."""
+    assert "sensor_wifi_signal" in DEVICE_CONFIGS[profile].entities
+
+
+@pytest.mark.parametrize("name", ["Blue Connect Gold", "Blue Connect"])
+def test_blue_connect_devices_resolve_to_a_wifi_capable_profile(name: str) -> None:
+    config = DeviceIdentifier.identify_device(_blue_connect(name))
+    assert config is not None
+    assert "sensor_wifi_signal" in config.entities
+    assert config.features.get("info_layout") == "blue_connect"

@@ -25,7 +25,14 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
         required_components=[0, 1, 2, 3],
         # Sensor-only: no switch (probe doesn't actuate), no select (no mode),
         # no number (no chlorination level).
-        entities=["sensor_info"],
+        entities=[
+            "sensor_info",
+            # c0 already decodes to signal_strength_component under the
+            # blue_connect info layout; only the entity was missing. Confirmed
+            # on a Blue Connect Gold dump: "C0: RSSI" reading -67
+            # (Issue #186, @Kal42).
+            "sensor_wifi_signal",
+        ],
         features={
             # No mode select (probe-only device).
             "skip_mode_select": True,
@@ -60,7 +67,14 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
         family_patterns=["data collectors"],
         components_range=25,
         required_components=[0, 1, 2, 3],
-        entities=["sensor_info"],
+        entities=[
+            "sensor_info",
+            # c0 already decodes to signal_strength_component under the
+            # blue_connect info layout; only the entity was missing. Confirmed
+            # on a Blue Connect Gold dump: "C0: RSSI" reading -67
+            # (Issue #186, @Kal42).
+            "sensor_wifi_signal",
+        ],
         features={
             "skip_mode_select": True,
             "info_layout": "blue_connect",
