@@ -367,6 +367,12 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # Z650iQ uses c4 for firmware version (standard layout uses c3).
                 if not DeviceIdentifier.has_feature(device, "skip_firmware"):
                     device["firmware_version_component"] = reported_value
+            elif bc_info_layout:
+                # Blue Connect carries two firmwares — c3 is the nRF one, c4 the
+                # ESP32 one, both shown on the app's Information page. Labelling
+                # c4 as hardware errors surfaced a version string as a fault
+                # (Issue #186, @Kal42).
+                device["secondary_firmware_component"] = reported_value
             else:
                 device["hardware_errors_component"] = reported_value
         elif component_id == 5:

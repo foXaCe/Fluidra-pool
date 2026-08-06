@@ -137,3 +137,24 @@ def test_blue_connect_devices_resolve_to_a_wifi_capable_profile(name: str) -> No
     assert config is not None
     assert "sensor_wifi_signal" in config.entities
     assert config.features.get("info_layout") == "blue_connect"
+
+
+def test_blue_connect_gold_maps_conductivity() -> None:
+    """c15 is µS/cm, identified on #75 and confirmed against the app on #186."""
+    config = DeviceIdentifier.identify_device(_blue_connect())
+    assert config is not None
+    assert config.features["sensors"]["conductivity"] == 15
+    assert 15 in config.features["specific_components"]
+    # Distinct from salinity on c16 — the two were confused once already.
+    assert config.features["sensors"]["salinity"] == 16
+
+
+def test_blue_connect_c4_is_a_firmware_not_a_hardware_fault() -> None:
+    """The BC3 reports two firmwares; c4 was surfacing as 'hardware_errors'."""
+    from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordinator
+
+    device = _blue_connect()
+    FluidraDataUpdateCoordinator._process_component_state(MagicMock(), device, "pool-1", 4, {"reportedValue": "0.31.4"})
+
+    assert device.get("secondary_firmware_component") == "0.31.4"
+    assert "hardware_errors_component" not in device

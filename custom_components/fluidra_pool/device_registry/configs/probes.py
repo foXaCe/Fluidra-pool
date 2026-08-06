@@ -82,8 +82,12 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
                 "temperature": 12,  # Direct °C.
                 "ph": 13,  # Direct decimal pH.
                 "orp": 14,  # Direct mV.
+                # Conductivity in µS/cm on c15 — identified while pinning salinity
+                # (Issue #75, ≈8461) and independently confirmed against the app's
+                # Information page reading 1362 µS/cm (Issue #186, @Kal42).
+                "conductivity": 15,
                 # Salinity confirmed on c16 (direct g/L) — 5.14 ≈ the app's 5.1 g/L
-                # (Issue #75 fresh diagnostics; c15 holds conductivity ≈ 8461, not salinity).
+                # (Issue #75 fresh diagnostics; c15 is the conductivity, not salinity).
                 "salinity": 16,
                 # Battery voltage in mV on c19 (Issue #138 — samples 4116/4104 mV,
                 # consistent with a near-full cell on this 3.6 V-nominal probe).
@@ -96,7 +100,7 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
                 "salinity": 1,
                 "battery_voltage": 1,
             },
-            "specific_components": [12, 13, 14, 16, 19],
+            "specific_components": [12, 13, 14, 15, 16, 19],
         },
         priority=90,  # Above blue_connect_silver (88) for Gold units.
     ),

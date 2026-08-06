@@ -13,6 +13,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     PERCENTAGE,
     EntityCategory,
+    UnitOfConductivity,
     UnitOfElectricPotential,
     UnitOfTemperature,
     UnitOfTime,
@@ -162,6 +163,14 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
                 "state_class": SensorStateClass.MEASUREMENT,
                 "icon": "mdi:percent",
                 "divisor": 1,  # Already a percentage.
+            },
+            "conductivity": {
+                "translation_key": "chlorinator_conductivity",
+                "unit": UnitOfConductivity.MICROSIEMENS_PER_CM,
+                "device_class": SensorDeviceClass.CONDUCTIVITY,
+                "state_class": SensorStateClass.MEASUREMENT,
+                "icon": "mdi:sine-wave",
+                "divisor": 1,  # Direct µS/cm (Issue #186: 1362 = 1362 µS/cm).
             },
             "battery_voltage": {
                 "translation_key": "chlorinator_battery_voltage",

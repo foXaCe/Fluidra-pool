@@ -732,6 +732,8 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
             info_data["firmware_version"] = device_data["firmware_version_component"]
         if "hardware_errors_component" in device_data:
             info_data["hardware_errors"] = device_data["hardware_errors_component"]
+        if "secondary_firmware_component" in device_data:
+            info_data["secondary_firmware"] = device_data["secondary_firmware_component"]
         if "comm_errors_component" in device_data:
             info_data["comm_errors"] = device_data["comm_errors_component"]
         if "timezone_component" in device_data:

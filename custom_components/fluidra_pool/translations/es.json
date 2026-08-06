@@ -206,6 +206,9 @@
       "chlorinator_chlorination_actual": {
         "name": "Cloración Real"
       },
+      "chlorinator_conductivity": {
+        "name": "Conductividad"
+      },
       "chlorinator_free_chlorine": {
         "name": "Cloro Libre"
       },

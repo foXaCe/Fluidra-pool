@@ -145,6 +145,7 @@ async def async_setup_entry(
                 "temperature",
                 "salinity",
                 "chlorination_actual",
+                "conductivity",
                 "battery_voltage",
             ):
                 if sensor_type in sensors_config:
