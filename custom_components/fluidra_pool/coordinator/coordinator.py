@@ -37,7 +37,7 @@ from ..const import (
 )
 from ..device_registry import DeviceIdentifier
 from ..fluidra_api import FluidraPoolAPI
-from ..helpers import determine_pool_access
+from ..helpers import determine_pool_access, resolve_schedule_component
 from ..repairs import (
     async_create_connection_issue,
     async_create_unverified_profile_issue,
@@ -657,6 +657,29 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._track_schedule_count(pool_id, device_id, schedule_data)
             device[f"component_{component_id}_data"] = component_state
 
+    def _apply_resolved_schedule(self, device: dict[str, Any], pool_id: str, device_id: str) -> None:
+        """Point schedule_data at the register the device is currently honouring.
+
+        The eXO iQ keeps chlorination-only schedules on c19, simple-pump ones on
+        c20 and variable-speed ones on c21, honouring only the one matching its
+        configured pump. Stale entries survive a configuration change, so the
+        live register is identified from the pump-type flags rather than from
+        which register happens to hold data (Issue #174, @Inervo).
+        """
+        component_id = resolve_schedule_component(device)
+        reported = device.get("components", {}).get(str(component_id), {}).get("reportedValue")
+
+        if isinstance(reported, dict) and "programs" in reported:
+            schedule_data = parse_dm24049704_schedule_format(reported)
+        elif isinstance(reported, list):
+            schedule_data = reported
+        else:
+            schedule_data = []
+
+        device["schedule_data"] = schedule_data
+        device["schedule_component_resolved"] = component_id
+        self._track_schedule_count(pool_id, device_id, schedule_data)
+
     def _process_victoria_component(
         self, device: dict[str, Any], component_id: int, component_state: dict[str, Any]
     ) -> None:
@@ -1066,6 +1089,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             for component_id, component_state in component_states.items():
                 self._process_component_state(device, pool_id, component_id, component_state)
+
+            # Re-read the schedules from the register the device actually
+            # honours, AFTER the whole scan: the pump-type flags (c82/c83) may
+            # be processed after the schedule registers themselves, so the
+            # inline branch above can resolve against flags that are not in
+            # yet. Only profiles declaring schedule_component_map are affected;
+            # everyone else keeps the single fixed register (Issue #174).
+            if DeviceIdentifier.get_feature(device, "schedule_component_map", None):
+                self._apply_resolved_schedule(device, pool_id, device_id)
 
             # Recompute auto-mode pump speed AFTER the whole component scan: the
             # speed (component 11) is processed before the schedule (component 20)

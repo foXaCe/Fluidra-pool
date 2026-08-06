@@ -15,7 +15,7 @@ from ..api_resilience import FluidraError
 from ..const import COMMAND_CONFIRMATION_DELAY, DOMAIN, UI_UPDATE_DELAY
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolControlEntity
-from ..helpers import get_schedule_data
+from ..helpers import get_schedule_data, resolve_schedule_component
 from ..utils import convert_cron_days
 
 if TYPE_CHECKING:
@@ -267,7 +267,7 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
                 self.async_write_ha_state()
                 return
 
-            schedule_component = DeviceIdentifier.get_feature(device_data, "schedule_component", 258)
+            schedule_component = resolve_schedule_component(device_data, 258)
 
             updated_schedules = []
             for sched in current_schedules:

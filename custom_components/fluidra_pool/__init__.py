@@ -32,6 +32,7 @@ from .const import (
     FluidraPoolConfigEntry,
     FluidraPoolRuntimeData,
 )
+from .helpers import resolve_schedule_component
 from .utils import mask_email
 
 if TYPE_CHECKING:
@@ -285,13 +286,10 @@ def _coordinator_has_device(coordinator: FluidraDataUpdateCoordinator, device_id
 
 def _get_schedule_component(coordinator: FluidraDataUpdateCoordinator, device_id: str) -> int:
     """Return the schedule component for a device, defaulting to pump schedules."""
-    from .device_registry import DeviceIdentifier
-
     device = _get_device_data(coordinator, device_id)
     if device is None:
         return COMPONENT_SCHEDULE
-    component: int = DeviceIdentifier.get_feature(device, "schedule_component", COMPONENT_SCHEDULE)
-    return component
+    return resolve_schedule_component(device, COMPONENT_SCHEDULE)
 
 
 def _get_coordinator_for_device(hass: HomeAssistant, device_id: str) -> FluidraDataUpdateCoordinator:

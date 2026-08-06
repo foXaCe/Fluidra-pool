@@ -11,6 +11,41 @@ from datetime import time
 from typing import Any
 
 
+def resolve_schedule_component(device_data: dict[str, Any], default: int = 20) -> int:
+    """Return the schedule register the device is currently honouring.
+
+    Most devices keep their schedules on one fixed register, declared as
+    ``schedule_component``. The eXO iQ moves them depending on how its pump is
+    configured — chlorination-only on c19, simple pump on c20, variable-speed on
+    c21 — and Fluidra honours only the one matching the current configuration.
+
+    Picking "whichever register has entries" does not work: stale schedules
+    survive a configuration change, so two registers can be populated at once
+    with one of them dead. A profile therefore declares which flags report the
+    pump type, and the register follows from those (Issue #174, @Inervo).
+    """
+    # Imported here to keep this module free of package-level import cycles.
+    from .device_registry import DeviceIdentifier
+
+    mapping = DeviceIdentifier.get_feature(device_data, "schedule_component_map", None)
+    if not isinstance(mapping, dict):
+        component = DeviceIdentifier.get_feature(device_data, "schedule_component", default)
+        return int(component) if component is not None else default
+
+    components = device_data.get("components", {})
+
+    def _flag(register: Any) -> bool:
+        if register is None:
+            return False
+        return bool(components.get(str(register), {}).get("reportedValue"))
+
+    if _flag(mapping.get("vs_flag")):
+        return int(mapping["vs"])
+    if _flag(mapping.get("simple_flag")):
+        return int(mapping["simple"])
+    return int(mapping["none"])
+
+
 def get_schedule_data(device_data: dict[str, Any], schedule_id: Any) -> dict[str, Any] | None:
     """Return the schedule dict matching ``schedule_id`` in ``device_data``.
 

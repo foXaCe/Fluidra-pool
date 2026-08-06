@@ -1001,8 +1001,22 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "ph_setpoint": 40,  # ÷10 — pH setpoint (72 = 7.2 target).
             "ph_setpoint_divisor": 10,  # EXO uses ÷10 (not ÷100 like CC chlorinators).
             "schedules": True,
-            "schedule_count": 4,
-            "schedule_component": 20,
+            # Six slots per output, confirmed in the app (Issue #174, @Inervo).
+            "schedule_count": 6,
+            "schedule_component": 20,  # Fallback; the map below decides at runtime.
+            # The eXO moves its pump/chlorination schedules by pump type, and
+            # honours only the register matching the current configuration.
+            # Stale entries survive a configuration change, so "whichever
+            # register has content" cannot identify the live one — the pump-type
+            # flags can. Confirmed across six captures: no pump c82/c83 both
+            # false, simple pump c82 true, VS pump c83 true (Issue #174, @Inervo).
+            "schedule_component_map": {
+                "none": 19,  # Chlorination-only schedules.
+                "simple": 20,
+                "vs": 21,  # Carries componentActions with the target RPM.
+                "simple_flag": 82,
+                "vs_flag": 83,
+            },
             "schedule_output_type": "output",  # pump/aux1/aux2.
             "exo_mode": True,
             # on_off_component removed — mode select (AUTO/ON/OFF) replaces ON/OFF switch.
@@ -1029,7 +1043,9 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 14,
                 15,
                 17,
+                19,
                 20,
+                21,
                 30,
                 31,
                 35,
@@ -1044,6 +1060,8 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 62,
                 63,
                 64,
+                82,
+                83,
                 88,
                 90,
                 91,

@@ -15,7 +15,7 @@ from ..api_resilience import FluidraError
 from ..const import DEVICE_MODEL_FALLBACK, DEVICE_MODEL_MAP, DOMAIN
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolControlEntity
-from ..helpers import get_schedule_data
+from ..helpers import get_schedule_data, resolve_schedule_component
 from ..utils import extract_cron_days
 
 if TYPE_CHECKING:
@@ -148,7 +148,7 @@ class FluidraScheduleTimeEntity(_FluidraTimeEntityBase):
         """Get the correct schedule component ID for this device."""
         device_data = self.device_data
         # Per-device override (e.g. 258 for DM24049704 chlorinator).
-        schedule_comp: int = DeviceIdentifier.get_feature(device_data, "schedule_component")
+        schedule_comp: int = resolve_schedule_component(device_data)
         if schedule_comp:
             return schedule_comp
         # Default to component 20 (pumps).

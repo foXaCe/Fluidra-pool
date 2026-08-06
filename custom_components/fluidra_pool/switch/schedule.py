@@ -11,8 +11,7 @@ from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
 from ..const import DOMAIN
-from ..device_registry import DeviceIdentifier
-from ..helpers import get_schedule_data
+from ..helpers import get_schedule_data, resolve_schedule_component
 from .base import FluidraPoolSwitchEntity
 
 if TYPE_CHECKING:
@@ -92,7 +91,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
 
     def _get_schedule_component(self) -> int:
         """Get the schedule component used by this device."""
-        value: int = DeviceIdentifier.get_feature(self.device_data, "schedule_component", 20)
+        value: int = resolve_schedule_component(self.device_data)
         return value
 
     @property
