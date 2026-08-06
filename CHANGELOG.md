@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.78.0] - 2026-08-06
+
+### Added
+
+- **Z250iQ / Z260iQ: `hvac_action` now reflects the live compressor state** — the action was derived
+  from `c14`, which only reports the mode the unit was *set to*, so a heat pump sitting idle at its
+  setpoint still showed as heating. `c75` reports what the compressor is actually doing: `0` idle,
+  `16` heating, `24` cooling, confirmed on hardware by driving the unit through Boost/Silent and
+  Heating/Cooling. Only those three values are trusted — a transient `8` was seen for a few seconds
+  after a mode change and remains unexplained, so any other value falls through to the previous
+  mode-derived behaviour, and units that never report `c75` are unaffected (Issue #139, @Kal42).
+
 ## [2.77.0] - 2026-08-06
 
 ### Added
