@@ -387,10 +387,61 @@ def test_chlorinator_ph_zero_reads_unknown() -> None:
 
 
 def test_chlorinator_salinity_zero_reads_unknown() -> None:
-    """A running salt cell never reads exactly 0 g/L — a frozen 0 means no reading (Issue #129)."""
+    """A running salt cell never reads exactly 0 g/L — a frozen 0 means no reading (Issue #129).
+
+    With no prior real reading captured (e.g. right after an HA restart),
+    there is nothing to fall back to, so this stays "unknown" — see
+    test_chlorinator_salinity_zero_falls_back_to_last_known_value for the
+    case where a real reading was seen earlier in the same session.
+    """
     device = _pinned_device(DEVICE_ID, components={"185": {"reportedValue": 0}})
     sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "salinity", 185)
     assert sensor.native_value is None
+
+
+def test_chlorinator_salinity_zero_falls_back_to_last_known_value() -> None:
+    """Salinity holds the last real reading while production is too low to measure.
+
+    Unlike ORP/pH, a salinity probe reading 0 is a *temporary* condition
+    (Fluidra documents it as chlorination production dropping below ~40%,
+    not a hardware/echo issue), so a dashboard gauge is better served by the
+    last real value than by going blank every time production dips.
+    """
+    device = _pinned_device(DEVICE_ID, components={"185": {"reportedValue": 467}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "salinity", 185)
+    sensor._update_last_known_salinity()  # a trustworthy poll happened
+    assert sensor.native_value == pytest.approx(4.67)
+
+    # Production drops: the component now reports 0.
+    device["components"] = {"185": {"reportedValue": 0}}
+    sensor._update_last_known_salinity()  # no-op: 0 is not a real reading
+    assert sensor.native_value == pytest.approx(4.67)
+
+
+def test_chlorinator_salinity_extra_state_attributes_expose_last_known() -> None:
+    """The salinity sensor exposes last_known_value/at and low_production; others don't."""
+    device = _pinned_device(DEVICE_ID, components={"185": {"reportedValue": 467}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "salinity", 185)
+    sensor._update_last_known_salinity()
+
+    device["components"] = {"185": {"reportedValue": 0}}
+    attrs = sensor.extra_state_attributes
+    assert attrs["last_known_value"] == pytest.approx(4.67)
+    assert attrs["last_known_at"] is not None
+    assert attrs["low_production"] is True
+
+    orp_device = _pinned_device(DEVICE_ID, components={"63": {"reportedValue": 738}})
+    orp_sensor = FluidraChlorinatorSensor(_coord([orp_device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "orp", 63)
+    assert "last_known_value" not in orp_sensor.extra_state_attributes
+
+
+def test_chlorinator_salinity_last_known_update_is_a_no_op_for_other_sensor_types() -> None:
+    """`_update_last_known_salinity` only tracks salinity, mirroring the zero-value guard."""
+    device = _pinned_device(DEVICE_ID, components={"63": {"reportedValue": 0}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "orp", 63)
+    sensor._update_last_known_salinity()
+    assert sensor._last_known_value is None
+    assert sensor._last_known_at is None
 
 
 def test_chlorinator_ph_nonzero_reads_value() -> None:
