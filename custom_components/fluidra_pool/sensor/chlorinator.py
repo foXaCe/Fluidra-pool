@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -18,7 +19,9 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfTime,
 )
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.util import dt as dt_util
 
 from ..const import DOMAIN
 from ..device_registry import DeviceIdentifier
@@ -113,6 +116,14 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         self._api = api
         self._sensor_type = sensor_type
         self._component_id = component_id
+
+        # Last real (non-zero) salinity reading, held while the probe can't
+        # measure due to low production (see native_value). In-memory only —
+        # reset to None on every integration reload/HA restart until the next
+        # real reading, same lifetime as the alarm binary sensor's
+        # last-known-* pair. Unused by every other sensor_type.
+        self._last_known_value: float | None = None
+        self._last_known_at: datetime | None = None
 
         # Sensor configuration based on type
         self._sensor_config: dict[str, dict[str, Any]] = {
@@ -242,9 +253,8 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         mapped = sensors.get(self._sensor_type)
         return mapped if isinstance(mapped, int) else self._component_id
 
-    @property
-    def native_value(self) -> float | None:
-        """Return the sensor value."""
+    def _parsed_value(self) -> float | None:
+        """Return the current raw component value divided by ``_divisor``, or None."""
         components = self.device_data.get("components", {})
         component_data = components.get(str(self._resolved_component_id), {})
         raw_value = component_data.get("reportedValue")
@@ -254,8 +264,42 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
 
         try:
             value: float = float(raw_value) / self._divisor
+            return value
         except (ValueError, TypeError):
             _LOGGER.debug("Failed to parse sensor value %s for component %s", raw_value, self._component_id)
+            return None
+
+    def _update_last_known_salinity(self) -> None:
+        """Snapshot the last real (non-zero) salinity reading, once per poll.
+
+        Kept separate from ``_handle_coordinator_update`` so it can be
+        exercised in tests without a real ``hass``/entity_id. No-op for
+        every sensor_type other than salinity.
+        """
+        if self._sensor_type != "salinity":
+            return
+        value = self._parsed_value()
+        if value is not None and value != 0:
+            self._last_known_value = value
+            self._last_known_at = dt_util.utcnow()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator.
+
+        Runs once per coordinator refresh (unlike ``native_value``/
+        ``extra_state_attributes``, which HA may read multiple times per
+        update), so this is the right place for the last-known-good
+        bookkeeping rather than a side effect inside those properties.
+        """
+        self._update_last_known_salinity()
+        super()._handle_coordinator_update()
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the sensor value."""
+        value = self._parsed_value()
+        if value is None:
             return None
 
         # A pH / ORP / salinity reading of exactly 0 is physically impossible for
@@ -263,9 +307,18 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         # than a real value: a bare ORP register on a probe-less unit (Zodiac
         # eXO iQ LS optional Dual Link probe, Issue #111), a pH register that
         # only echoes the setpoint and clears to 0 when the dosing pump is idle,
-        # or a salinity slot frozen at 0 (Issue #129). Report "unknown" instead
-        # of a misleading 0; a real value surfaces automatically if it appears.
-        if value == 0 and self._sensor_type in ("orp", "ph", "salinity"):
+        # or a salinity slot that reads 0 whenever chlorination production drops
+        # below the ~40% threshold Fluidra documents for the conductivity probe
+        # (Issue #129). ORP/pH report "unknown" outright — a real value surfaces
+        # automatically if it appears. Salinity instead falls back to the last
+        # real reading (see _update_last_known_salinity), since a dashboard
+        # gauge tracking a continuously-produced measurement is more useful
+        # showing a slightly stale number than going blank every time
+        # production dips, and "unknown" is still correct if no real reading
+        # has ever been seen (e.g. right after an HA restart).
+        if value == 0 and self._sensor_type == "salinity":
+            return self._last_known_value
+        if value == 0 and self._sensor_type in ("orp", "ph"):
             return None
 
         return value
@@ -277,10 +330,17 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         components = self.device_data.get("components", {})
         component_data = components.get(str(component_id), {})
 
-        return {
+        attributes: dict[str, Any] = {
             "component_id": component_id,
             "sensor_type": self._sensor_type,
             "raw_value": component_data.get("reportedValue"),
             "divisor": self._divisor,
             "device_id": self._device_id,
         }
+
+        if self._sensor_type == "salinity":
+            attributes["last_known_value"] = self._last_known_value
+            attributes["last_known_at"] = self._last_known_at.isoformat() if self._last_known_at else None
+            attributes["low_production"] = self._parsed_value() == 0
+
+        return attributes
