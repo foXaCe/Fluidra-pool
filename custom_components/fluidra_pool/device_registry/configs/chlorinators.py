@@ -633,6 +633,24 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # level, boost mode, pH setpoint, ORP setpoint) now write correctly and
         # the official app reflects each change within seconds, in both
         # directions (HA->app and app->HA).
+        # chlorination_actual (real cell output %, distinct from the c10 setpoint
+        # above) confirmed 2026-08-07. A same-value test first (consigna and real
+        # output both at 60%) couldn't tell a live sensor from a setpoint echo,
+        # since c10/c153/c154 all read 60 with no way to tell them apart. Forced
+        # a genuine split instead: lowered the ORP setpoint (c20) below the live
+        # ORP reading until the app confirmed real production had dropped to 0%,
+        # while the chlorination_level setpoint (c10) was left untouched at 60%.
+        # A component sweep at that moment showed c10 still at 60 with the exact
+        # same timestamp as before the test (never re-written -- it only reflects
+        # the configured target), while c153 and c154 had both dropped to 0 with
+        # their own fresh timestamps, seconds apart from the live ORP/salinity
+        # refresh -- a live reading, not an echo of c10. c154 is mapped here
+        # rather than c153 (which gave the identical result in this test) to
+        # match the register every other verified profile in this file already
+        # uses for chlorination_actual (cc24068402_chlorinator,
+        # cc_energy_connect_bridged_chlorinator, cc25005502_chlorinator,
+        # cc24042711_chlorinator) -- one fewer outlier in the catalog rather than
+        # a second convention for the same feature.
         identifier_patterns=["CC24018506*"],
         family_patterns=["chlorinator"],
         components_range=25,
@@ -649,11 +667,12 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "temperature": 172,  # 315 = 31.5 °C.
                 "ph": 165,  # Confirmed live pH probe reading — see profile comment.
                 "salinity": 174,  # Confirmed live salinity — see profile comment.
+                "chlorination_actual": 154,  # Real cell output % — confirmed 2026-08-07, see profile comment.
             },
             # 103 must be listed: specific_components is the exhaustive scan set
             # ([0,1,2,3] + this list), so an unlisted boost register is written but
             # never read back, leaving the switch snapping to off after each poll.
-            "specific_components": [4, 8, 10, 11, 16, 20, 103, 164, 165, 170, 172, 174, 245],
+            "specific_components": [4, 8, 10, 11, 16, 20, 103, 154, 164, 165, 170, 172, 174, 245],
         },
         priority=90,
     ),
