@@ -295,6 +295,8 @@ class TestDeviceConfigRegistry:
         # Confirmed live pH probe (c165) and salinity (c174) — see profile comment.
         assert sensors["ph"] == 165
         assert sensors["salinity"] == 174
+        # Real cell output % (c154), confirmed 2026-08-07 — see profile comment.
+        assert sensors["chlorination_actual"] == 154
         # c20 is the ORP setpoint, not a mode register -> the broken mode select is skipped.
         assert config.features["skip_mode_select"] is True
         # Single-component fixes (2026-08-05): the declared write/read pairs and the
@@ -312,7 +314,7 @@ class TestDeviceConfigRegistry:
         for feature in ("chlorination_level", "ph_setpoint", "orp_setpoint", "boost_mode"):
             assert config.features[feature] in scanned, feature
         assert scanned >= set(config.features["sensors"].values())
-        assert set(config.features["specific_components"]) >= {10, 165, 174}
+        assert set(config.features["specific_components"]) >= {10, 154, 165, 174}
 
     def test_cc26010842_ei2_iq_20_ph_evo_ph_only_layout(self):
         """Ei2 iQ 20 pH Evo CC26010842 maps on the pH-only tecnoLC2 layout (Issue #104)."""
