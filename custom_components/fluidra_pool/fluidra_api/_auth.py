@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -42,24 +43,35 @@ class AuthMixin(FluidraAPIBase):
 
         Tries the stored refresh token first to avoid MFA on every HA restart.
         Falls back to full credentials auth only when needed.
+
+        The user-profile fetch and the pool/device discovery are independent of
+        each other once the access token is valid, so they run concurrently —
+        this trims one full RTT from the boot critical path (profile and pools
+        used to be two sequential requests).
         """
         try:
             if self.refresh_token:
                 if await self.refresh_access_token():
                     _LOGGER.info("Authenticated via stored refresh token (no MFA required)")
-                    await self._get_user_profile()
-                    await self.async_update_data()
+                    await self._post_auth_discovery()
                     return
                 _LOGGER.warning("Stored refresh token expired or invalid, falling back to full auth")
 
             await self._cognito_initial_auth()
-            await self._get_user_profile()
-            await self.async_update_data()
+            await self._post_auth_discovery()
 
         except FluidraError:
             raise
         except (aiohttp.ClientError, TimeoutError, json.JSONDecodeError, KeyError) as err:
             raise FluidraAuthError(f"Authentication failed: {type(err).__name__}") from err
+
+    async def _post_auth_discovery(self) -> None:
+        """Fetch the consumer profile and discover pools/devices concurrently.
+
+        Extracted from :meth:`authenticate` so both call sites (stored-token and
+        full-auth) share the same boot-time parallelism.
+        """
+        await asyncio.gather(self._get_user_profile(), self.async_update_data())
 
     async def _cognito_initial_auth(self) -> None:
         """Perform initial AWS Cognito authentication."""

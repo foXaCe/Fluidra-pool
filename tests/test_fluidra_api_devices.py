@@ -12,6 +12,7 @@ from custom_components.fluidra_pool.api_resilience import (
     FluidraCircuitBreakerError,
     FluidraConnectionError,
 )
+from custom_components.fluidra_pool.fluidra_api._constants import USER_POOLS_ENDPOINT
 from custom_components.fluidra_pool.fluidra_api._devices import DevicesMixin
 
 
@@ -77,14 +78,48 @@ async def test_async_update_data_keeps_state_unchanged_on_request_error() -> Non
 async def test_async_update_data_skips_pool_devices_when_inner_call_fails() -> None:
     """A device discovery failure for one pool doesn't break the rest."""
     api = _FakeAPI()
-    api._request.side_effect = [
-        (200, [{"id": "pool_1"}, {"id": "pool_2"}], "[]"),
-        FluidraConnectionError("fail for pool_1"),  # _discover_devices_for_pool raises.
-        (200, [{"id": "DEV-2", "info": {"name": "Pump", "family": "pump"}, "type": "connected"}], "[]"),
-    ]
+
+    async def _request(method, url, **kwargs):
+        if url == USER_POOLS_ENDPOINT:
+            return (200, [{"id": "pool_1"}, {"id": "pool_2"}], "[]")
+        if kwargs.get("params", {}).get("poolId") == "pool_1":
+            raise FluidraConnectionError("fail for pool_1")
+        return (200, [{"id": "DEV-2", "info": {"name": "Pump", "family": "pump"}, "type": "connected"}], "[]")
+
+    api._request = _request
     await api.async_update_data()
     # pool_2's devices were still discovered.
     assert any(d["device_id"] == "DEV-2" for d in api.devices)
+
+
+async def test_async_update_data_discovers_pools_concurrently() -> None:
+    """Per-pool device discovery runs in parallel (boot critical path).
+
+    Each pool's device fetch blocks on an event released by the other pool's
+    *entry*. If the pools were discovered one after another, the second fetch
+    would never start and the call would deadlock (the 2s cap turns that into
+    a failure).
+    """
+    import asyncio
+
+    api = _FakeAPI()
+    pool_1_entered = asyncio.Event()
+    pool_2_entered = asyncio.Event()
+
+    async def _request(method, url, **kwargs):
+        if url == USER_POOLS_ENDPOINT:
+            return (200, [{"id": "pool_1"}, {"id": "pool_2"}], "[]")
+        # Device-tree fetch for a pool: block until the sibling pool entered too.
+        pool_id = kwargs.get("params", {}).get("poolId")
+        event = pool_1_entered if pool_id == "pool_1" else pool_2_entered
+        event.set()
+        other = pool_2_entered if pool_id == "pool_1" else pool_1_entered
+        await other.wait()
+        return (200, [{"id": f"DEV-{pool_id}", "info": {"name": "Pump", "family": "pump"}, "type": "connected"}], "[]")
+
+    api._request = _request
+    await asyncio.wait_for(api.async_update_data(), timeout=2)
+    assert {d["device_id"] for d in api.devices} == {"DEV-pool_1", "DEV-pool_2"}
 
 
 # --- _discover_devices_for_pool ------------------------------------------

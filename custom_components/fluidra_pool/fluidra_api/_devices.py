@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 from urllib.parse import quote
@@ -19,7 +20,14 @@ class DevicesMixin(FluidraAPIBase):
     """Pool & device discovery, caching, and polling."""
 
     async def async_update_data(self) -> None:
-        """Discover pools and devices for the account; atomic replacement at end."""
+        """Discover pools and devices for the account; atomic replacement at end.
+
+        Device discovery per pool runs concurrently: pools are independent
+        once the account's pool list is known, so a multi-pool account's boot
+        discovery drops from N sequential RTTs to one (this is on the HA boot
+        critical path via ``authenticate``). ``asyncio.gather`` keeps the
+        result order aligned with the pool list.
+        """
         headers = self._build_auth_headers()
 
         user_pools: list[dict[str, Any]] = []
@@ -33,11 +41,14 @@ class DevicesMixin(FluidraAPIBase):
                 elif isinstance(data, dict):
                     user_pools = data.get("pools", [])
 
-                for pool in user_pools:
-                    pool_id = pool.get("id")
-                    if pool_id:
-                        pool_devices = await self._discover_devices_for_pool(pool_id, headers)
-                        devices.extend(pool_devices)
+                pool_ids: list[str] = [str(pool["id"]) for pool in user_pools if pool.get("id")]
+                discovery_results = await asyncio.gather(
+                    *(self._discover_devices_for_pool(pool_id, headers) for pool_id in pool_ids),
+                    return_exceptions=True,
+                )
+                for result in discovery_results:
+                    if isinstance(result, list):
+                        devices.extend(result)
         except FluidraError as err:
             _LOGGER.warning("Failed to update data: %s", err)
             return
