@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.78.3] - 2026-08-09
+
+### Performance
+
+- **Faster setup on every HA restart** — the config-entry setup previously ran
+  four sequential HTTP round-trips (refresh token → profile → pools → devices).
+  The profile fetch and the pool/device discovery only depend on the freshly-obtained
+  access token, so they now run concurrently, and per-pool device discovery is
+  parallelized for multi-pool accounts. Measured on the HA dev instance:
+  `config_entry_setup` drops from ~2.18s to ~1.19s (-45%).
+
 ## [2.78.2] - 2026-08-09
 
 ### Fixed
