@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.78.2] - 2026-08-09
+
+### Fixed
+
+- **Enabling/disabling a schedule could bounce with an API error** — the schedule toggle echoed each
+  slot back to the API verbatim, including the read-only runtime fields `state`/`endActions`. The
+  Fluidra backend rejects those in a write payload (`invalid scheduleUser`, Issue #89), so toggling a
+  schedule on any device failed. The write now strips them (Issue #174).
+- **Zodiac eXO iQ: editing a schedule's start/end time reset its mode and shifted the days** — the
+  time entities rebuilt every slot from scratch as `operationName` with a `"0"` default, so a unit
+  whose schedule mode lives in `componentActions` silently lost it, and the cron day field was run
+  through a 0→7 conversion on every write even though it had just been read back from the API in its
+  own format. Entries are now copied verbatim and only the edited time changes, preserving the mode
+  and the days (Issue #174).
+
 ## [2.78.1] - 2026-08-06
 
 ### Fixed
