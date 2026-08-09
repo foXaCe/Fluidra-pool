@@ -59,7 +59,8 @@ def test_enabling_preserves_cron_days_verbatim() -> None:
 def test_only_the_targeted_slot_changes() -> None:
     """Toggling one slot must leave the others byte-identical."""
     updated = _with_enabled([EXO_SLOT, LEGACY_SLOT], 2, True)
-    assert updated[0] == EXO_SLOT  # untouched
+    expected_untouched = {k: v for k, v in EXO_SLOT.items() if k not in ("state", "endActions")}
+    assert updated[0] == expected_untouched  # untouched except read-only fields stripped
     assert updated[1]["enabled"] is True
     assert updated[1]["startActions"] == {"operationName": "2"}  # mode preserved
 
@@ -67,8 +68,8 @@ def test_only_the_targeted_slot_changes() -> None:
 def test_disabling_only_flips_the_flag() -> None:
     updated = _with_enabled([EXO_SLOT], 1, False)
     assert updated[0]["enabled"] is False
-    assert {k: v for k, v in updated[0].items() if k != "enabled"} == {
-        k: v for k, v in EXO_SLOT.items() if k != "enabled"
+    assert {k: v for k, v in updated[0].items() if k not in ("enabled", "state", "endActions")} == {
+        k: v for k, v in EXO_SLOT.items() if k not in ("enabled", "state", "endActions")
     }
 
 
@@ -77,7 +78,22 @@ def test_unknown_fields_are_carried_through() -> None:
     slot = {**EXO_SLOT, "someFutureField": {"nested": True}}
     [updated] = _with_enabled([slot], 1, True)
     assert updated["someFutureField"] == {"nested": True}
-    assert updated["state"] == "IDLE"
+
+
+def test_state_and_end_actions_are_stripped_before_write() -> None:
+    """Runtime fields the API reports but rejects on write must not be echoed.
+
+    A capture of the official app's PUT body carries only id/groupId/startActions
+    (Issue #89); `state`/`endActions` in the payload made the backend reject the
+    whole list as "invalid scheduleUser". Since toggling echoes every slot back,
+    they have to be dropped or the toggle bounces with an API error (Issue #174).
+    """
+    [updated] = _with_enabled([EXO_SLOT], 1, True)
+    assert "state" not in updated
+    assert "endActions" not in updated
+    # startActions — the actual configuration — survives untouched.
+    assert updated["startActions"] == {"componentActions": [{"id": 0, "reportedValue": 1}]}
+    assert updated["startTime"] == "00 08 * * 0,1,2,3,4,5,6"
 
 
 def test_group_id_defaults_to_id_when_absent() -> None:

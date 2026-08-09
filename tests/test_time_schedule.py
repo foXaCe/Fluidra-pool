@@ -303,8 +303,71 @@ async def test_start_time_set_value_preserves_existing_days() -> None:
     assert sent[0]["startTime"].endswith("* * 1,3,5")
 
 
-async def test_start_time_set_value_converts_cron_sunday_zero_to_seven() -> None:
-    """CRON day 0 (Sunday) is rewritten as 7 in the mobile-app payload."""
+async def test_start_time_set_value_preserves_component_actions() -> None:
+    """An eXO schedule whose mode lives in componentActions must keep it.
+
+    The old code rebuilt every slot's startActions as operationName with a "0"
+    default, so merely editing a time silently reset the eXO's mode to 0
+    (Issue #175, same class as the switch corruption). The entry is now copied
+    verbatim and only the time field is touched.
+    """
+    schedule = {
+        "id": 1,
+        "groupId": 1,
+        "enabled": True,
+        "startTime": "0 8 * * 0,1,2,3,4,5,6",
+        "endTime": "0 12 * * 0,1,2,3,4,5,6",
+        "startActions": {"componentActions": [{"id": 0, "reportedValue": 1}]},
+        "state": "IDLE",
+    }
+    device = _pump_device([schedule])
+    api = _api()
+    entity = FluidraScheduleStartTimeEntity(_coord(device), api, POOL_ID, PUMP_ID, schedule_id="1")
+    _attach_ha(entity)
+
+    await entity.async_set_value(time(9, 0))
+
+    sent = api.set_schedule.call_args.args[1]
+    assert len(sent) == 1
+    # Mode survives; only the start time moved (days and end preserved).
+    assert sent[0]["startActions"] == {"componentActions": [{"id": 0, "reportedValue": 1}]}
+    assert sent[0]["startTime"] == "0 9 * * 0,1,2,3,4,5,6"
+    assert sent[0]["endTime"] == "0 12 * * 0,1,2,3,4,5,6"
+    # Read-only runtime fields are stripped from the write payload (Issue #174).
+    assert "state" not in sent[0]
+
+
+async def test_end_time_set_value_preserves_component_actions() -> None:
+    """Symmetrically, editing the end time must not touch the eXO's mode."""
+    schedule = {
+        "id": 2,
+        "groupId": 2,
+        "enabled": True,
+        "startTime": "0 8 * * 0,1,2,3,4,5,6",
+        "endTime": "0 12 * * 0,1,2,3,4,5,6",
+        "startActions": {"componentActions": [{"id": 0, "reportedValue": 1}]},
+    }
+    device = _pump_device([schedule])
+    api = _api()
+    entity = FluidraScheduleEndTimeEntity(_coord(device), api, POOL_ID, PUMP_ID, schedule_id="2")
+    _attach_ha(entity)
+
+    await entity.async_set_value(time(13, 0))
+
+    sent = api.set_schedule.call_args.args[1]
+    assert len(sent) == 1
+    assert sent[0]["startActions"] == {"componentActions": [{"id": 0, "reportedValue": 1}]}
+    assert sent[0]["startTime"] == "0 8 * * 0,1,2,3,4,5,6"
+    assert sent[0]["endTime"] == "0 13 * * 0,1,2,3,4,5,6"
+
+
+async def test_start_time_set_value_preserves_cron_sunday_zero_verbatim() -> None:
+    """CRON day 0 (Sunday) is kept as-is, not shifted to 7.
+
+    The day field comes straight from the API in the API's own numbering; running
+    it through a 0→7 conversion on every write shifted the configured days
+    (Issue #175), so the days are preserved verbatim alongside the time edit.
+    """
     schedule = {**SCHEDULE, "id": 1, "startTime": "0 8 * * 0,1"}
     device = _pump_device([schedule])
     api = _api()
@@ -314,8 +377,8 @@ async def test_start_time_set_value_converts_cron_sunday_zero_to_seven() -> None
     await entity.async_set_value(time(7, 0))
 
     sent = api.set_schedule.call_args.args[1]
-    # The days are sorted and Sunday 0 becomes 7.
-    assert sent[0]["startTime"].endswith("* * 1,7")
+    # Only the minute/hour changed; the days are untouched.
+    assert sent[0]["startTime"] == "0 7 * * 0,1"
 
 
 async def test_start_time_set_value_refreshes_coordinator_on_success() -> None:

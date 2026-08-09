@@ -13,7 +13,6 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from ..api_resilience import FluidraError
 from ..const import COMMAND_CONFIRMATION_DELAY, DOMAIN
-from ..utils import convert_cron_days
 from .base import FluidraScheduleTimeEntity
 
 if TYPE_CHECKING:
@@ -21,6 +20,21 @@ if TYPE_CHECKING:
     from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _replace_cron_time(cron_time: str, new_time: time) -> str:
+    """Return ``cron_time`` with only its minute/hour replaced, days preserved.
+
+    The day field is copied verbatim — it came straight from the API in the API's
+    own numbering, so rewriting it (e.g. a 0→7 conversion) would shift the
+    configured days on every write (Issue #175).
+    """
+    parts = cron_time.split()
+    if len(parts) >= 5:
+        parts[0] = str(new_time.minute)
+        parts[1] = str(new_time.hour)
+        return " ".join(parts)
+    return f"{new_time.minute} {new_time.hour} * * 1,2,3,4,5,6,7"
 
 
 class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
@@ -93,28 +107,9 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
 
             updated_schedules = []
             for sched in current_schedules:
-                start_time = convert_cron_days(sched.get("startTime", ""))
-                end_time = convert_cron_days(sched.get("endTime", ""))
-
+                scheduler = dict(sched)
                 if str(sched.get("id")) == str(self._schedule_id):
-                    current_cron = sched.get("startTime", "")
-                    days = [1, 2, 3, 4, 5, 6, 7]  # Default to every day (mobile format).
-                    if current_cron:
-                        parts = current_cron.split()
-                        if len(parts) >= 5:
-                            try:
-                                old_days = [int(d) for d in parts[4].split(",")]
-                                days = []
-                                for day in old_days:
-                                    if day == 0:  # CRON Sunday 0 → mobile Sunday 7.
-                                        days.append(7)
-                                    else:
-                                        days.append(day)
-                                days = sorted(days)
-                            except (ValueError, TypeError):
-                                pass
-
-                    start_time = self._format_time_to_cron(value, days)
+                    scheduler["startTime"] = _replace_cron_time(sched.get("startTime", ""), value)
 
                 component_id = self._get_schedule_component()
 
@@ -124,19 +119,20 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
                         "id": sched.get("id"),
                         "groupId": 1,
                         "enabled": True,
-                        "startTime": self._format_cron_time_chlorinator(start_time),
-                        "endTime": self._format_cron_time_chlorinator(end_time),
+                        "startTime": self._format_cron_time_chlorinator(scheduler["startTime"]),
+                        "endTime": self._format_cron_time_chlorinator(scheduler.get("endTime", "")),
                         "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "1"))},
                     }
                 else:
-                    scheduler = {
-                        "id": sched.get("id"),
-                        "groupId": sched.get("id"),
-                        "enabled": sched.get("enabled", False),
-                        "startTime": start_time,
-                        "endTime": end_time,
-                        "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
-                    }
+                    # Copy the entry verbatim and touch only the time being edited,
+                    # so a schedule whose mode lives in componentActions (eXO iQ)
+                    # keeps it instead of being rebuilt as operationName (Issue #175).
+                    scheduler.setdefault("groupId", sched.get("id"))
+                    scheduler["startTime"] = scheduler.get("startTime", "")
+                    scheduler["endTime"] = scheduler.get("endTime", "")
+                    # Read-only runtime fields the API rejects on write (Issue #89/#174).
+                    scheduler.pop("state", None)
+                    scheduler.pop("endActions", None)
                 updated_schedules.append(scheduler)
 
             component_id = self._get_schedule_component()
@@ -249,49 +245,30 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
 
             updated_schedules = []
             for sched in current_schedules:
-                start_time = convert_cron_days(sched.get("startTime", ""))
-                end_time = convert_cron_days(sched.get("endTime", ""))
-
+                scheduler = dict(sched)
                 if str(sched.get("id")) == str(self._schedule_id):
-                    current_cron = sched.get("endTime", "")
-                    days = [1, 2, 3, 4, 5, 6, 7]
-                    if current_cron:
-                        parts = current_cron.split()
-                        if len(parts) >= 5:
-                            try:
-                                old_days = [int(d) for d in parts[4].split(",")]
-                                days = []
-                                for day in old_days:
-                                    if day == 0:
-                                        days.append(7)
-                                    else:
-                                        days.append(day)
-                                days = sorted(days)
-                            except (ValueError, TypeError):
-                                pass
-
-                    end_time = self._format_time_to_cron(value, days)
+                    scheduler["endTime"] = _replace_cron_time(sched.get("endTime", ""), value)
 
                 component_id = self._get_schedule_component()
 
                 if component_id == 258:
+                    # DM24049704 chlorinator uses a flat groupId=1 + padded CRON.
                     scheduler = {
                         "id": sched.get("id"),
                         "groupId": 1,
                         "enabled": True,
-                        "startTime": self._format_cron_time_chlorinator(start_time),
-                        "endTime": self._format_cron_time_chlorinator(end_time),
+                        "startTime": self._format_cron_time_chlorinator(scheduler.get("startTime", "")),
+                        "endTime": self._format_cron_time_chlorinator(scheduler["endTime"]),
                         "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "1"))},
                     }
                 else:
-                    scheduler = {
-                        "id": sched.get("id"),
-                        "groupId": sched.get("id"),
-                        "enabled": sched.get("enabled", False),
-                        "startTime": start_time,
-                        "endTime": end_time,
-                        "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "0"))},
-                    }
+                    # Copy the entry verbatim and touch only the time being edited
+                    # (see the start-time entity; Issue #175).
+                    scheduler.setdefault("groupId", sched.get("id"))
+                    scheduler["startTime"] = scheduler.get("startTime", "")
+                    scheduler["endTime"] = scheduler.get("endTime", "")
+                    scheduler.pop("state", None)
+                    scheduler.pop("endActions", None)
                 updated_schedules.append(scheduler)
 
             component_id = self._get_schedule_component()

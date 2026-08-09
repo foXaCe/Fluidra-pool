@@ -37,6 +37,13 @@ def _with_enabled(schedules: list[dict[str, Any]], schedule_id: Any, enabled: bo
 
     Copying the entry verbatim and touching only the one field being changed avoids
     the whole class of problem, and keeps working for payload shapes we've never seen.
+
+    One exception: ``state`` and ``endActions`` are runtime fields the API
+    reports but rejects in a write payload — a capture of the official app's PUT
+    body carries only id/groupId/startActions, and a payload containing
+    synthesised endActions/state was rejected as "invalid scheduleUser"
+    (Issue #89). Since toggling echoes every slot back, they must be dropped
+    or the whole list bounces with an API error (Issue #174).
     """
     updated: list[dict[str, Any]] = []
     for sched in schedules:
@@ -45,6 +52,9 @@ def _with_enabled(schedules: list[dict[str, Any]], schedule_id: Any, enabled: bo
             entry["enabled"] = enabled
         # The API rejects a payload without groupId; mirror id when it's absent.
         entry.setdefault("groupId", entry.get("id"))
+        # Read-only runtime fields the API never accepts on write (see above).
+        entry.pop("state", None)
+        entry.pop("endActions", None)
         updated.append(entry)
     return updated
 
