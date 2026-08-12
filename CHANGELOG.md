@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.78.4] - 2026-08-11
+
+### Fixed
+
+- **Salinity kept showing a reading while the pump was off** — v2.78.2 falls back to the last real
+  value when the register reads 0, because chlorine production below ~40% stops the probe measuring
+  while it still sits in the same water. A no-flow condition reads 0 identically but means the cell
+  holds no flowing water, so the held value describes water that is no longer at the probe. The
+  fallback is now suppressed while the device reports an active `FLOW` alarm, restoring the previous
+  "unknown" for that case only; low production is unchanged, and a live non-zero reading always wins.
+  A `no_flow` attribute exposes which case applies (Issue #193, @FoxP).
+- **`set_schedule` could leave a variable-speed pump unreachable from the Fluidra app** — a VS-pump
+  schedule slot carries two component actions, chlorination and the target pump speed, and the
+  service only sets the first. The resulting slot had no speed, after which the app's device page
+  hung on loading until the pump type was changed on the unit itself. The service now refuses that
+  write with an explanatory error instead of performing it. Chlorination-only and simple-pump
+  schedules are unaffected (Issue #174, @Inervo).
+
 ## [2.78.3] - 2026-08-09
 
 ### Performance
