@@ -459,6 +459,9 @@
     "schedule_set_rejected": {
       "message": "La API de Fluidra rechazó la actualización del horario para {device_id}"
     },
+    "schedule_vs_pump_unsupported": {
+      "message": "No se pueden escribir programaciones en {device_id}: este dispositivo está configurado con una bomba de velocidad variable, cuyas franjas incluyen además una velocidad objetivo que este servicio no puede establecer. Escribir una franja incompleta impide que la aplicación Fluidra cargue el dispositivo. Use la aplicación Fluidra para estas programaciones."
+    },
     "switch_set_failed": {
       "message": "No se pudo cambiar el estado del interruptor"
     },

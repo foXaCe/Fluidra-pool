@@ -317,11 +317,35 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         # production dips, and "unknown" is still correct if no real reading
         # has ever been seen (e.g. right after an HA restart).
         if value == 0 and self._sensor_type == "salinity":
+            # ...but not while the device reports no flow: then the cell is not
+            # full of water at all, so the held reading describes water that is
+            # no longer passing the probe. Report unknown, as before #187
+            # (Issue #193, @FoxP).
+            if self._no_flow_reported():
+                return None
             return self._last_known_value
         if value == 0 and self._sensor_type in ("orp", "ph"):
             return None
 
         return value
+
+    def _no_flow_reported(self) -> bool:
+        """Return True while the device reports an active no-flow alarm.
+
+        A low-production zero and a no-flow zero look identical in the register
+        but mean different things. Production dipping below the ~40% threshold
+        leaves the probe sitting in the same water, so holding the last reading
+        is a reasonable way to keep a dashboard gauge useful. No flow means the
+        cell is not full of water — the last reading then describes water that
+        is no longer there, and showing it invites the reader to trust a number
+        the device is not measuring.
+        """
+        for alarm in self.device_data.get("alarms") or []:
+            if not isinstance(alarm, dict) or not alarm.get("value"):
+                continue
+            if str(alarm.get("errorCode") or "").upper() == "FLOW":
+                return True
+        return False
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -342,5 +366,6 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
             attributes["last_known_value"] = self._last_known_value
             attributes["last_known_at"] = self._last_known_at.isoformat() if self._last_known_at else None
             attributes["low_production"] = self._parsed_value() == 0
+            attributes["no_flow"] = self._no_flow_reported()
 
         return attributes

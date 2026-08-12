@@ -416,6 +416,34 @@ def _schedule_start_actions(mode: Any, use_component_actions: bool) -> dict[str,
     return {"operationName": mode}
 
 
+def _ensure_schedule_write_supported(
+    coordinator: FluidraDataUpdateCoordinator, device_id: str, component_id: int
+) -> None:
+    """Refuse a write that would leave a variable-speed schedule incomplete.
+
+    A VS-pump slot carries two component actions — chlorination under id 0 and
+    the target RPM under id 1. This service only knows the first, so writing to
+    the VS register produces a slot with no speed. The Fluidra app then fails to
+    load the device at all: its detail page hangs until the pump type is changed
+    on the unit itself, which needs physical access (Issue #174, @Inervo).
+
+    Refusing the call is recoverable. Writing is not, so this errors rather than
+    writing a slot that is known to be malformed.
+    """
+    from .device_registry import DeviceIdentifier
+
+    device = _get_device_data(coordinator, device_id)
+    if device is None:
+        return
+    mapping = DeviceIdentifier.get_feature(device, "schedule_component_map", None)
+    if isinstance(mapping, dict) and component_id == mapping.get("vs"):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="schedule_vs_pump_unsupported",
+            translation_placeholders={"device_id": device_id},
+        )
+
+
 async def _async_register_services(hass: HomeAssistant) -> None:
     """Register services for Fluidra Pool.
 
@@ -441,10 +469,11 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             for i, schedule in enumerate(schedules_data, start=1)
         ]
 
+        schedule_component = _get_schedule_component(coordinator, device_id)
+        _ensure_schedule_write_supported(coordinator, device_id, schedule_component)
+
         try:
-            success = await coordinator.api.set_schedule(
-                device_id, fluidra_schedules, component_id=_get_schedule_component(coordinator, device_id)
-            )
+            success = await coordinator.api.set_schedule(device_id, fluidra_schedules, component_id=schedule_component)
         except FluidraError as err:
             _LOGGER.exception("Service %s failed for device %s", SERVICE_SET_SCHEDULE, device_id)
             raise HomeAssistantError(

@@ -459,6 +459,9 @@
     "schedule_set_rejected": {
       "message": "Fluidra API rejected the schedule update for {device_id}"
     },
+    "schedule_vs_pump_unsupported": {
+      "message": "Cannot write schedules to {device_id}: this device is configured with a variable-speed pump, whose schedule slots also carry a target pump speed that this service cannot set. Writing an incomplete slot makes the Fluidra app unable to load the device. Use the Fluidra app for variable-speed pump schedules."
+    },
     "switch_set_failed": {
       "message": "Failed to change the switch state"
     },

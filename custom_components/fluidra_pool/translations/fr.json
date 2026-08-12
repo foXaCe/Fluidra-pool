@@ -459,6 +459,9 @@
     "schedule_set_rejected": {
       "message": "L'API Fluidra a refusé la mise à jour du programme pour {device_id}"
     },
+    "schedule_vs_pump_unsupported": {
+      "message": "Impossible d'écrire les plannings sur {device_id} : cet appareil est configuré avec une pompe à vitesse variable, dont les créneaux portent aussi une vitesse de consigne que ce service ne sait pas définir. Écrire un créneau incomplet empêche l'application Fluidra de charger l'appareil. Utilisez l'application Fluidra pour les plannings de pompe à vitesse variable."
+    },
     "switch_set_failed": {
       "message": "Échec du changement d'état de l'interrupteur"
     },

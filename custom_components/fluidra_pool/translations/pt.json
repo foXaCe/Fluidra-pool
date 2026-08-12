@@ -459,6 +459,9 @@
     "schedule_set_rejected": {
       "message": "A API Fluidra rejeitou a atualização do programa para {device_id}"
     },
+    "schedule_vs_pump_unsupported": {
+      "message": "Não é possível gravar agendamentos em {device_id}: este dispositivo está configurado com uma bomba de velocidade variável, cujos intervalos incluem também uma velocidade alvo que este serviço não consegue definir. Gravar um intervalo incompleto impede a aplicação Fluidra de carregar o dispositivo. Use a aplicação Fluidra para estes agendamentos."
+    },
     "switch_set_failed": {
       "message": "Falha ao alterar o estado do interruptor"
     },
