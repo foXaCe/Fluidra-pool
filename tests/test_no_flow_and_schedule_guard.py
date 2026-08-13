@@ -59,14 +59,14 @@ def _poll(sensor: FluidraChlorinatorSensor, salinity: Any, alarms: list | None =
     """Apply one coordinator refresh, driving the last-known bookkeeping.
 
     The snapshot happens in _handle_coordinator_update, once per refresh —
-    calling _update_last_known_salinity directly is what HA's update does,
+    calling _update_last_known_value directly is what HA's update does,
     without needing a real hass to write state.
     """
     device = sensor.coordinator.data[POOL_ID]["devices"][0]
     device["components"]["174"]["reportedValue"] = salinity
     if alarms is not None:
         device["alarms"] = alarms
-    sensor._update_last_known_salinity()
+    sensor._update_last_known_value()
 
 
 def test_last_known_is_held_while_production_is_low() -> None:
@@ -117,6 +117,27 @@ def test_no_flow_is_exposed_as_an_attribute() -> None:
     attributes = sensor.extra_state_attributes
     assert attributes["no_flow"] is True
     assert attributes["low_production"] is True
+
+
+def test_last_known_wins_over_no_flow_while_device_is_offline() -> None:
+    """The device_offline guard takes priority over the no-flow guard.
+
+    An offline chlorinator cannot report a trustworthy alarm state either --
+    a stale FLOW alarm sitting in a frozen components/alarms snapshot is no
+    more trustworthy than a stale reportedValue. native_value must return
+    early on the offline check, never reaching _no_flow_reported(), so a
+    disconnected device with an active (necessarily stale) FLOW alarm still
+    shows the last confirmed-good salinity rather than unknown.
+    """
+    sensor = _sensor(_device(498))
+    _poll(sensor, 498)
+    assert sensor.native_value == 4.98
+
+    device = sensor.coordinator.data[POOL_ID]["devices"][0]
+    device["online"] = False
+    device["components"]["174"]["reportedValue"] = 0
+    device["alarms"] = [FLOW_ALARM]
+    assert sensor.native_value == 4.98
 
 
 # --- Issue #174: schedule write guard ----------------------------------------
