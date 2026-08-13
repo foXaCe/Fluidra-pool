@@ -102,16 +102,30 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
 
     _attr_has_entity_name = True
 
-    # Sensor types that fall back to the last confirmed reading instead of
-    # echoing whatever sits in device_data["components"] verbatim -- either
-    # because the device has gone offline (component data can be a frozen
-    # cloud-cached snapshot, confirmed 2026-08-10: chlorination_actual and
-    # salinity both stayed at their last real values, timestamp-for-timestamp
-    # identical to a direct live API call, for 12+ hours after the
-    # chlorinator was physically powered off) or, for salinity specifically,
-    # because the probe temporarily can't measure during low production
-    # (Issue #129). Every other sensor_type reads device_data verbatim.
+    # Sensor types whose native_value falls back to the last confirmed
+    # reading instead of echoing whatever sits in device_data["components"]
+    # verbatim -- either because the device has gone offline (component data
+    # can be a frozen cloud-cached snapshot, confirmed 2026-08-10:
+    # chlorination_actual and salinity both stayed at their last real values,
+    # timestamp-for-timestamp identical to a direct live API call, for 12+
+    # hours after the chlorinator was physically powered off) or, for
+    # salinity specifically, because the probe temporarily can't measure
+    # during low production (Issue #129). Every other sensor_type reads
+    # device_data verbatim in native_value -- but still tracks
+    # last_known_at (see _update_last_known_value), since the raw echo
+    # already freezes on its own once the device stops reporting, so a
+    # fallback there would produce the same displayed value through a
+    # second code path rather than changing anything observable.
     _STALENESS_GUARDED_TYPES = frozenset({"salinity", "chlorination_actual"})
+
+    # Sensor types where a reading of exactly 0 means "no real measurement"
+    # rather than a genuine 0 -- a bare register with no probe attached
+    # (Issue #111), or (salinity only) production too low for the probe to
+    # measure (Issue #129). Excluded from the last-known snapshot so an
+    # artifact 0 can't overwrite a real prior reading with a fake one.
+    # chlorination_actual/temperature/free_chlorine/conductivity/
+    # battery_voltage have no such artifact and are not in this set.
+    _ZERO_IS_NOT_A_REAL_READING = frozenset({"salinity", "orp", "ph"})
 
     def __init__(
         self,
@@ -128,12 +142,14 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         self._sensor_type = sensor_type
         self._component_id = component_id
 
-        # Last confirmed-good reading, held while the current poll can't be
-        # trusted (see _poll_is_trustworthy) or, for salinity only, while
-        # production is too low for the probe to measure. In-memory only —
-        # reset to None on every integration reload/HA restart until the
-        # next trustworthy reading. Unused by sensor types outside
-        # _STALENESS_GUARDED_TYPES.
+        # Last confirmed-good reading and when it was confirmed, updated for
+        # every sensor_type on each trustworthy poll (see
+        # _update_last_known_value). In-memory only — reset to None on every
+        # integration reload/HA restart until the next trustworthy reading.
+        # last_known_at is exposed in extra_state_attributes for all eight
+        # sensor_type values; last_known_value only for the two in
+        # _STALENESS_GUARDED_TYPES, which is also the only place
+        # last_known_value itself is read (native_value's fallback).
         self._last_known_value: float | None = None
         self._last_known_at: datetime | None = None
 
@@ -301,27 +317,29 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         """Snapshot the last confirmed-good reading, once per trustworthy poll.
 
         Kept separate from ``_handle_coordinator_update`` so it can be
-        exercised in tests without a real ``hass``/entity_id. No-op for
-        every sensor_type outside ``_STALENESS_GUARDED_TYPES``, and for an
-        untrustworthy poll (offline, or the coordinator update itself
-        failed) -- an untrustworthy poll must never refresh
-        ``last_known_at``, or a frozen cached value would appear to be
-        confirmed fresh on every subsequent poll while the device stays
-        disconnected.
+        exercised in tests without a real ``hass``/entity_id. Runs for
+        every sensor_type -- ``last_known_at`` is exposed on all eight so a
+        dashboard can show staleness uniformly (2026-08-12), even though
+        only the types in ``_STALENESS_GUARDED_TYPES`` actually fall back
+        to the stored value in ``native_value``; for the rest, the value
+        would be the same either way (see that constant's docstring), so
+        tracking just the timestamp is enough. No-op for an untrustworthy
+        poll (offline, or the coordinator update itself failed) -- an
+        untrustworthy poll must never refresh ``last_known_at``, or a
+        frozen cached value would appear to be confirmed fresh on every
+        subsequent poll while the device stays disconnected.
 
-        For salinity, a reading of exactly 0 is excluded (it means "probe
-        can't measure right now", not a real salinity value -- Issue #129);
-        chlorination_actual's 0 is a genuine reading (cell idle by
-        regulation) and is always snapshotted.
+        A reading of exactly 0 is excluded for the types in
+        ``_ZERO_IS_NOT_A_REAL_READING`` (it means "no real measurement", not
+        a genuine 0 -- see ``native_value``); every other sensor_type has no
+        such exclusion, since 0 is a real reading for all of them.
         """
-        if self._sensor_type not in self._STALENESS_GUARDED_TYPES:
-            return
         if not self._poll_is_trustworthy():
             return
         value = self._parsed_value()
         if value is None:
             return
-        if value == 0 and self._sensor_type == "salinity":
+        if value == 0 and self._sensor_type in self._ZERO_IS_NOT_A_REAL_READING:
             return
         self._last_known_value = value
         self._last_known_at = dt_util.utcnow()
@@ -411,11 +429,11 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
             "divisor": self._divisor,
             "device_id": self._device_id,
             "device_offline": self.device_data.get("online") is False,
+            "last_known_at": self._last_known_at.isoformat() if self._last_known_at else None,
         }
 
         if self._sensor_type in self._STALENESS_GUARDED_TYPES:
             attributes["last_known_value"] = self._last_known_value
-            attributes["last_known_at"] = self._last_known_at.isoformat() if self._last_known_at else None
 
         if self._sensor_type == "salinity":
             attributes["low_production"] = self._parsed_value() == 0

@@ -435,8 +435,12 @@ def test_chlorinator_salinity_extra_state_attributes_expose_last_known() -> None
     assert "last_known_value" not in orp_sensor.extra_state_attributes
 
 
-def test_chlorinator_salinity_last_known_update_is_a_no_op_for_other_sensor_types() -> None:
-    """`_update_last_known_value` only tracks salinity/chlorination_actual, mirroring the zero-value guard."""
+def test_chlorinator_orp_zero_is_excluded_from_last_known_snapshot() -> None:
+    """A raw 0 on ORP means "no probe", not a real reading (Issue #111) -- excluded
+    from the snapshot just like salinity's low-production 0, via the shared
+    _ZERO_IS_NOT_A_REAL_READING set. See test_last_known_at_tracked_for_non_guarded_sensor_types
+    for the non-zero case, which ORP (and every other sensor_type) does track.
+    """
     device = _pinned_device(DEVICE_ID, components={"63": {"reportedValue": 0}})
     sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "orp", 63)
     sensor._update_last_known_value()
@@ -584,6 +588,80 @@ def test_device_offline_attribute_present_on_every_sensor_type(
         _coord([offline_device]), SimpleNamespace(), POOL_ID, DEVICE_ID, sensor_type, component_id
     )
     assert offline_sensor.extra_state_attributes["device_offline"] is True
+
+
+# --- last_known_at tracked on all eight sensor_type (2026-08-12) -----------
+#
+# Extends the offline-staleness bookkeeping proven above for chlorination_actual
+# and salinity to the remaining six sensor_type values, for dashboard consistency.
+# Only last_known_at is tracked/exposed for these six -- native_value keeps
+# reading device_data verbatim (unchanged), since the raw echo already freezes
+# on its own once the device stops reporting (component data isn't refreshed
+# while offline), so a value fallback here would just be a second code path to
+# the same displayed number. See _STALENESS_GUARDED_TYPES's docstring.
+
+
+@pytest.mark.parametrize(
+    ("sensor_type", "component_id", "reported_value"),
+    [
+        ("ph", 165, 742),
+        ("orp", 63, 738),
+        ("free_chlorine", 178, 150),
+        ("temperature", 172, 261),
+        ("conductivity", 15, 1362),
+        ("battery_voltage", 4, 4116),
+    ],
+)
+def test_last_known_at_tracked_for_non_guarded_sensor_types(
+    sensor_type: str, component_id: int, reported_value: int
+) -> None:
+    """A trustworthy poll snapshots last_known_at for every sensor_type, not just
+    the two with a value fallback -- but last_known_value is exposed only for
+    those two (_STALENESS_GUARDED_TYPES), since native_value never reads it
+    for the other six.
+    """
+    device = _pinned_device(DEVICE_ID, components={str(component_id): {"reportedValue": reported_value}})
+    sensor = FluidraChlorinatorSensor(
+        _coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, sensor_type, component_id
+    )
+    assert sensor._last_known_at is None  # nothing polled yet
+
+    sensor._update_last_known_value()
+    assert sensor._last_known_at is not None
+
+    attrs = sensor.extra_state_attributes
+    assert attrs["last_known_at"] is not None
+    assert "last_known_value" not in attrs
+
+
+def test_last_known_at_not_re_stamped_while_offline_for_a_non_guarded_type() -> None:
+    """Same regression guard proven for salinity, checked here for a sensor_type
+    outside _STALENESS_GUARDED_TYPES (temperature): an untrustworthy poll must
+    never refresh last_known_at, even though native_value doesn't fall back
+    to a stored value for this type -- the timestamp still shouldn't lie about
+    freshness.
+    """
+    device = _pinned_device(DEVICE_ID, components={"172": {"reportedValue": 261}}, online=True)
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "temperature", 172)
+    sensor._update_last_known_value()
+    frozen_at = sensor._last_known_at
+    assert frozen_at is not None
+
+    device["online"] = False
+    sensor._update_last_known_value()  # must be a no-op: the poll is untrustworthy
+    assert sensor._last_known_at == frozen_at
+    assert sensor.extra_state_attributes["last_known_at"] == frozen_at.isoformat()
+
+
+def test_chlorinator_temperature_zero_is_snapshotted_unlike_orp_and_ph() -> None:
+    """temperature has no "fake zero" artifact (unlike salinity/orp/ph), so a
+    genuine 0 reading (0 degC) is snapshotted like any other real value.
+    """
+    device = _pinned_device(DEVICE_ID, components={"172": {"reportedValue": 0}})
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "temperature", 172)
+    sensor._update_last_known_value()
+    assert sensor._last_known_value == pytest.approx(0.0)
+    assert sensor._last_known_at is not None
 
 
 def test_chlorinator_ph_nonzero_reads_value() -> None:
