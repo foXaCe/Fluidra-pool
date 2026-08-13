@@ -373,7 +373,11 @@ def _device_uses_component_actions(coordinator: Any, device_id: str) -> bool:
 
 
 def _service_schedule_to_fluidra(
-    schedule: dict[str, Any], schedule_id: int, *, use_component_actions: bool = False
+    schedule: dict[str, Any],
+    schedule_id: int,
+    *,
+    use_component_actions: bool = False,
+    include_state: bool = False,
 ) -> dict[str, Any]:
     """Convert service schedule input to the Fluidra CRON schedule shape."""
     start_hour, start_minute = _parse_service_time(schedule["start_time"])
@@ -391,7 +395,7 @@ def _service_schedule_to_fluidra(
     # previous payload (string "schedule_N" id, no groupId, a spurious
     # componentToChange, plus synthesised endActions and state) was rejected by the
     # server-side JSONata transform ("invalid scheduleUser").
-    return {
+    payload = {
         "id": schedule_id,
         "groupId": schedule_id,
         "enabled": schedule["enabled"],
@@ -399,6 +403,29 @@ def _service_schedule_to_fluidra(
         "endTime": f"{end_minute:02d} {end_hour:02d} * * {days_str}",
         "startActions": _schedule_start_actions(schedule["mode"], use_component_actions),
     }
+    if include_state:
+        # Written as IDLE rather than echoing a running slot's state: this is a
+        # fresh definition, not a live status (Issue #174).
+        payload["state"] = "IDLE"
+    return payload
+
+
+def _device_uses_schedule_state(coordinator: Any, device_id: str) -> bool:
+    """Return True when this device's own schedule slots carry a ``state`` field.
+
+    The eXO iQ's slots include ``"state": "IDLE"`` — visible in schedules created
+    from the Fluidra app — and a payload without it is not applied: the write
+    lands in ``desiredValue``, mangled, and ``reportedValue`` stays untouched
+    (Issue #174, @Inervo). Other devices rejected a *synthesised* state back on
+    #89, so this mirrors what the device already reports rather than assuming
+    either way, exactly as ``_device_uses_component_actions`` does for the
+    actions shape.
+    """
+    device = coordinator.api.get_device_by_id(device_id) if coordinator else None
+    for sched in (device or {}).get("schedule_data") or []:
+        if isinstance(sched, dict) and isinstance(sched.get("state"), str):
+            return True
+    return False
 
 
 def _schedule_start_actions(mode: Any, use_component_actions: bool) -> dict[str, Any]:
@@ -464,8 +491,11 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
         # Convert HA format to Fluidra API format
         component_actions = _device_uses_component_actions(coordinator, device_id)
+        include_state = _device_uses_schedule_state(coordinator, device_id)
         fluidra_schedules = [
-            _service_schedule_to_fluidra(schedule, i, use_component_actions=component_actions)
+            _service_schedule_to_fluidra(
+                schedule, i, use_component_actions=component_actions, include_state=include_state
+            )
             for i, schedule in enumerate(schedules_data, start=1)
         ]
 

@@ -167,3 +167,62 @@ def test_devices_without_a_schedule_map_are_unaffected() -> None:
     coordinator = MagicMock()
     coordinator.data = {POOL_ID: {"id": POOL_ID, "name": "Pool", "devices": [device]}}
     _ensure_schedule_write_supported(coordinator, "DM24008702.nn_1", 20)
+
+
+# --- Issue #174: the schedule payload must match what the device reports ------
+
+
+def _coordinator_with_schedules(schedules: list) -> Any:
+    coordinator = MagicMock()
+    coordinator.api.get_device_by_id.return_value = {"schedule_data": schedules}
+    return coordinator
+
+
+EXO_SLOT = {
+    "id": 3,
+    "groupId": 3,
+    "state": "IDLE",
+    "enabled": False,
+    "startTime": "11 21 * * 1",
+    "endTime": "19 21 * * 1",
+    "startActions": {"componentActions": [{"id": 0, "reportedValue": 1}]},
+}
+
+
+def test_payload_matches_the_shape_the_exo_itself_reports() -> None:
+    """Field for field, against a slot the Fluidra app created (Issue #174)."""
+    from custom_components.fluidra_pool import _service_schedule_to_fluidra
+
+    ours = _service_schedule_to_fluidra(
+        {"enabled": False, "start_time": "21:11", "end_time": "21:19", "mode": "1", "days": [1]},
+        3,
+        use_component_actions=True,
+        include_state=True,
+    )
+    assert ours == EXO_SLOT
+
+
+def test_state_is_mirrored_from_the_device_not_assumed() -> None:
+    """Devices that reject a synthesised state (#89) must not receive one."""
+    from custom_components.fluidra_pool import _device_uses_schedule_state
+
+    assert _device_uses_schedule_state(_coordinator_with_schedules([EXO_SLOT]), "NS25007212") is True
+
+    without_state = {k: v for k, v in EXO_SLOT.items() if k != "state"}
+    assert _device_uses_schedule_state(_coordinator_with_schedules([without_state]), "DM1") is False
+    assert _device_uses_schedule_state(_coordinator_with_schedules([]), "DM1") is False
+    assert _device_uses_schedule_state(_coordinator_with_schedules(["junk", None]), "DM1") is False
+
+
+def test_state_is_omitted_unless_requested() -> None:
+    from custom_components.fluidra_pool import _service_schedule_to_fluidra
+
+    ours = _service_schedule_to_fluidra(
+        {"enabled": True, "start_time": "05:45", "end_time": "10:15", "mode": "1", "days": [0, 1, 2, 3, 4, 5, 6]},
+        1,
+        use_component_actions=True,
+    )
+    assert "state" not in ours
+    # Times and days still match the app's own encoding.
+    assert ours["startTime"] == "45 05 * * 0,1,2,3,4,5,6"
+    assert ours["endTime"] == "15 10 * * 0,1,2,3,4,5,6"
