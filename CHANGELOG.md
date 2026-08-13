@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.78.5] - 2026-08-13
+
+### Fixed
+
+- **`set_schedule` writes were never applied on the eXO iQ** — comparing a schedule the Fluidra app
+  created against the payload the service produces showed them identical field for field, except
+  that the device's own slots carry `"state": "IDLE"` and ours did not. Writes therefore sat in
+  `desiredValue` unapplied. The field is now mirrored from the device rather than assumed, so only
+  devices whose own schedules carry one receive it — a synthesised `state` was rejected by other
+  devices back on #89. This also confirms the time and day encoding was never at fault
+  (Issue #174, @Inervo).
+
 ## [2.78.4] - 2026-08-11
 
 ### Fixed
