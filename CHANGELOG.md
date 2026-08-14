@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.78.6] - 2026-08-14
+
+### Fixed
+
+- **Schedules including Sunday were written with an undefined day number** — the `set_schedule`
+  service takes mobile-app day numbers (1=Mon..7=Sun) and wrote them straight into the CRON field,
+  but CRON has no day 7: Sunday is `0`. Reading already converted the other way round; writing never
+  converted back. Checked against schedules the Fluidra app itself created on an eXO iQ — a Sunday
+  18:00 slot reads `"00 18 * * 0"` and an all-days 05:45 slot reads `"45 05 * * 0,1,2,3,4,5,6"`,
+  both of which the service now produces exactly (Issue #174, @Inervo).
+
+### Changed
+
+- Schedule payload keys are now ordered as the device reports them, with `state` third rather than
+  appended last, in case the backend transform is positional (Issue #174).
+
 ## [2.78.5] - 2026-08-13
 
 ### Fixed
