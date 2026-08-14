@@ -388,25 +388,28 @@ def _service_schedule_to_fluidra(
             translation_domain=DOMAIN,
             translation_key="empty_schedule_days",
         )
-    days_str = ",".join(str(day) for day in days)
+    # The service takes mobile-app day numbers (1=Mon..7=Sun, see services.yaml)
+    # but the device stores plain CRON, where Sunday is 0 — its own schedules read
+    # "* * 0,1,2,3,4,5,6" for every day (Issue #174, @Inervo). Reading already
+    # converts the other way (utils.convert_cron_days); writing never converted
+    # back, so a Sunday schedule went out as day 7, which CRON does not define.
+    days_str = ",".join(str(0 if day == 7 else day) for day in sorted({0 if d == 7 else d for d in days}))
 
     # Shape captured from the official Fluidra Connect app's PUT body (Issue #89):
     # an integer id/groupId per slot and a single startActions.operationName. The
     # previous payload (string "schedule_N" id, no groupId, a spurious
     # componentToChange, plus synthesised endActions and state) was rejected by the
     # server-side JSONata transform ("invalid scheduleUser").
-    payload = {
-        "id": schedule_id,
-        "groupId": schedule_id,
-        "enabled": schedule["enabled"],
-        "startTime": f"{start_minute:02d} {start_hour:02d} * * {days_str}",
-        "endTime": f"{end_minute:02d} {end_hour:02d} * * {days_str}",
-        "startActions": _schedule_start_actions(schedule["mode"], use_component_actions),
-    }
+    payload: dict[str, Any] = {"id": schedule_id, "groupId": schedule_id}
     if include_state:
         # Written as IDLE rather than echoing a running slot's state: this is a
-        # fresh definition, not a live status (Issue #174).
+        # fresh definition, not a live status. Placed here rather than appended,
+        # so the key order matches the device's own slots exactly (Issue #174).
         payload["state"] = "IDLE"
+    payload["enabled"] = schedule["enabled"]
+    payload["startTime"] = f"{start_minute:02d} {start_hour:02d} * * {days_str}"
+    payload["endTime"] = f"{end_minute:02d} {end_hour:02d} * * {days_str}"
+    payload["startActions"] = _schedule_start_actions(schedule["mode"], use_component_actions)
     return payload
 
 
