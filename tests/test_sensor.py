@@ -676,3 +676,77 @@ def test_chlorinator_temperature_zero_still_reads_zero() -> None:
     device = _pinned_device(DEVICE_ID, components={"172": {"reportedValue": 0}})
     sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "temperature", 172)
     assert sensor.native_value == pytest.approx(0.0)
+
+
+# --- Bridged .nn_ child reporting online=False with a live/frozen ts (2026-08-15) ---
+#
+# Reproduced by @foXaCe against PR #194's review (2026-08-13): a bridged
+# chlorinator child that reports online=False on *every* poll, even while
+# serving fresh data, was permanently locked out of _STALENESS_GUARDED_TYPES
+# -- _poll_is_trustworthy() keyed on `online` alone, so _last_known_value
+# never got a first value and native_value stayed unknown forever. The fix
+# corroborates an online=False poll against the resolved component's `ts`:
+# a value that has genuinely moved since the last poll is trusted even
+# though `online` never flips to True; a `ts` that stays frozen (the actual
+# disconnected case this guard exists for) is still treated as offline.
+
+
+def test_bridged_child_offline_flag_is_untrusted_until_ts_is_seen_advancing() -> None:
+    """online=False + an advancing component `ts` is trusted; online=False + a
+    frozen `ts` (or no `ts` at all yet) is not -- exactly the corroboration
+    @foXaCe asked for, checked across three consecutive polls of the same
+    always-offline-flagged bridged device.
+    """
+    device = _pinned_device(DEVICE_ID, components={"185": {"reportedValue": 467, "ts": "t1"}}, online=False)
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "salinity", 185)
+
+    # First sighting: a ts is present, but there is nothing yet to compare it
+    # against, so it can't be proven fresh -- same as the pre-fix behaviour,
+    # and the same conservative default as a device with no ts field at all.
+    sensor._update_last_known_value()
+    assert sensor.native_value is None
+    assert sensor.extra_state_attributes["device_offline"] is True
+
+    # ts advances on the next poll, together with a new reading: this is now
+    # provably live data, not a frozen cached snapshot, even though `online`
+    # never flips to True.
+    device["components"]["185"] = {"reportedValue": 467, "ts": "t2"}
+    sensor._update_last_known_value()
+    assert sensor.native_value == pytest.approx(4.67)
+    assert sensor.extra_state_attributes["device_offline"] is False
+    assert sensor.extra_state_attributes["last_known_value"] == pytest.approx(4.67)
+
+    # ts freezes again (the genuine disconnect this guard exists for): back
+    # to untrusted, falling back to the last confirmed-good reading instead
+    # of echoing the new but uncorroborated reportedValue.
+    device["components"]["185"] = {"reportedValue": 999, "ts": "t2"}
+    sensor._update_last_known_value()
+    assert sensor.native_value == pytest.approx(4.67)
+    assert sensor.extra_state_attributes["device_offline"] is True
+
+
+def test_bridged_child_online_true_after_offline_resets_ts_corroboration() -> None:
+    """Once the device reports online=True again, native_value trusts it
+    immediately via the fast path -- the ts corroboration state from the
+    offline period must not leak into a false negative once online recovers,
+    nor into a false positive if it drops offline again with a stale ts.
+    """
+    device = _pinned_device(DEVICE_ID, components={"185": {"reportedValue": 300, "ts": "t1"}}, online=False)
+    sensor = FluidraChlorinatorSensor(_coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, "salinity", 185)
+    sensor._update_last_known_value()  # first sighting: untrusted
+    assert sensor.native_value is None
+
+    # Device genuinely reconnects.
+    device["online"] = True
+    device["components"]["185"] = {"reportedValue": 300, "ts": "t1"}  # same ts, now trusted via `online`
+    sensor._update_last_known_value()
+    assert sensor.native_value == pytest.approx(3.0)
+    assert sensor.extra_state_attributes["device_offline"] is False
+
+    # Drops back to online=False with the *same* ts as the last trustworthy
+    # poll -- must not be mistaken for an advance just because the baseline
+    # predates the reconnect.
+    device["online"] = False
+    sensor._update_last_known_value()
+    assert sensor.native_value == pytest.approx(3.0)  # falls back to last known
+    assert sensor.extra_state_attributes["device_offline"] is True

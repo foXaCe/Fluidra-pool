@@ -153,6 +153,22 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         self._last_known_value: float | None = None
         self._last_known_at: datetime | None = None
 
+        # Baseline for corroborating an online=False report against the
+        # resolved component's raw `ts` field (see _poll_is_trustworthy).
+        # None until a poll has actually been recorded, so the very first
+        # sighting of an offline-flagged device has nothing to compare
+        # against yet and cannot be corroborated as fresh.
+        self._last_seen_component_ts: Any = None
+        # Cached once per poll, in _update_last_known_value: whether an
+        # online=False poll was corroborated as fresh by an advancing `ts`.
+        # _poll_is_trustworthy reads this cached value instead of
+        # recomputing the ts comparison on every call, so every property
+        # read within the same poll cycle agrees -- recomputing live would
+        # make the very read that just confirmed freshness immediately
+        # disagree with itself, since by then _last_seen_component_ts has
+        # already advanced to match the current ts.
+        self._offline_poll_confirmed_fresh: bool = False
+
         # Sensor configuration based on type
         self._sensor_config: dict[str, dict[str, Any]] = {
             "ph": {
@@ -264,19 +280,56 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         """
         return self.coordinator.last_update_success and bool(self.device_data.get("components"))
 
+    def _current_component_ts(self) -> Any:
+        """Return the resolved component's raw ``ts`` field, or None if absent.
+
+        Not parsed as a datetime -- its exact format (epoch, ISO, ...) isn't
+        documented anywhere else in this integration, and comparing it for
+        equality/inequality is all ``_poll_is_trustworthy`` needs to detect
+        whether the value has moved since the last poll.
+        """
+        components = self.device_data.get("components", {})
+        component_data = components.get(str(self._resolved_component_id), {})
+        return component_data.get("ts")
+
     def _poll_is_trustworthy(self) -> bool:
         """Return True when this poll's component data can be trusted.
 
-        False whenever the coordinator update itself failed, or the device
-        reports ``online=False`` -- Fluidra's cloud can keep serving a cached
-        component snapshot for a disconnected device (confirmed 2026-08-10:
-        chlorination_actual and salinity both stayed at their last real
-        values -- a direct, cache-bypassing live API call returned the exact
-        same component timestamp as the coordinator's cached copy, 12+ hours
-        after the chlorinator was physically powered off). Mirrors
-        ``FluidraChlorinatorAlarmBinarySensor._poll_is_trustworthy``.
+        False whenever the coordinator update itself failed. When the
+        device reports ``online=False``, Fluidra's cloud can keep serving a
+        cached component snapshot for a disconnected device (confirmed
+        2026-08-10: chlorination_actual and salinity both stayed at their
+        last real values -- a direct, cache-bypassing live API call
+        returned the exact same component timestamp as the coordinator's
+        cached copy, 12+ hours after the chlorinator was physically powered
+        off) -- but some bridged ``.nn_`` children report ``online=False``
+        on *every* poll while still serving genuinely live data (Issue #63;
+        reproduced against this guard by @foXaCe in PR #194's review,
+        2026-08-13: a bridged child with fresh incoming data was locked
+        into ``unknown`` forever, since ``online`` alone never gave it a
+        chance to be trusted).
+
+        ``online`` can't tell the two cases apart, so an offline report is
+        corroborated against the resolved component's raw ``ts``: a value
+        that has advanced since the last poll means the cloud handed over a
+        fresh reading this cycle, not a frozen cached one, and is trusted
+        over the unreliable connectivity flag. A ``ts`` that is missing, or
+        unchanged from the last poll, cannot be corroborated as fresh, so
+        the device is treated as genuinely offline -- including the very
+        first poll ever seen for a device flagged offline, which has
+        nothing yet to compare its ``ts`` against.
+
+        The comparison itself runs once per poll, in
+        ``_update_last_known_value``, and is cached in
+        ``_offline_poll_confirmed_fresh`` -- read here rather than
+        recomputed, so repeated reads within the same poll cycle (
+        ``native_value``, ``extra_state_attributes``) always agree.
         """
-        return self.coordinator.last_update_success and self.device_data.get("online") is not False
+        if not self.coordinator.last_update_success:
+            return False
+        if self.device_data.get("online") is not False:
+            return True
+        return self._offline_poll_confirmed_fresh
 
     @property
     def _resolved_component_id(self) -> int:
@@ -329,11 +382,31 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         frozen cached value would appear to be confirmed fresh on every
         subsequent poll while the device stays disconnected.
 
+        Also where the ``online=False`` staleness corroboration is decided
+        for this poll (see ``_poll_is_trustworthy``): captures whether the
+        resolved component's ``ts`` has moved since the last poll, caches
+        the verdict in ``_offline_poll_confirmed_fresh``, then advances
+        ``_last_seen_component_ts`` to the ``ts`` just observed -- always,
+        trustworthy or not, so a device that starts advancing its ``ts``
+        again after a genuine freeze is picked up on its very next poll
+        rather than staying compared against a stale baseline forever.
+
         A reading of exactly 0 is excluded for the types in
         ``_ZERO_IS_NOT_A_REAL_READING`` (it means "no real measurement", not
         a genuine 0 -- see ``native_value``); every other sensor_type has no
         such exclusion, since 0 is a real reading for all of them.
         """
+        current_ts = self._current_component_ts()
+        if (
+            self.device_data.get("online") is False
+            and current_ts is not None
+            and self._last_seen_component_ts is not None
+        ):
+            self._offline_poll_confirmed_fresh = current_ts != self._last_seen_component_ts
+        else:
+            self._offline_poll_confirmed_fresh = False
+        self._last_seen_component_ts = current_ts
+
         if not self._poll_is_trustworthy():
             return
         value = self._parsed_value()
@@ -428,7 +501,11 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
             "raw_value": component_data.get("reportedValue"),
             "divisor": self._divisor,
             "device_id": self._device_id,
-            "device_offline": self.device_data.get("online") is False,
+            # Not the raw `online` flag -- see _poll_is_trustworthy: a
+            # bridged `.nn_` child can report online=False while still
+            # serving corroborated-fresh data, and must not show as offline
+            # here either (Issue #63, PR #194 review).
+            "device_offline": not self._poll_is_trustworthy(),
             "last_known_at": self._last_known_at.isoformat() if self._last_known_at else None,
         }
 
