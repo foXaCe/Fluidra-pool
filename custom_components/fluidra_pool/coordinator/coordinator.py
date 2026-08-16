@@ -645,6 +645,12 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 except (ValueError, TypeError):
                     pass
         else:
+            aux_schedule_components = DeviceIdentifier.get_feature(device, "aux_schedule_components", {})
+            for aux_number, aux_component in aux_schedule_components.items():
+                if component_id == int(aux_component):
+                    schedule_data = reported_value if isinstance(reported_value, list) else []
+                    device.setdefault("aux_schedule_data", {})[str(aux_number)] = schedule_data
+
             schedule_comp = DeviceIdentifier.get_feature(device, "schedule_component")
             if schedule_comp and component_id == schedule_comp:
                 if isinstance(reported_value, dict) and "programs" in reported_value:

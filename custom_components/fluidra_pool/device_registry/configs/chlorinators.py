@@ -1009,6 +1009,10 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             # surfaced as an attribute (Issue #175, @Inervo).
             "aux_outputs": {"1": 30, "2": 31},
             "aux_labels": {"1": 90, "2": 91},
+            # Auxiliary-output schedules: fixed registers independent of the pump
+            # type (Aux 1 = c22, Aux 2 = c24), up to 2 slots per aux (Issue #174).
+            "aux_schedule_components": {"1": 22, "2": 24},
+            "aux_schedule_count": 2,
             # Heating, available once an aux output is assigned to it (c88).
             # c43 is the setpoint in whole °C: an isolated capture moved it
             # 27 -> 23 with nothing else changing (Issue #175, @Inervo).
@@ -1065,6 +1069,8 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 19,
                 20,
                 21,
+                22,
+                24,
                 30,
                 31,
                 35,

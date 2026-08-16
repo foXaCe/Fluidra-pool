@@ -79,13 +79,7 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             self._optimistic_value = value
             self.async_write_ha_state()
 
-            device_data = self.device_data
-            if "schedule_data" not in device_data:
-                self._optimistic_value = None
-                self.async_write_ha_state()
-                return
-
-            current_schedules = device_data["schedule_data"]
+            current_schedules = self._get_schedule_list()
             if not current_schedules:
                 self._optimistic_value = None
                 self.async_write_ha_state()
@@ -220,13 +214,7 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             self._optimistic_value = value
             self.async_write_ha_state()
 
-            device_data = self.device_data
-            if "schedule_data" not in device_data:
-                self._optimistic_value = None
-                self.async_write_ha_state()
-                return
-
-            current_schedules = device_data["schedule_data"]
+            current_schedules = self._get_schedule_list()
             if not current_schedules:
                 self._optimistic_value = None
                 self.async_write_ha_state()

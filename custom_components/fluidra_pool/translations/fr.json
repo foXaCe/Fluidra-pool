@@ -322,6 +322,9 @@
       "auto_mode": {
         "name": "Mode Auto"
       },
+      "aux_schedule_enable": {
+        "name": "Aux {aux_number} Planning {schedule_id}"
+      },
       "boost_mode": {
         "name": "Mode Boost"
       },
@@ -348,6 +351,12 @@
       }
     },
     "time": {
+      "aux_schedule_end": {
+        "name": "Aux {aux_number} Planning {schedule_id} Fin"
+      },
+      "aux_schedule_start": {
+        "name": "Aux {aux_number} Planning {schedule_id} Début"
+      },
       "light_schedule_end": {
         "name": "Planning Éclairage {schedule_id} Fin"
       },

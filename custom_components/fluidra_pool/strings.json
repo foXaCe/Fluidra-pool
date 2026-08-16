@@ -345,9 +345,18 @@
       },
       "schedule_enable": {
         "name": "Schedule {schedule_id}"
+      },
+      "aux_schedule_enable": {
+        "name": "Aux {aux_number} Schedule {schedule_id}"
       }
     },
     "time": {
+      "aux_schedule_end": {
+        "name": "Aux {aux_number} Schedule {schedule_id} End"
+      },
+      "aux_schedule_start": {
+        "name": "Aux {aux_number} Schedule {schedule_id} Start"
+      },
       "light_schedule_end": {
         "name": "Light Schedule {schedule_id} End"
       },
