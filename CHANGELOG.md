@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.79.0] - 2026-08-16
+
+### Added
+
+- **Zodiac eXO iQ: Aux 1 / Aux 2 schedule entities** — the auxiliary-output
+  schedules (Aux 1 on register c22, Aux 2 on c24, up to two slots each) were
+  never read because the registers were missing from the profile scan, so no
+  schedule entity existed for the aux outputs (Issue #174). The registers are
+  now scanned and decoded per aux, and each slot gets a start time, an end
+  time and an enable switch — writing back to the correct register and
+  preserving the configured windows and modes. Entities are only created for
+  devices whose profile declares the feature, and an empty aux register
+  leaves them unavailable rather than pretending a schedule exists.
+
 ## [2.78.7] - 2026-08-16
 
 ### Fixed
