@@ -92,6 +92,24 @@ async def async_setup_entry(
                     FluidraScheduleEnableSwitch(coordinator, coordinator.api, pool_id, device_id, schedule_id)
                 )
 
+        # Auxiliary-output schedules on the eXO iQ (Aux 1 = c22, Aux 2 = c24),
+        # up to two slots per aux (Issue #174).
+        aux_schedule_components = DeviceIdentifier.get_feature(device, "aux_schedule_components", {})
+        if aux_schedule_components:
+            aux_schedule_count = DeviceIdentifier.get_feature(device, "aux_schedule_count", 2)
+            for aux_number in sorted(aux_schedule_components):
+                for i in range(1, aux_schedule_count + 1):
+                    entities.append(
+                        FluidraScheduleEnableSwitch(
+                            coordinator,
+                            coordinator.api,
+                            pool_id,
+                            device_id,
+                            str(i),
+                            aux_number=str(aux_number),
+                        )
+                    )
+
         if DeviceIdentifier.has_feature(device, "boost_mode"):
             entities.append(FluidraChlorinatorBoostSwitch(coordinator, coordinator.api, pool_id, device_id))
 

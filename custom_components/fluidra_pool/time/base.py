@@ -15,7 +15,7 @@ from ..api_resilience import FluidraError
 from ..const import DEVICE_MODEL_FALLBACK, DEVICE_MODEL_MAP, DOMAIN
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolControlEntity
-from ..helpers import get_schedule_data, resolve_schedule_component
+from ..helpers import get_aux_schedule_data, get_schedule_data, resolve_schedule_component
 from ..utils import extract_cron_days
 
 if TYPE_CHECKING:
@@ -97,8 +97,11 @@ class _FluidraTimeEntityBase(FluidraPoolControlEntity, TimeEntity):
         self._time_type = time_type  # "start" or "end"
 
     def _get_schedule_data(self) -> dict[str, Any] | None:
-        """Get schedule data from coordinator."""
+        """Get schedule data from coordinator (main or per-aux list)."""
         try:
+            aux_number = getattr(self, "_aux_number", None)
+            if aux_number is not None:
+                return get_aux_schedule_data(self.device_data, aux_number, self._schedule_id)
             return get_schedule_data(self.device_data, self._schedule_id)
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
@@ -129,7 +132,7 @@ class _FluidraTimeEntityBase(FluidraPoolControlEntity, TimeEntity):
 class FluidraScheduleTimeEntity(_FluidraTimeEntityBase):
     """Base class for Fluidra pump/chlorinator schedule time entities."""
 
-    __slots__ = ("_optimistic_value",)
+    __slots__ = ("_aux_number", "_optimistic_value")
 
     def __init__(
         self,
@@ -139,13 +142,28 @@ class FluidraScheduleTimeEntity(_FluidraTimeEntityBase):
         device_id: str,
         schedule_id: str,
         time_type: str,
+        aux_number: str | None = None,
     ) -> None:
         """Initialize the time entity."""
         super().__init__(coordinator, api, pool_id, device_id, schedule_id, time_type)
         self._optimistic_value: time | None = None
+        self._aux_number = aux_number
+
+    def _get_schedule_list(self) -> list[dict[str, Any]]:
+        """Return the schedule list this entity edits (main or per-aux)."""
+        if self._aux_number is not None:
+            aux_schedules: list[dict[str, Any]] = (self.device_data.get("aux_schedule_data") or {}).get(
+                str(self._aux_number), []
+            )
+            return aux_schedules
+        schedules: list[dict[str, Any]] = self.device_data.get("schedule_data", [])
+        return schedules
 
     def _get_schedule_component(self) -> int:
         """Get the correct schedule component ID for this device."""
+        if self._aux_number is not None:
+            aux_map = DeviceIdentifier.get_feature(self.device_data, "aux_schedule_components", {})
+            return int(aux_map.get(str(self._aux_number), 22))
         device_data = self.device_data
         # Per-device override (e.g. 258 for DM24049704 chlorinator).
         schedule_comp: int = resolve_schedule_component(device_data)
@@ -184,11 +202,9 @@ class FluidraScheduleTimeEntity(_FluidraTimeEntityBase):
     ) -> tuple[bool, str]:
         """Validate that the new schedule doesn't overlap with existing enabled schedules."""
         try:
-            device_data = self.device_data
-            if "schedule_data" not in device_data:
+            current_schedules = self._get_schedule_list()
+            if not current_schedules:
                 return True, ""
-
-            current_schedules = device_data["schedule_data"]
             current_schedule = next(
                 (schedule for schedule in current_schedules if str(schedule.get("id")) == str(schedule_id_to_update)),
                 None,

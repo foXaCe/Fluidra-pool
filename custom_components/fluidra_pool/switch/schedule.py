@@ -11,7 +11,8 @@ from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
 from ..const import DOMAIN
-from ..helpers import get_schedule_data, resolve_schedule_component
+from ..device_registry import DeviceIdentifier
+from ..helpers import get_aux_schedule_data, get_schedule_data, resolve_schedule_component
 from .base import FluidraPoolSwitchEntity
 
 if TYPE_CHECKING:
@@ -69,14 +70,21 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         pool_id: str,
         device_id: str,
         schedule_id: str,
+        aux_number: str | None = None,
     ) -> None:
         """Initialize the switch."""
         super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
+        self._aux_number = aux_number
 
-        self._attr_translation_key = "schedule_enable"
-        self._attr_translation_placeholders = {"schedule_id": schedule_id}
-        self._attr_unique_id = f"fluidra_{self._device_id}_schedule_{schedule_id}_enabled"
+        if aux_number is not None:
+            self._attr_translation_key = "aux_schedule_enable"
+            self._attr_translation_placeholders = {"aux_number": aux_number, "schedule_id": schedule_id}
+            self._attr_unique_id = f"fluidra_{self._device_id}_aux{aux_number}_schedule_{schedule_id}_enabled"
+        else:
+            self._attr_translation_key = "schedule_enable"
+            self._attr_translation_placeholders = {"schedule_id": schedule_id}
+            self._attr_unique_id = f"fluidra_{self._device_id}_schedule_{schedule_id}_enabled"
         self._attr_entity_category = EntityCategory.CONFIG
 
     @property
@@ -94,13 +102,28 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
     def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
+            if self._aux_number is not None:
+                return get_aux_schedule_data(self.device_data, self._aux_number, self._schedule_id)
             return get_schedule_data(self.device_data, self._schedule_id)
         except (aiohttp.ClientError, TimeoutError, FluidraError, ValueError, TypeError, KeyError, AttributeError):
             _LOGGER.debug("Failed to get schedule data for %s", self._device_id)
             return None
 
+    def _get_schedule_list(self) -> list[dict[str, Any]]:
+        """Return the schedule list this switch edits (main or per-aux)."""
+        if self._aux_number is not None:
+            aux_schedules: list[dict[str, Any]] = (self.device_data.get("aux_schedule_data") or {}).get(
+                str(self._aux_number), []
+            )
+            return aux_schedules
+        schedules: list[dict[str, Any]] = self.device_data.get("schedule_data", [])
+        return schedules
+
     def _get_schedule_component(self) -> int:
         """Get the schedule component used by this device."""
+        if self._aux_number is not None:
+            aux_map = DeviceIdentifier.get_feature(self.device_data, "aux_schedule_components", {})
+            return int(aux_map.get(str(self._aux_number), 22))
         value: int = resolve_schedule_component(self.device_data)
         return value
 
@@ -134,12 +157,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         self._ensure_pool_writable()
         try:
             self._set_pending_state(True)
-            device_data = self.device_data
-            if "schedule_data" not in device_data:
-                self._clear_pending_state()
-                return
-
-            current_schedules = device_data["schedule_data"]
+            current_schedules = self._get_schedule_list()
             if not current_schedules:
                 self._clear_pending_state()
                 return
@@ -186,12 +204,7 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         self._ensure_pool_writable()
         try:
             self._set_pending_state(False)
-            device_data = self.device_data
-            if "schedule_data" not in device_data:
-                self._clear_pending_state()
-                return
-
-            current_schedules = device_data["schedule_data"]
+            current_schedules = self._get_schedule_list()
             if not current_schedules:
                 self._clear_pending_state()
                 return

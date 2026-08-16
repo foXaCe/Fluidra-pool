@@ -14,6 +14,7 @@ from ..const import (
 )
 from ..device_registry import DeviceIdentifier
 from ..platform_setup import async_setup_dynamic_platform
+from .aux_schedule import FluidraAuxScheduleEndTimeEntity, FluidraAuxScheduleStartTimeEntity
 from .base import (
     FluidraLightScheduleTimeEntity,
     FluidraScheduleTimeEntity,
@@ -27,6 +28,8 @@ if TYPE_CHECKING:
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 __all__ = [
+    "FluidraAuxScheduleEndTimeEntity",
+    "FluidraAuxScheduleStartTimeEntity",
     "FluidraLightScheduleEndTimeEntity",
     "FluidraLightScheduleStartTimeEntity",
     "FluidraLightScheduleTimeEntity",
@@ -104,6 +107,26 @@ async def async_setup_entry(
                 entities.append(
                     FluidraScheduleEndTimeEntity(coordinator, coordinator.api, pool_id, device_id, schedule_id)
                 )
+
+        # Auxiliary-output schedules on the eXO iQ (Aux 1 = c22, Aux 2 = c24),
+        # up to two slots per aux, fixed registers independent of the pump type
+        # (Issue #174). Entities are gated on the profile declaring the feature.
+        aux_schedule_components = DeviceIdentifier.get_feature(device, "aux_schedule_components", {})
+        if aux_schedule_components:
+            aux_schedule_count = DeviceIdentifier.get_feature(device, "aux_schedule_count", 2)
+            for aux_number in sorted(aux_schedule_components):
+                for i in range(1, aux_schedule_count + 1):
+                    schedule_id = str(i)
+                    entities.append(
+                        FluidraAuxScheduleStartTimeEntity(
+                            coordinator, coordinator.api, pool_id, device_id, aux_number, schedule_id
+                        )
+                    )
+                    entities.append(
+                        FluidraAuxScheduleEndTimeEntity(
+                            coordinator, coordinator.api, pool_id, device_id, aux_number, schedule_id
+                        )
+                    )
 
         return entities
 

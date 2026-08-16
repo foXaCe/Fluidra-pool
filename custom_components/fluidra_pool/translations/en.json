@@ -322,6 +322,9 @@
       "auto_mode": {
         "name": "Auto Mode"
       },
+      "aux_schedule_enable": {
+        "name": "Aux {aux_number} Schedule {schedule_id}"
+      },
       "boost_mode": {
         "name": "Boost Mode"
       },
@@ -348,6 +351,12 @@
       }
     },
     "time": {
+      "aux_schedule_end": {
+        "name": "Aux {aux_number} Schedule {schedule_id} End"
+      },
+      "aux_schedule_start": {
+        "name": "Aux {aux_number} Schedule {schedule_id} Start"
+      },
       "light_schedule_end": {
         "name": "Light Schedule {schedule_id} End"
       },

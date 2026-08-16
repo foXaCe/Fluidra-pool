@@ -69,6 +69,31 @@ def get_schedule_data(device_data: dict[str, Any], schedule_id: Any) -> dict[str
     return None
 
 
+def get_aux_schedule_data(device_data: dict[str, Any], aux_number: Any, schedule_id: Any) -> dict[str, Any] | None:
+    """Return the schedule dict for an auxiliary output (eXO iQ c22/c24).
+
+    Aux schedules live on fixed registers independent of the pump type, so they
+    are stored separately from the pump/chlorination ``schedule_data``, keyed by
+    aux number (``device_data["aux_schedule_data"]["1"]`` etc.). Looks up an
+    entry whose ``id`` matches ``schedule_id`` (string-compared like the main
+    schedule lookup). Returns ``None`` when there is no data for that aux.
+    """
+    if not device_data:
+        return None
+
+    aux_schedules = device_data.get("aux_schedule_data") or {}
+    schedules = aux_schedules.get(str(aux_number))
+    if not schedules:
+        return None
+
+    for schedule in schedules:
+        if str(schedule.get("id")) == str(schedule_id):
+            result: dict[str, Any] = schedule
+            return result
+
+    return None
+
+
 def resolve_component_rw(cfg: int | dict[str, Any]) -> tuple[Any, Any]:
     """Resolve a component config that may be a plain int or a read/write dict.
 
