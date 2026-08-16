@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.78.7] - 2026-08-16
+
+### Fixed
+
+- **Stale sensor values when the chlorinator goes offline** — the `device_offline` + `last_known_at`
+  staleness guard, previously only on the alarm binary_sensor, now applies to all 8 `sensor_type`
+  values of `FluidraChlorinatorSensor` (ph, orp, salinity, chlorination_actual, water_temperature…).
+  Value sensors now hold the last known reading instead of reporting stale/misleading values during
+  a disconnect. (#194)
+
 ## [2.78.6] - 2026-08-14
 
 ### Fixed
