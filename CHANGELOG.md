@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.79.1] - 2026-08-17
+
+### Fixed
+
+- **GenSalt OE iQ mode select stuck on `Off`** — unknown-serial tecnoLC2 units fell to the
+  generic catch-all, which reads c20 as the mode; on tecnoLC2 units c20 is the ORP setpoint
+  (mV), so the select always showed `Off`. The integration now routes by the device
+  `thingType` (available from the first fetch) → correct profile, no bogus mode select.
+  (#195, #199)
+
 ## [2.79.0] - 2026-08-16
 
 ### Added
