@@ -1062,6 +1062,20 @@ class TestTecnoLC2Signature:
         config = DeviceIdentifier.identify_device(self._device("CC29999998.nn_1", **{"8": 0}))
         assert self._name(config) == "chlorinator"
 
+    def test_thing_type_tecnoLC2_routes_before_components_scanned(self):
+        """thingType from the status tree is enough, even before c8/c172 are scanned."""
+        device = self._device("CC29990003.nn_1")
+        device["status"] = {"thingType": "tecnoLC2"}
+        device["components"] = {}
+        assert self._name(DeviceIdentifier.identify_device(device)) == "tecnolc2_signature"
+        assert DeviceIdentifier.has_feature(device, "skip_mode_select") is True
+
+    def test_thing_type_other_value_keeps_component_signature(self):
+        """Non-tecnoLC2 thingType does not short-circuit the existing component check."""
+        device = self._device("CC29990004.nn_1", **{"8": 0, "172": 303})
+        device["status"] = {"thingType": "domoticS2"}
+        assert self._name(DeviceIdentifier.identify_device(device)) == "tecnolc2_signature"
+
     def test_signature_activates_after_components_are_scanned(self):
         """The override is re-evaluated post-cache: it flips once c8/c172 are present."""
         device = self._device("CC29990002.nn_1")
