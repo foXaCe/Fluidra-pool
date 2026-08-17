@@ -128,7 +128,9 @@ def _identify_device_uncached(
     return best_match
 
 
-def _tecnolc2_signature_override(config: DeviceConfig | None, components: dict[str, Any]) -> DeviceConfig | None:
+def _tecnolc2_signature_override(
+    config: DeviceConfig | None, components: dict[str, Any], thing_type: str = ""
+) -> DeviceConfig | None:
     """Re-route the domoticS2 catch-all to the tecnoLC2 profile when the components say so.
 
     Applied *after* identification (and outside the device-level cache) so it re-reads
@@ -139,6 +141,12 @@ def _tecnolc2_signature_override(config: DeviceConfig | None, components: dict[s
     """
     if config is not DEVICE_CONFIGS.get("chlorinator"):
         return config
+    # The Fluidra cloud labels the unit thingType "tecnoLC2" (GenSalt OE iQ family) as
+    # soon as the device tree is fetched — before c8/c172 are even scanned. That is the
+    # most reliable signal, so use it directly (case-insensitive) in addition to the
+    # component signature, which only becomes usable after the first register scan.
+    if thing_type and "tecnolc2" in thing_type.lower():
+        return DEVICE_CONFIGS.get("tecnolc2_signature", config)
     comp8_value = str(components["8"].get("reportedValue", "")) if isinstance(components.get("8"), dict) else ""
     comp172_value = str(components["172"].get("reportedValue", "")) if isinstance(components.get("172"), dict) else ""
     if _looks_like_tecnolc2(comp8_value, comp172_value):
@@ -196,6 +204,10 @@ class DeviceIdentifier:
         # signature so a signature change (first vs subsequent polls) invalidates it.
         raw_components = device.get("components")
         components: dict[str, Any] = raw_components if isinstance(raw_components, dict) else {}
+        # The Fluidra cloud exposes the unit's thingType (e.g. "tecnoLC2") on the
+        # status tree from the very first fetch — available before any register scan.
+        status = device.get("status")
+        thing_type = str(status.get("thingType", "")) if isinstance(status, dict) else ""
         comp7_value = ""
         if "7" in components and isinstance(components["7"], dict):
             comp7_value = str(components["7"].get("reportedValue", ""))
@@ -211,7 +223,7 @@ class DeviceIdentifier:
         if isinstance(cache, dict) and cache.get("key") == cache_key:
             # The tecnoLC2 signature is re-evaluated here (not baked into the cache) so
             # it activates as soon as c8/c172 are scanned, without a key change.
-            return _tecnolc2_signature_override(cache.get("config"), components)
+            return _tecnolc2_signature_override(cache.get("config"), components, thing_type)
 
         result = _identify_device_uncached(
             device_id=str(cache_key[0]),
@@ -222,7 +234,7 @@ class DeviceIdentifier:
             comp7_value=comp7_value,
         )
         device["_identify_cache"] = {"key": cache_key, "config": result}
-        return _tecnolc2_signature_override(result, components)
+        return _tecnolc2_signature_override(result, components, thing_type)
 
     @staticmethod
     def should_create_entity(device: dict[str, Any], entity_type: str) -> bool:
