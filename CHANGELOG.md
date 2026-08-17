@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.80.0] - 2026-08-17
+
+### Changed
+
+- **`set_schedule` now refuses to write on the Zodiac eXO iQ instead of writing a schedule the
+  device alters** — verified across four hardware runs: a slot sent as 01:02-03:04 on one day is
+  stored as `"03 02"` / `"00 04"` on *four* days, with the stored day set tracking the sent day
+  deterministically (day *n* → `{0, n+2, n+5, n+6}`). The payload matches a slot the Fluidra app
+  itself created field for field, key order included, so the shape is not the cause — the backend is
+  transforming it. Since the device then *acts* on the altered schedule, running equipment at hours
+  nobody chose, the service now returns an explanatory error. **Reading schedules is unaffected**:
+  those created in the Fluidra app still appear correctly. Use the Fluidra app to set schedules on
+  this device meanwhile (Issue #174, @Inervo).
+
 ## [2.79.2] - 2026-08-17
 
 ### Fixed
