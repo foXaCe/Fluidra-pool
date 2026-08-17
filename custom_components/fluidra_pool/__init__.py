@@ -449,16 +449,26 @@ def _schedule_start_actions(mode: Any, use_component_actions: bool) -> dict[str,
 def _ensure_schedule_write_supported(
     coordinator: FluidraDataUpdateCoordinator, device_id: str, component_id: int
 ) -> None:
-    """Refuse a write that would leave a variable-speed schedule incomplete.
+    """Refuse schedule writes on devices where they are known to land wrong.
 
-    A VS-pump slot carries two component actions — chlorination under id 0 and
-    the target RPM under id 1. This service only knows the first, so writing to
-    the VS register produces a slot with no speed. The Fluidra app then fails to
-    load the device at all: its detail page hangs until the pump type is changed
-    on the unit itself, which needs physical access (Issue #174, @Inervo).
+    On the eXO iQ the backend does not store what we send. Verified on hardware
+    across four runs (Issue #174, @Inervo): a slot sent as 01:02-03:04 on a
+    single day was stored as "03 02" / "00 04" on **four** days, and the stored
+    days track the sent day deterministically -- sending day *n* yields
+    ``{0, n+2, n+5, n+6}``. The payload matches a slot the Fluidra app itself
+    created field for field, including key order, so the shape is not the cause.
 
-    Refusing the call is recoverable. Writing is not, so this errors rather than
-    writing a slot that is known to be malformed.
+    Two distinct failures, both worse than the feature being absent:
+
+    * The VS register additionally needs a target RPM this service cannot set,
+      and an RPM-less slot leaves the Fluidra app unable to load the device at
+      all -- recoverable only by changing the pump type on the unit itself.
+    * Every register here stores a schedule that differs from the one asked
+      for, and the device *acts* on it: chlorination running at hours nobody
+      chose is a worse outcome than an error message.
+
+    Refusing is recoverable; writing is not. Lifted per-register once the
+    backend's transform is understood.
     """
     from .device_registry import DeviceIdentifier
 
@@ -466,10 +476,18 @@ def _ensure_schedule_write_supported(
     if device is None:
         return
     mapping = DeviceIdentifier.get_feature(device, "schedule_component_map", None)
-    if isinstance(mapping, dict) and component_id == mapping.get("vs"):
+    if not isinstance(mapping, dict):
+        return
+    if component_id == mapping.get("vs"):
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="schedule_vs_pump_unsupported",
+            translation_placeholders={"device_id": device_id},
+        )
+    if component_id in {mapping.get("none"), mapping.get("simple")}:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="schedule_write_not_stored",
             translation_placeholders={"device_id": device_id},
         )
 

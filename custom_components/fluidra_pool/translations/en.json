@@ -471,6 +471,9 @@
     "schedule_vs_pump_unsupported": {
       "message": "Cannot write schedules to {device_id}: this device is configured with a variable-speed pump, whose schedule slots also carry a target pump speed that this service cannot set. Writing an incomplete slot makes the Fluidra app unable to load the device. Use the Fluidra app for variable-speed pump schedules."
     },
+    "schedule_write_not_stored": {
+      "message": "Cannot write schedules to {device_id}: this device stores something different from what is sent — verified on hardware, the times and days both come back altered, and the device acts on the altered schedule. Writing would run your equipment at hours you did not choose. Use the Fluidra app for schedules on this device until this is resolved (issue #174)."
+    },
     "switch_set_failed": {
       "message": "Failed to change the switch state"
     },

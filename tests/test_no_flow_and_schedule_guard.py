@@ -165,12 +165,20 @@ def test_writing_to_a_variable_speed_schedule_is_refused() -> None:
         _ensure_schedule_write_supported(coordinator, "NS25007212", 21)
 
 
-def test_simple_pump_and_chlorination_schedules_are_still_writable() -> None:
+@pytest.mark.parametrize("component", [19, 20, 21])
+def test_every_exo_schedule_register_is_refused(component: int) -> None:
+    """The eXO stores a schedule different from the one sent, and acts on it.
+
+    Verified across four hardware runs: 01:02-03:04 on one day came back as
+    "03 02" / "00 04" on four days, the stored days tracking the sent day as
+    {0, n+2, n+5, n+6}. A wrong-but-applied schedule runs the equipment at
+    hours nobody chose, which is worse than refusing (Issue #174).
+    """
     from custom_components.fluidra_pool import _ensure_schedule_write_supported
 
-    coordinator = _exo_coordinator(vs=False)
-    _ensure_schedule_write_supported(coordinator, "NS25007212", 20)
-    _ensure_schedule_write_supported(coordinator, "NS25007212", 19)
+    coordinator = _exo_coordinator(vs=component == 21)
+    with pytest.raises(ServiceValidationError):
+        _ensure_schedule_write_supported(coordinator, "NS25007212", component)
 
 
 def test_devices_without_a_schedule_map_are_unaffected() -> None:
