@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.79.2] - 2026-08-17
+
+### Fixed
+
+- **A pool that discovers no equipment now says why** — device discovery returned an empty list on
+  any non-200 response without logging anything, so a refused request looked exactly like a pool
+  that genuinely owns no equipment: `total_devices: 0`, and a log containing nothing but the
+  successful authentication. The HTTP status and response body are now logged at WARNING, as is an
+  unusable payload and a legitimately empty pool — the latter pointing at account-level access as
+  the likely cause (Issue #196, @oskarreiners987-commits).
+
 ## [2.79.1] - 2026-08-17
 
 ### Fixed
