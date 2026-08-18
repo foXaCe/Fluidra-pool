@@ -29,6 +29,35 @@ from ._constants import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def cognito_error_type(data: Any, raw_text: str) -> str | None:
+    """Extract the Cognito ``__type`` from a failed authentication reply.
+
+    Cognito answers every failure with ``{"__type": "NotAuthorizedException",
+    "message": "..."}``, and sometimes qualifies the type as
+    ``com.amazonaws...#NotAuthorizedException`` — only the trailing segment is
+    kept. ``data`` is the already-parsed body; ``raw_text`` is a fallback for
+    the case where parsing happened elsewhere or produced a non-dict.
+
+    Returns None when there is no usable ``__type``: callers then fall back to
+    the generic "check your credentials" message rather than failing. Only the
+    type name is ever returned — the ``message`` field stays out, so nothing
+    from the raw body can reach a user-facing string.
+    """
+    payload: Any = data
+    if not isinstance(payload, dict):
+        try:
+            payload = json.loads(raw_text)
+        except (ValueError, TypeError):
+            return None
+    if not isinstance(payload, dict):
+        return None
+
+    raw_type = payload.get("__type")
+    if not isinstance(raw_type, str):
+        return None
+    return raw_type.strip().rpartition("#")[2] or None
+
+
 class AuthMixin(FluidraAPIBase):
     """Cognito sign-in, MFA, refresh-token rotation, and standard auth headers.
 
@@ -101,7 +130,10 @@ class AuthMixin(FluidraAPIBase):
 
         if status != 200 or data is None:
             _LOGGER.debug("Cognito auth failed body: %s", raw_text[:500])
-            raise FluidraAuthError(f"Cognito auth failed with status {status}")
+            raise FluidraAuthError(
+                f"Cognito auth failed with status {status}",
+                cognito_error_type(data, raw_text),
+            )
 
         auth_result = data.get("AuthenticationResult")
         if not auth_result:
@@ -144,7 +176,10 @@ class AuthMixin(FluidraAPIBase):
 
         if status != 200 or data is None:
             _LOGGER.debug("MFA verification failed body: %s", raw_text[:500])
-            raise FluidraAuthError(f"MFA verification failed with status {status}")
+            raise FluidraAuthError(
+                f"MFA verification failed with status {status}",
+                cognito_error_type(data, raw_text),
+            )
 
         auth_result = data.get("AuthenticationResult", {})
         self._store_tokens(auth_result)

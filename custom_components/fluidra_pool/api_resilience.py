@@ -47,7 +47,20 @@ class FluidraError(Exception):
 
 
 class FluidraAuthError(FluidraError):
-    """Exception for authentication errors."""
+    """Exception for authentication errors.
+
+    ``error_code`` carries the Cognito ``__type`` (``UserNotFoundException``,
+    ``PasswordResetRequiredException``, …) when the failure came from a Cognito
+    reply. The config flow maps it to a message that tells the user what to
+    actually do, instead of blaming their password for every failure mode
+    (Issue #201). It stays None for auth failures raised outside a Cognito
+    response — the generic message is the right answer there.
+    """
+
+    def __init__(self, message: str, error_code: str | None = None) -> None:
+        """Initialise with an optional Cognito error type."""
+        super().__init__(message)
+        self.error_code = error_code
 
 
 class FluidraConnectionError(FluidraError):
