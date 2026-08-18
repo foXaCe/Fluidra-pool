@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The login form now says what actually went wrong instead of always blaming the password.**
+  Every AWS Cognito rejection used to render as the same "check your email and password" message,
+  with the real cause reachable only in a debug log nobody enables before opening an issue. The
+  Cognito error type is now mapped to its own message: account not found on the EMEA servers,
+  account not yet confirmed, password reset required by Fluidra, and too many attempts each get
+  distinct, actionable wording in all five translation files. `NotAuthorizedException` keeps the
+  generic message on purpose — Cognito returns it both for a genuinely wrong password and for an
+  account absent from this user pool. Any unknown error type falls back to the same generic message
+  rather than failing, and the raw Cognito response body never reaches a displayed string; it stays
+  in the debug log exactly as before (Refs #201).
+
 ## [2.80.0] - 2026-08-17
 
 ### Changed

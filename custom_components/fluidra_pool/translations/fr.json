@@ -6,10 +6,14 @@
       "reconfigure_successful": "Configuration mise à jour avec succès"
     },
     "error": {
+      "account_not_confirmed": "Ce compte n'a pas encore été confirmé. Ouvrez l'app Fluidra Pool, terminez la vérification de l'adresse e-mail envoyée par Fluidra, puis réessayez.",
+      "account_not_found": "Aucun compte Fluidra n'existe pour cette adresse e-mail sur les serveurs EMEA (Europe). Vérifiez la saisie — et notez que les comptes enregistrés hors EMEA ne sont pas encore pris en charge.",
       "cannot_connect": "Impossible de se connecter à l'API Fluidra",
       "invalid_auth": "Échec de la connexion. Vérifiez votre e-mail et votre mot de passe. Si votre compte est enregistré hors de la région EMEA (Europe), il n'est pas pris en charge actuellement.",
       "invalid_mfa_code": "Code de vérification invalide ou expiré. Veuillez réessayer.",
       "no_pools": "Aucune piscine trouvée. Assurez-vous que vos équipements sont configurés dans l'app Fluidra Pool",
+      "password_reset_required": "Fluidra exige une réinitialisation du mot de passe pour ce compte. Réinitialisez-le dans l'app Fluidra Pool ou sur le site Fluidra, puis connectez-vous ici avec le nouveau mot de passe.",
+      "too_many_attempts": "Trop de tentatives de connexion. Fluidra a temporairement bloqué ce compte — patientez quelques minutes avant de réessayer.",
       "unknown": "Erreur inattendue"
     },
     "step": {

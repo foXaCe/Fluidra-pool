@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import logging
-from typing import Any
+from typing import Any, Final
 
 import aiohttp
 from homeassistant.config_entries import (
@@ -47,6 +47,38 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_PASSWORD): _PASSWORD_SELECTOR,
     }
 )
+
+# Cognito rejects a sign-in for very different reasons, and every one of them
+# used to surface as "check your email and password" — so users opened issues
+# with no idea what had happened, and the real cause only existed in a debug log
+# nobody enables before reporting (Issue #201). The ``__type`` in the reply is
+# the only reliable discriminator; map the ones that change what the user should
+# DO next, and let everything else fall back to the generic message.
+#
+# Deliberately absent: ``NotAuthorizedException``. Cognito returns it both for a
+# genuinely wrong password AND — when the app client hides user-existence errors,
+# which is the default — for an account that simply isn't in this user pool. It
+# is a true "check your credentials", which is what ``invalid_auth`` already says.
+COGNITO_ERROR_KEYS: Final[Mapping[str, str]] = {
+    "UserNotFoundException": "account_not_found",
+    "UserNotConfirmedException": "account_not_confirmed",
+    "PasswordResetRequiredException": "password_reset_required",
+    "TooManyRequestsException": "too_many_attempts",
+    "TooManyFailedAttemptsException": "too_many_attempts",
+    "LimitExceededException": "too_many_attempts",
+}
+
+
+def cognito_error_key(error_code: str | None) -> str:
+    """Map a Cognito ``__type`` to a config-flow error translation key.
+
+    An unknown type — or None, when the failure carried no Cognito body at all —
+    falls back to the existing generic ``invalid_auth`` message. New Cognito
+    error types therefore degrade to today's behaviour instead of raising.
+    """
+    if not error_code:
+        return "invalid_auth"
+    return COGNITO_ERROR_KEYS.get(error_code, "invalid_auth")
 
 
 class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -322,7 +354,8 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
         Returns:
             (None, None) on success.
             (None, {"session": ..., "challenge_name": ...}) when MFA is required.
-            (error_key, None) on failure.
+            (error_key, None) on failure — the key is derived from the Cognito
+            error type so the form explains the actual cause.
         """
         api = FluidraPoolAPI(email, password)
 
@@ -333,9 +366,15 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
         except FluidraMFARequired as mfa_err:
             _LOGGER.info("MFA required for %s (%s)", mask_email(email), mfa_err.challenge_name)
             return None, {"session": mfa_err.session, "challenge_name": mfa_err.challenge_name}
-        except FluidraAuthError:
-            _LOGGER.warning("Invalid credentials for %s", mask_email(email))
-            return "invalid_auth", None
+        except FluidraAuthError as err:
+            # Only the Cognito error *type* is logged and mapped; the reply body
+            # itself never leaves the debug log in fluidra_api._auth.
+            _LOGGER.warning(
+                "Authentication rejected for %s (Cognito: %s)",
+                mask_email(email),
+                err.error_code or "no error type",
+            )
+            return cognito_error_key(err.error_code), None
         except (FluidraConnectionError, aiohttp.ClientError, TimeoutError):
             _LOGGER.warning("Cannot reach Fluidra API for %s", mask_email(email))
             return "cannot_connect", None
@@ -361,9 +400,19 @@ class FluidraPoolConfigFlow(ConfigFlow, domain=DOMAIN):
             await api.respond_to_mfa(code, session, challenge_name)
             _LOGGER.info("MFA verification successful for %s", mask_email(email))
             return None, api.refresh_token
-        except FluidraAuthError:
-            _LOGGER.warning("MFA verification rejected for %s", mask_email(email))
-            return "invalid_mfa_code", None
+        except FluidraAuthError as err:
+            # Same Cognito surface, different step. A rate-limit rejection here is
+            # not a bad code, and telling the user to re-read their authenticator
+            # would send them round in circles. Every other failure on this step
+            # really is about the code (CodeMismatch / ExpiredCode / dead session).
+            mapped = cognito_error_key(err.error_code)
+            error_key = mapped if mapped == "too_many_attempts" else "invalid_mfa_code"
+            _LOGGER.warning(
+                "MFA verification rejected for %s (Cognito: %s)",
+                mask_email(email),
+                err.error_code or "no error type",
+            )
+            return error_key, None
         except (FluidraConnectionError, aiohttp.ClientError, TimeoutError):
             _LOGGER.warning("Cannot reach Fluidra API during MFA for %s", mask_email(email))
             return "cannot_connect", None
