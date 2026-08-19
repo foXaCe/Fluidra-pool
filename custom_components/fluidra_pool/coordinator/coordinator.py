@@ -37,7 +37,7 @@ from ..const import (
 )
 from ..device_registry import DeviceIdentifier
 from ..fluidra_api import FluidraPoolAPI
-from ..helpers import determine_pool_access, resolve_schedule_component
+from ..helpers import determine_pool_access, resolve_aux_schedule_component, resolve_schedule_component
 from ..repairs import (
     async_create_connection_issue,
     async_create_unverified_profile_issue,
@@ -645,11 +645,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 except (ValueError, TypeError):
                     pass
         else:
-            aux_schedule_components = DeviceIdentifier.get_feature(device, "aux_schedule_components", {})
-            for aux_number, aux_component in aux_schedule_components.items():
-                if component_id == int(aux_component):
-                    schedule_data = reported_value if isinstance(reported_value, list) else []
-                    device.setdefault("aux_schedule_data", {})[str(aux_number)] = schedule_data
+            # An aux keeps its schedules on one of two registers depending on
+            # what it drives (plain output c22/c24, colour LED c23/c25), so both
+            # are decoded here and the live one is picked after the full scan by
+            # _apply_resolved_aux_schedules (Issue #174).
+            for feature in ("aux_schedule_components", "aux_colour_schedule_components"):
+                for aux_number, aux_component in (DeviceIdentifier.get_feature(device, feature, {}) or {}).items():
+                    if component_id == int(aux_component):
+                        schedule_data = reported_value if isinstance(reported_value, list) else []
+                        device.setdefault("aux_schedule_data", {})[str(aux_number)] = schedule_data
 
             schedule_comp = DeviceIdentifier.get_feature(device, "schedule_component")
             if schedule_comp and component_id == schedule_comp:
@@ -685,6 +689,29 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         device["schedule_data"] = schedule_data
         device["schedule_component_resolved"] = component_id
         self._track_schedule_count(pool_id, device_id, schedule_data)
+
+    def _apply_resolved_aux_schedules(self, device: dict[str, Any]) -> None:
+        """Point each aux's schedule_data at the register that output honours.
+
+        Aux 1 keeps its slots on c22 when it drives a plain on/off output and on
+        c23 when it drives a colour LED; Aux 2 uses c24/c25 the same way. Both
+        are scanned, so this runs after the full pass and keeps only the live
+        one -- otherwise whichever register happened to come last in scan order
+        would win (Issue #174, @Inervo).
+        """
+        aux_numbers = set(DeviceIdentifier.get_feature(device, "aux_schedule_components", {}) or {})
+        aux_numbers |= set(DeviceIdentifier.get_feature(device, "aux_colour_schedule_components", {}) or {})
+        if not aux_numbers:
+            return
+
+        components = device.get("components", {})
+        resolved: dict[str, int] = {}
+        for aux_number in aux_numbers:
+            component_id = resolve_aux_schedule_component(device, aux_number)
+            reported = components.get(str(component_id), {}).get("reportedValue")
+            device.setdefault("aux_schedule_data", {})[str(aux_number)] = reported if isinstance(reported, list) else []
+            resolved[str(aux_number)] = component_id
+        device["aux_schedule_components_resolved"] = resolved
 
     def _process_victoria_component(
         self, device: dict[str, Any], component_id: int, component_state: dict[str, Any]
@@ -1104,6 +1131,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # everyone else keeps the single fixed register (Issue #174).
             if DeviceIdentifier.get_feature(device, "schedule_component_map", None):
                 self._apply_resolved_schedule(device, pool_id, device_id)
+            self._apply_resolved_aux_schedules(device)
 
             # Recompute auto-mode pump speed AFTER the whole component scan: the
             # speed (component 11) is processed before the schedule (component 20)

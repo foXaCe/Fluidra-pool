@@ -11,8 +11,13 @@ from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
 from ..const import DOMAIN
-from ..device_registry import DeviceIdentifier
-from ..helpers import get_aux_schedule_data, get_schedule_data, resolve_schedule_component
+from ..helpers import (
+    describe_led_colour,
+    get_aux_schedule_data,
+    get_schedule_data,
+    resolve_aux_schedule_component,
+    resolve_schedule_component,
+)
 from .base import FluidraPoolSwitchEntity
 
 if TYPE_CHECKING:
@@ -122,8 +127,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
     def _get_schedule_component(self) -> int:
         """Get the schedule component used by this device."""
         if self._aux_number is not None:
-            aux_map = DeviceIdentifier.get_feature(self.device_data, "aux_schedule_components", {})
-            return int(aux_map.get(str(self._aux_number), 22))
+            # c22/c24 for a plain output, c23/c25 for a colour LED (Issue #174).
+            return resolve_aux_schedule_component(self.device_data, self._aux_number)
         value: int = resolve_schedule_component(self.device_data)
         return value
 
@@ -262,6 +267,22 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                     "end_action": schedule.get("endActions", {}),
                 }
             )
+
+        if self._aux_number is not None:
+            attrs["schedule_component"] = self._get_schedule_component()
+            # A colour-LED slot carries the colour under componentActions id 0.
+            # The raw index is authoritative: the eXO drives two LED families
+            # whose colour tables share neither base nor length, and nothing
+            # read from the device names which one is wired here, so both
+            # candidate names are offered rather than one guessed (Issue #174).
+            for action in (schedule or {}).get("startActions", {}).get("componentActions", []) or []:
+                if isinstance(action, dict) and action.get("id") == 0:
+                    colour_index = action.get("desiredValue", action.get("reportedValue"))
+                    candidates = describe_led_colour(colour_index)
+                    if candidates is not None:
+                        attrs["colour_index"] = colour_index
+                        attrs["colour_candidates"] = candidates
+                    break
 
         attrs.update({"pending_action": self._pending_state is not None, "action_timestamp": self._last_action_time})
 

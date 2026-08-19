@@ -376,6 +376,39 @@ async def test_chlor_schedule_speed_select_writes_component_actions_for_exo() ->
     assert sent[0]["startActions"]["componentActions"][0]["reportedValue"] == 2
 
 
+async def test_chlor_schedule_speed_keeps_the_variable_speed_target_rpm() -> None:
+    """A VS slot carries the RPM under id 1; changing the mode must not drop it.
+
+    An RPM-less slot leaves the Fluidra app unable to load the device at all,
+    recoverable only by changing the pump type on the unit (Issue #174).
+    """
+    schedule = {
+        **SCHEDULE,
+        "id": 1,
+        "startActions": {"componentActions": [{"id": 0, "reportedValue": 1}, {"id": 1, "reportedValue": 2332}]},
+    }
+    device = _chlor_device(schedule_data=[schedule], output_type="output")
+    api = _api()
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), api, POOL_ID, CHLOR_ID, schedule_id="1")
+    _attach_ha(select)
+
+    await select.async_select_option("aux1")
+
+    sent = api.set_schedule.call_args.args[1]
+    actions = {action["id"]: action["reportedValue"] for action in sent[0]["startActions"]["componentActions"]}
+    assert actions == {0: 2, 1: 2332}
+
+
+async def test_chlor_schedule_speed_reads_a_freshly_written_slot() -> None:
+    """A slot echoed back under desiredValue must still resolve to an option."""
+    schedule = {**SCHEDULE, "id": 1, "startActions": {"componentActions": [{"id": 0, "desiredValue": 2}]}}
+    device = _chlor_device(schedule_data=[schedule], output_type="output")
+    select = FluidraChlorinatorScheduleSpeedSelect(_coord(device), _api(), POOL_ID, CHLOR_ID, schedule_id="1")
+    _attach_ha(select)
+
+    assert select.current_option == "aux1"
+
+
 async def test_chlor_schedule_speed_clears_optimistic_after_success() -> None:
     """After a successful API call, the optimistic option is cleared."""
     device = _chlor_device(schedule_data=[SCHEDULE])

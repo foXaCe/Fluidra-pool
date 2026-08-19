@@ -147,7 +147,7 @@ def test_service_builds_component_actions_for_exo_devices() -> None:
         1,
         use_component_actions=True,
     )
-    assert built["startActions"] == {"componentActions": [{"id": 0, "reportedValue": 1}]}
+    assert built["startActions"] == {"operationName": "1", "componentActions": [{"id": 0, "desiredValue": 1}]}
     assert built["startTime"] == "00 08 * * 1,2,3"
 
 

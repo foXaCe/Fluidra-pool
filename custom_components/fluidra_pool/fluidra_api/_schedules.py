@@ -8,6 +8,7 @@ from urllib.parse import quote
 
 from ..api_resilience import FluidraAuthError, FluidraError
 from ..const import COMPONENT_DM24049704_SCHEDULE, COMPONENT_SCHEDULE
+from ..helpers import schedule_slots_for_write
 from ..utils import CRON_DAY_TO_NAME, extract_cron_days
 from ._base import FluidraAPIBase
 from ._constants import CONNECTED_PARAMS, FLUIDRA_EMEA_BASE
@@ -113,7 +114,7 @@ class SchedulesMixin(FluidraAPIBase):
         headers["content-type"] = "application/json; charset=utf-8"
 
         url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}/components/{int(component_id)}"
-        desired_value: Any = schedules
+        desired_value: Any = schedule_slots_for_write(schedules)
         if int(component_id) == COMPONENT_DM24049704_SCHEDULE:
             desired_value = self._convert_schedules_to_dm24049704_format(schedules)
         payload = {"desiredValue": desired_value}

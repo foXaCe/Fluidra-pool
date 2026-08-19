@@ -477,3 +477,61 @@ def test_get_aux_schedule_data_finds_slot() -> None:
     assert get_aux_schedule_data(device, "2", "1") == {"id": 1, "enabled": False}
     assert get_aux_schedule_data(device, "1", "99") is None
     assert get_aux_schedule_data({}, "1", "1") is None
+
+
+# --- Issue #174: a colour-LED aux carries its colour in the slot --------------
+
+
+COLOUR_SLOT = {
+    "id": 1,
+    "groupId": 1,
+    "enabled": True,
+    "startTime": "00 10 * * 5",
+    "endTime": "00 11 * * 5",
+    "startActions": {"operationName": "1", "componentActions": [{"id": 0, "reportedValue": 7}]},
+}
+
+
+def test_aux_switch_reports_the_raw_colour_and_both_candidate_names() -> None:
+    """The two LED tables disagree on index 7, so neither name is asserted."""
+    device = _aux_device({"1": [COLOUR_SLOT]})
+    entity = FluidraScheduleEnableSwitch(_coord(device), _api(), POOL_ID, DEVICE_ID, "1", aux_number="1")
+    _attach_ha(entity)
+
+    attrs = entity.extra_state_attributes
+    assert attrs["colour_index"] == 7
+    assert attrs["colour_candidates"] == {"lumiplus": "sequence_1", "zodiac_nl": "emerald_green"}
+    assert attrs["schedule_component"] == 22
+
+
+def test_aux_switch_omits_colour_for_a_plain_on_off_slot() -> None:
+    """An output with no componentActions has no colour to report."""
+    device = _aux_device({"1": [AUX1_SCHEDULE]})
+    entity = FluidraScheduleEnableSwitch(_coord(device), _api(), POOL_ID, DEVICE_ID, "1", aux_number="1")
+    _attach_ha(entity)
+
+    attrs = entity.extra_state_attributes
+    assert "colour_index" not in attrs
+    assert "colour_candidates" not in attrs
+
+
+def test_aux_switch_omits_colour_when_the_index_is_off_both_tables() -> None:
+    """An unknown index is not dressed up with a name it may not have."""
+    slot = {**COLOUR_SLOT, "startActions": {"componentActions": [{"id": 0, "reportedValue": 99}]}}
+    device = _aux_device({"1": [slot]})
+    entity = FluidraScheduleEnableSwitch(_coord(device), _api(), POOL_ID, DEVICE_ID, "1", aux_number="1")
+    _attach_ha(entity)
+
+    assert "colour_index" not in entity.extra_state_attributes
+
+
+def test_main_schedule_switch_reports_no_colour_attributes() -> None:
+    """Only aux outputs drive LEDs; the pump switch must be untouched."""
+    device = _aux_device({"1": [COLOUR_SLOT]})
+    device["schedule_data"] = [dict(AUX1_SCHEDULE)]
+    entity = FluidraScheduleEnableSwitch(_coord(device), _api(), POOL_ID, DEVICE_ID, "1")
+    _attach_ha(entity)
+
+    attrs = entity.extra_state_attributes
+    assert "schedule_component" not in attrs
+    assert "colour_index" not in attrs

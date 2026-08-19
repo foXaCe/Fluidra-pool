@@ -466,6 +466,9 @@
     "schedule_overlap": {
       "message": "This schedule overlaps another active schedule"
     },
+    "schedule_overnight_unsupported": {
+      "message": "Cannot set a schedule from {start_time} to {end_time}: the end time must come after the start time. A schedule cannot cross midnight — use two schedules instead, one until 23:59 and one from 00:00."
+    },
     "schedule_set_failed": {
       "message": "Fluidra API call failed while setting the schedule for {device_id}"
     },

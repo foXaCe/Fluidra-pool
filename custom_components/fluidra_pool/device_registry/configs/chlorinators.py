@@ -1012,6 +1012,12 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             # Auxiliary-output schedules: fixed registers independent of the pump
             # type (Aux 1 = c22, Aux 2 = c24), up to 2 slots per aux (Issue #174).
             "aux_schedule_components": {"1": 22, "2": 24},
+            # ... unless the output is wired to a colour LED, which moves its
+            # schedules to c23/c25 and carries the colour as a componentAction.
+            # That accounts for all seven schedulers the unit declares (c19-c25).
+            # Which register of a pair is live is resolved at runtime, from the
+            # one that holds slots (helpers.resolve_aux_schedule_component).
+            "aux_colour_schedule_components": {"1": 23, "2": 25},
             "aux_schedule_count": 2,
             # Heating, available once an aux output is assigned to it (c88).
             # c43 is the setpoint in whole °C: an isolated capture moved it
@@ -1070,7 +1076,9 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 20,
                 21,
                 22,
+                23,
                 24,
+                25,
                 30,
                 31,
                 35,

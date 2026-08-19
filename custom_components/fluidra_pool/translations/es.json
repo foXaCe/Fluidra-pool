@@ -326,6 +326,9 @@
       "auto_mode": {
         "name": "Modo Auto"
       },
+      "aux_schedule_enable": {
+        "name": "Aux {aux_number} Horario {schedule_id}"
+      },
       "boost_mode": {
         "name": "Modo Turbo"
       },
@@ -352,6 +355,12 @@
       }
     },
     "time": {
+      "aux_schedule_end": {
+        "name": "Aux {aux_number} Horario {schedule_id} Fin"
+      },
+      "aux_schedule_start": {
+        "name": "Aux {aux_number} Horario {schedule_id} Inicio"
+      },
       "light_schedule_end": {
         "name": "Programación Luz {schedule_id} Fin"
       },
@@ -456,6 +465,9 @@
     },
     "schedule_overlap": {
       "message": "Esta programación se solapa con otra programación activa"
+    },
+    "schedule_overnight_unsupported": {
+      "message": "No se puede definir un horario de {start_time} a {end_time}: la hora de fin debe ser posterior a la de inicio. Un horario no puede cruzar la medianoche: use dos horarios, uno hasta las 23:59 y otro desde las 00:00."
     },
     "schedule_set_failed": {
       "message": "La llamada a la API de Fluidra falló al establecer el horario para {device_id}"

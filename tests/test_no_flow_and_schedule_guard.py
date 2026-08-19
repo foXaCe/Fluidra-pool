@@ -207,7 +207,23 @@ def _coordinator_with_schedules(schedules: list) -> Any:
     return coordinator
 
 
-EXO_SLOT = {
+# The PUT body @Inervo captured from the official app, for the same device
+# family and endpoint the integration writes to. Its full key set is
+# id/groupId/enabled/startTime/endTime/startActions -- no ``state``, and the
+# componentActions value under ``desiredValue`` with ``operationName``
+# alongside, not instead.
+APP_PUT_SLOT = {
+    "id": 3,
+    "groupId": 3,
+    "enabled": False,
+    "startTime": "11 21 * * 1",
+    "endTime": "19 21 * * 1",
+    "startActions": {"operationName": "1", "componentActions": [{"id": 0, "desiredValue": 1}]},
+}
+
+# The same slot as the device *reports* it back: it adds ``state`` itself and
+# echoes the action under ``reportedValue``.
+EXO_REPORTED_SLOT = {
     "id": 3,
     "groupId": 3,
     "state": "IDLE",
@@ -218,32 +234,41 @@ EXO_SLOT = {
 }
 
 
-def test_payload_matches_the_shape_the_exo_itself_reports() -> None:
-    """Field for field, against a slot the Fluidra app created (Issue #174)."""
+def test_payload_matches_the_apps_own_put_body() -> None:
+    """Field for field, against the app's captured PUT body (Issue #174)."""
     from custom_components.fluidra_pool import _service_schedule_to_fluidra
 
     ours = _service_schedule_to_fluidra(
         {"enabled": False, "start_time": "21:11", "end_time": "21:19", "mode": "1", "days": [1]},
         3,
         use_component_actions=True,
-        include_state=True,
     )
-    assert ours == EXO_SLOT
+    assert ours == APP_PUT_SLOT
 
 
-def test_state_is_mirrored_from_the_device_not_assumed() -> None:
-    """Devices that reject a synthesised state (#89) must not receive one."""
-    from custom_components.fluidra_pool import _device_uses_schedule_state
+def test_a_reported_slot_is_converted_to_the_write_shape() -> None:
+    """Echoing a read slot back verbatim is what landed mangled (Issue #174)."""
+    from custom_components.fluidra_pool.helpers import schedule_slots_for_write
 
-    assert _device_uses_schedule_state(_coordinator_with_schedules([EXO_SLOT]), "NS25007212") is True
-
-    without_state = {k: v for k, v in EXO_SLOT.items() if k != "state"}
-    assert _device_uses_schedule_state(_coordinator_with_schedules([without_state]), "DM1") is False
-    assert _device_uses_schedule_state(_coordinator_with_schedules([]), "DM1") is False
-    assert _device_uses_schedule_state(_coordinator_with_schedules(["junk", None]), "DM1") is False
+    assert schedule_slots_for_write([EXO_REPORTED_SLOT]) == [APP_PUT_SLOT]
 
 
-def test_state_is_omitted_unless_requested() -> None:
+def test_write_shape_leaves_operation_name_devices_alone() -> None:
+    """Units carrying the mode as operationName keep their payload untouched."""
+    from custom_components.fluidra_pool.helpers import schedule_slots_for_write
+
+    slot = {
+        "id": 1,
+        "groupId": 1,
+        "enabled": True,
+        "startTime": "09 08 * * 1,0",
+        "endTime": "11 10 * * 1,0",
+        "startActions": {"operationName": "1"},
+    }
+    assert schedule_slots_for_write([slot]) == [slot]
+
+
+def test_state_is_never_sent() -> None:
     from custom_components.fluidra_pool import _service_schedule_to_fluidra
 
     ours = _service_schedule_to_fluidra(
@@ -298,14 +323,53 @@ def test_sunday_is_not_duplicated_when_sent_both_ways() -> None:
     assert slot["startTime"] == "00 01 * * 0,1"
 
 
-def test_key_order_matches_the_devices_own_slots() -> None:
-    """Ordered as the eXO reports them, state third (Issue #174)."""
+def test_key_order_matches_the_apps_own_put_body() -> None:
+    """Ordered as the app sends them (Issue #174)."""
     from custom_components.fluidra_pool import _service_schedule_to_fluidra
 
     slot = _service_schedule_to_fluidra(
         {"enabled": False, "start_time": "21:11", "end_time": "21:19", "mode": "1", "days": [1]},
         3,
         use_component_actions=True,
-        include_state=True,
     )
-    assert list(slot) == list(EXO_SLOT)
+    assert list(slot) == list(APP_PUT_SLOT)
+
+
+# --- Issue #174: a slot cannot cross midnight --------------------------------
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [
+        ("22:00", "06:00"),  # The overnight case named on the issue.
+        ("08:00", "08:00"),  # Zero-length.
+        ("10:30", "10:29"),  # One minute backwards.
+        ("23:59", "00:00"),  # Straddling midnight by a minute.
+    ],
+)
+def test_a_slot_that_does_not_end_after_it_starts_is_refused(start: str, end: str) -> None:
+    """start and end are two CRONs on one day set, so overnight has no shape."""
+    from homeassistant.exceptions import ServiceValidationError
+
+    from custom_components.fluidra_pool import _service_schedule_to_fluidra
+
+    with pytest.raises(ServiceValidationError) as err:
+        _service_schedule_to_fluidra(
+            {"enabled": True, "start_time": start, "end_time": end, "mode": "1", "days": [1]},
+            1,
+        )
+    assert err.value.translation_key == "schedule_overnight_unsupported"
+
+
+def test_the_two_halves_of_an_overnight_window_are_both_accepted() -> None:
+    """The documented workaround: an evening slot and a morning slot."""
+    from custom_components.fluidra_pool import _service_schedule_to_fluidra
+
+    evening = _service_schedule_to_fluidra(
+        {"enabled": True, "start_time": "22:00", "end_time": "23:59", "mode": "1", "days": [1]}, 1
+    )
+    morning = _service_schedule_to_fluidra(
+        {"enabled": True, "start_time": "00:00", "end_time": "06:00", "mode": "1", "days": [2]}, 2
+    )
+    assert evening["startTime"] == "00 22 * * 1"
+    assert morning["endTime"] == "00 06 * * 2"
