@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.80.1] - 2026-08-19
+## [2.80.2] - 2026-08-19
 
 ### Changed
 
@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a Z250iQ must resolve to the Z260iQ climate behaviour. @Kal42's register-by-register
   comparison on #139 is the evidence that both models ship the same firmware; the profiles
   stay separate only for identification, never for behaviour (Issue #139, @Kal42).
+
+  No integration code changes in this release: the profiles were already identical, only the
+  documentation of them was wrong. Installing it changes nothing about how a device behaves.
+
+## [2.80.1] - 2026-08-19
+
+### Changed
 
 - **The login form now says what actually went wrong instead of always blaming the password.**
   Every AWS Cognito rejection used to render as the same "check your email and password" message,
