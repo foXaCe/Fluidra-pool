@@ -265,6 +265,66 @@ class TestDeviceConfigRegistry:
         }
         assert DeviceIdentifier.identify_device(device) is config
 
+    def test_z250iq_and_z260iq_expose_the_same_feature_set(self):
+        """The two profiles must stay equal on everything behavioural (Issue #139).
+
+        @Kal42 read every register on a Z250iQ and found them identical to the
+        Z260iQ — HVAC modes, no-flow, running hours — and concluded both models
+        ship the same firmware. The profiles are kept separate only for
+        *identification* (the Z260iQ has no name patterns and both share the
+        LF* prefix with the BXWAD), never for behaviour. This guards that
+        split: a feature added to one model and forgotten on the other is a
+        regression, not a design choice. If a genuine hardware difference is
+        ever measured, change this test deliberately.
+        """
+        z250 = DEVICE_CONFIGS["z250iq_heat_pump"]
+        z260 = DEVICE_CONFIGS["z260iq_heat_pump"]
+        assert z250.features == z260.features
+        assert z250.entities == z260.entities
+        assert z250.device_type == z260.device_type
+        # Identification stays distinct — that is the whole reason for two profiles.
+        assert z250.priority != z260.priority
+        assert z250.name_patterns
+        assert not z260.name_patterns
+
+    def test_z250iq_device_resolves_to_the_z260iq_climate_behavior(self):
+        """A Z250iQ unit must be driven by the Z260iQ behaviour at runtime.
+
+        Equal feature dicts are only worth something if the climate layer acts
+        on them: resolve_behavior() dispatches on the z260iq_mode feature, so a
+        Z250iQ that lands on its own profile still gets Z260iqBehavior. This is
+        the end-to-end proof for Issue #139 — same reported values, same driver.
+        """
+        from custom_components.fluidra_pool.climate_behaviors import (
+            Z260iqBehavior,
+            resolve_behavior,
+        )
+
+        z250 = {
+            "device_id": "LF25001234",
+            "name": "Z250iQ",
+            "family": "Heat Pump",
+            "type": "heat_pump",
+            "model": "Z250iQ",
+            "components": {},
+        }
+        z260 = {
+            "device_id": "LF26005678",
+            "name": "Heat Pump",
+            "family": "Heat Pump",
+            "type": "heat_pump",
+            "model": "Z260iQ",
+            # The Z260iQ profile is gated on the comp-7 BXWAD signature: without
+            # it the identifier scores it zero, and the unit falls through to the
+            # Z250iQ profile. Harmless now that the two carry the same features —
+            # which is exactly what the parity test above locks in.
+            "components": {"7": {"reportedValue": "BXWAD0103544325004"}},
+        }
+        assert DeviceIdentifier.identify_device(z250) is DEVICE_CONFIGS["z250iq_heat_pump"]
+        assert DeviceIdentifier.identify_device(z260) is DEVICE_CONFIGS["z260iq_heat_pump"]
+        assert isinstance(resolve_behavior(z250), Z260iqBehavior)
+        assert type(resolve_behavior(z250)) is type(resolve_behavior(z260))
+
     def test_cc24018506_energy_connect_full_profile_fix(self):
         """Energy Connect CC24018506 profile fix, covering four write/read pairs
         inherited from the generic catch-all and never verified against real
