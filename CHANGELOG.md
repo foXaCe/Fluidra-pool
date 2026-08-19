@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.80.1] - 2026-08-19
 
 ### Changed
 
@@ -19,6 +19,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   account absent from this user pool. Any unknown error type falls back to the same generic message
   rather than failing, and the raw Cognito response body never reaches a displayed string; it stays
   in the debug log exactly as before (Refs #201).
+
+### Fixed
+
+- **Schedules are now written in the exact shape the official app sends on the Zodiac eXO iQ.**
+  A capture of the app's own PUT body for every eXO scheduler shows three differences the
+  integration could not see before: `componentActions` carry their value under `desiredValue` (the
+  device echoes reads back as `reportedValue`, and every write path re-sent that key verbatim —
+  a key the backend does not consume), `operationName` is sent *alongside* `componentActions`
+  rather than instead of it, and `state` is not sent at all (v2.78.5 synthesised `"state": "IDLE"`
+  from the device's own reported slots; the capture shows the device adds it, the client does not).
+  All three are corrected inside `fluidra_api.set_schedule`, so no write path can drift from the
+  others again. The eXO chlorination write guard added in 2.80.0 stays in place: the corrected
+  payload is a plausible cause of the mangling, not a verified one, and it has not been re-run on
+  hardware (Issue #174, @Inervo).
+- **An auxiliary output driving a colour LED no longer reads as having no schedules.** Each aux uses
+  two registers, not one: `c22` for a plain on/off output and `c23` for a colour LED, `c24`/`c25`
+  the same way for Aux 2. Only `c22`/`c24` were scanned. Both are scanned now and the live one is
+  resolved from whichever register actually holds slots; when both do, the choice is genuinely
+  ambiguous, so the pre-existing register is kept and the assigned-function label logged rather than
+  guessed at. Together with `c19`-`c21` that accounts for all seven schedulers the unit declares. A
+  colour slot's index is exposed as a raw `colour_index` attribute with both `colour_candidates`
+  names: the two LED colour tables share neither a base nor a length (LumiPlus 0-13, Zodiac NL
+  2-15) and nothing read from the device says which family an aux drives, so naming one would be
+  wrong for the other (Issue #174, @Inervo).
+- **Changing a schedule's mode no longer breaks the Fluidra app's ability to load the device.** The
+  schedule mode select rebuilt a slot's `componentActions` from id 0 alone, dropping the target RPM
+  a variable-speed slot carries under id 1 — after which the official app could not open the device
+  until the pump type was changed on the unit itself. Every other action is now preserved
+  (Issue #174, @Inervo).
+- **An overnight schedule is now refused with an explanation instead of silently sent.** A slot is
+  two CRON expressions over one day set, so a window crossing midnight has no representation; the
+  service used to send an end time preceding its own start. It now raises an error naming the
+  workaround — two schedules, one until 23:59 and one from 00:00 (Issue #174).
 
 ## [2.80.0] - 2026-08-17
 
