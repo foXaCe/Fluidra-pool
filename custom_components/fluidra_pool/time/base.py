@@ -15,7 +15,12 @@ from ..api_resilience import FluidraError
 from ..const import DEVICE_MODEL_FALLBACK, DEVICE_MODEL_MAP, DOMAIN
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolControlEntity
-from ..helpers import get_aux_schedule_data, get_schedule_data, resolve_schedule_component
+from ..helpers import (
+    get_aux_schedule_data,
+    get_schedule_data,
+    resolve_aux_schedule_component,
+    resolve_schedule_component,
+)
 from ..utils import extract_cron_days
 
 if TYPE_CHECKING:
@@ -162,8 +167,8 @@ class FluidraScheduleTimeEntity(_FluidraTimeEntityBase):
     def _get_schedule_component(self) -> int:
         """Get the correct schedule component ID for this device."""
         if self._aux_number is not None:
-            aux_map = DeviceIdentifier.get_feature(self.device_data, "aux_schedule_components", {})
-            return int(aux_map.get(str(self._aux_number), 22))
+            # c22/c24 for a plain output, c23/c25 for a colour LED (Issue #174).
+            return resolve_aux_schedule_component(self.device_data, self._aux_number)
         device_data = self.device_data
         # Per-device override (e.g. 258 for DM24049704 chlorinator).
         schedule_comp: int = resolve_schedule_component(device_data)

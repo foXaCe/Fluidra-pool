@@ -25,6 +25,27 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+def _component_action_value(action: Any) -> Any:
+    """Return a componentAction's value under whichever key carries it."""
+    if not isinstance(action, dict):
+        return 1
+    if "reportedValue" in action:
+        return action["reportedValue"]
+    return action.get("desiredValue", 1)
+
+
+def _start_actions_with_mode(start_actions: Any, mode: int) -> dict[str, Any]:
+    """Return ``startActions`` with componentAction id 0 set to ``mode``.
+
+    Every other action is preserved: a variable-speed eXO slot carries the
+    target RPM under id 1 alongside the chlorination mode under id 0, and this
+    entity only knows the latter (Issue #174).
+    """
+    actions = start_actions.get("componentActions") if isinstance(start_actions, dict) else None
+    kept = [action for action in actions if isinstance(action, dict) and action.get("id") != 0] if actions else []
+    return {"componentActions": [{"id": 0, "reportedValue": mode}, *kept]}
+
+
 class FluidraScheduleModeSelect(FluidraPoolControlEntity, SelectEntity):
     """Select entity for choosing schedule mode (speed level) for existing pump schedules."""
 
@@ -232,8 +253,9 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
             start_actions = schedule.get("startActions", {})
             component_actions = start_actions.get("componentActions", [])
             if component_actions:
-                # EXO format: componentActions[0].reportedValue.
-                value = str(component_actions[0].get("reportedValue", 1))
+                # eXO format: componentActions[0]. Reads echo the value as
+                # reportedValue; a slot we just wrote carries desiredValue.
+                value = str(_component_action_value(component_actions[0]))
             else:
                 # DM format: operationName.
                 value = str(start_actions.get("operationName", "1"))
@@ -280,20 +302,24 @@ class FluidraChlorinatorScheduleSpeedSelect(FluidraPoolControlEntity, SelectEnti
                     start_actions = sched.get("startActions", {})
                     component_actions = start_actions.get("componentActions", [])
                     if component_actions:
-                        operation_name = str(component_actions[0].get("reportedValue", 1))
+                        operation_name = str(_component_action_value(component_actions[0]))
                     else:
                         operation_name = str(start_actions.get("operationName", "1"))
 
                 if self._output_type == "output":
-                    # EXO format: componentActions with reportedValue.
+                    # eXO format: the mode lives in componentActions under id 0.
+                    # The rest of the list is copied through -- a variable-speed
+                    # slot also carries the target RPM under id 1, and rebuilding
+                    # the list from id 0 alone dropped it, which leaves the
+                    # Fluidra app unable to load the device at all until the pump
+                    # type is changed on the unit itself (Issue #174, @Inervo).
                     scheduler = {
                         "id": sched.get("id"),
                         "groupId": sched.get("groupId", sched.get("id")),
-                        "state": sched.get("state", "IDLE"),
                         "enabled": sched.get("enabled", True),
                         "startTime": start_time,
                         "endTime": end_time,
-                        "startActions": {"componentActions": [{"id": 0, "reportedValue": int(operation_name)}]},
+                        "startActions": _start_actions_with_mode(sched.get("startActions"), int(operation_name)),
                     }
                 elif schedule_component == 258:
                     # DM24049704 format: operationName with CRON padding.

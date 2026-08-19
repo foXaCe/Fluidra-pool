@@ -466,6 +466,9 @@
     "schedule_overlap": {
       "message": "Cet horaire chevauche un autre horaire actif"
     },
+    "schedule_overnight_unsupported": {
+      "message": "Impossible de définir un planning de {start_time} à {end_time} : l'heure de fin doit être postérieure à l'heure de début. Un planning ne peut pas traverser minuit — utilisez deux plannings, l'un jusqu'à 23:59 et l'autre à partir de 00:00."
+    },
     "schedule_set_failed": {
       "message": "L'appel à l'API Fluidra a échoué lors de la définition du programme pour {device_id}"
     },

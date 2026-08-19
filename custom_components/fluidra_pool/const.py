@@ -146,6 +146,55 @@ COMPONENT_SCHEDULE: Final = 20
 COMPONENT_LIGHT_COLOR: Final = 45
 COMPONENT_DM24049704_SCHEDULE: Final = 258
 
+# eXO iQ auxiliary-output colour-LED schedule registers. An aux wired to a plain
+# on/off light (or to "Other") keeps its schedule on c22/c24; an aux wired to a
+# colour LED keeps it on c23/c25 instead, with the colour carried as a
+# componentAction under id 0 (Issue #174, @Inervo -- capture of the official app).
+# Which of the pair is live is resolved at runtime, see
+# helpers.resolve_aux_schedule_component.
+COMPONENT_EXO_AUX1_COLOUR_SCHEDULE: Final = 23
+COMPONENT_EXO_AUX2_COLOUR_SCHEDULE: Final = 25
+
+# Colour index -> name for the two LED families the eXO can drive. They share
+# neither a base nor a length, so a single table would be wrong for one of them.
+# Both come from @Inervo's capture; only the LumiPlus-on-Aux-1 and
+# Zodiac-NL-on-Aux-2 pairings were actually exercised, the mirrored ones are
+# inferred. Nothing derives the family from the device yet -- c90/c91 report the
+# assigned function as a plain string but are not known to distinguish the two --
+# so these are surfaced as candidate names, never used to rewrite a value.
+EXO_LED_COLOURS_LUMIPLUS: Final[dict[int, str]] = {
+    0: "white",
+    1: "red",
+    2: "blue",
+    3: "green",
+    4: "magenta",
+    5: "cyan",
+    6: "yellow",
+    7: "sequence_1",
+    8: "sequence_2",
+    9: "sequence_3",
+    10: "sequence_4",
+    11: "sequence_5",
+    12: "sequence_6",
+    13: "sequence_7",
+}
+EXO_LED_COLOURS_ZODIAC_NL: Final[dict[int, str]] = {
+    2: "alpine_white",
+    3: "sky_blue",
+    4: "cobalt_blue",
+    5: "caribbean_blue",
+    6: "spring_green",
+    7: "emerald_green",
+    8: "emerald_rose",
+    9: "magenta",
+    10: "violet",
+    11: "slow_color_splash",
+    12: "fast_color_splash",
+    13: "america",
+    14: "fat_tuesday",
+    15: "disco_tech",
+}
+
 # Pump speed mapping: API level → displayed percentage
 PUMP_SPEED_PERCENTAGES: Final[dict[int, int]] = {
     0: 45,  # Low

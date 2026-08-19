@@ -187,7 +187,8 @@ async def test_set_schedule_success_returns_true_and_puts_payload() -> None:
     assert url.startswith("https://api.fluidra-emea.com/generic/devices/DEV-1/components/")
     assert url.endswith(f"/components/{COMPONENT_SCHEDULE}")
     assert kwargs.get("params") == {"deviceType": "connected"}
-    assert kwargs["json_data"] == {"desiredValue": schedules}
+    # groupId is filled in from id on the way out (schedule_slots_for_write).
+    assert kwargs["json_data"] == {"desiredValue": [{"id": 1, "enabled": True, "groupId": 1}]}
     # content-type header is set on the auth headers.
     assert kwargs["headers"]["content-type"] == "application/json; charset=utf-8"
 
@@ -334,3 +335,90 @@ async def test_get_pool_schedulers_returns_none_on_error_status() -> None:
     api = _FakeAPI()
     api._request.return_value = (404, None, "")
     assert await api.get_pool_schedulers("pool-1") is None
+
+
+# --- Issue #174: the PUT body must match the official app's, byte for byte ----
+
+
+async def test_put_body_matches_the_captured_app_body_for_a_vs_pump_slot() -> None:
+    """@Inervo's capture: PUT /components/21, chlorination on, 05:06-07:08, 2332 rpm.
+
+    Fed to us as the device reports the slot back — ``reportedValue``, a runtime
+    ``state``, no ``groupId`` — which is what every write path hands over after
+    an edit. What leaves must be the app's shape regardless.
+    """
+    api = _make_api(status=200)
+    reported_slot: dict[str, Any] = {
+        "id": 1,
+        "state": "IDLE",
+        "enabled": True,
+        "startTime": "06 05 * * 1",
+        "endTime": "08 07 * * 1",
+        "endActions": {},
+        "startActions": {"componentActions": [{"id": 0, "reportedValue": 1}, {"id": 1, "reportedValue": 2332}]},
+    }
+
+    assert await api.set_schedule("NS25007212", [reported_slot], component_id=21) is True
+
+    _args, kwargs = api._request.await_args
+    assert kwargs["json_data"] == {
+        "desiredValue": [
+            {
+                "id": 1,
+                "groupId": 1,
+                "enabled": True,
+                "startTime": "06 05 * * 1",
+                "endTime": "08 07 * * 1",
+                "startActions": {
+                    "operationName": "1",
+                    "componentActions": [{"id": 0, "desiredValue": 1}, {"id": 1, "desiredValue": 2332}],
+                },
+            }
+        ]
+    }
+
+
+async def test_put_body_matches_the_captured_app_body_for_a_colour_led_slot() -> None:
+    """@Inervo's capture: PUT /components/23, Friday 10:00-11:00, colour index 3."""
+    api = _make_api(status=200)
+    reported_slot: dict[str, Any] = {
+        "id": 1,
+        "groupId": 1,
+        "enabled": True,
+        "startTime": "00 10 * * 5",
+        "endTime": "00 11 * * 5",
+        "startActions": {"componentActions": [{"id": 0, "reportedValue": 3}]},
+    }
+
+    assert await api.set_schedule("NS25007212", [reported_slot], component_id=23) is True
+
+    _args, kwargs = api._request.await_args
+    assert kwargs["json_data"]["desiredValue"][0]["startActions"] == {
+        "operationName": "1",
+        "componentActions": [{"id": 0, "desiredValue": 3}],
+    }
+
+
+async def test_a_simple_on_off_aux_slot_is_sent_unchanged() -> None:
+    """@Inervo's capture: PUT /components/22 carries operationName and nothing else."""
+    api = _make_api(status=200)
+    slot: dict[str, Any] = {
+        "id": 1,
+        "groupId": 1,
+        "enabled": True,
+        "startTime": "09 08 * * 1,0",
+        "endTime": "11 10 * * 1,0",
+        "startActions": {"operationName": "1"},
+    }
+
+    assert await api.set_schedule("NS25007212", [slot], component_id=22) is True
+
+    _args, kwargs = api._request.await_args
+    assert kwargs["json_data"] == {"desiredValue": [slot]}
+
+
+async def test_clearing_a_register_still_sends_an_empty_list() -> None:
+    api = _make_api(status=200)
+    assert await api.clear_schedule("NS25007212", component_id=23) is True
+    _args, kwargs = api._request.await_args
+    assert kwargs["json_data"] == {"desiredValue": []}

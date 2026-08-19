@@ -377,11 +377,27 @@ def _service_schedule_to_fluidra(
     schedule_id: int,
     *,
     use_component_actions: bool = False,
-    include_state: bool = False,
 ) -> dict[str, Any]:
     """Convert service schedule input to the Fluidra CRON schedule shape."""
     start_hour, start_minute = _parse_service_time(schedule["start_time"])
     end_hour, end_minute = _parse_service_time(schedule["end_time"])
+    # A slot is two independent CRON expressions sharing one day set, so an
+    # overnight window has no representation: 22:00 -> 06:00 would be stored as
+    # "start Monday 22:00, end Monday 06:00", an end that precedes its own start.
+    # None of the captured app slots crosses midnight either. Refuse it here,
+    # where the whole window is specified at once and the intent is unambiguous;
+    # split it into an evening slot and a morning slot instead. (The time
+    # entities still tolerate a momentarily inverted pair, because that is a
+    # half-finished edit rather than a stated overnight range.)
+    if (end_hour, end_minute) <= (start_hour, start_minute):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="schedule_overnight_unsupported",
+            translation_placeholders={
+                "start_time": f"{start_hour:02d}:{start_minute:02d}",
+                "end_time": f"{end_hour:02d}:{end_minute:02d}",
+            },
+        )
     days = sorted({int(day) for day in schedule["days"]})
     if not days:
         raise ServiceValidationError(
@@ -400,35 +416,16 @@ def _service_schedule_to_fluidra(
     # previous payload (string "schedule_N" id, no groupId, a spurious
     # componentToChange, plus synthesised endActions and state) was rejected by the
     # server-side JSONata transform ("invalid scheduleUser").
+    # No ``state``: a v2.78.5 attempt added ``"state": "IDLE"`` because the eXO's
+    # own slots report one, but the capture of the app's PUT body settles it --
+    # the app sends id/groupId/enabled/startTime/endTime/startActions and nothing
+    # else. ``state`` is added by the device, not by the client (Issue #174).
     payload: dict[str, Any] = {"id": schedule_id, "groupId": schedule_id}
-    if include_state:
-        # Written as IDLE rather than echoing a running slot's state: this is a
-        # fresh definition, not a live status. Placed here rather than appended,
-        # so the key order matches the device's own slots exactly (Issue #174).
-        payload["state"] = "IDLE"
     payload["enabled"] = schedule["enabled"]
     payload["startTime"] = f"{start_minute:02d} {start_hour:02d} * * {days_str}"
     payload["endTime"] = f"{end_minute:02d} {end_hour:02d} * * {days_str}"
     payload["startActions"] = _schedule_start_actions(schedule["mode"], use_component_actions)
     return payload
-
-
-def _device_uses_schedule_state(coordinator: Any, device_id: str) -> bool:
-    """Return True when this device's own schedule slots carry a ``state`` field.
-
-    The eXO iQ's slots include ``"state": "IDLE"`` — visible in schedules created
-    from the Fluidra app — and a payload without it is not applied: the write
-    lands in ``desiredValue``, mangled, and ``reportedValue`` stays untouched
-    (Issue #174, @Inervo). Other devices rejected a *synthesised* state back on
-    #89, so this mirrors what the device already reports rather than assuming
-    either way, exactly as ``_device_uses_component_actions`` does for the
-    actions shape.
-    """
-    device = coordinator.api.get_device_by_id(device_id) if coordinator else None
-    for sched in (device or {}).get("schedule_data") or []:
-        if isinstance(sched, dict) and isinstance(sched.get("state"), str):
-            return True
-    return False
 
 
 def _schedule_start_actions(mode: Any, use_component_actions: bool) -> dict[str, Any]:
@@ -442,7 +439,12 @@ def _schedule_start_actions(mode: Any, use_component_actions: bool) -> dict[str,
                 translation_key="invalid_schedule_mode",
                 translation_placeholders={"value": str(mode)},
             ) from None
-        return {"componentActions": [{"id": 0, "reportedValue": value}]}
+        # ``desiredValue``, and ``operationName`` kept alongside: that is what the
+        # official app PUTs. Reads echo the same action back as ``reportedValue``,
+        # and sending that key back is a write the backend's transform does not
+        # consume (Issue #174, @Inervo). ``schedule_slots_for_write`` enforces the
+        # same rule on every other write path.
+        return {"operationName": "1", "componentActions": [{"id": 0, "desiredValue": value}]}
     return {"operationName": mode}
 
 
@@ -455,8 +457,16 @@ def _ensure_schedule_write_supported(
     across four runs (Issue #174, @Inervo): a slot sent as 01:02-03:04 on a
     single day was stored as "03 02" / "00 04" on **four** days, and the stored
     days track the sent day deterministically -- sending day *n* yields
-    ``{0, n+2, n+5, n+6}``. The payload matches a slot the Fluidra app itself
-    created field for field, including key order, so the shape is not the cause.
+    ``{0, n+2, n+5, n+6}``.
+
+    That was blamed on the payload matching the device's own *reported* slots
+    field for field. @Inervo's later capture of the app's PUT body shows the two
+    are not the same object: the app sends the action value under
+    ``desiredValue`` with ``operationName`` alongside and no ``state`` at all,
+    where the integration echoed back ``reportedValue`` and synthesised a
+    ``state``. Both are corrected now, which is a plausible cause of the
+    transform producing garbage rather than storing the slot -- but plausible is
+    not verified, and nobody has re-run this on hardware.
 
     Two distinct failures, both worse than the feature being absent:
 
@@ -467,8 +477,10 @@ def _ensure_schedule_write_supported(
       for, and the device *acts* on it: chlorination running at hours nobody
       chose is a worse outcome than an error message.
 
-    Refusing is recoverable; writing is not. Lifted per-register once the
-    backend's transform is understood.
+    Refusing is recoverable; writing is not, so the refusal stands until a
+    hardware run confirms the corrected shape. The aux registers (c22-c25) are
+    deliberately *not* covered: they take the same corrected payload and drive
+    only an auxiliary output, so they are the safe place to confirm it.
     """
     from .device_registry import DeviceIdentifier
 
@@ -512,11 +524,8 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
         # Convert HA format to Fluidra API format
         component_actions = _device_uses_component_actions(coordinator, device_id)
-        include_state = _device_uses_schedule_state(coordinator, device_id)
         fluidra_schedules = [
-            _service_schedule_to_fluidra(
-                schedule, i, use_component_actions=component_actions, include_state=include_state
-            )
+            _service_schedule_to_fluidra(schedule, i, use_component_actions=component_actions)
             for i, schedule in enumerate(schedules_data, start=1)
         ]
 
