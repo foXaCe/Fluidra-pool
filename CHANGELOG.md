@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The README no longer under-sells the Z250iQ.** It still described the model as on/off,
+  target temperature and current temperature only — the state it was in before v2.48.0
+  (2026-07-08) promoted it to the full Z260iQ feature set. The profile has carried HVAC modes, presets,
+  the no-flow alarm, running hours and the WiFi signal since then, so a Z250iQ owner reading
+  the supported-devices list was told their unit does less than it does. The two profiles are
+  now also locked together by a test: their entity lists and feature dicts must stay equal,
+  and a Z250iQ must resolve to the Z260iQ climate behaviour. @Kal42's register-by-register
+  comparison on #139 is the evidence that both models ship the same firmware; the profiles
+  stay separate only for identification, never for behaviour (Issue #139, @Kal42).
+
 - **The login form now says what actually went wrong instead of always blaming the password.**
   Every AWS Cognito rejection used to render as the same "check your email and password" message,
   with the real cause reachable only in a debug log nobody enables before opening an issue. The

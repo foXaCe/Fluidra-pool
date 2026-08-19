@@ -80,7 +80,9 @@ profile, so unknown equipment is usually still usable.
 
 ### 🔥 Heat Pumps
 - **LG Eco Elyo** — reversible: Smart Heating / Cooling, Boost, Silence presets; target temp; water-temp sensor
-- **Z250iQ / Z25iQ** — on/off, target temperature, current temperature
+- **Z250iQ / Z25iQ** — same firmware family as the Z260iQ, so the same feature set:
+  HVAC modes (heat / cool / heat-cool), presets, no-flow alarm, water/air temperatures,
+  running hours, WiFi signal
 - **Z260iQ** — HVAC modes (heat / cool / heat-cool), presets, no-flow alarm, water/air temperatures
 - **Z550iQ+** — HVAC modes (heat / cool / auto), presets, HVAC action (heating/cooling/idle/no-flow), water/air temperatures
 - **Z650iQ** — HVAC modes (heat / cool / heat-cool), Smart+/Smart/Ecosilence/Boost presets,
