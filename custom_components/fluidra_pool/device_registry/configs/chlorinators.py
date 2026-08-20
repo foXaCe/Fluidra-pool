@@ -143,7 +143,14 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # the generic config wrongly read c172 as pH 2.13); c165 = pH (7.5); c170 = ORP
         # measured (663 mV, matches the app — c177 = 725 is the uncalibrated raw value);
         # c174 = salinity (3.7 g/L); c10 = chlorination level (100 %).
-        identifier_patterns=["CC25051112*"],
+        # CC26009948 (Issue #195, @albo-yo) — GenSalt OE iQ pH Evo *with ORP kit*, same
+        # tecnoLC2 layout and same live c20: diagnostics show c20 = 700 next to a measured
+        # c170 = 710 mV, so the ORP setpoint is real on this unit. It is listed here rather
+        # than on the ORP-less sibling (cc25052635) for that reason. Until now it fell back
+        # to the generic chlorinator profile, which put the OFF/ON/AUTO mode select on c20 —
+        # so the select read 700, fell through to "Off", and writing On/Auto wrote 1 or 2
+        # into the ORP setpoint.
+        identifier_patterns=["CC25051112*", "CC26009948*"],
         family_patterns=["chlorinator"],
         components_range=25,
         required_components=[0, 1, 2, 3],

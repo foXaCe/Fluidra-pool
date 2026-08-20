@@ -168,6 +168,11 @@ class DevicesMixin(FluidraAPIBase):
                                 # entity, gated on these keys by the select platform.
                                 "variable_speed": child_is_pump,
                                 "pump_type": "variable_speed" if child_is_pump else child_device_type,
+                                # The cloud's model signature (e.g. "tecnoLC2"). Carried over
+                                # from the tree so profile routing works at entity-creation
+                                # time — the status tree that also holds it is only attached
+                                # on the second poll, long after setup (Issue #195).
+                                "thing_type": str(child_device.get("thingType", "")),
                             },
                         )
                 continue
@@ -191,6 +196,8 @@ class DevicesMixin(FluidraAPIBase):
                     "speed_percent": 0,
                     "variable_speed": True,
                     "pump_type": "variable_speed",
+                    # See above (Issue #195).
+                    "thing_type": str(device.get("thingType", "")),
                 },
             )
 

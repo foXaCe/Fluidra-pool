@@ -205,9 +205,14 @@ class DeviceIdentifier:
         raw_components = device.get("components")
         components: dict[str, Any] = raw_components if isinstance(raw_components, dict) else {}
         # The Fluidra cloud exposes the unit's thingType (e.g. "tecnoLC2") on the
-        # status tree from the very first fetch — available before any register scan.
-        status = device.get("status")
-        thing_type = str(status.get("thingType", "")) if isinstance(status, dict) else ""
+        # device tree from the very first fetch — available before any register scan.
+        # Discovery copies it to ``thing_type`` on the device dict, which is the only
+        # copy that exists while the platforms build their entities: ``status`` is the
+        # same tree entry, but it is not attached until the second poll (Issue #195).
+        thing_type = str(device.get("thing_type", ""))
+        if not thing_type:
+            status = device.get("status")
+            thing_type = str(status.get("thingType", "")) if isinstance(status, dict) else ""
         comp7_value = ""
         if "7" in components and isinstance(components["7"], dict):
             comp7_value = str(components["7"].get("reportedValue", ""))
