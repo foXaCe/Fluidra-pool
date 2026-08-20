@@ -113,6 +113,21 @@ class ComponentsMixin(FluidraAPIBase):
                 continue
         return states or None
 
+    def reported_component_value(self, device_id: str, component_id: int) -> Any:
+        """Return the last value the device reported for a component, if known.
+
+        Read from the local mirror rather than the network: this is called on
+        the write path, where an extra round-trip would cost a request per
+        command (the rate limiting of Issue #63 is a real constraint).
+        """
+        device = self.get_device_by_id(device_id)
+        if not device:
+            return None
+        component = device.get("components", {}).get(str(int(component_id)))
+        if not isinstance(component, dict):
+            return None
+        return component.get("reportedValue")
+
     async def control_device_component(
         self, device_id: str, component_id: int, value: int | str | dict[str, Any]
     ) -> bool:
@@ -129,6 +144,10 @@ class ComponentsMixin(FluidraAPIBase):
         url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}/components/{int(component_id)}"
         payload = {"desiredValue": value}
 
+        # Read the value the device reports *before* the write: the response
+        # echoes back whatever we asked for, so it cannot serve as a baseline.
+        baseline = self.reported_component_value(device_id, component_id)
+
         try:
             status, data, raw_text = await self._request(
                 "PUT", url, headers=headers, json_data=payload, params=dict(CONNECTED_PARAMS)
@@ -141,12 +160,19 @@ class ComponentsMixin(FluidraAPIBase):
             return False
 
         if status == 200:
+            # HTTP 200 is not proof the write landed (Issue #133) — arm a
+            # read-back through the normal poll, a few cycles from now.
+            self.write_verifier.record(device_id, component_id, value, baseline)
             if isinstance(data, dict) and isinstance(value, int):
                 self._update_device_state_from_response(device_id, component_id, data, value)
             elif isinstance(value, int):
                 self._update_device_state_fallback(device_id, component_id, value)
             return True
 
+        # An outright rejection (the boost 404 of Issue #133) is already visible
+        # here; a stale pending entry for the same component would later be
+        # judged against a write that never happened.
+        self.write_verifier.discard(device_id, component_id)
         _LOGGER.warning(
             "Control component %s on %s failed: HTTP %s",
             component_id,
@@ -231,6 +257,8 @@ class ComponentsMixin(FluidraAPIBase):
         url = f"{FLUIDRA_EMEA_BASE}/generic/devices/{quote(str(device_id), safe='')}/components/{int(component_id)}"
         payload = {"desiredValue": value}
 
+        baseline = self.reported_component_value(device_id, component_id)
+
         try:
             status, _, _ = await self._request(
                 "PUT", url, headers=headers, json_data=payload, params=dict(CONNECTED_PARAMS)
@@ -238,4 +266,10 @@ class ComponentsMixin(FluidraAPIBase):
         except FluidraError as err:
             _LOGGER.debug("Set component value failed: %s", err)
             return False
-        return status == 200
+
+        if status != 200:
+            self.write_verifier.discard(device_id, component_id)
+            return False
+
+        self.write_verifier.record(device_id, component_id, value, baseline)
+        return True

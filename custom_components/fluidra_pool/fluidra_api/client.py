@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import aiohttp
 
 from ..api_resilience import CircuitBreaker, RateLimiter
+from ..write_verification import WriteVerifier
 from ._auth import AuthMixin
 from ._commands import CommandsMixin
 from ._components import ComponentsMixin
@@ -65,3 +66,7 @@ class FluidraPoolAPI(SessionMixin, AuthMixin, DevicesMixin, ComponentsMixin, Com
         self._rate_limiter: RateLimiter = RateLimiter()
 
         self._token_lock: asyncio.Lock = asyncio.Lock()
+
+        # Judges control writes against the next polls: the cloud returns 200
+        # and echoes the requested value even when it discards it (Issue #133).
+        self.write_verifier: WriteVerifier = WriteVerifier()

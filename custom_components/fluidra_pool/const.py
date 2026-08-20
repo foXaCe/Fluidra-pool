@@ -281,3 +281,25 @@ Z260_TEMP_STEP: Final = 1.0
 LUMIPLUS_COMPONENT_POWER: Final = 11
 LUMIPLUS_COMPONENT_BRIGHTNESS: Final = COMPONENT_LIGHT_BRIGHTNESS
 LUMIPLUS_COMPONENT_COLOR: Final = COMPONENT_LIGHT_COLOR
+
+# --- Post-write verification (Issue #133) ---
+# A control write returns HTTP 200 with a `reportedValue` that merely echoes the
+# requested `desiredValue`, even when the cloud discards it (read-only account,
+# per-component ACL, device offline, schedule overriding the setpoint). The
+# response proves nothing: the only proof is re-reading the component through
+# the normal poll a few cycles later. These bound that re-read.
+#
+# Grace period before a write is judged: many registers need several poll cycles
+# to report back (a Victoria pump takes 15-30 s just to acknowledge), so an
+# immediate check would cry wolf on every command. The grace is the larger of a
+# floor and a multiple of the poll interval, so a slow user-configured interval
+# still gets several cycles rather than a single one.
+WRITE_VERIFY_MIN_GRACE_SECONDS: Final = 180
+WRITE_VERIFY_POLL_CYCLES: Final = 3
+# Hard cap on in-flight writes awaiting verification. One entry per
+# (device, component) — a re-write supersedes the previous one — so this is only
+# a backstop against an unbounded pending map.
+WRITE_VERIFY_MAX_PENDING: Final = 128
+# Lost writes kept for the diagnostics dump, newest last. Enough to show a
+# pattern (which components are dropped) without bloating the export.
+WRITE_VERIFY_HISTORY_SIZE: Final = 20

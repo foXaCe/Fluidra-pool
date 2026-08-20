@@ -275,3 +275,54 @@ async def test_async_get_config_entry_diagnostics_redacts_credentials_only() -> 
     # Pool readings retained for debugging.
     pool_block = next(iter(diagnostics["pools"].values()))
     assert pool_block["devices"][0]["components"]["7"]["reportedValue"] == 720
+
+
+async def test_diagnostics_carry_the_lost_writes_trace() -> None:
+    """The dump must expose writes the cloud accepted and never applied.
+
+    This is what turns "my setpoint keeps reverting" into something measurable
+    for a bug report (Issues #133, #195), so it has to survive the redaction
+    pass — the verifier already masks the device id.
+    """
+    lost = [{"device_id": "LE2***883", "component_id": 8, "desired_value": 730.0}]
+    coordinator = SimpleNamespace(
+        data={},
+        last_update_success=True,
+        update_interval=timedelta(seconds=30),
+        lost_writes=lost,
+    )
+
+    entry = MagicMock()
+    entry.entry_id = "entry-1"
+    entry.version = 1
+    entry.domain = "fluidra_pool"
+    entry.title = "Fluidra Pool"
+    entry.data = {}
+    entry.options = {}
+    entry.runtime_data = SimpleNamespace(coordinator=coordinator)
+
+    diagnostics = await async_get_config_entry_diagnostics(None, entry)
+
+    assert diagnostics["lost_writes"] == lost
+
+
+async def test_diagnostics_report_no_lost_writes_when_none_were_seen() -> None:
+    """A healthy account gets an empty list, not a missing key."""
+    coordinator = SimpleNamespace(
+        data={},
+        last_update_success=True,
+        update_interval=timedelta(seconds=30),
+    )
+
+    entry = MagicMock()
+    entry.entry_id = "entry-1"
+    entry.version = 1
+    entry.domain = "fluidra_pool"
+    entry.title = "Fluidra Pool"
+    entry.data = {}
+    entry.options = {}
+    entry.runtime_data = SimpleNamespace(coordinator=coordinator)
+
+    diagnostics = await async_get_config_entry_diagnostics(None, entry)
+
+    assert diagnostics["lost_writes"] == []

@@ -14,6 +14,7 @@ from custom_components.fluidra_pool.api_resilience import (
 )
 from custom_components.fluidra_pool.const import COMPONENT_AUTO_MODE, COMPONENT_PUMP_ONOFF
 from custom_components.fluidra_pool.fluidra_api._components import ComponentsMixin
+from custom_components.fluidra_pool.write_verification import WriteVerifier
 
 
 class _FakeAPI(ComponentsMixin):
@@ -25,6 +26,7 @@ class _FakeAPI(ComponentsMixin):
         self._build_auth_headers = MagicMock(return_value={"Authorization": "Bearer fake-token"})
         self.ensure_valid_token = AsyncMock(return_value=True)
         self._devices = devices or {}
+        self.write_verifier = WriteVerifier()
 
     def get_device_by_id(self, device_id: str) -> dict | None:
         return self._devices.get(device_id)

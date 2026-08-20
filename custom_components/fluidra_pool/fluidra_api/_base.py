@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
     from ..api_resilience import CircuitBreaker, RateLimiter
+    from ..write_verification import WriteVerifier
 
 
 class FluidraAPIBase:
@@ -44,6 +45,7 @@ class FluidraAPIBase:
         _circuit_breaker: CircuitBreaker
         _rate_limiter: RateLimiter
         _token_lock: asyncio.Lock
+        write_verifier: WriteVerifier
 
         # --- Cross-mixin methods (defined on sibling mixins) ---
         async def _request(
@@ -67,6 +69,8 @@ class FluidraAPIBase:
         async def async_update_data(self) -> None: ...
 
         def get_device_by_id(self, device_id: str) -> dict[str, Any] | None: ...
+
+        def reported_component_value(self, device_id: str, component_id: int) -> Any: ...
 
         async def control_device_component(
             self, device_id: str, component_id: int, value: int | str | dict[str, Any]

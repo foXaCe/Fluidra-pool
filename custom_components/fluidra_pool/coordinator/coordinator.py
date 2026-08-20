@@ -44,6 +44,7 @@ from ..repairs import (
     async_delete_connection_issue,
     async_delete_unverified_profile_issue,
 )
+from ..write_verification import WriteVerifier
 from ._parsers import calculate_auto_speed_from_schedules, parse_dm24049704_schedule_format
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,6 +89,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         scan_interval = DEFAULT_SCAN_INTERVAL
         if config_entry and config_entry.options:
             scan_interval = config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+
+        # Post-write verification waits several poll cycles before judging a
+        # write, so it has to know how long a cycle lasts here (Issue #133).
+        if (verifier := self._write_verifier) is not None:
+            verifier.set_poll_interval(scan_interval)
 
         super().__init__(
             hass,
@@ -952,6 +958,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 self._handle_update_success()
                 self._sync_device_firmware(pools)
+                self._verify_pending_writes(pools)
 
             return {pool["id"]: pool for pool in pools}
 
@@ -961,6 +968,60 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.exception("Error updating Fluidra Pool data")
             self._note_update_failure()
             raise UpdateFailed(f"Error communicating with API: {type(err).__name__}") from err
+
+    @property
+    def _write_verifier(self) -> WriteVerifier | None:
+        """Return the API client's write verifier, when it has one.
+
+        Post-write verification is a diagnostic layer bolted onto the API
+        client, not a contract of it: an API object that predates it (or a test
+        double specced from the class) must never make a poll fail. The
+        isinstance check also keeps a bare Mock from silently standing in.
+        """
+        verifier = getattr(self.api, "write_verifier", None)
+        return verifier if isinstance(verifier, WriteVerifier) else None
+
+    @property
+    def lost_writes(self) -> list[dict[str, Any]]:
+        """Return the recent control writes the cloud accepted but never applied."""
+        verifier = self._write_verifier
+        return list(verifier.lost_writes) if verifier is not None else []
+
+    def _verify_pending_writes(self, pools: list[dict[str, Any]]) -> None:
+        """Judge the control writes whose grace period elapsed, on fresh data.
+
+        The Fluidra cloud confirms a write it never applies (Issue #133), so the
+        write response cannot be trusted — only what the device reports on a
+        later poll can. Reading it here, from the state this cycle just fetched,
+        costs no extra request and is the "normal path" the echo bypasses.
+
+        Devices the cloud reports offline are skipped: their components are the
+        values preserved from an earlier poll, so "unchanged" would say nothing
+        about the write, and the user already sees the device unavailable.
+        """
+        verifier = self._write_verifier
+        if verifier is None:
+            return
+        due = verifier.due()
+        if not due:
+            return
+
+        components_by_device: dict[str, dict[str, Any]] = {}
+        access_by_device: dict[str, str | None] = {}
+        for pool in pools:
+            access_level = pool.get("access_level")
+            for device in pool.get("devices", []):
+                device_id = device.get("device_id")
+                if not device_id or device.get("online") is False:
+                    continue
+                components = device.get("components")
+                components_by_device[str(device_id)] = components if isinstance(components, dict) else {}
+                access_by_device[str(device_id)] = access_level if isinstance(access_level, str) else None
+
+        for pending in due:
+            component = components_by_device.get(pending.device_id, {}).get(str(pending.component_id))
+            reported = component.get("reportedValue") if isinstance(component, dict) else None
+            verifier.resolve(pending, reported, access_by_device.get(pending.device_id))
 
     def _apply_online_flag(self, device: dict[str, Any], device_id: str, connected: bool) -> None:
         """Debounce the cloud connectivity flag before it gates availability.

@@ -114,6 +114,12 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: Fluidra
             "last_update_success": coordinator.last_update_success,
             "update_interval": str(coordinator.update_interval),
         },
+        # Control writes the cloud accepted and then discarded (Issue #133).
+        # This is what turns "my setpoint keeps reverting" into a measurement:
+        # the component, the value asked for, the value the device kept. Device
+        # ids are already masked by the verifier and the values are setpoints
+        # and modes, so there is nothing identifying left to redact.
+        "lost_writes": list(getattr(coordinator, "lost_writes", [])),
         "pools": _redact_pools_data(coordinator_data),
     }
 

@@ -9,6 +9,7 @@ from homeassistant.loader import DATA_CUSTOM_COMPONENTS
 import pytest
 
 from custom_components.fluidra_pool.fluidra_api import FluidraPoolAPI
+from custom_components.fluidra_pool.write_verification import WriteVerifier
 
 
 @pytest.fixture(autouse=True)
@@ -30,6 +31,7 @@ def mock_api() -> AsyncMock:
     api.refresh_token = "test-refresh-token"
     api.token_expires_at = None
     api.user_id = "test-user-id"
+    api.write_verifier = WriteVerifier()
     api.authenticate = AsyncMock(return_value=True)
     api.ensure_valid_token = AsyncMock(return_value=True)
     api.get_pools = AsyncMock(
