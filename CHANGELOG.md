@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.81.0] - 2026-08-20
+
+### Added
+
+- **A command the cloud accepts but never applies is now reported instead of vanishing.**
+  Fluidra answers every control write with HTTP 200 and a `reportedValue` that simply echoes
+  the `desiredValue` just sent — byte for byte the same response whether the device really
+  changed or the cloud silently dropped the order. A read-only (viewer) account, a
+  per-component ACL, a device that is offline and a schedule resetting the setpoint all look
+  identical from the write path, which is why "my setpoint keeps reverting" (#133, #195) could
+  only ever be described, never measured. Each accepted write is now recorded together with
+  the value the device reported *before* it, then judged at the end of a later poll cycle once
+  a grace period of several intervals has passed: reported value equal to the requested one is
+  verified, a value moving towards the target is progressing (a setpoint climbing by steps is
+  not a lost write), a value that moved elsewhere or disappeared is unknown, and a value that
+  did not budge at all is a lost write — logged as a single warning for that component. The
+  verdict is read from the state the poll already fetched, so it costs no extra request and it
+  goes through the normal read path the echo bypasses; offline devices are skipped, since their
+  components are carried over from an earlier poll and say nothing about the write. Nothing is
+  ever blocked: which access levels are allowed to write is still unknown, and guessing would
+  break a legitimate owner.
+
+  Lost writes are also exported in the integration's diagnostics — the component, the value
+  asked for and the value the device kept — which is what turns the report into evidence an
+  issue can be answered on (Issue #133, Refs #195).
+
 ## [2.80.2] - 2026-08-19
 
 ### Changed
