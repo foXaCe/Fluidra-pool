@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.81.1] - 2026-08-20
+
+### Fixed
+
+- **The GenSalt OE iQ mode select is gone — it was writing into the ORP setpoint.** On these
+  units the OFF/ON/AUTO select landed on component 20, which is not a mode register but the
+  ORP target in millivolts: it read back 700, found no match in `{0, 1, 2}` and fell through
+  to "Off", and picking On or Auto wrote `1` or `2` into that 700 mV setpoint before the next
+  poll snapped the select back to "Off" (Issue #195). v2.79.1 already routed tecnoLC2 units to
+  a profile that has no mode select, but it read the cloud's `thingType` from the device status
+  tree — which is only attached on the *second* poll, well after the platforms have built their
+  entities from the discovery snapshot. So the select was created anyway, on every unlisted
+  tecnoLC2 serial, and survived a full uninstall/reinstall. Discovery already fetches the tree
+  that carries `thingType`; it now keeps it on the device instead of discarding it, and the
+  profile override reads it from there first, falling back to the status tree as before. The
+  routing therefore happens before the first entity is created, for any tecnoLC2 unit the
+  registry has never seen.
+
+- **Zodiac GenSalt OE iQ pH Evo with ORP kit (CC26009948) now uses the tecnoLC2 profile that
+  maps the ORP setpoint.** Its c20 reads 700 mV next to a measured c170 of 710 mV, so the
+  setpoint register is genuinely live on this unit — unlike the ORP-less sibling model, where
+  c20 is left unmapped (Issue #195, @albo-yo).
+
 ## [2.81.0] - 2026-08-20
 
 ### Added
