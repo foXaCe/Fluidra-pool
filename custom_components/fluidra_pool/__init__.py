@@ -432,7 +432,6 @@ def _service_schedule_to_fluidra(
     payload["startTime"] = f"{start_minute:02d} {start_hour:02d} * * {days_str}"
     payload["endTime"] = f"{end_minute:02d} {end_hour:02d} * * {days_str}"
     payload["startActions"] = _schedule_start_actions(schedule["mode"], use_component_actions)
-    _LOGGER.debug("Payload prepared:  %s", payload)
     return payload
 
 
