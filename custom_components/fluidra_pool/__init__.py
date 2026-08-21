@@ -497,6 +497,12 @@ def _ensure_schedule_write_supported(
     mapping = DeviceIdentifier.get_feature(device, "schedule_component_map", None)
     if not isinstance(mapping, dict):
         return
+    if component_id == mapping.get("vs"):
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="schedule_vs_pump_unsupported",
+            translation_placeholders={"device_id": device_id},
+        )
 
 
 async def _async_register_services(hass: HomeAssistant) -> None:
