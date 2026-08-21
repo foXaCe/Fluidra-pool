@@ -362,20 +362,20 @@ def _device_uses_component_actions(coordinator: Any, device_id: str, component_i
     Two payload shapes exist in the wild: ``startActions.operationName`` (a string
     mode) and ``startActions.componentActions`` (a list, used by the eXO family).
     Writing the wrong one doesn't fail loudly — the backend accepts it and the
-    schedule ends up mangled (Issue #175) — so retrieve the pump mode rather 
+    schedule ends up mangled (Issue #175) — so retrieve the pump mode rather
     than assuming.
     """
     from .device_registry import DeviceIdentifier
-    
+
     device = _get_device_data(coordinator, device_id)
     if device is None:
-        return
+        return None
     mapping = DeviceIdentifier.get_feature(device, "schedule_component_map", None)
     if not isinstance(mapping, dict):
-        return
-    if component_id in {mapping.get("simple"), mapping.get("vs")} :
+        return None
+    if component_id in {mapping.get("simple"), mapping.get("vs")}:
         return True
-    
+
     return False
 
 
@@ -653,7 +653,9 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         schedule_component = _get_schedule_component(coordinator, device_id)
         fluidra_schedules = [
             _service_schedule_to_fluidra(
-                schedule, i, use_component_actions=_device_uses_component_actions(coordinator, device_id, schedule_component)
+                schedule,
+                i,
+                use_component_actions=_device_uses_component_actions(coordinator, device_id, schedule_component),
             )
             for i, schedule in enumerate(presets[preset], start=1)
         ]
