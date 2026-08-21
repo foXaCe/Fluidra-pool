@@ -130,7 +130,9 @@ class TestDeviceConfigRegistry:
         assert sensors["orp"] == 170  # calibrated ORP (663 mV), not the raw c177 (725)
         assert sensors["temperature"] == 172
         assert sensors["salinity"] == 174
+        assert sensors["chlorination_actual"] == 154  # real cell output % (Issue #207)
         assert config.features["orp_setpoint"] == 20  # this variant exposes the ORP setpoint (c20 = 750)
+        assert 154 in config.features["specific_components"]  # c154 polled → shows up in diagnostics
 
     def test_dm24008702_neolysis_connect_identifies_over_generic(self):
         """Neolysis Connect (DM24008702, domoticS2) resolves to its verified profile, not the catch-all (Issue #141)."""
