@@ -150,6 +150,13 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # to the generic chlorinator profile, which put the OFF/ON/AUTO mode select on c20 —
         # so the select read 700, fell through to "Off", and writing On/Auto wrote 1 or 2
         # into the ORP setpoint.
+        # chlorination_actual on c154 (Issue #207, @albo-yo): the real cell-output %,
+        # distinct from the c10 setpoint, as confirmed on every other tecnoLC2 profile
+        # where it was checked. Exposed here following that same convention — the
+        # reporter can validate it live against the app (production falls to 0 once the
+        # ORP target is reached). c154 was previously absent from specific_components,
+        # so it never appeared in any diagnostics capture from this unit; it is now
+        # polled, so a mismatch against the app can be settled by a single export.
         identifier_patterns=["CC25051112*", "CC26009948*"],
         family_patterns=["chlorinator"],
         components_range=25,
@@ -167,8 +174,9 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
                 "orp": 170,  # ORP measured (mV) — matches the app (c177 is uncalibrated).
                 "temperature": 172,  # Water temperature (°C × 10).
                 "salinity": 174,  # Salinity (g/L × 100).
+                "chlorination_actual": 154,  # Real cell output % (Issue #207) — pending live confirmation vs the app.
             },
-            "specific_components": [0, 10, 16, 20, 103, 165, 170, 172, 174],
+            "specific_components": [0, 10, 16, 20, 103, 154, 165, 170, 172, 174],
         },
         priority=90,
     ),
