@@ -238,6 +238,33 @@ installation:
 The same trick verified a mechanical timer disc that closed its contact ~6.7 min *before* the mark and
 opened it *on* the mark — about 20 extra minutes of filtration a day that no one had accounted for.
 
+### 🔁 The first value after a reconnect is not real
+
+Every time the unit comes back online, the integration emits **one wrong value per entity** before the
+real one arrives on the next poll (~35 s later). It affects **sensors and `number` entities alike**, and
+on the `number` entities it is the more dangerous of the two, because those are the control surfaces.
+
+Measured on a tecnoLC2. The `number` entities repeat this exact two-step sequence on **every**
+reconnect in the recorder; the sensor figures are from one clean power cycle:
+
+| Entity | 1st value after reconnect | 2nd value (real) |
+|---|---|---|
+| `sensor.*_orp` | 694 mV | 659 mV |
+| `sensor.*_ph` | 7.50 | 7.70 |
+| `number.*` pH setpoint | 7.2 | 7.7 |
+| `number.*` ORP setpoint | 700 | 750 |
+| `number.*` chlorination level | 0 | 60 |
+
+For the sensors it is a stale reading; for the `number` entities the first value is a placeholder that
+never corresponded to anything on the device. Either way:
+
+> **Discard the first value after every reconnection.** An automation that reads a chlorination level of
+> `0`, or a pH setpoint of `7.2`, and acts on it, is acting on a value the equipment never held. The same
+> goes for any average or statistic computed across a power cycle.
+
+A reconnect is easy to spot: entities pass through `unavailable`/`unknown` on the way back, so a `for:`
+delay of about a minute on that transition — or simply ignoring the first update after it — is enough.
+
 ### Services
 
 The integration registers three services for schedule management. The `device_id` is the
@@ -324,7 +351,7 @@ entities:
 | Commands seem ignored | Check debug logs; transient cloud rejections now surface as errors |
 | Setpoints/switches never change (no error) | Account has **viewer** (read-only) access to the pool — the cloud accepts writes but doesn't apply them. Check the `access_level` attribute on the pool status sensor; owner access is required to control equipment |
 | `Free chlorine` is permanently `unavailable` (tecnoLC2) | Expected — the unit has no free-chlorine probe, only pH and ORP (see [Salt Chlorinators](#-salt-chlorinators--electrolysers)). Use ORP as the disinfection proxy |
-| The first reading after the unit powers back on looks wrong | The cloud serves one **stale** sample on reconnect. Measured on a tecnoLC2: ORP read 694 mV and pH 7.50 on the first row, while the true values were 659 mV and 7.70. **Discard the first sample after every reconnection**; the next poll (~35 s later) is correct. Worth filtering in any automation or statistics you build |
+| The first value after the unit powers back on is wrong | Affects **sensors and `number` entities alike** — every reconnection emits one bad value before the real one. See [The first value after a reconnect is not real](#-the-first-value-after-a-reconnect-is-not-real) |
 
 ---
 
