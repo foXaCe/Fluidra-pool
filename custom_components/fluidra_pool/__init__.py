@@ -416,7 +416,7 @@ def _service_schedule_to_fluidra(
     # "* * 0,1,2,3,4,5,6" for every day (Issue #174, @Inervo). Reading already
     # converts the other way (utils.convert_cron_days); writing never converted
     # back, so a Sunday schedule went out as day 7, which CRON does not define.
-    days_str = ",".join(str(day) for day in sorted({d for d in days}))
+    days_str = ",".join(str(day) for day in sorted(set(days)))
 
     # Shape captured from the official Fluidra Connect app's PUT body (Issue #89):
     # an integer id/groupId per slot and a single startActions.operationName. The
