@@ -356,19 +356,26 @@ def _parse_service_time(value: str) -> tuple[int, int]:
     return hour, minute
 
 
-def _device_uses_component_actions(coordinator: Any, device_id: str) -> bool:
+def _device_uses_component_actions(coordinator: Any, device_id: str, component_id: int) -> bool:
     """Return True when this device carries a schedule's mode in ``componentActions``.
 
     Two payload shapes exist in the wild: ``startActions.operationName`` (a string
     mode) and ``startActions.componentActions`` (a list, used by the eXO family).
     Writing the wrong one doesn't fail loudly — the backend accepts it and the
-    schedule ends up mangled (Issue #175) — so mirror whatever the device already
-    reports rather than assuming.
+    schedule ends up mangled (Issue #175) — so retrieve the pump mode rather 
+    than assuming.
     """
-    device = coordinator.api.get_device_by_id(device_id) if coordinator else None
-    for sched in (device or {}).get("schedule_data") or []:
-        if isinstance(sched, dict) and isinstance(sched.get("startActions"), dict):
-            return "componentActions" in sched["startActions"]
+    from .device_registry import DeviceIdentifier
+    
+    device = _get_device_data(coordinator, device_id)
+    if device is None:
+        return
+    mapping = DeviceIdentifier.get_feature(device, "schedule_component_map", None)
+    if not isinstance(mapping, dict):
+        return
+    if component_id in {mapping.get("simple"), mapping.get("vs")} :
+        return True
+    
     return False
 
 
@@ -406,8 +413,9 @@ def _service_schedule_to_fluidra(
         )
     # The service takes mobile-app day numbers (1=Mon..7=Sun, see services.yaml)
     # but the device stores plain CRON, where Sunday is 0 — its own schedules read
-    # "* * 0,1,2,3,4,5,6" for every day (Issue #174, @Inervo). So writing is
-    #  1..7, Reading is 0..6. Reading is performed by utils.convert_cron_days).
+    # "* * 0,1,2,3,4,5,6" for every day (Issue #174, @Inervo). Reading already
+    # converts the other way (utils.convert_cron_days); writing never converted
+    # back, so a Sunday schedule went out as day 7, which CRON does not define.
     days_str = ",".join(str(day) for day in sorted({d for d in days}))
 
     # Shape captured from the official Fluidra Connect app's PUT body (Issue #89):
@@ -424,6 +432,7 @@ def _service_schedule_to_fluidra(
     payload["startTime"] = f"{start_minute:02d} {start_hour:02d} * * {days_str}"
     payload["endTime"] = f"{end_minute:02d} {end_hour:02d} * * {days_str}"
     payload["startActions"] = _schedule_start_actions(schedule["mode"], use_component_actions)
+    _LOGGER.debug("Payload prepared:  %s", payload)
     return payload
 
 
@@ -452,11 +461,11 @@ def _ensure_schedule_write_supported(
 ) -> None:
     """Refuse schedule writes on devices where they are known to land wrong.
 
-    On the eXO iQ the backend does not store what we send when in VS pump mode.
-    Verified on hardware across four runs (Issue #174, @Inervo): a slot sent as
-    01:02-03:04 on a single day was stored as "03 02" / "00 04" on **four** days,
-    and the stored days track the sent day deterministically -- sending day *n*
-    yields ``{0, n+2, n+5, n+6}``.
+    On the eXO iQ the backend does not store what we send. Verified on hardware
+    across four runs (Issue #174, @Inervo): a slot sent as 01:02-03:04 on a
+    single day was stored as "03 02" / "00 04" on **four** days, and the stored
+    days track the sent day deterministically -- sending day *n* yields
+    ``{0, n+2, n+5, n+6}``.
 
     That was blamed on the payload matching the device's own *reported* slots
     field for field. @Inervo's later capture of the app's PUT body shows the two
@@ -489,12 +498,6 @@ def _ensure_schedule_write_supported(
     mapping = DeviceIdentifier.get_feature(device, "schedule_component_map", None)
     if not isinstance(mapping, dict):
         return
-    if component_id == mapping.get("vs"):
-        raise ServiceValidationError(
-            translation_domain=DOMAIN,
-            translation_key="schedule_vs_pump_unsupported",
-            translation_placeholders={"device_id": device_id},
-        )
 
 
 async def _async_register_services(hass: HomeAssistant) -> None:
@@ -516,13 +519,13 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         _ensure_device_pool_writable(coordinator, device_id)
 
         # Convert HA format to Fluidra API format
-        component_actions = _device_uses_component_actions(coordinator, device_id)
+        schedule_component = _get_schedule_component(coordinator, device_id)
+        component_actions = _device_uses_component_actions(coordinator, device_id, schedule_component)
         fluidra_schedules = [
             _service_schedule_to_fluidra(schedule, i, use_component_actions=component_actions)
             for i, schedule in enumerate(schedules_data, start=1)
         ]
 
-        schedule_component = _get_schedule_component(coordinator, device_id)
         _ensure_schedule_write_supported(coordinator, device_id, schedule_component)
 
         try:
@@ -647,9 +650,10 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             )
 
         # Build schedules in Fluidra format
+        schedule_component = _get_schedule_component(coordinator, device_id)
         fluidra_schedules = [
             _service_schedule_to_fluidra(
-                schedule, i, use_component_actions=_device_uses_component_actions(coordinator, device_id)
+                schedule, i, use_component_actions=_device_uses_component_actions(coordinator, device_id, schedule_component)
             )
             for i, schedule in enumerate(presets[preset], start=1)
         ]
