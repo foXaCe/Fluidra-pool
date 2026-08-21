@@ -266,9 +266,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-def _get_device_data(coordinator: FluidraDataUpdateCoordinator, device_id: str) -> dict[str, Any] | None:
+def _get_device_data(coordinator: FluidraDataUpdateCoordinator | None, device_id: str) -> dict[str, Any] | None:
     """Return device data from a coordinator for a Fluidra device ID."""
-    if not coordinator.data:
+    if not coordinator or not coordinator.data:
         return None
 
     for pool_data in coordinator.data.values():
@@ -362,21 +362,22 @@ def _device_uses_component_actions(coordinator: Any, device_id: str, component_i
     Two payload shapes exist in the wild: ``startActions.operationName`` (a string
     mode) and ``startActions.componentActions`` (a list, used by the eXO family).
     Writing the wrong one doesn't fail loudly — the backend accepts it and the
-    schedule ends up mangled (Issue #175) — so retrieve the pump mode rather
-    than assuming.
+    schedule ends up mangled (Issue #175) — so decide from the device's declared
+    schedule registers rather than from whatever happens to be stored: a freshly
+    added device has no slots to learn from, which is exactly what used to send
+    an operationName payload to an eXO (Issue #174, @Inervo). All three eXO
+    registers (chlorination-only c19, simple pump c20, VS c21) carry the mode in
+    componentActions.
     """
     from .device_registry import DeviceIdentifier
 
     device = _get_device_data(coordinator, device_id)
     if device is None:
-        return None
+        return False
     mapping = DeviceIdentifier.get_feature(device, "schedule_component_map", None)
     if not isinstance(mapping, dict):
-        return None
-    if component_id in {mapping.get("simple"), mapping.get("vs")}:
-        return True
-
-    return False
+        return False
+    return component_id in {mapping.get("none"), mapping.get("simple"), mapping.get("vs")}
 
 
 def _service_schedule_to_fluidra(
@@ -412,10 +413,11 @@ def _service_schedule_to_fluidra(
             translation_key="empty_schedule_days",
         )
     # The service takes mobile-app day numbers (1=Mon..7=Sun, see services.yaml)
-    # but the device stores plain CRON, where Sunday is 0 — its own schedules read
-    # "* * 0,1,2,3,4,5,6" for every day (Issue #174, @Inervo). Reading already
-    # converts the other way (utils.convert_cron_days); writing never converted
-    # back, so a Sunday schedule went out as day 7, which CRON does not define.
+    # and the PUT wire format uses the same numbering: @Inervo's capture of the
+    # official app shows Monday+Sunday sent as "* * 1,7" (Issue #174). The
+    # backend converts to plain CRON (Sunday=0) when storing — its own schedules
+    # read "* * 0,1,2,3,4,5,6". Reading converts the other way
+    # (utils.convert_cron_days); writing passes the numbers through untouched.
     days_str = ",".join(str(day) for day in sorted(set(days)))
 
     # Shape captured from the official Fluidra Connect app's PUT body (Issue #89):
@@ -460,34 +462,25 @@ def _ensure_schedule_write_supported(
 ) -> None:
     """Refuse schedule writes on devices where they are known to land wrong.
 
-    On the eXO iQ the backend does not store what we send. Verified on hardware
-    across four runs (Issue #174, @Inervo): a slot sent as 01:02-03:04 on a
-    single day was stored as "03 02" / "00 04" on **four** days, and the stored
-    days track the sent day deterministically -- sending day *n* yields
-    ``{0, n+2, n+5, n+6}``.
+    On the eXO iQ the backend used to store something other than what we sent.
+    Verified on hardware across four runs (Issue #174, @Inervo): a slot sent as
+    01:02-03:04 on a single day was stored as "03 02" / "00 04" on **four**
+    days, and the stored days tracked the sent day deterministically --
+    sending day *n* yielded ``{0, n+2, n+5, n+6}``.
 
-    That was blamed on the payload matching the device's own *reported* slots
-    field for field. @Inervo's later capture of the app's PUT body shows the two
-    are not the same object: the app sends the action value under
-    ``desiredValue`` with ``operationName`` alongside and no ``state`` at all,
-    where the integration echoed back ``reportedValue`` and synthesised a
-    ``state``. Both are corrected now, which is a plausible cause of the
-    transform producing garbage rather than storing the slot -- but plausible is
-    not verified, and nobody has re-run this on hardware.
+    @Inervo's capture of the app's PUT body settled it: the wire format differs
+    from what the integration used to send in three ways — days 1..7 rather
+    than CRON's 0..6, the action value under ``desiredValue`` with
+    ``operationName`` alongside, and no synthesised ``state``. With all three
+    corrected, a simple-pump schedule written from Home Assistant now
+    round-trips byte-identically on his unit (PR #205), so the lock is lifted
+    for the chlorination-only (c19) and simple-pump (c20) registers.
 
-    Two distinct failures, both worse than the feature being absent:
-
-    * The VS register additionally needs a target RPM this service cannot set,
-      and an RPM-less slot leaves the Fluidra app unable to load the device at
-      all -- recoverable only by changing the pump type on the unit itself.
-    * Every register here stores a schedule that differs from the one asked
-      for, and the device *acts* on it: chlorination running at hours nobody
-      chose is a worse outcome than an error message.
-
-    Refusing is recoverable; writing is not, so the refusal stands until a
-    hardware run confirms the corrected shape. The aux registers (c22-c25) are
-    deliberately *not* covered: they take the same corrected payload and drive
-    only an auxiliary output, so they are the safe place to confirm it.
+    What remains refused is the VS register (c21): it additionally needs a
+    target RPM this service cannot set, and an RPM-less slot leaves the Fluidra
+    app unable to load the device at all -- recoverable only by changing the
+    pump type on the unit itself. The aux registers (c22-c25) are not covered
+    by this guard; they are not reachable through this service yet.
     """
     from .device_registry import DeviceIdentifier
 

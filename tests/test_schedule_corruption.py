@@ -125,19 +125,44 @@ def _coordinator(schedule_data: list[dict[str, Any]] | None) -> Any:
     device = {"device_id": "D1"}
     if schedule_data is not None:
         device["schedule_data"] = schedule_data
-    return SimpleNamespace(api=SimpleNamespace(get_device_by_id=lambda _d: device))
+    return SimpleNamespace(data=None, api=SimpleNamespace(get_device_by_id=lambda _d: device))
 
 
-def test_component_actions_detected_from_the_device() -> None:
-    assert _device_uses_component_actions(_coordinator([EXO_SLOT]), "D1") is True
-    assert _device_uses_component_actions(_coordinator([LEGACY_SLOT]), "D1") is False
+def _exo_coordinator() -> Any:
+    """A coordinator holding an eXO iQ as discovery delivers it.
+
+    The shape mirrors the fixture in test_no_flow_and_schedule_guard.py: the
+    profile is matched from the NS* identifier and the chlorinator family, and
+    the pump-type flags (c82/c83) are what resolve the live schedule register.
+    """
+    device = {
+        "device_id": "NS25007212",
+        "name": "Zodiac EXO iQ 35",
+        "family": "Chlorinators",
+        "type": "connected",
+        "components": {"82": {"reportedValue": True}, "83": {"reportedValue": False}},
+    }
+    return SimpleNamespace(data={"pool-1": {"id": "pool-1", "name": "Pool", "devices": [device]}})
 
 
-def test_detection_defaults_to_legacy_without_data() -> None:
-    """No schedules to learn from → keep the long-standing shape."""
-    assert _device_uses_component_actions(_coordinator(None), "D1") is False
-    assert _device_uses_component_actions(_coordinator([]), "D1") is False
-    assert _device_uses_component_actions(None, "D1") is False
+def test_every_exo_register_carries_component_actions() -> None:
+    """All three eXO registers take the componentActions shape (Issue #174).
+
+    Decided from the declared schedule registers, not from stored slots: a
+    freshly added device has no schedules yet, which used to send an
+    operationName payload to an eXO and mangle its first write.
+    """
+    coordinator = _exo_coordinator()
+    assert _device_uses_component_actions(coordinator, "NS25007212", 19) is True  # chlorination-only
+    assert _device_uses_component_actions(coordinator, "NS25007212", 20) is True  # simple pump
+    assert _device_uses_component_actions(coordinator, "NS25007212", 21) is True  # VS pump
+
+
+def test_detection_defaults_to_operation_name_without_a_map() -> None:
+    """Devices without a declared register map keep the long-standing shape."""
+    assert _device_uses_component_actions(_coordinator(None), "D1", 20) is False
+    assert _device_uses_component_actions(_coordinator([]), "D1", 20) is False
+    assert _device_uses_component_actions(None, "D1", 20) is False
 
 
 def test_service_builds_component_actions_for_exo_devices() -> None:

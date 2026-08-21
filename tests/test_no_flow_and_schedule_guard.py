@@ -165,20 +165,18 @@ def test_writing_to_a_variable_speed_schedule_is_refused() -> None:
         _ensure_schedule_write_supported(coordinator, "NS25007212", 21)
 
 
-@pytest.mark.parametrize("component", [19, 20, 21])
-def test_every_exo_schedule_register_is_refused(component: int) -> None:
-    """The eXO stores a schedule different from the one sent, and acts on it.
+@pytest.mark.parametrize("component", [19, 20])
+def test_chlorination_and_simple_pump_registers_are_writable(component: int) -> None:
+    """The corrected payload round-trips on hardware (PR #205, @Inervo).
 
-    Verified across four hardware runs: 01:02-03:04 on one day came back as
-    "03 02" / "00 04" on four days, the stored days tracking the sent day as
-    {0, n+2, n+5, n+6}. A wrong-but-applied schedule runs the equipment at
-    hours nobody chose, which is worse than refusing (Issue #174).
+    A simple-pump schedule written from Home Assistant came back byte-identical
+    on his eXO iQ, so the refusal that used to cover every register is lifted
+    for these two. c19 (chlorination-only) follows the same payload shape.
     """
     from custom_components.fluidra_pool import _ensure_schedule_write_supported
 
-    coordinator = _exo_coordinator(vs=component == 21)
-    with pytest.raises(ServiceValidationError):
-        _ensure_schedule_write_supported(coordinator, "NS25007212", component)
+    coordinator = _exo_coordinator(vs=False)
+    _ensure_schedule_write_supported(coordinator, "NS25007212", component)
 
 
 def test_devices_without_a_schedule_map_are_unaffected() -> None:
@@ -272,21 +270,22 @@ def test_state_is_never_sent() -> None:
     from custom_components.fluidra_pool import _service_schedule_to_fluidra
 
     ours = _service_schedule_to_fluidra(
-        {"enabled": True, "start_time": "05:45", "end_time": "10:15", "mode": "1", "days": [0, 1, 2, 3, 4, 5, 6]},
+        {"enabled": True, "start_time": "05:45", "end_time": "10:15", "mode": "1", "days": [1, 2, 3, 4, 5, 6, 7]},
         1,
         use_component_actions=True,
     )
     assert "state" not in ours
     # Times and days still match the app's own encoding.
-    assert ours["startTime"] == "45 05 * * 0,1,2,3,4,5,6"
-    assert ours["endTime"] == "15 10 * * 0,1,2,3,4,5,6"
+    assert ours["startTime"] == "45 05 * * 1,2,3,4,5,6,7"
+    assert ours["endTime"] == "15 10 * * 1,2,3,4,5,6,7"
 
 
-def test_sunday_is_written_as_cron_day_zero() -> None:
-    """The service takes 1..7 (Sunday=7); CRON has no day 7 (Issue #174).
+def test_sunday_is_sent_as_day_seven() -> None:
+    """The PUT wire format uses mobile numbering, Sunday=7 (Issue #174).
 
-    Checked against a Sunday schedule the Fluidra app itself created, which
-    reads "00 18 * * 0" for 18:00 on Sunday.
+    @Inervo's capture of the app shows Monday+Sunday sent as "* * 1,7"; the
+    backend converts to CRON's 0 when storing — a Sunday slot created in the
+    app reads back "00 18 * * 0".
     """
     from custom_components.fluidra_pool import _service_schedule_to_fluidra
 
@@ -295,12 +294,12 @@ def test_sunday_is_written_as_cron_day_zero() -> None:
         2,
         use_component_actions=True,
     )
-    assert sunday["startTime"] == "00 18 * * 0"
-    assert sunday["endTime"] == "00 19 * * 0"
+    assert sunday["startTime"] == "00 18 * * 7"
+    assert sunday["endTime"] == "00 19 * * 7"
 
 
 def test_every_day_matches_the_apps_own_encoding() -> None:
-    """The app writes "45 05 * * 0,1,2,3,4,5,6" for an all-days 05:45 start."""
+    """All seven days go out in mobile numbering, Monday first."""
     from custom_components.fluidra_pool import _service_schedule_to_fluidra
 
     all_days = _service_schedule_to_fluidra(
@@ -308,11 +307,11 @@ def test_every_day_matches_the_apps_own_encoding() -> None:
         1,
         use_component_actions=True,
     )
-    assert all_days["startTime"] == "45 05 * * 0,1,2,3,4,5,6"
+    assert all_days["startTime"] == "45 05 * * 1,2,3,4,5,6,7"
 
 
 def test_sunday_is_not_duplicated_when_sent_both_ways() -> None:
-    """0 and 7 both mean Sunday; the slot must not list it twice."""
+    """The service takes 1..7 only; a duplicated entry must not list it twice."""
     from custom_components.fluidra_pool import _service_schedule_to_fluidra
 
     slot = _service_schedule_to_fluidra(
@@ -320,7 +319,7 @@ def test_sunday_is_not_duplicated_when_sent_both_ways() -> None:
         1,
         use_component_actions=True,
     )
-    assert slot["startTime"] == "00 01 * * 0,1"
+    assert slot["startTime"] == "00 01 * * 1,7"
 
 
 def test_key_order_matches_the_apps_own_put_body() -> None:

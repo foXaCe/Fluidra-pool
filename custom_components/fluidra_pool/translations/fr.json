@@ -478,9 +478,6 @@
     "schedule_vs_pump_unsupported": {
       "message": "Impossible d'écrire les plannings sur {device_id} : cet appareil est configuré avec une pompe à vitesse variable, dont les créneaux portent aussi une vitesse de consigne que ce service ne sait pas définir. Écrire un créneau incomplet empêche l'application Fluidra de charger l'appareil. Utilisez l'application Fluidra pour les plannings de pompe à vitesse variable."
     },
-    "schedule_write_not_stored": {
-      "message": "Impossible d'écrire les plannings sur {device_id} : cet appareil enregistre autre chose que ce qui lui est envoyé — vérifié sur matériel, les heures et les jours reviennent modifiés, et l'appareil applique le planning modifié. L'écriture ferait fonctionner votre équipement à des heures non choisies. Utilisez l'application Fluidra pour les plannings de cet appareil en attendant la résolution (issue #174)."
-    },
     "switch_set_failed": {
       "message": "Échec du changement d'état de l'interrupteur"
     },
