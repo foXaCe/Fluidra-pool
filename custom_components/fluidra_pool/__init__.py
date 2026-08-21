@@ -406,7 +406,7 @@ def _service_schedule_to_fluidra(
         )
     # The service takes mobile-app day numbers (1=Mon..7=Sun, see services.yaml)
     # but the device stores plain CRON, where Sunday is 0 — its own schedules read
-    # "* * 0,1,2,3,4,5,6" for every day (Issue #174, @Inervo). So writing is 
+    # "* * 0,1,2,3,4,5,6" for every day (Issue #174, @Inervo). So writing is
     #  1..7, Reading is 0..6. Reading is performed by utils.convert_cron_days).
     days_str = ",".join(str(day) for day in sorted({d for d in days}))
 
