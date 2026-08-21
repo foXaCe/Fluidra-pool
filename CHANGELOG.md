@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.83.0] - 2026-08-21
+
+### Added
+
+- **Actual chlorination % on the Zodiac GenSalt OE iQ Evo** (tecnoLC2, Issue #207): the
+  `cc25051112` profile — which also covers serials `CC26009948*` — now exposes the
+  `chlorination_actual` sensor on register **c154**, the real cell-output percentage that
+  falls to 0 once the ORP target is reached, distinct from the c10 setpoint. c154 had never
+  been scanned for this unit, so it could not appear in any diagnostics export either; it is
+  now polled, so any mismatch against the app can be settled by a single capture (pending
+  live confirmation by the reporter, @albo-yo).
+
+### Fixed
+
+- **pH and ORP setpoints no longer invent values when no reading exists** (#209,
+  @Pep190272): on every reconnection the first refresh carried no component data yet, so
+  `number.ph_setpoint` reported a fabricated 7.2 and `number.orp_setpoint` a fabricated
+  700 mV until the real value arrived ~35 s later — plausible enough to skew statistics and
+  mislead automations. Both entities now read `unknown` instead, matching what
+  `number.heating_setpoint` already did.
+
 ## [2.82.0] - 2026-08-21
 
 ### Fixed
