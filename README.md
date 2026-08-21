@@ -109,6 +109,12 @@ profile, so unknown equipment is usually still usable.
   **ORP/Redox setpoint**, boost mode, schedules, and sensors (pH, ORP, free chlorine,
   salinity, water temperature)
 
+> **tecnoLC2: there is no free-chlorine probe.** These units expose 11 components and carry exactly
+> **two** probes — pH and ORP/Redox. The *Free Chlorine* sensor stays `unavailable` for their whole
+> lifetime (verified against a recorder database: not a single numeric state, ever). That is the
+> hardware, not a bug in this integration, so please don't open an issue for it. Use **ORP as the
+> disinfection proxy** — 650 mV is the usual floor — and measure free chlorine with a test kit.
+
 ### 🧪 Water Analysers
 - **Zodiac Blue Connect Silver / Gold** (`WA*`, BC3) — pH, ORP and water-temperature sensors (read-only)
 
@@ -203,6 +209,62 @@ automation:
           option: "low"
 ```
 
+### ⏱️ Measuring real filtration hours (no extra hardware)
+
+If your pump is driven by a mechanical timer or an external contactor, the integration still tells you
+when it actually ran — no wiring, no extra sensor, no touching the electrical panel. When the unit
+loses power its entities go `unknown`, so the chlorinator's **alarm binary sensor doubles as a run-time
+log**:
+
+```sql
+-- Home Assistant recorder database (/config/home-assistant_v2.db)
+-- Works with the container stopped: docker cp homeassistant:/config/home-assistant_v2.db ./ha.db
+SELECT s.state,
+       datetime(s.last_updated_ts, 'unixepoch') AS utc
+FROM states s
+JOIN states_meta m ON m.metadata_id = s.metadata_id
+WHERE m.entity_id = 'binary_sensor.<your_chlorinator>_alarm'   -- slug follows your HA language
+ORDER BY s.last_updated_ts;
+```
+
+`unknown` → `off` is a **start**; `off` → `unknown` is a **stop**. Two caveats measured on a real
+installation:
+
+- Polling is roughly **35 s**, so every transition carries that much uncertainty. Fine for hours/day,
+  useless for anything that needs the second.
+- **Discard the first sample after each start** (see [Troubleshooting](#-troubleshooting)) — it is stale,
+  and it will skew any average you compute over the block.
+
+The same trick verified a mechanical timer disc that closed its contact ~6.7 min *before* the mark and
+opened it *on* the mark — about 20 extra minutes of filtration a day that no one had accounted for.
+
+### 🔁 The first value after a reconnect is not real
+
+Every time the unit comes back online, the integration emits **one wrong value per entity** before the
+real one arrives on the next poll (~35 s later). It affects **sensors and `number` entities alike**, and
+on the `number` entities it is the more dangerous of the two, because those are the control surfaces.
+
+Measured on a tecnoLC2. The `number` entities repeat this exact two-step sequence on **every**
+reconnect in the recorder; the sensor figures are from one clean power cycle:
+
+| Entity | 1st value after reconnect | 2nd value (real) |
+|---|---|---|
+| `sensor.*_orp` | 694 mV | 659 mV |
+| `sensor.*_ph` | 7.50 | 7.70 |
+| `number.*` pH setpoint | 7.2 | 7.7 |
+| `number.*` ORP setpoint | 700 | 750 |
+| `number.*` chlorination level | 0 | 60 |
+
+For the sensors it is a stale reading; for the `number` entities the first value is a placeholder that
+never corresponded to anything on the device. Either way:
+
+> **Discard the first value after every reconnection.** An automation that reads a chlorination level of
+> `0`, or a pH setpoint of `7.2`, and acts on it, is acting on a value the equipment never held. The same
+> goes for any average or statistic computed across a power cycle.
+
+A reconnect is easy to spot: entities pass through `unavailable`/`unknown` on the way back, so a `for:`
+delay of about a minute on that transition — or simply ignoring the first update after it — is enough.
+
 ### Services
 
 The integration registers three services for schedule management. The `device_id` is the
@@ -288,6 +350,8 @@ entities:
 | Device shows *unavailable* | The device reports itself offline to the Fluidra cloud |
 | Commands seem ignored | Check debug logs; transient cloud rejections now surface as errors |
 | Setpoints/switches never change (no error) | Account has **viewer** (read-only) access to the pool — the cloud accepts writes but doesn't apply them. Check the `access_level` attribute on the pool status sensor; owner access is required to control equipment |
+| `Free chlorine` is permanently `unavailable` (tecnoLC2) | Expected — the unit has no free-chlorine probe, only pH and ORP (see [Salt Chlorinators](#-salt-chlorinators--electrolysers)). Use ORP as the disinfection proxy |
+| The first value after the unit powers back on is wrong | Affects **sensors and `number` entities alike** — every reconnection emits one bad value before the real one. See [The first value after a reconnect is not real](#-the-first-value-after-a-reconnect-is-not-real) |
 
 ---
 
