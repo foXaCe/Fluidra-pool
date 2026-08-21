@@ -406,10 +406,9 @@ def _service_schedule_to_fluidra(
         )
     # The service takes mobile-app day numbers (1=Mon..7=Sun, see services.yaml)
     # but the device stores plain CRON, where Sunday is 0 — its own schedules read
-    # "* * 0,1,2,3,4,5,6" for every day (Issue #174, @Inervo). Reading already
-    # converts the other way (utils.convert_cron_days); writing never converted
-    # back, so a Sunday schedule went out as day 7, which CRON does not define.
-    days_str = ",".join(str(0 if day == 7 else day) for day in sorted({0 if d == 7 else d for d in days}))
+    # "* * 0,1,2,3,4,5,6" for every day (Issue #174, @Inervo). So writing is 
+    #  1..7, Reading is 0..6. Reading is performed by utils.convert_cron_days).
+    days_str = ",".join(str(day) for day in sorted({d for d in days}))
 
     # Shape captured from the official Fluidra Connect app's PUT body (Issue #89):
     # an integer id/groupId per slot and a single startActions.operationName. The
@@ -453,11 +452,11 @@ def _ensure_schedule_write_supported(
 ) -> None:
     """Refuse schedule writes on devices where they are known to land wrong.
 
-    On the eXO iQ the backend does not store what we send. Verified on hardware
-    across four runs (Issue #174, @Inervo): a slot sent as 01:02-03:04 on a
-    single day was stored as "03 02" / "00 04" on **four** days, and the stored
-    days track the sent day deterministically -- sending day *n* yields
-    ``{0, n+2, n+5, n+6}``.
+    On the eXO iQ the backend does not store what we send when in VS pump mode.
+    Verified on hardware across four runs (Issue #174, @Inervo): a slot sent as
+    01:02-03:04 on a single day was stored as "03 02" / "00 04" on **four** days,
+    and the stored days track the sent day deterministically -- sending day *n*
+    yields ``{0, n+2, n+5, n+6}``.
 
     That was blamed on the payload matching the device's own *reported* slots
     field for field. @Inervo's later capture of the app's PUT body shows the two
@@ -494,12 +493,6 @@ def _ensure_schedule_write_supported(
         raise ServiceValidationError(
             translation_domain=DOMAIN,
             translation_key="schedule_vs_pump_unsupported",
-            translation_placeholders={"device_id": device_id},
-        )
-    if component_id in {mapping.get("none"), mapping.get("simple")}:
-        raise ServiceValidationError(
-            translation_domain=DOMAIN,
-            translation_key="schedule_write_not_stored",
             translation_placeholders={"device_id": device_id},
         )
 
