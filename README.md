@@ -109,6 +109,12 @@ profile, so unknown equipment is usually still usable.
   **ORP/Redox setpoint**, boost mode, schedules, and sensors (pH, ORP, free chlorine,
   salinity, water temperature)
 
+> **tecnoLC2: there is no free-chlorine probe.** These units expose 11 components and carry exactly
+> **two** probes — pH and ORP/Redox. The *Free Chlorine* sensor stays `unavailable` for their whole
+> lifetime (verified against a recorder database: not a single numeric state, ever). That is the
+> hardware, not a bug in this integration, so please don't open an issue for it. Use **ORP as the
+> disinfection proxy** — 650 mV is the usual floor — and measure free chlorine with a test kit.
+
 ### 🧪 Water Analysers
 - **Zodiac Blue Connect Silver / Gold** (`WA*`, BC3) — pH, ORP and water-temperature sensors (read-only)
 
@@ -203,6 +209,35 @@ automation:
           option: "low"
 ```
 
+### ⏱️ Measuring real filtration hours (no extra hardware)
+
+If your pump is driven by a mechanical timer or an external contactor, the integration still tells you
+when it actually ran — no wiring, no extra sensor, no touching the electrical panel. When the unit
+loses power its entities go `unknown`, so the chlorinator's **alarm binary sensor doubles as a run-time
+log**:
+
+```sql
+-- Home Assistant recorder database (/config/home-assistant_v2.db)
+-- Works with the container stopped: docker cp homeassistant:/config/home-assistant_v2.db ./ha.db
+SELECT s.state,
+       datetime(s.last_updated_ts, 'unixepoch') AS utc
+FROM states s
+JOIN states_meta m ON m.metadata_id = s.metadata_id
+WHERE m.entity_id = 'binary_sensor.<your_chlorinator>_alarm'   -- slug follows your HA language
+ORDER BY s.last_updated_ts;
+```
+
+`unknown` → `off` is a **start**; `off` → `unknown` is a **stop**. Two caveats measured on a real
+installation:
+
+- Polling is roughly **35 s**, so every transition carries that much uncertainty. Fine for hours/day,
+  useless for anything that needs the second.
+- **Discard the first sample after each start** (see [Troubleshooting](#-troubleshooting)) — it is stale,
+  and it will skew any average you compute over the block.
+
+The same trick verified a mechanical timer disc that closed its contact ~6.7 min *before* the mark and
+opened it *on* the mark — about 20 extra minutes of filtration a day that no one had accounted for.
+
 ### Services
 
 The integration registers three services for schedule management. The `device_id` is the
@@ -288,6 +323,8 @@ entities:
 | Device shows *unavailable* | The device reports itself offline to the Fluidra cloud |
 | Commands seem ignored | Check debug logs; transient cloud rejections now surface as errors |
 | Setpoints/switches never change (no error) | Account has **viewer** (read-only) access to the pool — the cloud accepts writes but doesn't apply them. Check the `access_level` attribute on the pool status sensor; owner access is required to control equipment |
+| `Free chlorine` is permanently `unavailable` (tecnoLC2) | Expected — the unit has no free-chlorine probe, only pH and ORP (see [Salt Chlorinators](#-salt-chlorinators--electrolysers)). Use ORP as the disinfection proxy |
+| The first reading after the unit powers back on looks wrong | The cloud serves one **stale** sample on reconnect. Measured on a tecnoLC2: ORP read 694 mV and pH 7.50 on the first row, while the true values were 659 mV and 7.70. **Discard the first sample after every reconnection**; the next poll (~35 s later) is correct. Worth filtering in any automation or statistics you build |
 
 ---
 
