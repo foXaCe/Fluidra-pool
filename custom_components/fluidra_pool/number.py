@@ -191,7 +191,7 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
         raw_value = component_data.get("desiredValue", component_data.get("reportedValue"))
 
         if raw_value is None:
-            return 7.2  # Default value
+            return None
 
         # Divisor: 100 by default (e.g., 720 = 7.20), 10 for EXO (e.g., 72 = 7.2)
         divisor = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint_divisor", 100)
@@ -199,7 +199,8 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
         try:
             value: float = float(raw_value) / divisor
         except (ValueError, TypeError):
-            return 7.2
+            _LOGGER.debug("Failed to parse pH setpoint value %s for %s", raw_value, self._device_id)
+            return None
         return value
 
     async def async_set_native_value(self, value: float) -> None:
@@ -384,12 +385,12 @@ class FluidraChlorinatorOrpSetpoint(FluidraPoolControlEntity, NumberEntity):
         raw_value = component_data.get("desiredValue", component_data.get("reportedValue"))
 
         if raw_value is None:
-            return 700.0
+            return None
         try:
             return float(raw_value)
         except (ValueError, TypeError):
             _LOGGER.debug("Failed to parse ORP setpoint value %s for %s", raw_value, self._device_id)
-            return 700.0
+            return None
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the ORP setpoint."""

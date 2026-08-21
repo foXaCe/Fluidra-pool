@@ -215,15 +215,15 @@ def test_ph_setpoint_native_value_divides_by_100() -> None:
     assert number.native_value == 7.2
 
 
-def test_ph_setpoint_default_when_no_reading() -> None:
-    """Missing reading falls back to 7.2 rather than returning None."""
+def test_ph_setpoint_none_when_no_reading() -> None:
+    """Missing reading returns None so the entity reads `unknown`, not an invented 7.2."""
     device = _chlorinator_device(
         components={},
         features={"ph_setpoint": {"write": 8, "read": 172}},
     )
     number = FluidraChlorinatorPhSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
     _attach_ha(number)
-    assert number.native_value == 7.2
+    assert number.native_value is None
 
 
 async def test_ph_setpoint_async_set_multiplies_by_divisor_and_writes() -> None:
@@ -267,14 +267,14 @@ def test_ph_setpoint_native_value_simple_int_reads_same_component() -> None:
 
 
 def test_ph_setpoint_native_value_guards_non_numeric() -> None:
-    """A non-numeric pH reading falls back to the 7.2 default instead of raising."""
+    """A non-numeric pH reading returns None instead of raising or inventing a value."""
     device = _chlorinator_device(
         components={"172": {"reportedValue": "bad"}},
         features={"ph_setpoint": {"write": 8, "read": 172}},
     )
     number = FluidraChlorinatorPhSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
     _attach_ha(number)
-    assert number.native_value == 7.2
+    assert number.native_value is None
 
 
 def test_ph_setpoint_icon_is_ph() -> None:
@@ -379,14 +379,14 @@ async def test_orp_setpoint_async_set_writes_integer_value() -> None:
 
 
 def test_orp_setpoint_native_value_guards_non_numeric() -> None:
-    """A non-numeric ORP value returns the 700.0 default instead of raising (climate_light_number-7)."""
+    """A non-numeric ORP value returns None instead of raising (climate_light_number-7)."""
     device = _chlorinator_device(
         components={"177": {"reportedValue": "n/a"}},
         features={"orp_setpoint": {"write": 11, "read": 177}},
     )
     number = FluidraChlorinatorOrpSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
     _attach_ha(number)
-    assert number.native_value == 700.0
+    assert number.native_value is None
 
 
 def test_orp_setpoint_native_value_simple_int_reads_same_component() -> None:
@@ -400,15 +400,15 @@ def test_orp_setpoint_native_value_simple_int_reads_same_component() -> None:
     assert number.native_value == 680.0
 
 
-def test_orp_setpoint_native_value_default_when_no_reading() -> None:
-    """Missing ORP reading falls back to 700.0 rather than returning None."""
+def test_orp_setpoint_native_value_none_when_no_reading() -> None:
+    """Missing ORP reading returns None so the entity reads `unknown`, not an invented 700 mV."""
     device = _chlorinator_device(
         components={},
         features={"orp_setpoint": {"write": 11, "read": 177}},
     )
     number = FluidraChlorinatorOrpSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
     _attach_ha(number)
-    assert number.native_value == 700.0
+    assert number.native_value is None
 
 
 def test_orp_setpoint_icon_is_lightning_bolt() -> None:
