@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.82.0] - 2026-08-21
+
+### Fixed
+
+- **Schedules can be written to the Zodiac eXO iQ again** — the chlorination-only (c19) and
+  simple-pump (c20) registers. Writes had been refused outright since v2.80.0 because the
+  device stored something other than what was sent: a slot asked for 01:02–03:04 on one day
+  came back as "03 02" / "00 04" on four days, and the device *acted* on the mangled result.
+  @Inervo then captured the official app's PUT bodies (Issue #174), which settled it — the
+  wire format differs from what the integration used to send in three ways:
+
+  - **Days travel in mobile numbering, 1=Mon..7=Sun**, not CRON's 0..6. The integration
+    converted Sunday to `0` on the way out; the app sends `7` and the backend converts when
+    storing. A Monday+Sunday slot now goes out exactly as the app sends it: `"02 01 * * 1,7"`.
+  - The action value travels under `desiredValue` with `operationName` alongside, not echoed
+    back from the read shape.
+  - No synthesised `state` — that field is added by the device, never sent by a client.
+
+  With all three corrected, a schedule written from Home Assistant round-trips byte-for-byte
+  on his unit (PR #205). Deciding which payload shape a device takes also moved: it now comes
+  from the declared schedule registers — i.e. the pump type — rather than from whatever slots
+  happen to be stored, because a freshly added device has no slots to learn from, which is
+  what used to send the wrong shape on its very first write.
+
+- **The variable-speed register (c21) stays refused, on purpose**: its slots also carry a
+  target RPM this service cannot set, and an RPM-less slot leaves the Fluidra app unable to
+  load the device at all until the pump type is changed on the unit itself. Aux registers
+  (c22–c25) are not reachable through this service yet.
+
 ## [2.81.1] - 2026-08-20
 
 ### Fixed
