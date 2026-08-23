@@ -255,18 +255,10 @@
       "heat_pump_activity": {
         "name": "Activity",
         "state": {
-          "off": {
-            "name": "Off"
-          },
-          "idle": {
-            "name": "Idle"
-          },
-          "heating": {
-            "name": "Heating"
-          },
-          "cooling": {
-            "name": "Cooling"
-          }
+          "off": "Off",
+          "idle": "Idle",
+          "heating": "Heating",
+          "cooling": "Cooling"
         }
       },
       "pool_location": {
