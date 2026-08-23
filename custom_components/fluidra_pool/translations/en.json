@@ -253,7 +253,21 @@
         }
       },
       "heat_pump_activity": {
-        "name": "Activity"
+        "name": "Activity",
+        "state": {
+          "cooling": {
+            "name": "Cooling"
+          },
+          "heating": {
+            "name": "Heating"
+          },
+          "idle": {
+            "name": "Idle"
+          },
+          "off": {
+            "name": "Off"
+          }
+        }
       },
       "pool_location": {
         "name": "Pool Location"

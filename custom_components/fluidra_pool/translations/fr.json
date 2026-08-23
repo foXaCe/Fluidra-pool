@@ -253,7 +253,21 @@
         }
       },
       "heat_pump_activity": {
-        "name": "Activité"
+        "name": "Activité",
+        "state": {
+          "cooling": {
+            "name": "Refroidissement"
+          },
+          "heating": {
+            "name": "Chauffage"
+          },
+          "idle": {
+            "name": "Au repos"
+          },
+          "off": {
+            "name": "Arrêté"
+          }
+        }
       },
       "pool_location": {
         "name": "Localisation Piscine"
