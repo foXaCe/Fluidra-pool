@@ -132,6 +132,19 @@ class DevicesMixin(FluidraAPIBase):
             device_type = classify_device_type(family, device_name)
             is_bridge = "bridge" in family.lower() or bool(device.get("devices"))
 
+            if device_type == "unknown":
+                # An unclassified device is dropped by every platform before any
+                # entity logging happens, so say here what it would take to
+                # classify it (Issue #210): the (family, name) pair is exactly
+                # what classify_device_type() matches on.
+                _LOGGER.debug(
+                    "Unclassified device %s (%s): family=%r name=%r — no profile will match",
+                    mask_device_id(str(device_id)),
+                    connection_type,
+                    family,
+                    device_name,
+                )
+
             if is_bridge:
                 children = device.get("devices") or []
                 if isinstance(children, list):
@@ -144,6 +157,15 @@ class DevicesMixin(FluidraAPIBase):
 
                         child_device_type = classify_device_type(child_family, child_device_name)
                         child_is_pump = child_device_type == "pump"
+                        if child_device_type == "unknown":
+                            # Same rationale as the top-level log above (Issue #210).
+                            _LOGGER.debug(
+                                "Unclassified bridge child %s (%s): family=%r name=%r — no profile will match",
+                                mask_device_id(str(child_device_id)),
+                                child_connection_type,
+                                child_family,
+                                child_device_name,
+                            )
 
                         _add(
                             child_device_id,

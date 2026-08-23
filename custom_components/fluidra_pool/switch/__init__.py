@@ -128,6 +128,27 @@ async def async_setup_entry(
                     )
                 )
 
+        # Profile-declared boolean switches (same toggle class): a list of
+        # (component feature, translation key, icon) under the "toggle_switches"
+        # feature. Used by multi-output devices that don't fit the one main
+        # switch shape — e.g. the Command Connect cabinet drives its filtration
+        # pump and its lights as four independent registers (Issue #210).
+        profile_toggles = DeviceIdentifier.get_feature(device, "toggle_switches", [])
+        if isinstance(profile_toggles, list):
+            for feature, translation_key, icon in profile_toggles:
+                if DeviceIdentifier.has_feature(device, feature):
+                    entities.append(
+                        FluidraChlorinatorToggleSwitch(
+                            coordinator,
+                            coordinator.api,
+                            pool_id,
+                            device_id,
+                            feature,
+                            translation_key,
+                            icon,
+                        )
+                    )
+
         return entities
 
     await async_setup_dynamic_platform(config_entry, async_add_entities, _build)

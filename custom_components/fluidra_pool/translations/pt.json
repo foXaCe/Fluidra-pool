@@ -198,6 +198,9 @@
       "air_temperature": {
         "name": "Temperatura do Ar"
       },
+      "battery_level": {
+        "name": "Bateria"
+      },
       "boost_remaining": {
         "name": "Turbo restante"
       },
@@ -249,6 +252,9 @@
           "signal_very_low": "Sinal Muito Fraco"
         }
       },
+      "heat_pump_activity": {
+        "name": "Atividade"
+      },
       "pool_location": {
         "name": "Localização da Piscina"
       },
@@ -289,6 +295,9 @@
       },
       "schedule_count": {
         "name": "Programações Ativas"
+      },
+      "schedule_days": {
+        "name": "Dias de agendamento"
       },
       "speed_mode": {
         "name": "Velocidade",
@@ -331,6 +340,18 @@
       },
       "boost_mode": {
         "name": "Modo Turbo"
+      },
+      "cabinet_lights": {
+        "name": "Iluminação da piscina"
+      },
+      "cabinet_lights_auto_mode": {
+        "name": "Modo automático da iluminação"
+      },
+      "cabinet_pump": {
+        "name": "Bomba de filtração"
+      },
+      "cabinet_pump_auto_mode": {
+        "name": "Modo automático da filtração"
       },
       "chlorinator": {
         "name": "Clorador"

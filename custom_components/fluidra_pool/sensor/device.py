@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
+from homeassistant.components.climate.const import HVACAction
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import (
     PERCENTAGE,
@@ -19,7 +20,8 @@ from homeassistant.const import (
 from homeassistant.util import dt as dt_util
 
 from ..api_resilience import FluidraError
-from ..const import LUMIPLUS_COMPONENT_BRIGHTNESS
+from ..climate_behaviors import resolve_behavior
+from ..const import HEAT_COOL_ACTION_DEADBAND, LUMIPLUS_COMPONENT_BRIGHTNESS
 from ..device_registry import DeviceIdentifier
 from ..helpers import parse_cron_time
 from .base import FluidraPoolSensorEntity
@@ -819,3 +821,152 @@ class FluidraDeviceInfoSensor(FluidraPoolSensorEntity):
             attrs["error"] = str(e)
 
         return attrs
+
+
+class FluidraDeviceBatterySensor(FluidraPoolSensorEntity):
+    """Battery charge sensor for battery-powered equipment (Issue #212).
+
+    The Zodiac Freedom Lite cleaner reports its charge in percent on a
+    profile-declared register (``battery_component``). A real HA battery
+    (device class BATTERY, %) so dashboards and low-battery automations work
+    out of the box.
+    """
+
+    _attr_translation_key = "battery_level"
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = PERCENTAGE
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the battery sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "battery")
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the reported charge percentage."""
+        component = DeviceIdentifier.get_feature(self.device_data, "battery_component", None)
+        if component is None:
+            return None
+        comp = self.device_data.get("components", {}).get(str(component), {})
+        reported = comp.get("reportedValue")
+        if reported is None:
+            return None
+        try:
+            return round(float(reported))
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def icon(self) -> str:
+        """Return a battery icon reflecting the charge level."""
+        value = self.native_value
+        if value is None:
+            return "mdi:battery-unknown"
+        if value >= 95:
+            return "mdi:battery"
+        if value <= 10:
+            return "mdi:battery-outline"
+        return f"mdi:battery-{value // 10 * 10}"
+
+
+class FluidraScheduleDaysSensor(FluidraPoolSensorEntity):
+    """Days on which the automatic schedule runs (Issue #212).
+
+    The Freedom Lite stores its auto-schedule as day-name strings on one
+    register (e.g. ``['wednesday', 'saturday']``); the sensor shows them in
+    week order as a comma-separated list, empty when nothing is scheduled.
+    """
+
+    _attr_translation_key = "schedule_days"
+    _attr_icon = "mdi:calendar-week"
+
+    _DAY_ORDER = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the schedule-days sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "schedule_days")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the scheduled days in week order."""
+        component = DeviceIdentifier.get_feature(self.device_data, "schedule_days_component", None)
+        if component is None:
+            return None
+        comp = self.device_data.get("components", {}).get(str(component), {})
+        reported = comp.get("reportedValue")
+        if not isinstance(reported, list):
+            return None
+        days = {str(day).strip().lower() for day in reported if isinstance(day, str)}
+        ordered = [day for day in self._DAY_ORDER if day in days]
+        # Unknown day names (firmware change, translation) still surface rather
+        # than being silently dropped.
+        ordered.extend(sorted(days.difference(self._DAY_ORDER)))
+        return ", ".join(ordered)
+
+
+class FluidraHeatPumpActivitySensor(FluidraPoolSensorEntity):
+    """What a heat pump is doing right now (Issue #211).
+
+    Mirrors the pump activity sensor: one enum state (off/idle/heating/cooling)
+    sourced from the same per-family logic the climate entity uses for its
+    hvac_action, so recording/graphing "when did it actually run" needs no
+    climate-entity spelunking.
+    """
+
+    _attr_translation_key = "heat_pump_activity"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["off", "idle", "heating", "cooling"]
+    _attr_icon = "mdi:heat-pump"
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the heat pump activity sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "heat_pump_activity")
+
+    def _infer_heat_cool_action(self) -> HVACAction:
+        """Infer the direction for Smart Heat+Cool like the climate entity does.
+
+        Same water-vs-setpoint deadband comparison (see
+        FluidraHeatPumpClimate._infer_heat_cool_action): the hardware exposes no
+        direction register in that mode.
+        """
+        current = self.device_data.get("water_temperature")
+        target = self.device_data.get("target_temperature")
+        if current is None or target is None:
+            return HVACAction.IDLE
+        try:
+            current = float(current)
+            target = float(target)
+        except (TypeError, ValueError):
+            return HVACAction.IDLE
+        if target - current > HEAT_COOL_ACTION_DEADBAND:
+            return HVACAction.HEATING
+        if current - target > HEAT_COOL_ACTION_DEADBAND:
+            return HVACAction.COOLING
+        return HVACAction.IDLE
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the current activity of the heat pump."""
+        device = self.device_data
+        action = resolve_behavior(device).hvac_action(device, self._infer_heat_cool_action)
+        if action is None:
+            return None
+        return str(action.value)

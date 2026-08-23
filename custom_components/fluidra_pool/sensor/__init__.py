@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import SensorEntity
 
-from ..const import DEVICE_TYPE_CHLORINATOR, FluidraPoolConfigEntry
+from ..const import (
+    DEVICE_TYPE_CHLORINATOR,
+    DEVICE_TYPE_HEAT_PUMP,
+    DEVICE_TYPE_PUMP,
+    FluidraPoolConfigEntry,
+)
 from ..device_registry import DeviceIdentifier
 from ..platform_setup import async_setup_dynamic_platform
 from .base import FluidraPoolSensorBase, FluidraPoolSensorEntity
@@ -14,7 +19,9 @@ from .chlorinator import FluidraBoostRemainingSensor, FluidraChlorinatorSensor
 from .device import (
     FluidraCompressorHoursSensor,
     FluidraCompressorModulationSensor,
+    FluidraDeviceBatterySensor,
     FluidraDeviceInfoSensor,
+    FluidraHeatPumpActivitySensor,
     FluidraLightBrightnessSensor,
     FluidraPumpActivitySensor,
     FluidraPumpFlowSensor,
@@ -23,6 +30,7 @@ from .device import (
     FluidraPumpScheduleSensor,
     FluidraPumpSpeedSensor,
     FluidraRunningHoursSensor,
+    FluidraScheduleDaysSensor,
     FluidraTemperatureSensor,
     FluidraWifiSignalSensor,
 )
@@ -42,7 +50,9 @@ __all__ = [
     "FluidraChlorinatorSensor",
     "FluidraCompressorHoursSensor",
     "FluidraCompressorModulationSensor",
+    "FluidraDeviceBatterySensor",
     "FluidraDeviceInfoSensor",
+    "FluidraHeatPumpActivitySensor",
     "FluidraLightBrightnessSensor",
     "FluidraPoolLocationSensor",
     "FluidraPoolSensorBase",
@@ -57,6 +67,7 @@ __all__ = [
     "FluidraPumpScheduleSensor",
     "FluidraPumpSpeedSensor",
     "FluidraRunningHoursSensor",
+    "FluidraScheduleDaysSensor",
     "FluidraTemperatureSensor",
     "FluidraWifiSignalSensor",
     "async_setup_entry",
@@ -98,7 +109,18 @@ async def async_setup_entry(
             entities.append(FluidraPumpFlowSensor(coordinator, coordinator.api, pool_id, device_id))
 
         if DeviceIdentifier.should_create_entity(device, "sensor_activity"):
-            entities.append(FluidraPumpActivitySensor(coordinator, coordinator.api, pool_id, device_id))
+            # Same token for both families, but the meaning differs: pumps report
+            # their run phase from their own registers, heat pumps reuse the
+            # per-model hvac_action logic of the climate entity (Issue #211).
+            device_type = getattr(
+                DeviceIdentifier.identify_device(device),
+                "device_type",
+                device.get("type", ""),
+            )
+            if device_type == DEVICE_TYPE_HEAT_PUMP:
+                entities.append(FluidraHeatPumpActivitySensor(coordinator, coordinator.api, pool_id, device_id))
+            elif device_type == DEVICE_TYPE_PUMP:
+                entities.append(FluidraPumpActivitySensor(coordinator, coordinator.api, pool_id, device_id))
 
         if DeviceIdentifier.should_create_entity(device, "sensor_temperature"):
             # Temperature sensors for heaters / heat pumps.
@@ -128,6 +150,12 @@ async def async_setup_entry(
 
         if DeviceIdentifier.should_create_entity(device, "sensor_wifi_signal"):
             entities.append(FluidraWifiSignalSensor(coordinator, coordinator.api, pool_id, device_id))
+
+        if DeviceIdentifier.should_create_entity(device, "sensor_battery"):
+            entities.append(FluidraDeviceBatterySensor(coordinator, coordinator.api, pool_id, device_id))
+
+        if DeviceIdentifier.should_create_entity(device, "sensor_schedule_days"):
+            entities.append(FluidraScheduleDaysSensor(coordinator, coordinator.api, pool_id, device_id))
 
         # Chlorinator sensors - create based on sensors_config from device registry
         config = DeviceIdentifier.identify_device(device)

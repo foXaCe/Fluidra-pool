@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 from ..types import DeviceConfig
+from .cabinets import CABINET_CONFIGS
 from .chlorinators import CHLORINATOR_CONFIGS
 from .generic import GENERIC_CONFIGS
 from .heat_pumps import HEAT_PUMP_CONFIGS
 from .probes import PROBE_CONFIGS
 from .pumps import PUMP_CONFIGS
+from .robots import ROBOT_CONFIGS
 
 DEVICE_CONFIGS: dict[str, DeviceConfig] = {
     **HEAT_PUMP_CONFIGS,
     **CHLORINATOR_CONFIGS,
     **PROBE_CONFIGS,
     **PUMP_CONFIGS,
+    **CABINET_CONFIGS,
+    **ROBOT_CONFIGS,
     **GENERIC_CONFIGS,
 }
 
