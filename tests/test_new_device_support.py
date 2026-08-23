@@ -124,6 +124,9 @@ class TestRobotSensors:
         assert sensor.native_value is None
         device["components"] = {"26": {"reportedValue": "not-a-number"}}
         assert sensor.native_value is None
+        # float("inf") survives float() but raises OverflowError on round().
+        device["components"] = {"26": {"reportedValue": float("inf")}}
+        assert sensor.native_value is None
 
     def test_schedule_days_sorted_in_week_order(self) -> None:
         device = _robot_device()

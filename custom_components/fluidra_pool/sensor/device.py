@@ -859,7 +859,8 @@ class FluidraDeviceBatterySensor(FluidraPoolSensorEntity):
             return None
         try:
             return round(float(reported))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
+            # OverflowError: float("inf") rounds fine in concept but raises.
             return None
 
     @property
