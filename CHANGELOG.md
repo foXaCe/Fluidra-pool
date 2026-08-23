@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.84.0] - 2026-08-23
+
+### Added
+
+- **Zodiac Freedom Lite robotic cleaner support** (#212, @MDBENNANI): a new `robot`
+  device type matched on `NLX*` serials and the model name, with a real Home Assistant
+  **battery sensor (%)** (register c26) and an **automatic-schedule days sensor**
+  (c25, day-name strings shown in week order). Only the two registers the reporter
+  confirmed from a live coordinator dump are mapped — the rest stay in the
+  unmapped-register debug log until someone correlates them with an app toggle.
+
+- **AstralPool Command Connect cabinet** (#210, @efgonzalez): the `Cabinets` family now
+  classifies as a cabinet instead of falling through to `unknown` and producing no
+  entities. One API device exposes **four independent switches**: filtration pump
+  on/off (c13) + auto mode (c15), pool lights on/off (c24) + auto mode (c26), mapped
+  and verified in both directions on real hardware by the reporter. ⚠ This cabinet
+  silently ignores integer writes, so every control goes through boolean write paths;
+  profiles can also declare their own extra toggles via the new `toggle_switches`
+  feature. Unclassified devices now log their `(family, name)` pair at debug level,
+  as requested in the issue.
+
+- **Heat-pump activity sensor** (#211): every heat pump gains an enum sensor reporting
+  `off` / `idle` / `heating` / `cooling`, driven by the same per-family logic as the
+  climate entity's HVAC action (including the Smart Heat+Cool ±2 °C deadband
+  inference), so graphing when the unit actually runs no longer requires reading the
+  climate entity. Pump activity sensors are unchanged.
+
 ## [2.83.0] - 2026-08-21
 
 ### Added
