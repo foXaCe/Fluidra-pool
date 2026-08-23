@@ -9,7 +9,7 @@ GENERIC_CONFIGS: dict[str, DeviceConfig] = {
         device_type="heat_pump",
         components_range=5,
         required_components=[0, 1, 2, 3],
-        entities=["climate", "switch", "sensor_info"],
+        entities=["climate", "switch", "sensor_info", "sensor_activity"],
         features={
             "temperature_control": True,
             "hvac_modes": ["off", "heat"],

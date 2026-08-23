@@ -34,6 +34,8 @@ DEVICE_TYPE_HEAT_PUMP: Final = "heat_pump"
 DEVICE_TYPE_HEATER: Final = "heater"
 DEVICE_TYPE_LIGHT: Final = "light"
 DEVICE_TYPE_CHLORINATOR: Final = "chlorinator"
+DEVICE_TYPE_ROBOT: Final = "robot"
+DEVICE_TYPE_CABINET: Final = "cabinet"
 
 # Device-registry model labels shown on the HA device page.
 DEVICE_MODEL_MAP: Final[dict[str, str]] = {
@@ -42,6 +44,8 @@ DEVICE_MODEL_MAP: Final[dict[str, str]] = {
     DEVICE_TYPE_HEAT_PUMP: "Heat Pump",
     DEVICE_TYPE_LIGHT: "Light",
     DEVICE_TYPE_HEATER: "Heater",
+    DEVICE_TYPE_ROBOT: "Pool Robot",
+    DEVICE_TYPE_CABINET: "Cabinet",
 }
 DEVICE_MODEL_FALLBACK: Final = "Pool Equipment"
 

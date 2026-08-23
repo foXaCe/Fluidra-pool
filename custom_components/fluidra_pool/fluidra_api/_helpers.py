@@ -36,6 +36,10 @@ def classify_device_type(family: str, device_name: str) -> str:
 
     if "pump" in family_lower and any(kw in family_lower for kw in ("heat", "eco", "elyo", "thermal")):
         return "heat_pump"
+    if "cabinet" in family_lower:
+        # AstralPool Command Connect (Issue #210): one API device driving several
+        # outputs (filtration pump, pool lights), each with on/off + auto mode.
+        return "cabinet"
     if "pump" in family_lower:
         return "pump"
     if any(kw in family_lower for kw in ("heat", "thermal", "eco elyo", "astralpool")):
@@ -48,4 +52,7 @@ def classify_device_type(family: str, device_name: str) -> str:
         return "heater"
     if "light" in family_lower or "lumiplus" in device_name_lower:
         return "light"
+    if "robot" in family_lower or "cleaner" in family_lower or "cleaner" in device_name_lower:
+        # Robotic cleaners (e.g. Zodiac Freedom Lite, Issue #212).
+        return "robot"
     return "unknown"

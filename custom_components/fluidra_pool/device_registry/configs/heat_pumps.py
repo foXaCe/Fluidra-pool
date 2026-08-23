@@ -13,7 +13,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         model_patterns=["astralpool"],
         components_range=5,  # Minimal scan; specific components below.
         required_components=[0, 1, 2, 3],
-        entities=["climate", "switch", "sensor_info"],
+        entities=["climate", "switch", "sensor_info", "sensor_activity"],
         features={
             "preset_modes": True,
             "temperature_control": True,
@@ -44,6 +44,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             # Z260iQ one, so declaring it there alone left the sensor unreachable for
             # every Z250iQ owner (Issue #183, @paradox37).
             "sensor_wifi_signal",
+            "sensor_activity",
         ],
         features={
             # Same firmware family as the Z260iQ — full register-by-register
@@ -89,6 +90,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             # No-flow is surfaced on the climate entity (no_flow_alarm attribute /
             # hvac_action "no_flow"), not as a separate binary_sensor: there is no
             # binary_sensor platform, so "binary_sensor_no_flow" was a dead token.
+            "sensor_activity",
         ],
         features={
             "z260iq_mode": True,
@@ -128,7 +130,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         family_patterns=["heat pump"],
         components_range=5,
         required_components=[0, 1, 2, 3],
-        entities=["climate", "switch", "sensor_info", "sensor_temperature", "sensor_running_hours"],
+        entities=["climate", "switch", "sensor_info", "sensor_temperature", "sensor_running_hours", "sensor_activity"],
         features={
             "temperature_control": True,
             # preset_modes stay disabled: component 17 is a read-only status whose
@@ -176,7 +178,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         model_patterns=["hpgic"],
         components_range=5,
         required_components=[0, 1, 2, 3],
-        entities=["climate", "switch", "sensor_info"],
+        entities=["climate", "switch", "sensor_info", "sensor_activity"],
         features={
             "preset_modes": True,
             "temperature_control": True,
@@ -211,6 +213,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             "sensor_wifi_signal",
             "sensor_power",
             "sensor_compressor_modulation",
+            "sensor_activity",
         ],
         features={
             "z260iq_mode": True,

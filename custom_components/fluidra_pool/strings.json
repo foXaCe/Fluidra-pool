@@ -198,6 +198,9 @@
       "air_temperature": {
         "name": "Air Temperature"
       },
+      "battery_level": {
+        "name": "Battery"
+      },
       "boost_remaining": {
         "name": "Boost Remaining"
       },
@@ -249,6 +252,9 @@
           "signal_very_low": "Signal Very Low"
         }
       },
+      "heat_pump_activity": {
+        "name": "Activity"
+      },
       "pool_location": {
         "name": "Pool Location"
       },
@@ -290,6 +296,9 @@
       "schedule_count": {
         "name": "Active Schedules"
       },
+      "schedule_days": {
+        "name": "Schedule Days"
+      },
       "speed_mode": {
         "name": "Speed",
         "state": {
@@ -326,8 +335,23 @@
       "auto_mode": {
         "name": "Auto Mode"
       },
+      "aux_schedule_enable": {
+        "name": "Aux {aux_number} Schedule {schedule_id}"
+      },
       "boost_mode": {
         "name": "Boost Mode"
+      },
+      "cabinet_lights": {
+        "name": "Pool Lights"
+      },
+      "cabinet_lights_auto_mode": {
+        "name": "Lights Auto Mode"
+      },
+      "cabinet_pump": {
+        "name": "Filtration Pump"
+      },
+      "cabinet_pump_auto_mode": {
+        "name": "Filtration Auto Mode"
       },
       "chlorinator": {
         "name": "Chlorinator"
@@ -349,9 +373,6 @@
       },
       "schedule_enable": {
         "name": "Schedule {schedule_id}"
-      },
-      "aux_schedule_enable": {
-        "name": "Aux {aux_number} Schedule {schedule_id}"
       }
     },
     "time": {
