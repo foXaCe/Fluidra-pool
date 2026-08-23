@@ -11,6 +11,7 @@ from homeassistant.components.climate.const import HVACAction
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
 from homeassistant.const import (
     PERCENTAGE,
+    EntityCategory,
     UnitOfLength,
     UnitOfPower,
     UnitOfTemperature,
@@ -915,6 +916,40 @@ class FluidraScheduleDaysSensor(FluidraPoolSensorEntity):
         # than being silently dropped.
         ordered.extend(sorted(days.difference(self._DAY_ORDER)))
         return ", ".join(ordered)
+
+
+class FluidraCabinetPackedConfigSensor(FluidraPoolSensorEntity):
+    """Read-only packed pump config string on Command Connect c16 (Issue #210).
+
+    The cabinet also encodes filtration schedule times and the auto-mode flag
+    (last digit mirrors c15) in this string. It is diagnostic only — this
+    integration never writes c16; schedules go through c35/c36.
+    """
+
+    _attr_translation_key = "cabinet_packed_config"
+    _attr_icon = "mdi:barcode"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the packed-config sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "cabinet_packed_config")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the packed config string from c16."""
+        component = DeviceIdentifier.get_feature(self.device_data, "cabinet_packed_config", None)
+        if component is None:
+            return None
+        reported = self.device_data.get("components", {}).get(str(component), {}).get("reportedValue")
+        if reported is None:
+            return None
+        return str(reported)
 
 
 class FluidraHeatPumpActivitySensor(FluidraPoolSensorEntity):

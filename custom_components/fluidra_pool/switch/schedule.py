@@ -14,8 +14,10 @@ from ..const import DOMAIN
 from ..helpers import (
     describe_led_colour,
     get_aux_schedule_data,
+    get_cabinet_schedule_data,
     get_schedule_data,
     resolve_aux_schedule_component,
+    resolve_cabinet_schedule_component,
     resolve_schedule_component,
 )
 from .base import FluidraPoolSwitchEntity
@@ -25,6 +27,8 @@ if TYPE_CHECKING:
     from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
+
+_CABINET_OUTPUT_LABELS = {"pump": "Filtration", "lights": "Lights"}
 
 
 def _with_enabled(schedules: list[dict[str, Any]], schedule_id: Any, enabled: bool) -> list[dict[str, Any]]:
@@ -76,13 +80,22 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         device_id: str,
         schedule_id: str,
         aux_number: str | None = None,
+        cabinet_output: str | None = None,
     ) -> None:
         """Initialize the switch."""
         super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
         self._aux_number = aux_number
+        self._cabinet_output = cabinet_output
 
-        if aux_number is not None:
+        if cabinet_output is not None:
+            self._attr_translation_key = "cabinet_schedule_enable"
+            self._attr_translation_placeholders = {
+                "output": _CABINET_OUTPUT_LABELS.get(cabinet_output, cabinet_output),
+                "schedule_id": schedule_id,
+            }
+            self._attr_unique_id = f"fluidra_{self._device_id}_cabinet_{cabinet_output}_schedule_{schedule_id}_enabled"
+        elif aux_number is not None:
             self._attr_translation_key = "aux_schedule_enable"
             self._attr_translation_placeholders = {"aux_number": aux_number, "schedule_id": schedule_id}
             self._attr_unique_id = f"fluidra_{self._device_id}_aux{aux_number}_schedule_{schedule_id}_enabled"
@@ -107,6 +120,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
     def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
+            if self._cabinet_output is not None:
+                return get_cabinet_schedule_data(self.device_data, self._cabinet_output, self._schedule_id)
             if self._aux_number is not None:
                 return get_aux_schedule_data(self.device_data, self._aux_number, self._schedule_id)
             return get_schedule_data(self.device_data, self._schedule_id)
@@ -115,7 +130,12 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             return None
 
     def _get_schedule_list(self) -> list[dict[str, Any]]:
-        """Return the schedule list this switch edits (main or per-aux)."""
+        """Return the schedule list this switch edits (main, per-aux, or cabinet)."""
+        if self._cabinet_output is not None:
+            cabinet_schedules: list[dict[str, Any]] = (self.device_data.get("cabinet_schedule_data") or {}).get(
+                str(self._cabinet_output), []
+            )
+            return cabinet_schedules
         if self._aux_number is not None:
             aux_schedules: list[dict[str, Any]] = (self.device_data.get("aux_schedule_data") or {}).get(
                 str(self._aux_number), []
@@ -126,6 +146,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
 
     def _get_schedule_component(self) -> int:
         """Get the schedule component used by this device."""
+        if self._cabinet_output is not None:
+            return resolve_cabinet_schedule_component(self.device_data, self._cabinet_output)
         if self._aux_number is not None:
             # c22/c24 for a plain output, c23/c25 for a colour LED (Issue #174).
             return resolve_aux_schedule_component(self.device_data, self._aux_number)
@@ -267,6 +289,14 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                     "end_action": schedule.get("endActions", {}),
                 }
             )
+
+        if self._cabinet_output is not None:
+            attrs["cabinet_output"] = self._cabinet_output
+            attrs["schedule_component"] = self._get_schedule_component()
+            # Verified behaviour (Issue #210): schedule = armed window, not a
+            # guaranteed stop when the window ends.
+            attrs["schedule_semantics"] = "armed_window"
+            attrs["schedule_local_time"] = True
 
         if self._aux_number is not None:
             attrs["schedule_component"] = self._get_schedule_component()

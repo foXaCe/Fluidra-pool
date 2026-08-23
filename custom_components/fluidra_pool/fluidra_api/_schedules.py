@@ -119,20 +119,30 @@ class SchedulesMixin(FluidraAPIBase):
             desired_value = self._convert_schedules_to_dm24049704_format(schedules)
         payload = {"desiredValue": desired_value}
 
+        # Baseline from the local mirror *before* the write: the HTTP response
+        # echoes desiredValue even when the device drops it (Issue #133 / #210).
+        baseline = self.reported_component_value(device_id, component_id)
+
         try:
             status, _, raw_text = await self._request(
                 "PUT", url, headers=headers, json_data=payload, params=dict(CONNECTED_PARAMS)
             )
         except FluidraError as err:
             _LOGGER.error("set_schedule error: %s", err)
+            self.write_verifier.discard(device_id, component_id)
             return False
 
         if status != 200:
             # Surface the rejection reason at WARNING so it reaches HA's system log
             # (the system_log buffer only retains WARNING+, so a DEBUG line was
             # invisible and a failed write gave no diagnostic info — Issue #89).
+            self.write_verifier.discard(device_id, component_id)
             _LOGGER.warning("set_schedule rejected by Fluidra (HTTP %s): %s", status, raw_text[:500])
-        return status == 200
+            return False
+
+        # Arm a later poll comparison — HTTP 200 alone proves nothing.
+        self.write_verifier.record(device_id, component_id, desired_value, baseline)
+        return True
 
     async def clear_schedule(self, device_id: str, component_id: int = COMPONENT_SCHEDULE) -> bool:
         """Clear all schedules for a device."""

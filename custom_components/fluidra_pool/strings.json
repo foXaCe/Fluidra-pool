@@ -335,6 +335,9 @@
       },
       "wifi_signal": {
         "name": "WiFi Signal"
+      },
+      "cabinet_packed_config": {
+        "name": "Packed pump config"
       }
     },
     "switch": {
@@ -379,6 +382,9 @@
       },
       "schedule_enable": {
         "name": "Schedule {schedule_id}"
+      },
+      "cabinet_schedule_enable": {
+        "name": "{output} Schedule {schedule_id}"
       }
     },
     "time": {
@@ -399,6 +405,12 @@
       },
       "schedule_start": {
         "name": "Schedule {schedule_id} Start"
+      },
+      "cabinet_schedule_end": {
+        "name": "{output} Schedule {schedule_id} End"
+      },
+      "cabinet_schedule_start": {
+        "name": "{output} Schedule {schedule_id} Start"
       }
     }
   },
@@ -549,6 +561,14 @@
         "device_id": {
           "description": "Device identifier (e.g. LE24500883)",
           "name": "Device ID"
+        },
+        "component_id": {
+          "description": "Optional schedule register (e.g. 35 pump / 36 lights on Command Connect)",
+          "name": "Component ID"
+        },
+        "schedule_output": {
+          "description": "Command Connect output: pump (c35) or lights (c36)",
+          "name": "Schedule output"
         }
       },
       "name": "Clear pump schedule"
@@ -577,6 +597,14 @@
         "schedules": {
           "description": "List of time slots",
           "name": "Schedules"
+        },
+        "component_id": {
+          "description": "Optional schedule register (e.g. 35 pump / 36 lights on Command Connect)",
+          "name": "Component ID"
+        },
+        "schedule_output": {
+          "description": "Command Connect output: pump (c35) or lights (c36)",
+          "name": "Schedule output"
         }
       },
       "name": "Set pump schedule"

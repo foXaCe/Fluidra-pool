@@ -66,7 +66,21 @@ def normalize_component_value(value: Any) -> Any:
     strings and the cloud reports them back as numbers, and integers come back
     as floats on some registers. Numeric-looking values are therefore compared
     as floats, everything else as-is (strings stripped).
+
+    Schedule lists are normalised through ``schedule_slots_for_write`` so a
+    reported slot that still carries runtime ``state`` / ``endActions`` compares
+    equal to the write body that deliberately omitted them (Issue #210).
     """
+    if isinstance(value, list):
+        # Empty clear (`[]`) and CRON slot lists both go through the same
+        # write-shape normaliser; non-schedule lists fall through unchanged.
+        if not value:
+            return []
+        if all(isinstance(item, dict) for item in value):
+            from .helpers import schedule_slots_for_write
+
+            return schedule_slots_for_write(value)
+        return value
     if isinstance(value, bool):
         return float(value)
     if isinstance(value, (int, float)):

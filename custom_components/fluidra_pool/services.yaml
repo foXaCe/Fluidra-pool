@@ -24,6 +24,24 @@ set_schedule:
           days: [6,7]
       selector:
         object:
+    # Optional: target a non-default schedule register (e.g. cabinet c35/c36).
+    component_id:
+      example: 35
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 300
+          mode: box
+    # Optional alias for Command Connect: "pump" → c35, "lights" → c36.
+    schedule_output:
+      example: "pump"
+      required: false
+      selector:
+        select:
+          options:
+            - "pump"
+            - "lights"
 
 clear_schedule:
   target:
@@ -33,6 +51,22 @@ clear_schedule:
       required: true
       selector:
         text:
+    component_id:
+      example: 35
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 300
+          mode: box
+    schedule_output:
+      example: "lights"
+      required: false
+      selector:
+        select:
+          options:
+            - "pump"
+            - "lights"
 
 set_preset_schedule:
   target:

@@ -20,6 +20,7 @@ from .base import (
     FluidraScheduleTimeEntity,
     parse_schedule_time,
 )
+from .cabinet_schedule import FluidraCabinetScheduleEndTimeEntity, FluidraCabinetScheduleStartTimeEntity
 from .light import FluidraLightScheduleEndTimeEntity, FluidraLightScheduleStartTimeEntity
 from .schedule import FluidraScheduleEndTimeEntity, FluidraScheduleStartTimeEntity
 
@@ -30,6 +31,8 @@ if TYPE_CHECKING:
 __all__ = [
     "FluidraAuxScheduleEndTimeEntity",
     "FluidraAuxScheduleStartTimeEntity",
+    "FluidraCabinetScheduleEndTimeEntity",
+    "FluidraCabinetScheduleStartTimeEntity",
     "FluidraLightScheduleEndTimeEntity",
     "FluidraLightScheduleStartTimeEntity",
     "FluidraLightScheduleTimeEntity",
@@ -125,6 +128,25 @@ async def async_setup_entry(
                     entities.append(
                         FluidraAuxScheduleEndTimeEntity(
                             coordinator, coordinator.api, pool_id, device_id, aux_number, schedule_id
+                        )
+                    )
+
+        # Command Connect cabinet schedules: pump = c35 (r1), lights = c36 (r2)
+        # (Issue #210). One slot per output in the verified captures.
+        cabinet_schedule_components = DeviceIdentifier.get_feature(device, "cabinet_schedule_components", {})
+        if cabinet_schedule_components:
+            cabinet_schedule_count = DeviceIdentifier.get_feature(device, "cabinet_schedule_count", 1)
+            for output in sorted(cabinet_schedule_components):
+                for i in range(1, cabinet_schedule_count + 1):
+                    schedule_id = str(i)
+                    entities.append(
+                        FluidraCabinetScheduleStartTimeEntity(
+                            coordinator, coordinator.api, pool_id, device_id, output, schedule_id
+                        )
+                    )
+                    entities.append(
+                        FluidraCabinetScheduleEndTimeEntity(
+                            coordinator, coordinator.api, pool_id, device_id, output, schedule_id
                         )
                     )
 

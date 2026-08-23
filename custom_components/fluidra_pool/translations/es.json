@@ -207,6 +207,9 @@
       "brightness": {
         "name": "Brillo"
       },
+      "cabinet_packed_config": {
+        "name": "Config. bomba empaquetada"
+      },
       "chlorinator_battery_voltage": {
         "name": "Tensión de la Batería"
       },
@@ -359,6 +362,9 @@
       "cabinet_pump_auto_mode": {
         "name": "Modo automático de filtración"
       },
+      "cabinet_schedule_enable": {
+        "name": "Programación {output} {schedule_id}"
+      },
       "chlorinator": {
         "name": "Clorador"
       },
@@ -387,6 +393,12 @@
       },
       "aux_schedule_start": {
         "name": "Aux {aux_number} Horario {schedule_id} Inicio"
+      },
+      "cabinet_schedule_end": {
+        "name": "Fin programación {output} {schedule_id}"
+      },
+      "cabinet_schedule_start": {
+        "name": "Inicio programación {output} {schedule_id}"
       },
       "light_schedule_end": {
         "name": "Programación Luz {schedule_id} Fin"
@@ -546,9 +558,17 @@
     "clear_schedule": {
       "description": "Eliminar todos los horarios de la bomba",
       "fields": {
+        "component_id": {
+          "description": "Registro de programación opcional (p. ej. 35 bomba / 36 luces en Command Connect)",
+          "name": "ID de componente"
+        },
         "device_id": {
           "description": "Identificador del dispositivo (p. ej. LE24500883)",
           "name": "ID del dispositivo"
+        },
+        "schedule_output": {
+          "description": "Salida Command Connect: pump (c35) o lights (c36)",
+          "name": "Salida de programación"
         }
       },
       "name": "Borrar el horario de la bomba"
@@ -570,9 +590,17 @@
     "set_schedule": {
       "description": "Configurar el horario de la bomba",
       "fields": {
+        "component_id": {
+          "description": "Registro de programación opcional (p. ej. 35 bomba / 36 luces en Command Connect)",
+          "name": "ID de componente"
+        },
         "device_id": {
           "description": "Identificador del dispositivo (p. ej. LE24500883)",
           "name": "ID del dispositivo"
+        },
+        "schedule_output": {
+          "description": "Salida Command Connect: pump (c35) o lights (c36)",
+          "name": "Salida de programación"
         },
         "schedules": {
           "description": "Lista de franjas horarias",

@@ -284,11 +284,30 @@ def _coordinator_has_device(coordinator: FluidraDataUpdateCoordinator, device_id
     return _get_device_data(coordinator, device_id) is not None
 
 
-def _get_schedule_component(coordinator: FluidraDataUpdateCoordinator, device_id: str) -> int:
-    """Return the schedule component for a device, defaulting to pump schedules."""
+def _get_schedule_component(
+    coordinator: FluidraDataUpdateCoordinator,
+    device_id: str,
+    *,
+    component_id: int | None = None,
+    schedule_output: str | None = None,
+) -> int:
+    """Return the schedule component for a device, defaulting to pump schedules.
+
+    ``component_id`` wins when given. ``schedule_output`` resolves a Command
+    Connect cabinet register (``pump`` → c35, ``lights`` → c36, Issue #210).
+    """
+    if component_id is not None:
+        return int(component_id)
+
     device = _get_device_data(coordinator, device_id)
     if device is None:
         return COMPONENT_SCHEDULE
+
+    if schedule_output:
+        from .helpers import resolve_cabinet_schedule_component
+
+        return resolve_cabinet_schedule_component(device, schedule_output)
+
     return resolve_schedule_component(device, COMPONENT_SCHEDULE)
 
 
@@ -517,7 +536,12 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         _ensure_device_pool_writable(coordinator, device_id)
 
         # Convert HA format to Fluidra API format
-        schedule_component = _get_schedule_component(coordinator, device_id)
+        schedule_component = _get_schedule_component(
+            coordinator,
+            device_id,
+            component_id=call.data.get("component_id"),
+            schedule_output=call.data.get("schedule_output"),
+        )
         component_actions = _device_uses_component_actions(coordinator, device_id, schedule_component)
         fluidra_schedules = [
             _service_schedule_to_fluidra(schedule, i, use_component_actions=component_actions)
@@ -560,7 +584,13 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
         try:
             success = await coordinator.api.clear_schedule(
-                device_id, component_id=_get_schedule_component(coordinator, device_id)
+                device_id,
+                component_id=_get_schedule_component(
+                    coordinator,
+                    device_id,
+                    component_id=call.data.get("component_id"),
+                    schedule_output=call.data.get("schedule_output"),
+                ),
             )
         except FluidraError as err:
             _LOGGER.exception("Service %s failed for device %s", SERVICE_CLEAR_SCHEDULE, device_id)

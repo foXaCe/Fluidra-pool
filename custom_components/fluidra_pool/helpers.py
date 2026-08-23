@@ -99,6 +99,77 @@ def get_aux_schedule_data(device_data: dict[str, Any], aux_number: Any, schedule
     return None
 
 
+# Command Connect cabinet: all-days CRON field verified by @efgonzalez (Issue
+# #210). Minutes first, local wall-clock — do not convert despite GMT0 on the
+# bridge. Sunday/Monday anchor for day 0 is not confirmed; keep the captured
+# string intact.
+CABINET_SCHEDULE_ALL_DAYS = "0,1,2,3,4,5,6"
+
+
+def get_cabinet_schedule_data(device_data: dict[str, Any], output: Any, schedule_id: Any) -> dict[str, Any] | None:
+    """Return one schedule slot for a Command Connect cabinet output (c35/c36).
+
+    Cabinet schedules live on fixed per-output registers (pump = c35 / r1,
+    lights = c36 / r2), stored under ``device_data["cabinet_schedule_data"]``
+    keyed by output name. Returns ``None`` when that output has no slots.
+    """
+    if not device_data:
+        return None
+
+    by_output = device_data.get("cabinet_schedule_data") or {}
+    schedules = by_output.get(str(output))
+    if not schedules:
+        return None
+
+    for schedule in schedules:
+        if str(schedule.get("id")) == str(schedule_id):
+            result: dict[str, Any] = schedule
+            return result
+
+    return None
+
+
+def resolve_cabinet_schedule_component(device_data: dict[str, Any], output: Any, default: int = 35) -> int:
+    """Return the schedule register for a Command Connect cabinet output."""
+    from .device_registry import DeviceIdentifier
+
+    mapping = DeviceIdentifier.get_feature(device_data, "cabinet_schedule_components", {}) or {}
+    raw = mapping.get(str(output))
+    if raw is None:
+        return default
+    return int(raw)
+
+
+def build_cabinet_schedule_slot(
+    schedule_id: int,
+    start: time,
+    end: time,
+    *,
+    enabled: bool = True,
+    days: str = CABINET_SCHEDULE_ALL_DAYS,
+) -> dict[str, Any]:
+    """Build one cabinet schedule slot in the exact shape the app PUTs.
+
+    Captured on hardware by @efgonzalez (Issue #210)::
+
+        {"id": 1, "groupId": 1, "enabled": true,
+         "startTime": "15 10 * * 0,1,2,3,4,5,6",
+         "endTime": "30 18 * * 0,1,2,3,4,5,6",
+         "startActions": {"operationName": "1"}}
+
+    No ``state`` field — the device reports RUNNING/IDLE itself and rejects or
+    ignores it on write. Times are local; ``days`` defaults to every day.
+    """
+    return {
+        "id": schedule_id,
+        "groupId": schedule_id,
+        "enabled": enabled,
+        "startTime": f"{start.minute} {start.hour} * * {days}",
+        "endTime": f"{end.minute} {end.hour} * * {days}",
+        "startActions": {"operationName": str(schedule_id)},
+    }
+
+
 def resolve_aux_schedule_component(device_data: dict[str, Any], aux_number: Any, default: int = 22) -> int:
     """Return the schedule register an auxiliary output is currently honouring.
 

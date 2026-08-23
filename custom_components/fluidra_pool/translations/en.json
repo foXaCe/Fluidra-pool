@@ -207,6 +207,9 @@
       "brightness": {
         "name": "Brightness"
       },
+      "cabinet_packed_config": {
+        "name": "Packed pump config"
+      },
       "chlorinator_battery_voltage": {
         "name": "Battery Voltage"
       },
@@ -359,6 +362,9 @@
       "cabinet_pump_auto_mode": {
         "name": "Filtration Auto Mode"
       },
+      "cabinet_schedule_enable": {
+        "name": "{output} Schedule {schedule_id}"
+      },
       "chlorinator": {
         "name": "Chlorinator"
       },
@@ -387,6 +393,12 @@
       },
       "aux_schedule_start": {
         "name": "Aux {aux_number} Schedule {schedule_id} Start"
+      },
+      "cabinet_schedule_end": {
+        "name": "{output} Schedule {schedule_id} End"
+      },
+      "cabinet_schedule_start": {
+        "name": "{output} Schedule {schedule_id} Start"
       },
       "light_schedule_end": {
         "name": "Light Schedule {schedule_id} End"
@@ -546,9 +558,17 @@
     "clear_schedule": {
       "description": "Delete all pump schedules",
       "fields": {
+        "component_id": {
+          "description": "Optional schedule register (e.g. 35 pump / 36 lights on Command Connect)",
+          "name": "Component ID"
+        },
         "device_id": {
           "description": "Device identifier (e.g. LE24500883)",
           "name": "Device ID"
+        },
+        "schedule_output": {
+          "description": "Command Connect output: pump (c35) or lights (c36)",
+          "name": "Schedule output"
         }
       },
       "name": "Clear pump schedule"
@@ -570,9 +590,17 @@
     "set_schedule": {
       "description": "Configure the pump schedule",
       "fields": {
+        "component_id": {
+          "description": "Optional schedule register (e.g. 35 pump / 36 lights on Command Connect)",
+          "name": "Component ID"
+        },
         "device_id": {
           "description": "Device identifier (e.g. LE24500883)",
           "name": "Device ID"
+        },
+        "schedule_output": {
+          "description": "Command Connect output: pump (c35) or lights (c36)",
+          "name": "Schedule output"
         },
         "schedules": {
           "description": "List of time slots",

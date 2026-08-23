@@ -207,6 +207,9 @@
       "brightness": {
         "name": "Brilho"
       },
+      "cabinet_packed_config": {
+        "name": "Config. bomba empacotada"
+      },
       "chlorinator_battery_voltage": {
         "name": "Tensão da Bateria"
       },
@@ -359,6 +362,9 @@
       "cabinet_pump_auto_mode": {
         "name": "Modo automático da filtração"
       },
+      "cabinet_schedule_enable": {
+        "name": "Agendamento {output} {schedule_id}"
+      },
       "chlorinator": {
         "name": "Clorador"
       },
@@ -387,6 +393,12 @@
       },
       "aux_schedule_start": {
         "name": "Aux {aux_number} Horário {schedule_id} Início"
+      },
+      "cabinet_schedule_end": {
+        "name": "Fim agendamento {output} {schedule_id}"
+      },
+      "cabinet_schedule_start": {
+        "name": "Início agendamento {output} {schedule_id}"
       },
       "light_schedule_end": {
         "name": "Programação Luz {schedule_id} Fim"
@@ -546,9 +558,17 @@
     "clear_schedule": {
       "description": "Eliminar todos os programas da bomba",
       "fields": {
+        "component_id": {
+          "description": "Registo de agendamento opcional (ex. 35 bomba / 36 luzes no Command Connect)",
+          "name": "ID do componente"
+        },
         "device_id": {
           "description": "Identificador do dispositivo (por ex. LE24500883)",
           "name": "ID do dispositivo"
+        },
+        "schedule_output": {
+          "description": "Saída Command Connect: pump (c35) ou lights (c36)",
+          "name": "Saída de agendamento"
         }
       },
       "name": "Limpar o programa da bomba"
@@ -570,9 +590,17 @@
     "set_schedule": {
       "description": "Configurar o programa da bomba",
       "fields": {
+        "component_id": {
+          "description": "Registo de agendamento opcional (ex. 35 bomba / 36 luzes no Command Connect)",
+          "name": "ID do componente"
+        },
         "device_id": {
           "description": "Identificador do dispositivo (por ex. LE24500883)",
           "name": "ID do dispositivo"
+        },
+        "schedule_output": {
+          "description": "Saída Command Connect: pump (c35) ou lights (c36)",
+          "name": "Saída de agendamento"
         },
         "schedules": {
           "description": "Lista de períodos horários",
