@@ -255,18 +255,10 @@
       "heat_pump_activity": {
         "name": "Activité",
         "state": {
-          "cooling": {
-            "name": "Refroidissement"
-          },
-          "heating": {
-            "name": "Chauffage"
-          },
-          "idle": {
-            "name": "Au repos"
-          },
-          "off": {
-            "name": "Arrêté"
-          }
+          "cooling": "Refroidissement",
+          "heating": "Chauffage",
+          "idle": "Au repos",
+          "off": "Arrêté"
         }
       },
       "pool_location": {
