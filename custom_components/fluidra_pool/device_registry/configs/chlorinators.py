@@ -2,6 +2,12 @@
 
 Each model lives in its own DeviceConfig because of subtle component-mapping
 differences across the CC/LC/DM/NS lineups.
+
+Only the ``chlorinator`` catch-all declares ``family_patterns``. Every unit of the
+lineup reports ``family: "Chlorinators"``, so a family match carries no model
+information: on a serial-specific profile it would outrank the catch-all on a unit that
+profile was never written for, purely on its higher priority. The serial in
+``identifier_patterns`` is the identity (Issue #216).
 """
 
 from __future__ import annotations
@@ -64,7 +70,7 @@ def _standard_tecnolc2(
     return DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=identifier_patterns,
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -76,7 +82,14 @@ def _standard_tecnolc2(
 CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "chlorinator": DeviceConfig(
         device_type="chlorinator",
-        identifier_patterns=["*.nn_*"],  # Bridged devices.
+        # No identifier_patterns: ".nn_" is the *bridge protocol* marker
+        # (status.bridgedInfo.protocol == "nn"), not a chlorinator serial. Every
+        # device behind an iQBridge/Connect bridge carries it, whatever its family,
+        # so "*.nn_*" scored the 50-point identifier signal on a Zodiac PX50 heat
+        # pump and beat every heat-pump profile — the unit came out as a chlorinator
+        # with no climate entity (Issue #216, @vicsol00-collab). The family match
+        # below is what actually identifies a chlorinator; the serial-specific
+        # profiles still win on their own ids, at their own priority.
         family_patterns=["chlorinator"],
         components_range=25,  # Scan only basic components; specific ones added below.
         required_components=[0, 1, 2, 3],
@@ -114,7 +127,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # fell back to the generic profile (read c172 water temperature as pH → 3.07, and
         # missed c165/c170/c174 so salinity/temperature showed 0).
         identifier_patterns=["CC25052635*", "CC25046312*", "CC26028741*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -158,7 +171,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # so it never appeared in any diagnostics capture from this unit; it is now
         # polled, so a mismatch against the app can be settled by a single export.
         identifier_patterns=["CC25051112*", "CC26009948*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -189,7 +202,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # standard tecnoLC2 layout as the GenSalt OE iQ pH 12 Evo (cc25052635); c20 (ORP
         # setpoint) read null on this unit so it is left unmapped like that sibling.
         identifier_patterns=["CC26009743*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -220,7 +233,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # widened this round so the next capture reveals the real components if c10/c174
         # turn out empty. No pH/ORP probes on this salt-only cell.
         identifier_patterns=["CC25016001.nn_*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["number", "sensor_info"],
@@ -384,7 +397,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # Confirmed by @eabin: salinity on component 174 (e.g. 634 → 6.34 g/L).
         # No pH/ORP probes on the base model — components 13-20 are null.
         identifier_patterns=["CC25064524.nn_*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -412,7 +425,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # layout minus everything ORP: pH c165, temperature c172, salinity c174,
         # setpoint c16, chlorination c10.
         identifier_patterns=["CC26010842*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -454,7 +467,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         #   LC26033146              — IBASEL Evoflex 30 7g/H (@FoxP)
         #   CC25021136              — Zodiac Ei2 iQ Evo (@crdo78) — confirmed c165/170/172/174
         identifier_patterns=["CC25102423.nn_*", "CC25066724*", "CC25106623*", "LC26033146*", "CC25021136*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -494,7 +507,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # CC25060723 — same Clear Connect layout, self-diagnosed by @ClaudeK83 (#152):
         # the existing mapping matched his unit exactly, only the serial was missing.
         identifier_patterns=["CC25019224.nn_*", "CC25009932*", "CC25060723.nn_*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -524,7 +537,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # KLINWASS MARK SALT 12 GR/H (tecnoLC2) — Issue #55 (confirmed by @FernandoArnanz).
         # No ORP / free-chlorine probes on this model.
         identifier_patterns=["LC25012727.nn_*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -576,7 +589,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "lc24056317_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["LC24056317*"],  # Gre chlorinator (I.D. Electroquimica/Fluidra) — Issue #28.
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -667,7 +680,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # cc24042711_chlorinator) -- one fewer outlier in the catalog rather than
         # a second convention for the same feature.
         identifier_patterns=["CC24018506*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -726,7 +739,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "cc25005502_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC25005502*"],  # alextoro82 — Issue #15.
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -750,7 +763,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # Energy Connect bridged tecnoLC2 devices — Issue #36.
         # Confirmed on: CC24054221 (cortalys), CC24041107 (StenGarny).
         identifier_patterns=["CC24054221*", "CC24041107*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -776,7 +789,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "cc24058902_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24058902*"],  # Issue #35 — Enkil13.
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -800,7 +813,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "cc24068402_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24068402*"],  # Energy Connect tecnoLC2 — Issue #33.
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -832,7 +845,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # by @Srekcah007 after testing: uses the standard tecnoLC2 layout, not the
         # 164/185 variant first assumed. Matches both the bridge and the bridged child.
         identifier_patterns=["CC24000304*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -852,7 +865,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "cc24042711_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["CC24042711*"],  # tecnoLC2 (AstralPool Clear Connect non-scalable) — Issue #25.
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -886,7 +899,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # c172/c177 the catch-all wrongly reused — so the number entities show 7.20 /
         # 700, not the live readings.
         identifier_patterns=["DM24008702*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "select", "number", "sensor_info"],
@@ -919,7 +932,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # setpoint (c4) / 0 % actual (c164), pH setpoint 7.4 (c8), pH measured 7.04
         # (c172 ÷100), water temperature 28.7 °C (c183 ÷10).
         identifier_patterns=["DM25028908*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "select", "number", "sensor_info"],
@@ -940,7 +953,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "dm24049704_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["DM24049704*"],  # Domotic S2 chlorinator (SheepPool).
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "select", "number", "sensor_info", "time"],
@@ -978,7 +991,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # c174 = salinity (g/L × 100) — e.g. 536 = 5.36 g/L.
         # No ORP probe on this model (c20/c170/c177 are None/0).
         identifier_patterns=["LC25050627*", "LC24076417*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "number", "sensor_info"],
@@ -1000,7 +1013,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "ns25_exo_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["NS*"],
-        family_patterns=["chlorinator"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
         entities=["switch", "select", "number", "sensor_info", "time"],
