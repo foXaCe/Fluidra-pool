@@ -25,11 +25,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.fluidra_pool.api_resilience import FluidraError
 from custom_components.fluidra_pool.const import SCHEDULE_WRITE_HOLD_SECONDS
 from custom_components.fluidra_pool.fluidra_api import FluidraPoolAPI
 from custom_components.fluidra_pool.time.cabinet_schedule import (
     FluidraCabinetScheduleEndTimeEntity,
     FluidraCabinetScheduleStartTimeEntity,
+)
+from custom_components.fluidra_pool.time.schedule import (
+    FluidraScheduleEndTimeEntity,
+    FluidraScheduleStartTimeEntity,
 )
 
 POOL_ID = "pool-1"
@@ -98,8 +103,11 @@ def _attach_ha(entity: Any) -> None:
 
 @pytest.fixture(autouse=True)
 def _skip_sleep() -> Any:
-    """Skip the post-write confirmation delay."""
-    with patch("custom_components.fluidra_pool.time.cabinet_schedule.asyncio.sleep", new=AsyncMock()):
+    """Skip the post-write confirmation delay on both schedule time platforms."""
+    with (
+        patch("custom_components.fluidra_pool.time.cabinet_schedule.asyncio.sleep", new=AsyncMock()),
+        patch("custom_components.fluidra_pool.time.schedule.asyncio.sleep", new=AsyncMock()),
+    ):
         yield
 
 
@@ -153,6 +161,42 @@ async def test_rejected_write_leaves_no_composition_base() -> None:
     assert api.pending_schedule_slots(DEVICE_ID, 36) is None
 
 
+@pytest.mark.asyncio
+async def test_rejected_write_keeps_the_base_left_by_the_last_good_one() -> None:
+    """A refused PUT changes nothing on the device, so the base still stands.
+
+    Dropping it here sent the next edit back to the poll cache, which inside the
+    confirmation window still reports the pre-write list — the very stale-field
+    overwrite that inverted @efgonzalez's window (Issue #210).
+    """
+    api = _make_api()
+    written = copy.deepcopy(LIGHTS_SLOT)
+    written["startTime"] = "30 19 * * 0,1,2,3,4,5,6"
+    assert await api.set_schedule(DEVICE_ID, [written], component_id=36) is True
+
+    api._request = AsyncMock(return_value=(422, {}, "OVERLAP in sched"))
+    refused = copy.deepcopy(written)
+    refused["endTime"] = "0 19 * * 0,1,2,3,4,5,6"  # end before start
+    assert await api.set_schedule(DEVICE_ID, [refused], component_id=36) is False
+
+    pending = api.pending_schedule_slots(DEVICE_ID, 36)
+    assert pending is not None
+    assert pending[0]["startTime"] == "30 19 * * 0,1,2,3,4,5,6"
+    assert pending[0]["endTime"] == LIGHTS_SLOT["endTime"]
+
+
+@pytest.mark.asyncio
+async def test_transport_failure_keeps_the_base_left_by_the_last_good_one() -> None:
+    """Same for a PUT that never got an answer: the last good list still stands."""
+    api = _make_api()
+    assert await api.set_schedule(DEVICE_ID, [LIGHTS_SLOT], component_id=36) is True
+
+    api._request = AsyncMock(side_effect=FluidraError("connection reset"))
+    assert await api.set_schedule(DEVICE_ID, [LIGHTS_SLOT], component_id=36) is False
+
+    assert api.pending_schedule_slots(DEVICE_ID, 36) is not None
+
+
 # --- entity layer: two edits in a row must not undo each other ------------
 
 
@@ -187,9 +231,6 @@ class _FrozenCloud:
 
     def pending_schedule_slots(self, device_id: str, component_id: int) -> list[dict[str, Any]] | None:
         return copy.deepcopy(self._pending.get((str(device_id), int(component_id))))
-
-    def discard_pending_schedule(self, device_id: str, component_id: int) -> None:
-        self._pending.pop((str(device_id), int(component_id)), None)
 
     async def set_schedule(self, device_id: str, schedules: list[dict[str, Any]], component_id: int) -> bool:
         self.order.append(f"put-{len(self.writes)}-in")
@@ -308,4 +349,101 @@ async def test_edited_time_released_after_the_hold_expires() -> None:
     entity._optimistic_until -= SCHEDULE_WRITE_HOLD_SECONDS + 1
 
     assert entity.native_value == time(19, 15)
+    assert entity._optimistic_value is None
+
+
+# --- the pump/chlorinator registers hold and release the same way ---------
+
+PUMP_DEVICE_ID = "VS-1"
+
+# One pump slot in the shape the poll publishes it (c20, CRON days 1-7).
+PUMP_SLOT: dict[str, Any] = {
+    "id": 1,
+    "groupId": 1,
+    "enabled": True,
+    "startTime": "15 19 * * 1,2,3,4,5,6,7",
+    "endTime": "30 22 * * 1,2,3,4,5,6,7",
+    "startActions": {"operationName": "3"},
+}
+
+
+def _pump_device(slots: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "device_id": PUMP_DEVICE_ID,
+        "name": "Pump",
+        "family": "Pumps",
+        "model": "VS",
+        "type": "pump",
+        "online": True,
+        "components": {"20": {"reportedValue": copy.deepcopy(slots)}},
+        "schedule_data": copy.deepcopy(slots),
+    }
+
+
+def _pump_coord(device: dict[str, Any]) -> Any:
+    coordinator = MagicMock()
+    coordinator.data = {POOL_ID: {"id": POOL_ID, "name": "Pool", "devices": [device]}}
+    coordinator.async_request_refresh = AsyncMock()
+    coordinator.last_update_success = True
+    return coordinator
+
+
+@pytest.mark.asyncio
+async def test_pump_edited_time_survives_the_post_write_refresh() -> None:
+    """The pump entity keeps the written time while the cloud lags behind."""
+    device = _pump_device([PUMP_SLOT])
+    entity = FluidraScheduleStartTimeEntity(_pump_coord(device), _FrozenCloud(), POOL_ID, PUMP_DEVICE_ID, "1")
+    _attach_ha(entity)
+
+    await entity.async_set_value(time(19, 30))
+
+    assert device["schedule_data"][0]["startTime"] == "15 19 * * 1,2,3,4,5,6,7"
+    assert entity.native_value == time(19, 30)
+
+
+@pytest.mark.asyncio
+async def test_pump_edited_time_released_when_the_device_reports_it() -> None:
+    """Once the poll agrees, the device is authoritative again.
+
+    ``native_value`` returned ``_optimistic_value`` directly and never reached
+    ``_optimistic_or``, so neither release condition ever ran on this platform.
+    """
+    device = _pump_device([PUMP_SLOT])
+    entity = FluidraScheduleStartTimeEntity(_pump_coord(device), _FrozenCloud(), POOL_ID, PUMP_DEVICE_ID, "1")
+    _attach_ha(entity)
+
+    await entity.async_set_value(time(19, 30))
+    device["schedule_data"][0]["startTime"] = "30 19 * * 1,2,3,4,5,6,7"
+
+    assert entity.native_value == time(19, 30)
+    assert entity._optimistic_value is None
+
+
+@pytest.mark.asyncio
+async def test_pump_edited_time_released_after_the_hold_expires() -> None:
+    """A write the device never took must stop masking the Fluidra app."""
+    device = _pump_device([PUMP_SLOT])
+    entity = FluidraScheduleStartTimeEntity(_pump_coord(device), _FrozenCloud(), POOL_ID, PUMP_DEVICE_ID, "1")
+    _attach_ha(entity)
+
+    await entity.async_set_value(time(19, 30))
+    entity._optimistic_until -= SCHEDULE_WRITE_HOLD_SECONDS + 1
+    device["schedule_data"][0]["startTime"] = "0 20 * * 1,2,3,4,5,6,7"
+
+    assert entity.native_value == time(20, 0)
+    assert entity._optimistic_value is None
+
+
+@pytest.mark.asyncio
+async def test_pump_end_time_released_after_the_hold_expires() -> None:
+    """Same for the end-time entity, which carried the same copy of the bug."""
+    device = _pump_device([PUMP_SLOT])
+    entity = FluidraScheduleEndTimeEntity(_pump_coord(device), _FrozenCloud(), POOL_ID, PUMP_DEVICE_ID, "1")
+    _attach_ha(entity)
+
+    await entity.async_set_value(time(23, 0))
+    entity._optimistic_until -= SCHEDULE_WRITE_HOLD_SECONDS + 1
+    device["schedule_data"][0]["endTime"] = "45 22 * * 1,2,3,4,5,6,7"
+
+    assert entity.native_value == time(22, 45)
     assert entity._optimistic_value is None

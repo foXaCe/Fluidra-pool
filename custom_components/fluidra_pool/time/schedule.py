@@ -64,13 +64,9 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
     @property
     def native_value(self) -> time | None:
         """Return the current start time."""
-        if self._optimistic_value is not None:
-            return self._optimistic_value
         schedule = self._get_schedule_data()
-        if schedule:
-            start_time_str = schedule.get("startTime", "")
-            return self._parse_cron_time(start_time_str)
-        return None
+        reported = self._parse_cron_time(schedule.get("startTime", "")) if schedule else None
+        return self._optimistic_or(reported)
 
     async def async_set_value(self, value: time) -> None:
         """Set the start time using exact mobile app format."""
@@ -215,13 +211,9 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
     @property
     def native_value(self) -> time | None:
         """Return the current end time."""
-        if self._optimistic_value is not None:
-            return self._optimistic_value
         schedule = self._get_schedule_data()
-        if schedule:
-            end_time_str = schedule.get("endTime", "")
-            return self._parse_cron_time(end_time_str)
-        return None
+        reported = self._parse_cron_time(schedule.get("endTime", "")) if schedule else None
+        return self._optimistic_or(reported)
 
     async def async_set_value(self, value: time) -> None:
         """Set the end time using exact mobile app format."""

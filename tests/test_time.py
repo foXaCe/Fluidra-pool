@@ -149,7 +149,9 @@ def test_schedule_start_native_value_uses_optimistic_value_when_set() -> None:
         schedule_id="1",
     )
     _attach_ha(entity)
-    entity._optimistic_value = time(7, 0)
+    # Arm it the way a write does: the hold has to be running, otherwise the
+    # value is released on sight (``_optimistic_or``).
+    entity._set_optimistic(time(7, 0))
     assert entity.native_value == time(7, 0)
 
 

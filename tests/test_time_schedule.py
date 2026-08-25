@@ -114,7 +114,7 @@ def test_start_time_native_value_returns_optimistic_when_set() -> None:
     device = _pump_device([SCHEDULE])
     entity = FluidraScheduleStartTimeEntity(_coord(device), _api(), POOL_ID, PUMP_ID, schedule_id="1")
     _attach_ha(entity)
-    entity._optimistic_value = time(7, 15)
+    entity._set_optimistic(time(7, 15))
     assert entity.native_value == time(7, 15)
 
 
@@ -123,7 +123,7 @@ def test_end_time_native_value_returns_optimistic_when_set() -> None:
     device = _pump_device([SCHEDULE])
     entity = FluidraScheduleEndTimeEntity(_coord(device), _api(), POOL_ID, PUMP_ID, schedule_id="1")
     _attach_ha(entity)
-    entity._optimistic_value = time(11, 30)
+    entity._set_optimistic(time(11, 30))
     assert entity.native_value == time(11, 30)
 
 
