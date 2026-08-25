@@ -10,12 +10,14 @@ from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
 
 from ..api_resilience import FluidraError
-from ..const import DOMAIN
+from ..const import DOMAIN, SCHEDULE_WRITE_HOLD_SECONDS
 from ..helpers import (
     describe_led_colour,
     get_aux_schedule_data,
+    get_cabinet_schedule_data,
     get_schedule_data,
     resolve_aux_schedule_component,
+    resolve_cabinet_schedule_component,
     resolve_schedule_component,
 )
 from .base import FluidraPoolSwitchEntity
@@ -25,6 +27,8 @@ if TYPE_CHECKING:
     from ..fluidra_api import FluidraPoolAPI
 
 _LOGGER = logging.getLogger(__name__)
+
+_CABINET_OUTPUT_LABELS = {"pump": "Filtration", "lights": "Lights"}
 
 
 def _with_enabled(schedules: list[dict[str, Any]], schedule_id: Any, enabled: bool) -> list[dict[str, Any]]:
@@ -76,13 +80,22 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         device_id: str,
         schedule_id: str,
         aux_number: str | None = None,
+        cabinet_output: str | None = None,
     ) -> None:
         """Initialize the switch."""
         super().__init__(coordinator, api, pool_id, device_id)
         self._schedule_id = schedule_id
         self._aux_number = aux_number
+        self._cabinet_output = cabinet_output
 
-        if aux_number is not None:
+        if cabinet_output is not None:
+            self._attr_translation_key = "cabinet_schedule_enable"
+            self._attr_translation_placeholders = {
+                "output": _CABINET_OUTPUT_LABELS.get(cabinet_output, cabinet_output),
+                "schedule_id": schedule_id,
+            }
+            self._attr_unique_id = f"fluidra_{self._device_id}_cabinet_{cabinet_output}_schedule_{schedule_id}_enabled"
+        elif aux_number is not None:
             self._attr_translation_key = "aux_schedule_enable"
             self._attr_translation_placeholders = {"aux_number": aux_number, "schedule_id": schedule_id}
             self._attr_unique_id = f"fluidra_{self._device_id}_aux{aux_number}_schedule_{schedule_id}_enabled"
@@ -107,6 +120,8 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
     def _get_schedule_data(self) -> dict[str, Any] | None:
         """Get schedule data from coordinator."""
         try:
+            if self._cabinet_output is not None:
+                return get_cabinet_schedule_data(self.device_data, self._cabinet_output, self._schedule_id)
             if self._aux_number is not None:
                 return get_aux_schedule_data(self.device_data, self._aux_number, self._schedule_id)
             return get_schedule_data(self.device_data, self._schedule_id)
@@ -115,7 +130,12 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
             return None
 
     def _get_schedule_list(self) -> list[dict[str, Any]]:
-        """Return the schedule list this switch edits (main or per-aux)."""
+        """Return the schedule list this switch edits (main, per-aux, or cabinet)."""
+        if self._cabinet_output is not None:
+            cabinet_schedules: list[dict[str, Any]] = (self.device_data.get("cabinet_schedule_data") or {}).get(
+                str(self._cabinet_output), []
+            )
+            return cabinet_schedules
         if self._aux_number is not None:
             aux_schedules: list[dict[str, Any]] = (self.device_data.get("aux_schedule_data") or {}).get(
                 str(self._aux_number), []
@@ -124,8 +144,23 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         schedules: list[dict[str, Any]] = self.device_data.get("schedule_data", [])
         return schedules
 
+    def _write_base_schedules(self, component_id: int) -> list[dict[str, Any]]:
+        """Return the slot list a write must build on for this register.
+
+        Prefers the list we last PUT over the poll cache: within the device's
+        confirmation window the cache still reports the pre-write list, so
+        composing from it re-sends stale times alongside the ``enabled`` flag
+        this switch is toggling (Issue #210).
+        """
+        pending = self._api.pending_schedule_slots(self._device_id, component_id)
+        if pending is not None:
+            return pending
+        return list(self._get_schedule_list())
+
     def _get_schedule_component(self) -> int:
         """Get the schedule component used by this device."""
+        if self._cabinet_output is not None:
+            return resolve_cabinet_schedule_component(self.device_data, self._cabinet_output)
         if self._aux_number is not None:
             # c22/c24 for a plain output, c23/c25 for a colour LED (Issue #174).
             return resolve_aux_schedule_component(self.device_data, self._aux_number)
@@ -142,12 +177,13 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         """Return true if the schedule is enabled using optimistic UI."""
         schedule = self._get_schedule_data()
         if self._pending_state is not None:
-            # Drop the optimistic state as soon as the server has caught up,
-            # or after 15 s as a safety net (the coordinator debounces refresh
-            # by 1.5 s and a full poll can take a few seconds on top).
+            # Drop the optimistic state as soon as the server has caught up, or
+            # after SCHEDULE_WRITE_HOLD_SECONDS as a safety net. The old 15 s net
+            # expired before the next poll on the default 30 s scan interval, so
+            # the toggle flipped back exactly like the time fields did (#210).
             if (
                 schedule and bool(schedule.get("enabled", False)) == self._pending_state
-            ) or self._pending_state_expired(15):
+            ) or self._pending_state_expired(SCHEDULE_WRITE_HOLD_SECONDS):
                 self._clear_pending_state()
             else:
                 return self._pending_state
@@ -162,17 +198,24 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         self._ensure_pool_writable()
         try:
             self._set_pending_state(True)
-            current_schedules = self._get_schedule_list()
-            if not current_schedules:
-                self._clear_pending_state()
-                return
             schedule_component = self._get_schedule_component()
+            # Compose *and* PUT under the register lock, on top of what we last
+            # sent: a schedule write replaces the whole slot list, so a toggle
+            # racing a time edit re-sent the stale times (Issue #210).
+            async with self._api.schedule_write_lock(self._device_id, schedule_component):
+                current_schedules = self._write_base_schedules(schedule_component)
+                if not current_schedules:
+                    self._clear_pending_state()
+                    return
 
-            updated_schedules = _with_enabled(current_schedules, self._schedule_id, True)
+                updated_schedules = _with_enabled(current_schedules, self._schedule_id, True)
 
-            # No padding — Fluidra fills the remaining slots; padding to 8 with
-            # identical placeholder windows is rejected as "OVERLAP in sched" (Issue #105).
-            success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
+                # No padding — Fluidra fills the remaining slots; padding to 8 with
+                # identical placeholder windows is rejected as "OVERLAP in sched" (Issue #105).
+                success = await self._api.set_schedule(
+                    self._device_id, updated_schedules, component_id=schedule_component
+                )
+
             if success:
                 # Keep optimistic state until is_on observes server confirmation
                 # or the 15 s safety timeout — clearing here flipped the UI back.
@@ -209,16 +252,23 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
         self._ensure_pool_writable()
         try:
             self._set_pending_state(False)
-            current_schedules = self._get_schedule_list()
-            if not current_schedules:
-                self._clear_pending_state()
-                return
             schedule_component = self._get_schedule_component()
+            # Compose *and* PUT under the register lock, on top of what we last
+            # sent: a schedule write replaces the whole slot list, so a toggle
+            # racing a time edit re-sent the stale times (Issue #210).
+            async with self._api.schedule_write_lock(self._device_id, schedule_component):
+                current_schedules = self._write_base_schedules(schedule_component)
+                if not current_schedules:
+                    self._clear_pending_state()
+                    return
 
-            updated_schedules = _with_enabled(current_schedules, self._schedule_id, False)
+                updated_schedules = _with_enabled(current_schedules, self._schedule_id, False)
 
-            # No padding — see the OVERLAP-in-sched note in async_turn_on (Issue #105).
-            success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=schedule_component)
+                # No padding — see the OVERLAP-in-sched note in async_turn_on (Issue #105).
+                success = await self._api.set_schedule(
+                    self._device_id, updated_schedules, component_id=schedule_component
+                )
+
             if success:
                 await self.coordinator.async_request_refresh()
             else:
@@ -267,6 +317,14 @@ class FluidraScheduleEnableSwitch(FluidraPoolSwitchEntity):
                     "end_action": schedule.get("endActions", {}),
                 }
             )
+
+        if self._cabinet_output is not None:
+            attrs["cabinet_output"] = self._cabinet_output
+            attrs["schedule_component"] = self._get_schedule_component()
+            # Verified behaviour (Issue #210): schedule = armed window, not a
+            # guaranteed stop when the window ends.
+            attrs["schedule_semantics"] = "armed_window"
+            attrs["schedule_local_time"] = True
 
         if self._aux_number is not None:
             attrs["schedule_component"] = self._get_schedule_component()

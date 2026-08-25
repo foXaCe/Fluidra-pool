@@ -17,6 +17,7 @@ from ..platform_setup import async_setup_dynamic_platform
 from .base import FluidraPoolSensorBase, FluidraPoolSensorEntity
 from .chlorinator import FluidraBoostRemainingSensor, FluidraChlorinatorSensor
 from .device import (
+    FluidraCabinetPackedConfigSensor,
     FluidraCompressorHoursSensor,
     FluidraCompressorModulationSensor,
     FluidraDeviceBatterySensor,
@@ -47,6 +48,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "FluidraBoostRemainingSensor",
+    "FluidraCabinetPackedConfigSensor",
     "FluidraChlorinatorSensor",
     "FluidraCompressorHoursSensor",
     "FluidraCompressorModulationSensor",
@@ -156,6 +158,10 @@ async def async_setup_entry(
 
         if DeviceIdentifier.should_create_entity(device, "sensor_schedule_days"):
             entities.append(FluidraScheduleDaysSensor(coordinator, coordinator.api, pool_id, device_id))
+
+        # Command Connect c16 packed pump config — diagnostic, read-only (Issue #210).
+        if DeviceIdentifier.has_feature(device, "cabinet_packed_config"):
+            entities.append(FluidraCabinetPackedConfigSensor(coordinator, coordinator.api, pool_id, device_id))
 
         # Chlorinator sensors - create based on sensors_config from device registry
         config = DeviceIdentifier.identify_device(device)

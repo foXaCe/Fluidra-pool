@@ -104,6 +104,13 @@ SWITCH_CONFIRMATION_DELAY: Final = 2  # seconds - delay after switch toggle befo
 UI_UPDATE_DELAY: Final = 0.1  # seconds - small delay for UI responsiveness
 PUMP_START_DELAY: Final = 1  # seconds - delay after pump start before setting speed
 OPTIMISTIC_ACTION_TIMEOUT: Final = 10  # seconds - timeout for optimistic local state
+# A schedule write is only echoed back once the device has taken it — 5-10 s on
+# the Command Connect cabinet, and the reported value can flap between the old
+# and the new list meanwhile (Issue #210). Dropping the optimistic value after
+# COMMAND_CONFIRMATION_DELAY therefore snapped the field back to the old time a
+# few seconds after every edit, which is what made testers retry and collide.
+# Three poll cycles is the same budget the write verifier gives a control write.
+SCHEDULE_WRITE_HOLD_SECONDS: Final = 3 * DEFAULT_SCAN_INTERVAL  # seconds
 # Consecutive bulk-component-fetch failures before falling back to per-component
 # polling for the rest of the session (Issue #144). A few retries absorb transient
 # network errors; a backend that genuinely lacks the endpoint stops costing an

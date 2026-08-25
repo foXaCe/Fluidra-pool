@@ -13,7 +13,7 @@ from ._auth import AuthMixin
 from ._commands import CommandsMixin
 from ._components import ComponentsMixin
 from ._devices import DevicesMixin
-from ._schedules import SchedulesMixin
+from ._schedules import PendingScheduleWrite, SchedulesMixin
 from ._session import SessionMixin
 
 if TYPE_CHECKING:
@@ -70,3 +70,12 @@ class FluidraPoolAPI(SessionMixin, AuthMixin, DevicesMixin, ComponentsMixin, Com
         # Judges control writes against the next polls: the cloud returns 200
         # and echoes the requested value even when it discards it (Issue #133).
         self.write_verifier: WriteVerifier = WriteVerifier()
+
+        # Schedule writes rewrite a whole slot list, so two of them racing on the
+        # same register silently undo each other's field. One lock per
+        # (device, component) serialises compose -> PUT, and the list we last
+        # PUT is kept as the composition base until the poll echoes it back —
+        # the poll cache still reports the pre-write list for several seconds
+        # (Issue #210).
+        self._schedule_write_locks: dict[tuple[str, int], asyncio.Lock] = {}
+        self._pending_schedule_writes: dict[tuple[str, int], PendingScheduleWrite] = {}

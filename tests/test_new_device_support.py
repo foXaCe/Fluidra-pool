@@ -163,8 +163,16 @@ class TestCabinetProfile:
     def test_boolean_writes_feature_declared(self) -> None:
         features = DEVICE_CONFIGS["command_connect_cabinet"].features
         assert features["boolean_writes"] is True
-        for component in (13, 15, 24, 26):
+        for component in (13, 15, 16, 24, 26, 35, 36):
             assert component in features["specific_components"]
+
+    def test_schedule_registers_declared(self) -> None:
+        features = DEVICE_CONFIGS["command_connect_cabinet"].features
+        assert features["cabinet_schedule_components"] == {"pump": 35, "lights": 36}
+        assert features["cabinet_schedule_count"] == 1
+        assert features["cabinet_packed_config"] == 16
+        assert features["schedule_armed_window"] is True
+        assert features["schedule_local_time"] is True
 
     def test_four_toggles_declared(self) -> None:
         toggles = DEVICE_CONFIGS["command_connect_cabinet"].features["toggle_switches"]
@@ -325,7 +333,7 @@ async def _run_platform_setup(platform: Any, devices: list[dict[str, Any]]) -> l
     return added
 
 
-async def test_cabinet_setup_creates_four_switches() -> None:
+async def test_cabinet_setup_creates_toggles_and_schedule_enables() -> None:
     from custom_components.fluidra_pool.switch import async_setup_entry as switch_setup
 
     device = _cabinet_device()
@@ -336,7 +344,32 @@ async def test_cabinet_setup_creates_four_switches() -> None:
         "cabinet_lights_auto_mode",
         "cabinet_pump",
         "cabinet_pump_auto_mode",
+        "cabinet_schedule_enable",
+        "cabinet_schedule_enable",
     ]
+
+
+async def test_cabinet_setup_creates_schedule_time_entities() -> None:
+    from custom_components.fluidra_pool.time import async_setup_entry as time_setup
+
+    device = _cabinet_device()
+    entities = await _run_platform_setup(SimpleNamespace(async_setup_entry=time_setup), [device])
+    keys = sorted(e._attr_translation_key for e in entities)
+    assert keys == [
+        "cabinet_schedule_end",
+        "cabinet_schedule_end",
+        "cabinet_schedule_start",
+        "cabinet_schedule_start",
+    ]
+
+
+async def test_cabinet_setup_creates_packed_config_sensor() -> None:
+    from custom_components.fluidra_pool.sensor import async_setup_entry as sensor_setup
+
+    device = _cabinet_device()
+    entities = await _run_platform_setup(SimpleNamespace(async_setup_entry=sensor_setup), [device])
+    keys = [e._attr_translation_key for e in entities]
+    assert "cabinet_packed_config" in keys
 
 
 async def test_robot_setup_creates_battery_and_schedule_days() -> None:

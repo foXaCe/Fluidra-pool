@@ -38,6 +38,8 @@ from custom_components.fluidra_pool.switch import (
     FluidraScheduleEnableSwitch,
 )
 
+from .schedule_write_stubs import schedule_api
+
 POOL_ID = "pool-1"
 DEVICE_ID = "LE24500883"
 
@@ -62,7 +64,7 @@ def _api(**overrides: Any) -> SimpleNamespace:
         "set_schedule": AsyncMock(return_value=True),
     }
     defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+    return schedule_api(**defaults)
 
 
 def _attach_ha(entity) -> None:

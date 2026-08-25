@@ -21,6 +21,8 @@ from custom_components.fluidra_pool.time.aux_schedule import (
     FluidraAuxScheduleStartTimeEntity,
 )
 
+from .schedule_write_stubs import schedule_api
+
 POOL_ID = "pool-1"
 DEVICE_ID = "NS25007212"
 
@@ -84,7 +86,7 @@ def _attach_ha(entity) -> None:
 
 
 def _api(*, success: bool = True) -> SimpleNamespace:
-    return SimpleNamespace(set_schedule=AsyncMock(return_value=success))
+    return schedule_api(set_schedule=AsyncMock(return_value=success))
 
 
 AUX1_SCHEDULE = {
@@ -289,7 +291,7 @@ async def test_aux_schedule_set_value_raises_on_connection_error() -> None:
     from custom_components.fluidra_pool.api_resilience import FluidraConnectionError
 
     device = _aux_device({"1": [dict(AUX1_SCHEDULE)]})
-    api = SimpleNamespace(set_schedule=AsyncMock(side_effect=FluidraConnectionError("net down")))
+    api = schedule_api(set_schedule=AsyncMock(side_effect=FluidraConnectionError("net down")))
     start = FluidraAuxScheduleStartTimeEntity(_coord(device), api, POOL_ID, DEVICE_ID, "1", "1")
     end = FluidraAuxScheduleEndTimeEntity(_coord(device), api, POOL_ID, DEVICE_ID, "1", "1")
     _attach_ha(start)

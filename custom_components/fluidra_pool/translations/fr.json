@@ -207,6 +207,9 @@
       "brightness": {
         "name": "Luminosité"
       },
+      "cabinet_packed_config": {
+        "name": "Config pompe packée"
+      },
       "chlorinator_battery_voltage": {
         "name": "Tension de la Batterie"
       },
@@ -359,6 +362,9 @@
       "cabinet_pump_auto_mode": {
         "name": "Mode auto filtration"
       },
+      "cabinet_schedule_enable": {
+        "name": "Planification {output} {schedule_id}"
+      },
       "chlorinator": {
         "name": "Chlorinateur"
       },
@@ -387,6 +393,12 @@
       },
       "aux_schedule_start": {
         "name": "Aux {aux_number} Planning {schedule_id} Début"
+      },
+      "cabinet_schedule_end": {
+        "name": "Fin planification {output} {schedule_id}"
+      },
+      "cabinet_schedule_start": {
+        "name": "Début planification {output} {schedule_id}"
       },
       "light_schedule_end": {
         "name": "Planning Éclairage {schedule_id} Fin"
@@ -546,9 +558,17 @@
     "clear_schedule": {
       "description": "Supprimer tous les programmes de la pompe",
       "fields": {
+        "component_id": {
+          "description": "Registre de planification optionnel (ex. 35 pompe / 36 lumières sur Command Connect)",
+          "name": "ID composant"
+        },
         "device_id": {
           "description": "Identifiant de l'appareil (par exemple LE24500883)",
           "name": "Identifiant de l'appareil"
+        },
+        "schedule_output": {
+          "description": "Sortie Command Connect : pump (c35) ou lights (c36)",
+          "name": "Sortie planification"
         }
       },
       "name": "Effacer le programme de la pompe"
@@ -570,9 +590,17 @@
     "set_schedule": {
       "description": "Configurer le programme de la pompe",
       "fields": {
+        "component_id": {
+          "description": "Registre de planification optionnel (ex. 35 pompe / 36 lumières sur Command Connect)",
+          "name": "ID composant"
+        },
         "device_id": {
           "description": "Identifiant de l'appareil (par exemple LE24500883)",
           "name": "Identifiant de l'appareil"
+        },
+        "schedule_output": {
+          "description": "Sortie Command Connect : pump (c35) ou lights (c36)",
+          "name": "Sortie planification"
         },
         "schedules": {
           "description": "Liste des créneaux horaires",

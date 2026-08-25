@@ -110,6 +110,23 @@ async def async_setup_entry(
                         )
                     )
 
+        # Command Connect cabinet schedules: pump = c35, lights = c36 (Issue #210).
+        cabinet_schedule_components = DeviceIdentifier.get_feature(device, "cabinet_schedule_components", {})
+        if cabinet_schedule_components:
+            cabinet_schedule_count = DeviceIdentifier.get_feature(device, "cabinet_schedule_count", 1)
+            for output in sorted(cabinet_schedule_components):
+                for i in range(1, cabinet_schedule_count + 1):
+                    entities.append(
+                        FluidraScheduleEnableSwitch(
+                            coordinator,
+                            coordinator.api,
+                            pool_id,
+                            device_id,
+                            str(i),
+                            cabinet_output=str(output),
+                        )
+                    )
+
         if DeviceIdentifier.has_feature(device, "boost_mode"):
             entities.append(FluidraChlorinatorBoostSwitch(coordinator, coordinator.api, pool_id, device_id))
 

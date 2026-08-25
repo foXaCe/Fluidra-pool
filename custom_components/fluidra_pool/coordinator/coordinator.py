@@ -661,6 +661,15 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         schedule_data = reported_value if isinstance(reported_value, list) else []
                         device.setdefault("aux_schedule_data", {})[str(aux_number)] = schedule_data
 
+            # Command Connect cabinet: pump schedule on c35 (r1), lights on c36
+            # (r2). Independent of the pump/aux paths above (Issue #210).
+            for output, cabinet_component in (
+                DeviceIdentifier.get_feature(device, "cabinet_schedule_components", {}) or {}
+            ).items():
+                if component_id == int(cabinet_component):
+                    schedule_data = reported_value if isinstance(reported_value, list) else []
+                    device.setdefault("cabinet_schedule_data", {})[str(output)] = schedule_data
+
             schedule_comp = DeviceIdentifier.get_feature(device, "schedule_component")
             if schedule_comp and component_id == schedule_comp:
                 if isinstance(reported_value, dict) and "programs" in reported_value:
@@ -718,6 +727,26 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             device.setdefault("aux_schedule_data", {})[str(aux_number)] = reported if isinstance(reported, list) else []
             resolved[str(aux_number)] = component_id
         device["aux_schedule_components_resolved"] = resolved
+
+    def _apply_resolved_cabinet_schedules(self, device: dict[str, Any]) -> None:
+        """Point each cabinet output's schedule list at its fixed register.
+
+        Command Connect keeps the filtration schedule on c35 and the lights
+        schedule on c36. Both are lists in the app's CRON shape; an empty list
+        means "no armed window" (Issue #210).
+        """
+        mapping = DeviceIdentifier.get_feature(device, "cabinet_schedule_components", {}) or {}
+        if not mapping:
+            return
+
+        components = device.get("components", {})
+        resolved: dict[str, int] = {}
+        for output, component_id in mapping.items():
+            cid = int(component_id)
+            reported = components.get(str(cid), {}).get("reportedValue")
+            device.setdefault("cabinet_schedule_data", {})[str(output)] = reported if isinstance(reported, list) else []
+            resolved[str(output)] = cid
+        device["cabinet_schedule_components_resolved"] = resolved
 
     def _process_victoria_component(
         self, device: dict[str, Any], component_id: int, component_state: dict[str, Any]
@@ -1193,6 +1222,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if DeviceIdentifier.get_feature(device, "schedule_component_map", None):
                 self._apply_resolved_schedule(device, pool_id, device_id)
             self._apply_resolved_aux_schedules(device)
+            self._apply_resolved_cabinet_schedules(device)
 
             # Recompute auto-mode pump speed AFTER the whole component scan: the
             # speed (component 11) is processed before the schedule (component 20)

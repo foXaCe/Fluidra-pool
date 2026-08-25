@@ -2,22 +2,81 @@
 
 from __future__ import annotations
 
+import asyncio
+import copy
+from dataclasses import dataclass
 import logging
+import time
 from typing import Any
 from urllib.parse import quote
 
 from ..api_resilience import FluidraAuthError, FluidraError
-from ..const import COMPONENT_DM24049704_SCHEDULE, COMPONENT_SCHEDULE
+from ..const import COMPONENT_DM24049704_SCHEDULE, COMPONENT_SCHEDULE, SCHEDULE_WRITE_HOLD_SECONDS
 from ..helpers import schedule_slots_for_write
 from ..utils import CRON_DAY_TO_NAME, extract_cron_days
+from ..write_verification import normalize_component_value
 from ._base import FluidraAPIBase
 from ._constants import CONNECTED_PARAMS, FLUIDRA_EMEA_BASE
 
 _LOGGER = logging.getLogger(__name__)
 
 
+@dataclass(slots=True)
+class PendingScheduleWrite:
+    """The slot list we last PUT, still waiting for the poll to echo it back.
+
+    A schedule write replaces the register's whole list, so the next write has to
+    start from what we just sent — not from the poll cache, which keeps reporting
+    the pre-write list until the device takes the change (5-10 s on the Command
+    Connect, Issue #210). Re-reading the device instead would be worse, not
+    better: inside that window the read *is* the old list.
+    """
+
+    slots: list[dict[str, Any]]
+    echo: Any
+    expires_at: float
+
+
 class SchedulesMixin(FluidraAPIBase):
     """Schedule encoding (CRON ↔ programs/slots) + ``set_schedule`` / ``clear_schedule``."""
+
+    def schedule_write_lock(self, device_id: str, component_id: int) -> asyncio.Lock:
+        """Return the lock that serialises schedule writes to one register.
+
+        Callers must hold it across *compose and PUT*, not just the PUT: the
+        corruption reported on Issue #210 came from two writes composing from the
+        same pre-write snapshot, each re-sending the other's field unchanged.
+        """
+        key = (str(device_id), int(component_id))
+        lock = self._schedule_write_locks.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._schedule_write_locks[key] = lock
+        return lock
+
+    def pending_schedule_slots(self, device_id: str, component_id: int) -> list[dict[str, Any]] | None:
+        """Return the slot list we last PUT, or ``None`` once it is stale.
+
+        Dropped as soon as the local mirror reports the value back (the write
+        landed and the poll cache is authoritative again) or the hold elapses, so
+        a change made in the Fluidra app is never masked for long.
+        """
+        key = (str(device_id), int(component_id))
+        pending = self._pending_schedule_writes.get(key)
+        if pending is None:
+            return None
+        if time.monotonic() >= pending.expires_at:
+            del self._pending_schedule_writes[key]
+            return None
+        reported = self.reported_component_value(device_id, component_id)
+        if reported is not None and normalize_component_value(reported) == normalize_component_value(pending.echo):
+            del self._pending_schedule_writes[key]
+            return None
+        return copy.deepcopy(pending.slots)
+
+    def discard_pending_schedule(self, device_id: str, component_id: int) -> None:
+        """Forget the composition base for a register (write failed or rejected)."""
+        self._pending_schedule_writes.pop((str(device_id), int(component_id)), None)
 
     def _convert_schedules_to_dm24049704_format(self, schedules: list[dict[str, Any]]) -> dict[str, Any]:
         """Convert CRON-format schedules to DM24049704 programs/slots format.
@@ -119,20 +178,39 @@ class SchedulesMixin(FluidraAPIBase):
             desired_value = self._convert_schedules_to_dm24049704_format(schedules)
         payload = {"desiredValue": desired_value}
 
+        # Baseline from the local mirror *before* the write: the HTTP response
+        # echoes desiredValue even when the device drops it (Issue #133 / #210).
+        baseline = self.reported_component_value(device_id, component_id)
+
         try:
             status, _, raw_text = await self._request(
                 "PUT", url, headers=headers, json_data=payload, params=dict(CONNECTED_PARAMS)
             )
         except FluidraError as err:
             _LOGGER.error("set_schedule error: %s", err)
+            self.write_verifier.discard(device_id, component_id)
+            self.discard_pending_schedule(device_id, component_id)
             return False
 
         if status != 200:
             # Surface the rejection reason at WARNING so it reaches HA's system log
             # (the system_log buffer only retains WARNING+, so a DEBUG line was
             # invisible and a failed write gave no diagnostic info — Issue #89).
+            self.write_verifier.discard(device_id, component_id)
+            self.discard_pending_schedule(device_id, component_id)
             _LOGGER.warning("set_schedule rejected by Fluidra (HTTP %s): %s", status, raw_text[:500])
-        return status == 200
+            return False
+
+        # Arm a later poll comparison — HTTP 200 alone proves nothing.
+        self.write_verifier.record(device_id, component_id, desired_value, baseline)
+        # Keep what we sent as the base for the next write on this register: the
+        # poll cache will still report the pre-write list for several seconds.
+        self._pending_schedule_writes[(str(device_id), int(component_id))] = PendingScheduleWrite(
+            slots=copy.deepcopy(schedule_slots_for_write(schedules)),
+            echo=desired_value,
+            expires_at=time.monotonic() + SCHEDULE_WRITE_HOLD_SECONDS,
+        )
+        return True
 
     async def clear_schedule(self, device_id: str, component_id: int = COMPONENT_SCHEDULE) -> bool:
         """Clear all schedules for a device."""
