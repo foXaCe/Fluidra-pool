@@ -1,4 +1,14 @@
-"""Heat-pump device configurations (LG Eco Elyo, Z250, Z260, Z550)."""
+"""Heat-pump device configurations (LG Eco Elyo, Z250, Z260, Z550).
+
+Model-specific profiles here declare no ``family_patterns``. The Fluidra cloud reports
+``family: "Heat Pumps"`` for every unit of the lineup, so a family match carries no model
+information: it would let any one of these profiles outrank ``generic_heat_pump`` on a
+unit it was never written for and pin it to a foreign register map. Issue #216 is the
+case in point — a Zodiac PX50 (``thingType`` ``proelyo``) shares no register with the
+Z250/Z260/Z550/Z650 maps. A genuine unit of a listed model always matches on its serial
+prefix, its product name or its component-7 signature; that is the identity. The HPGIC
+profile below spells out the same rule in its own comment.
+"""
 
 from __future__ import annotations
 
@@ -29,7 +39,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         device_type="heat_pump",
         identifier_patterns=["LF*"],
         name_patterns=["z250", "z25"],
-        family_patterns=["heat pump"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=5,
         required_components=[0, 1, 2, 3],
         entities=[
@@ -74,7 +84,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
     "z260iq_heat_pump": DeviceConfig(
         device_type="heat_pump",
         identifier_patterns=["LF*"],
-        family_patterns=["heat pump"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=5,
         required_components=[0, 1, 2, 3],
         entities=[
@@ -127,7 +137,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         device_type="heat_pump",
         identifier_patterns=["LD*"],
         name_patterns=["z550", "z55"],
-        family_patterns=["heat pump"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=5,
         required_components=[0, 1, 2, 3],
         entities=["climate", "switch", "sensor_info", "sensor_temperature", "sensor_running_hours", "sensor_activity"],
@@ -200,7 +210,7 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         identifier_patterns=["ZB*"],
         name_patterns=["z650", "z65"],
         model_patterns=["z650", "z65"],
-        family_patterns=["heat pump"],
+        # No family_patterns — see the module note (Issue #216).
         components_range=5,
         required_components=[0, 1, 2, 3],
         entities=[
