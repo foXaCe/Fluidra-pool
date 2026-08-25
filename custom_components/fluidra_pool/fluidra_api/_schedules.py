@@ -74,10 +74,6 @@ class SchedulesMixin(FluidraAPIBase):
             return None
         return copy.deepcopy(pending.slots)
 
-    def discard_pending_schedule(self, device_id: str, component_id: int) -> None:
-        """Forget the composition base for a register (write failed or rejected)."""
-        self._pending_schedule_writes.pop((str(device_id), int(component_id)), None)
-
     def _convert_schedules_to_dm24049704_format(self, schedules: list[dict[str, Any]]) -> dict[str, Any]:
         """Convert CRON-format schedules to DM24049704 programs/slots format.
 
@@ -188,16 +184,21 @@ class SchedulesMixin(FluidraAPIBase):
             )
         except FluidraError as err:
             _LOGGER.error("set_schedule error: %s", err)
+            # Only the verifier entry goes: there is no write to confirm. The
+            # composition base left by the *previous* successful write must
+            # survive — dropping it sends the next edit back to the poll cache,
+            # which still reports the pre-write list, and that is exactly the
+            # stale-field overwrite this register serialisation prevents (#210).
             self.write_verifier.discard(device_id, component_id)
-            self.discard_pending_schedule(device_id, component_id)
             return False
 
         if status != 200:
             # Surface the rejection reason at WARNING so it reaches HA's system log
             # (the system_log buffer only retains WARNING+, so a DEBUG line was
             # invisible and a failed write gave no diagnostic info — Issue #89).
+            # A rejected PUT did not change the device, so the base left by the
+            # last successful write is still the right one to compose on.
             self.write_verifier.discard(device_id, component_id)
-            self.discard_pending_schedule(device_id, component_id)
             _LOGGER.warning("set_schedule rejected by Fluidra (HTTP %s): %s", status, raw_text[:500])
             return False
 

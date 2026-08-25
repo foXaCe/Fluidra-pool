@@ -24,7 +24,6 @@ def install_schedule_write_stubs(api: Any) -> None:
 
     api.schedule_write_lock = MagicMock(side_effect=_lock)
     api.pending_schedule_slots = MagicMock(return_value=None)
-    api.discard_pending_schedule = MagicMock()
 
 
 def schedule_api(**attrs: Any) -> SimpleNamespace:
