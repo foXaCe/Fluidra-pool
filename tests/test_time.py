@@ -16,6 +16,8 @@ from custom_components.fluidra_pool.time import (
     parse_schedule_time,
 )
 
+from .schedule_write_stubs import schedule_api
+
 POOL_ID = "pool-1"
 DEVICE_ID = "TEST-PUMP-001"
 
@@ -115,7 +117,7 @@ def test_schedule_start_native_value_parses_cron_string() -> None:
     """Start time is decoded from the CRON minute/hour fields."""
     entity = FluidraScheduleStartTimeEntity(
         _coord([SCHEDULE]),
-        SimpleNamespace(set_schedule=AsyncMock(return_value=True)),
+        schedule_api(set_schedule=AsyncMock(return_value=True)),
         POOL_ID,
         DEVICE_ID,
         schedule_id="1",
@@ -128,7 +130,7 @@ def test_schedule_end_native_value_parses_cron_string() -> None:
     """End time is decoded from the CRON minute/hour fields."""
     entity = FluidraScheduleEndTimeEntity(
         _coord([SCHEDULE]),
-        SimpleNamespace(set_schedule=AsyncMock(return_value=True)),
+        schedule_api(set_schedule=AsyncMock(return_value=True)),
         POOL_ID,
         DEVICE_ID,
         schedule_id="1",
@@ -141,7 +143,7 @@ def test_schedule_start_native_value_uses_optimistic_value_when_set() -> None:
     """Just after a user edit the optimistic value shadows the stale CRON."""
     entity = FluidraScheduleStartTimeEntity(
         _coord([SCHEDULE]),
-        SimpleNamespace(set_schedule=AsyncMock(return_value=True)),
+        schedule_api(set_schedule=AsyncMock(return_value=True)),
         POOL_ID,
         DEVICE_ID,
         schedule_id="1",
@@ -155,7 +157,7 @@ def test_schedule_start_native_value_none_when_no_match() -> None:
     """Schedule id without a matching entry returns None."""
     entity = FluidraScheduleStartTimeEntity(
         _coord([SCHEDULE]),
-        SimpleNamespace(set_schedule=AsyncMock(return_value=True)),
+        schedule_api(set_schedule=AsyncMock(return_value=True)),
         POOL_ID,
         DEVICE_ID,
         schedule_id="42",
@@ -168,7 +170,7 @@ async def test_schedule_start_async_set_value_no_op_without_schedule_data() -> N
     """When the coordinator hasn't populated schedule_data yet, set_value is a no-op."""
     coord = _coord([])
     coord.data[POOL_ID]["devices"][0].pop("schedule_data")
-    api = SimpleNamespace(set_schedule=AsyncMock(return_value=True))
+    api = schedule_api(set_schedule=AsyncMock(return_value=True))
     entity = FluidraScheduleStartTimeEntity(coord, api, POOL_ID, DEVICE_ID, schedule_id="1")
     _attach_ha(entity)
 

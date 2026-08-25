@@ -44,6 +44,8 @@ from custom_components.fluidra_pool.time.schedule import (
     FluidraScheduleStartTimeEntity,
 )
 
+from .schedule_write_stubs import schedule_api
+
 POOL_ID = "pool-1"
 DEVICE_ID = "LE24500883"
 
@@ -70,7 +72,7 @@ def _api(**overrides: Any) -> SimpleNamespace:
         "set_schedule": AsyncMock(return_value=True),
     }
     defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+    return schedule_api(**defaults)
 
 
 def _attach_ha(entity) -> None:
@@ -794,17 +796,20 @@ async def test_schedule_end_returns_false_raises_clears_optimistic() -> None:
     assert entity._optimistic_value is None
 
 
-async def test_schedule_start_success_clears_optimistic_and_refreshes() -> None:
+async def test_schedule_start_success_holds_optimistic_and_refreshes() -> None:
+    # The post-write refresh reads a device that has not confirmed yet, so the
+    # optimistic value must survive it — clearing here snapped the field back to
+    # the old time and made testers retry into a write race (Issue #210).
     entity, coordinator = _start_time()
     await entity.async_set_value(time(7, 0))
-    assert entity._optimistic_value is None
+    assert entity._optimistic_value == time(7, 0)
     coordinator.async_request_refresh.assert_awaited()
 
 
-async def test_schedule_end_success_clears_optimistic_and_refreshes() -> None:
+async def test_schedule_end_success_holds_optimistic_and_refreshes() -> None:
     entity, coordinator = _end_time()
     await entity.async_set_value(time(20, 0))
-    assert entity._optimistic_value is None
+    assert entity._optimistic_value == time(20, 0)
     coordinator.async_request_refresh.assert_awaited()
 
 

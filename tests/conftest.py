@@ -11,6 +11,8 @@ import pytest
 from custom_components.fluidra_pool.fluidra_api import FluidraPoolAPI
 from custom_components.fluidra_pool.write_verification import WriteVerifier
 
+from .schedule_write_stubs import install_schedule_write_stubs
+
 
 @pytest.fixture(autouse=True)
 def enable_custom_integrations(request: pytest.FixtureRequest) -> None:
@@ -25,6 +27,7 @@ def enable_custom_integrations(request: pytest.FixtureRequest) -> None:
 def mock_api() -> AsyncMock:
     """Create a mock FluidraPoolAPI."""
     api = AsyncMock(spec=FluidraPoolAPI)
+    install_schedule_write_stubs(api)
     # Instance attributes are invisible to spec= (the class is not slotted);
     # wire the ones production code reads directly.
     api.access_token = "test-access-token"

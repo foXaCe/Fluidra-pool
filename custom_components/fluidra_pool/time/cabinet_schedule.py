@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 from datetime import time
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import aiohttp
 from homeassistant.const import EntityCategory
@@ -24,7 +24,6 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from ..api_resilience import FluidraError
 from ..const import COMMAND_CONFIRMATION_DELAY, DOMAIN
-from ..entity import FluidraPoolEntity
 from ..helpers import (
     CABINET_SCHEDULE_ALL_DAYS,
     build_cabinet_schedule_slot,
@@ -58,6 +57,10 @@ class _FluidraCabinetScheduleTimeEntity(FluidraScheduleTimeEntity):
     """Shared start/end logic for one Command Connect cabinet schedule slot."""
 
     __slots__ = ("_cabinet_output",)
+
+    # An empty c35/c36 means "no armed window", not "no such control": the
+    # entity has to stay available so the window can be written back.
+    _requires_schedule_data: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -100,11 +103,6 @@ class _FluidraCabinetScheduleTimeEntity(FluidraScheduleTimeEntity):
         return resolve_cabinet_schedule_component(self.device_data, self._cabinet_output)
 
     @property
-    def available(self) -> bool:
-        """Stay available when the slot is empty so a clear can be rewritten."""
-        return FluidraPoolEntity.available.fget(self)  # type: ignore[misc]
-
-    @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Expose armed-window semantics and the live register."""
         schedule = self._get_schedule_data()
@@ -123,12 +121,32 @@ class _FluidraCabinetScheduleTimeEntity(FluidraScheduleTimeEntity):
 
     async def _async_set_time(self, value: time) -> None:
         """Rewrite this slot's time (or seed a new slot) and PUT the register."""
-        self._optimistic_value = value
+        component_id = self._get_schedule_component()
+        # Compose and PUT under one lock per register: a schedule write replaces
+        # the whole slot list, so two overlapping edits each re-sent the other's
+        # field from their own pre-write snapshot — that is how an end time came
+        # back holding the old start time (Issue #210).
+        async with self._api.schedule_write_lock(self._device_id, component_id):
+            await self._async_compose_and_write(value, component_id)
+
+        await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
+        await self.coordinator.async_request_refresh()
+        # The optimistic value is NOT dropped here: this refresh reads the
+        # pre-write list on a device that takes 5-10 s to confirm. It expires on
+        # its own once the device echoes the new time (see ``_optimistic_or``).
         self.async_write_ha_state()
 
-        current_schedules = list(self._get_schedule_list())
+    async def _async_compose_and_write(self, value: time, component_id: int) -> None:
+        """Build the register's full slot list around this edit and PUT it."""
+        current_schedules = self._write_base_schedules(component_id)
         field = "startTime" if self._time_type == "start" else "endTime"
         current_schedule = self._get_schedule_data()
+
+        if current_schedule is None:
+            current_schedule = next(
+                (slot for slot in current_schedules if str(slot.get("id")) == str(self._schedule_id)),
+                None,
+            )
 
         if current_schedule and self._time_type == "start":
             current_end_time = self._parse_cron_time(current_schedule.get("endTime", ""))
@@ -146,6 +164,10 @@ class _FluidraCabinetScheduleTimeEntity(FluidraScheduleTimeEntity):
                     raise ServiceValidationError(
                         error_msg, translation_domain=DOMAIN, translation_key="schedule_overlap"
                     )
+
+        # Only now show the new time: a rejected overlap must not leave the field
+        # holding a value for the whole confirmation window.
+        self._set_optimistic(value)
 
         if not current_schedules:
             start, end = _default_pair(value, self._time_type)
@@ -172,20 +194,14 @@ class _FluidraCabinetScheduleTimeEntity(FluidraScheduleTimeEntity):
                 start, end = _default_pair(value, self._time_type)
                 updated_schedules.append(build_cabinet_schedule_slot(int(self._schedule_id), start, end, enabled=True))
 
-        component_id = self._get_schedule_component()
         success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
         if not success:
-            self._optimistic_value = None
-            self.async_write_ha_state()
+            self._clear_optimistic()
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="schedule_set_rejected",
                 translation_placeholders={"device_id": self._device_id},
             )
-        await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
-        await self.coordinator.async_request_refresh()
-        self._optimistic_value = None
-        self.async_write_ha_state()
 
 
 class FluidraCabinetScheduleStartTimeEntity(_FluidraCabinetScheduleTimeEntity):
@@ -215,12 +231,9 @@ class FluidraCabinetScheduleStartTimeEntity(_FluidraCabinetScheduleTimeEntity):
     @property
     def native_value(self) -> time | None:
         """Return the current start time."""
-        if self._optimistic_value is not None:
-            return self._optimistic_value
         schedule = self._get_schedule_data()
-        if schedule:
-            return self._parse_cron_time(schedule.get("startTime", ""))
-        return None
+        reported = self._parse_cron_time(schedule.get("startTime", "")) if schedule else None
+        return self._optimistic_or(reported)
 
     async def async_set_value(self, value: time) -> None:
         """Set the start time."""
@@ -228,6 +241,7 @@ class FluidraCabinetScheduleStartTimeEntity(_FluidraCabinetScheduleTimeEntity):
         try:
             await self._async_set_time(value)
         except HomeAssistantError:
+            self._clear_optimistic()
             raise
         except (
             aiohttp.ClientError,
@@ -244,8 +258,7 @@ class FluidraCabinetScheduleStartTimeEntity(_FluidraCabinetScheduleTimeEntity):
                 self._device_id,
                 err,
             )
-            self._optimistic_value = None
-            self.async_write_ha_state()
+            self._clear_optimistic()
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="schedule_set_failed",
@@ -280,12 +293,9 @@ class FluidraCabinetScheduleEndTimeEntity(_FluidraCabinetScheduleTimeEntity):
     @property
     def native_value(self) -> time | None:
         """Return the current end time."""
-        if self._optimistic_value is not None:
-            return self._optimistic_value
         schedule = self._get_schedule_data()
-        if schedule:
-            return self._parse_cron_time(schedule.get("endTime", ""))
-        return None
+        reported = self._parse_cron_time(schedule.get("endTime", "")) if schedule else None
+        return self._optimistic_or(reported)
 
     async def async_set_value(self, value: time) -> None:
         """Set the end time."""
@@ -293,6 +303,7 @@ class FluidraCabinetScheduleEndTimeEntity(_FluidraCabinetScheduleTimeEntity):
         try:
             await self._async_set_time(value)
         except HomeAssistantError:
+            self._clear_optimistic()
             raise
         except (
             aiohttp.ClientError,
@@ -309,8 +320,7 @@ class FluidraCabinetScheduleEndTimeEntity(_FluidraCabinetScheduleTimeEntity):
                 self._device_id,
                 err,
             )
-            self._optimistic_value = None
-            self.async_write_ha_state()
+            self._clear_optimistic()
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="schedule_set_failed",

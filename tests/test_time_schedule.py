@@ -15,6 +15,8 @@ from custom_components.fluidra_pool.time.schedule import (
     FluidraScheduleStartTimeEntity,
 )
 
+from .schedule_write_stubs import schedule_api
+
 POOL_ID = "pool-1"
 PUMP_ID = "TEST-PUMP-001"
 CHLOR_ID = "TEST-CHLOR-DM"
@@ -41,7 +43,7 @@ def _attach_ha(entity) -> None:
 
 
 def _api(*, success: bool = True) -> SimpleNamespace:
-    return SimpleNamespace(set_schedule=AsyncMock(return_value=success))
+    return schedule_api(set_schedule=AsyncMock(return_value=success))
 
 
 def _pump_device(schedules: list[dict] | None) -> dict:
@@ -382,7 +384,7 @@ async def test_start_time_set_value_preserves_cron_sunday_zero_verbatim() -> Non
 
 
 async def test_start_time_set_value_refreshes_coordinator_on_success() -> None:
-    """Successful API call → coordinator refresh, optimistic cleared."""
+    """Successful API call → coordinator refresh, optimistic value held."""
     device = _pump_device([SCHEDULE])
     api = _api()
     coord = _coord(device)
@@ -391,7 +393,8 @@ async def test_start_time_set_value_refreshes_coordinator_on_success() -> None:
 
     await entity.async_set_value(time(7, 0))
 
-    assert entity._optimistic_value is None
+    # Held, not cleared: that refresh still reads the pre-write list (Issue #210).
+    assert entity._optimistic_value == time(7, 0)
     coord.async_request_refresh.assert_awaited_once()
 
 

@@ -76,82 +76,26 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
         """Set the start time using exact mobile app format."""
         self._ensure_pool_writable()
         try:
-            self._optimistic_value = value
-            self.async_write_ha_state()
-
-            current_schedules = self._get_schedule_list()
-            if not current_schedules:
-                self._optimistic_value = None
-                self.async_write_ha_state()
-                return
-
-            current_schedule = self._get_schedule_data()
-            if current_schedule:
-                current_end_time = self._parse_cron_time(current_schedule.get("endTime", ""))
-                # Only validate a forward, same-day window. An inverted pair
-                # (start > end) mid-edit is an in-progress state, not a real
-                # overnight range, so skip the overlap check (the user usually
-                # fixes the other endpoint next; the device is the final arbiter).
-                if current_end_time and value < current_end_time:
-                    is_valid, error_msg = self._validate_schedule_overlap(value, current_end_time, self._schedule_id)
-                    if not is_valid:
-                        raise ServiceValidationError(
-                            error_msg, translation_domain=DOMAIN, translation_key="schedule_overlap"
-                        )
-
-            updated_schedules = []
-            for sched in current_schedules:
-                scheduler = dict(sched)
-                if str(sched.get("id")) == str(self._schedule_id):
-                    scheduler["startTime"] = _replace_cron_time(sched.get("startTime", ""), value)
-
-                component_id = self._get_schedule_component()
-
-                if component_id == 258:
-                    # DM24049704 chlorinator uses a flat groupId=1 + padded CRON.
-                    scheduler = {
-                        "id": sched.get("id"),
-                        "groupId": 1,
-                        "enabled": True,
-                        "startTime": self._format_cron_time_chlorinator(scheduler["startTime"]),
-                        "endTime": self._format_cron_time_chlorinator(scheduler.get("endTime", "")),
-                        "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "1"))},
-                    }
-                else:
-                    # Copy the entry verbatim and touch only the time being edited,
-                    # so a schedule whose mode lives in componentActions (eXO iQ)
-                    # keeps it instead of being rebuilt as operationName (Issue #175).
-                    scheduler.setdefault("groupId", sched.get("id"))
-                    scheduler["startTime"] = scheduler.get("startTime", "")
-                    scheduler["endTime"] = scheduler.get("endTime", "")
-                    # Read-only runtime fields the API rejects on write (Issue #89/#174).
-                    scheduler.pop("state", None)
-                    scheduler.pop("endActions", None)
-                updated_schedules.append(scheduler)
-
             component_id = self._get_schedule_component()
+            # Compose *and* PUT under one lock per register: a schedule write
+            # replaces the register's whole slot list, so two overlapping edits
+            # each re-sent the other's field from their own pre-write snapshot
+            # — that is how an end time came back holding an old start time
+            # (Issue #210).
+            async with self._api.schedule_write_lock(self._device_id, component_id):
+                if not await self._async_compose_and_write(value, component_id):
+                    return
 
-            # Send only the configured schedules — no padding. Fluidra fills the
-            # remaining device slots itself; padding to 8 with identical placeholder
-            # windows is rejected as "OVERLAP in sched" (Issue #105), and a packet
-            # capture of the official app confirms it sends only the real entries.
-            success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
-            if not success:
-                self._optimistic_value = None
-                self.async_write_ha_state()
-                raise HomeAssistantError(
-                    translation_domain=DOMAIN,
-                    translation_key="schedule_set_rejected",
-                    translation_placeholders={"device_id": self._device_id},
-                )
             await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
             await self.coordinator.async_request_refresh()
-            self._optimistic_value = None
+            # The optimistic value is deliberately NOT dropped here: this
+            # refresh still reads the pre-write list on a device that takes
+            # seconds to confirm. ``_optimistic_or`` releases it when the device
+            # echoes the new time, or after SCHEDULE_WRITE_HOLD_SECONDS.
             self.async_write_ha_state()
 
         except HomeAssistantError:
-            self._optimistic_value = None
-            self.async_write_ha_state()
+            self._clear_optimistic()
             raise
         except (
             aiohttp.ClientError,
@@ -163,13 +107,85 @@ class FluidraScheduleStartTimeEntity(FluidraScheduleTimeEntity):
             AttributeError,
         ) as err:
             _LOGGER.error("Failed to set schedule start time for %s: %s", self._device_id, err)
-            self._optimistic_value = None
-            self.async_write_ha_state()
+            self._clear_optimistic()
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="schedule_set_failed",
                 translation_placeholders={"device_id": self._device_id},
             ) from err
+
+    async def _async_compose_and_write(self, value: time, component_id: int) -> bool:
+        """Rewrite this slot's start time in the full list and PUT the register.
+
+        Returns ``False`` when there is no slot to edit; raises when the write is
+        rejected.
+        """
+        current_schedules = self._write_base_schedules(component_id)
+        if not current_schedules:
+            return False
+
+        current_schedule = self._get_schedule_data() or next(
+            (slot for slot in current_schedules if str(slot.get("id")) == str(self._schedule_id)),
+            None,
+        )
+        if current_schedule:
+            current_end_time = self._parse_cron_time(current_schedule.get("endTime", ""))
+            # Only validate a forward, same-day window. An inverted pair
+            # (start > end) mid-edit is an in-progress state, not a real
+            # overnight range, so skip the overlap check (the user usually
+            # fixes the other endpoint next; the device is the final arbiter).
+            if current_end_time and value < current_end_time:
+                is_valid, error_msg = self._validate_schedule_overlap(value, current_end_time, self._schedule_id)
+                if not is_valid:
+                    raise ServiceValidationError(
+                        error_msg, translation_domain=DOMAIN, translation_key="schedule_overlap"
+                    )
+
+        # Only now show the new time: a rejected overlap must not leave the field
+        # holding a value for the whole confirmation window.
+        self._set_optimistic(value)
+
+        updated_schedules = []
+        for sched in current_schedules:
+            scheduler = dict(sched)
+            if str(sched.get("id")) == str(self._schedule_id):
+                scheduler["startTime"] = _replace_cron_time(sched.get("startTime", ""), value)
+
+            if component_id == 258:
+                # DM24049704 chlorinator uses a flat groupId=1 + padded CRON.
+                scheduler = {
+                    "id": sched.get("id"),
+                    "groupId": 1,
+                    "enabled": True,
+                    "startTime": self._format_cron_time_chlorinator(scheduler["startTime"]),
+                    "endTime": self._format_cron_time_chlorinator(scheduler.get("endTime", "")),
+                    "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "1"))},
+                }
+            else:
+                # Copy the entry verbatim and touch only the time being edited,
+                # so a schedule whose mode lives in componentActions (eXO iQ)
+                # keeps it instead of being rebuilt as operationName (Issue #175).
+                scheduler.setdefault("groupId", sched.get("id"))
+                scheduler["startTime"] = scheduler.get("startTime", "")
+                scheduler["endTime"] = scheduler.get("endTime", "")
+                # Read-only runtime fields the API rejects on write (Issue #89/#174).
+                scheduler.pop("state", None)
+                scheduler.pop("endActions", None)
+            updated_schedules.append(scheduler)
+
+        # Send only the configured schedules — no padding. Fluidra fills the
+        # remaining device slots itself; padding to 8 with identical placeholder
+        # windows is rejected as "OVERLAP in sched" (Issue #105), and a packet
+        # capture of the official app confirms it sends only the real entries.
+        success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
+        if not success:
+            self._clear_optimistic()
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_set_rejected",
+                translation_placeholders={"device_id": self._device_id},
+            )
+        return True
 
 
 class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
@@ -211,74 +227,26 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
         """Set the end time using exact mobile app format."""
         self._ensure_pool_writable()
         try:
-            self._optimistic_value = value
-            self.async_write_ha_state()
-
-            current_schedules = self._get_schedule_list()
-            if not current_schedules:
-                self._optimistic_value = None
-                self.async_write_ha_state()
-                return
-
-            current_schedule = self._get_schedule_data()
-            if current_schedule:
-                current_start_time = self._parse_cron_time(current_schedule.get("startTime", ""))
-                # Only validate a forward, same-day window (see start-time entity).
-                if current_start_time and value > current_start_time:
-                    is_valid, error_msg = self._validate_schedule_overlap(current_start_time, value, self._schedule_id)
-                    if not is_valid:
-                        raise ServiceValidationError(
-                            error_msg, translation_domain=DOMAIN, translation_key="schedule_overlap"
-                        )
-
-            updated_schedules = []
-            for sched in current_schedules:
-                scheduler = dict(sched)
-                if str(sched.get("id")) == str(self._schedule_id):
-                    scheduler["endTime"] = _replace_cron_time(sched.get("endTime", ""), value)
-
-                component_id = self._get_schedule_component()
-
-                if component_id == 258:
-                    # DM24049704 chlorinator uses a flat groupId=1 + padded CRON.
-                    scheduler = {
-                        "id": sched.get("id"),
-                        "groupId": 1,
-                        "enabled": True,
-                        "startTime": self._format_cron_time_chlorinator(scheduler.get("startTime", "")),
-                        "endTime": self._format_cron_time_chlorinator(scheduler["endTime"]),
-                        "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "1"))},
-                    }
-                else:
-                    # Copy the entry verbatim and touch only the time being edited
-                    # (see the start-time entity; Issue #175).
-                    scheduler.setdefault("groupId", sched.get("id"))
-                    scheduler["startTime"] = scheduler.get("startTime", "")
-                    scheduler["endTime"] = scheduler.get("endTime", "")
-                    scheduler.pop("state", None)
-                    scheduler.pop("endActions", None)
-                updated_schedules.append(scheduler)
-
             component_id = self._get_schedule_component()
+            # Compose *and* PUT under one lock per register: a schedule write
+            # replaces the register's whole slot list, so two overlapping edits
+            # each re-sent the other's field from their own pre-write snapshot
+            # — that is how an end time came back holding an old start time
+            # (Issue #210).
+            async with self._api.schedule_write_lock(self._device_id, component_id):
+                if not await self._async_compose_and_write(value, component_id):
+                    return
 
-            # No padding — see the OVERLAP-in-sched note in the slot editor above (Issue #105).
-            success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
-            if not success:
-                self._optimistic_value = None
-                self.async_write_ha_state()
-                raise HomeAssistantError(
-                    translation_domain=DOMAIN,
-                    translation_key="schedule_set_rejected",
-                    translation_placeholders={"device_id": self._device_id},
-                )
             await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
             await self.coordinator.async_request_refresh()
-            self._optimistic_value = None
+            # The optimistic value is deliberately NOT dropped here: this
+            # refresh still reads the pre-write list on a device that takes
+            # seconds to confirm. ``_optimistic_or`` releases it when the device
+            # echoes the new time, or after SCHEDULE_WRITE_HOLD_SECONDS.
             self.async_write_ha_state()
 
         except HomeAssistantError:
-            self._optimistic_value = None
-            self.async_write_ha_state()
+            self._clear_optimistic()
             raise
         except (
             aiohttp.ClientError,
@@ -290,10 +258,73 @@ class FluidraScheduleEndTimeEntity(FluidraScheduleTimeEntity):
             AttributeError,
         ) as err:
             _LOGGER.error("Failed to set schedule end time for %s: %s", self._device_id, err)
-            self._optimistic_value = None
-            self.async_write_ha_state()
+            self._clear_optimistic()
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="schedule_set_failed",
                 translation_placeholders={"device_id": self._device_id},
             ) from err
+
+    async def _async_compose_and_write(self, value: time, component_id: int) -> bool:
+        """Rewrite this slot's end time in the full list and PUT the register.
+
+        Returns ``False`` when there is no slot to edit; raises when the write is
+        rejected.
+        """
+        current_schedules = self._write_base_schedules(component_id)
+        if not current_schedules:
+            return False
+
+        current_schedule = self._get_schedule_data() or next(
+            (slot for slot in current_schedules if str(slot.get("id")) == str(self._schedule_id)),
+            None,
+        )
+        if current_schedule:
+            current_start_time = self._parse_cron_time(current_schedule.get("startTime", ""))
+            # Only validate a forward, same-day window (see the start-time entity).
+            if current_start_time and value > current_start_time:
+                is_valid, error_msg = self._validate_schedule_overlap(current_start_time, value, self._schedule_id)
+                if not is_valid:
+                    raise ServiceValidationError(
+                        error_msg, translation_domain=DOMAIN, translation_key="schedule_overlap"
+                    )
+
+        # Only now show the new time (see the start-time entity).
+        self._set_optimistic(value)
+
+        updated_schedules = []
+        for sched in current_schedules:
+            scheduler = dict(sched)
+            if str(sched.get("id")) == str(self._schedule_id):
+                scheduler["endTime"] = _replace_cron_time(sched.get("endTime", ""), value)
+
+            if component_id == 258:
+                # DM24049704 chlorinator uses a flat groupId=1 + padded CRON.
+                scheduler = {
+                    "id": sched.get("id"),
+                    "groupId": 1,
+                    "enabled": True,
+                    "startTime": self._format_cron_time_chlorinator(scheduler.get("startTime", "")),
+                    "endTime": self._format_cron_time_chlorinator(scheduler["endTime"]),
+                    "startActions": {"operationName": str(sched.get("startActions", {}).get("operationName", "1"))},
+                }
+            else:
+                # Copy the entry verbatim and touch only the time being edited
+                # (see the start-time entity; Issue #175).
+                scheduler.setdefault("groupId", sched.get("id"))
+                scheduler["startTime"] = scheduler.get("startTime", "")
+                scheduler["endTime"] = scheduler.get("endTime", "")
+                scheduler.pop("state", None)
+                scheduler.pop("endActions", None)
+            updated_schedules.append(scheduler)
+
+        # No padding — see the OVERLAP-in-sched note in the slot editor above (Issue #105).
+        success = await self._api.set_schedule(self._device_id, updated_schedules, component_id=component_id)
+        if not success:
+            self._clear_optimistic()
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="schedule_set_rejected",
+                translation_placeholders={"device_id": self._device_id},
+            )
+        return True

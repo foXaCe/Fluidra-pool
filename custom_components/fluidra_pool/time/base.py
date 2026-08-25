@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import time
 import logging
-from typing import TYPE_CHECKING, Any
+from time import monotonic
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import aiohttp
 from homeassistant.components.time import TimeEntity
@@ -12,7 +13,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from ..api_resilience import FluidraError
-from ..const import DEVICE_MODEL_FALLBACK, DEVICE_MODEL_MAP, DOMAIN
+from ..const import DEVICE_MODEL_FALLBACK, DEVICE_MODEL_MAP, DOMAIN, SCHEDULE_WRITE_HOLD_SECONDS
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolControlEntity
 from ..helpers import (
@@ -87,6 +88,12 @@ class _FluidraTimeEntityBase(FluidraPoolControlEntity, TimeEntity):
 
     __slots__ = ("_schedule_id", "_time_type")
 
+    # A slot that does not exist yet has nothing to edit, so these entities go
+    # unavailable with it. Subclasses whose register can legitimately be empty
+    # and still writable (the Command Connect cabinet re-arms a cleared window)
+    # set this to False.
+    _requires_schedule_data: ClassVar[bool] = True
+
     def __init__(
         self,
         coordinator: FluidraDataUpdateCoordinator,
@@ -115,7 +122,9 @@ class _FluidraTimeEntityBase(FluidraPoolControlEntity, TimeEntity):
     @property
     def available(self) -> bool:
         """Return True if the device/coordinator are healthy and the schedule exists."""
-        return super().available and self._get_schedule_data() is not None
+        if not super().available:
+            return False
+        return not self._requires_schedule_data or self._get_schedule_data() is not None
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -137,7 +146,7 @@ class _FluidraTimeEntityBase(FluidraPoolControlEntity, TimeEntity):
 class FluidraScheduleTimeEntity(_FluidraTimeEntityBase):
     """Base class for Fluidra pump/chlorinator schedule time entities."""
 
-    __slots__ = ("_aux_number", "_optimistic_value")
+    __slots__ = ("_aux_number", "_optimistic_until", "_optimistic_value")
 
     def __init__(
         self,
@@ -152,7 +161,51 @@ class FluidraScheduleTimeEntity(_FluidraTimeEntityBase):
         """Initialize the time entity."""
         super().__init__(coordinator, api, pool_id, device_id, schedule_id, time_type)
         self._optimistic_value: time | None = None
+        self._optimistic_until: float = 0.0
         self._aux_number = aux_number
+
+    def _set_optimistic(self, value: time) -> None:
+        """Show the time we are writing and hold it until the device confirms."""
+        self._optimistic_value = value
+        self._optimistic_until = monotonic() + SCHEDULE_WRITE_HOLD_SECONDS
+        self.async_write_ha_state()
+
+    def _clear_optimistic(self) -> None:
+        """Drop the optimistic value (the write failed) and show the device again."""
+        self._optimistic_value = None
+        self._optimistic_until = 0.0
+        self.async_write_ha_state()
+
+    def _optimistic_or(self, reported: time | None) -> time | None:
+        """Return the value we wrote until the device echoes it back.
+
+        Dropping it right after the PUT is what made every edit visibly snap back
+        to the old time: the cloud keeps reporting the pre-write value for
+        several seconds, so the refresh fired ``COMMAND_CONFIRMATION_DELAY``
+        later necessarily reads the old one. Users read that as a failed edit and
+        retried, and the retries are what corrupted the slot (Issue #210). The
+        enable switch already worked this way; the time entities did not.
+        """
+        if self._optimistic_value is None:
+            return reported
+        if reported == self._optimistic_value or monotonic() >= self._optimistic_until:
+            self._optimistic_value = None
+            self._optimistic_until = 0.0
+            return reported
+        return self._optimistic_value
+
+    def _write_base_schedules(self, component_id: int) -> list[dict[str, Any]]:
+        """Return the slot list a write must build on for this register.
+
+        Prefers the list we last PUT over the poll cache: within the device's
+        confirmation window the cache still holds the pre-write list, so
+        composing from it re-sends stale values for every field the current edit
+        does not touch (Issue #210).
+        """
+        pending = self._api.pending_schedule_slots(self._device_id, component_id)
+        if pending is not None:
+            return pending
+        return list(self._get_schedule_list())
 
     def _get_schedule_list(self) -> list[dict[str, Any]]:
         """Return the schedule list this entity edits (main or per-aux)."""

@@ -30,6 +30,8 @@ from custom_components.fluidra_pool.write_verification import (
     normalize_component_value,
 )
 
+from .schedule_write_stubs import schedule_api
+
 POOL_ID = "pool-1"
 DEVICE_ID = "QR24xxxx.ndsr_1"
 
@@ -123,7 +125,7 @@ def _attach_ha(entity) -> None:
 
 
 def _api(*, success: bool = True) -> SimpleNamespace:
-    return SimpleNamespace(set_schedule=AsyncMock(return_value=success))
+    return schedule_api(set_schedule=AsyncMock(return_value=success))
 
 
 # --- profile / helpers ----------------------------------------------------

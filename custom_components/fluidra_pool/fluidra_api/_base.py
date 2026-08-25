@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
     from ..api_resilience import CircuitBreaker, RateLimiter
     from ..write_verification import WriteVerifier
+    from ._schedules import PendingScheduleWrite
 
 
 class FluidraAPIBase:
@@ -46,6 +47,8 @@ class FluidraAPIBase:
         _rate_limiter: RateLimiter
         _token_lock: asyncio.Lock
         write_verifier: WriteVerifier
+        _schedule_write_locks: dict[tuple[str, int], asyncio.Lock]
+        _pending_schedule_writes: dict[tuple[str, int], PendingScheduleWrite]
 
         # --- Cross-mixin methods (defined on sibling mixins) ---
         async def _request(
