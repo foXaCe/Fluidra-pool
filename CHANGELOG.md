@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.85.0] - 2026-08-25
+
+### Added
+
+- **The AstralPool Command Connect cabinet can now be scheduled from Home Assistant** (#210,
+  @efgonzalez): the filtration pump (register c35) and the pool lights (c36) each gain a
+  schedule entity on the `time` platform, written through the same `set_schedule` service as
+  every other scheduler — a new optional `component_id` field targets the cabinet registers
+  instead of the default one. The wire format follows what @efgonzalez verified against his
+  unit from captures of the official app: CRON `mm HH * * 0-6` in local time, no state field
+  ever sent, an empty list clears the slot, and every write is re-read afterwards because
+  HTTP 200 alone is not proof — the same post-write verification every other schedule path in
+  this integration goes through. The c16 register stays read-only, exposed as a diagnostic.
+  As everywhere else, these are armed windows, not guaranteed stops.
+
+### Fixed
+
+- **Editing a Command Connect schedule time no longer snaps back — or worse, corrupts the slot.**
+  The edited value used to be released three seconds after the write, while the cabinet takes five
+  to ten seconds to report the change back, so the refresh that followed always read the pre-write
+  value and put it straight back into the UI; and because every write recomposed the register's
+  whole slot list from the poll cache, two edits inside that window each re-sent a stale value for
+  the field they were not editing — which is how @efgonzalez ended up with endTime holding the old
+  startTime, an inverted window the cabinet then actually armed. The edited value now survives
+  until the device echoes the new time (with a hard cap so a dead device cannot freeze the field),
+  writes compose on the last-sent list instead of the stale poll cache, and composing plus writing
+  runs under one lock per device and register, so two quick edits can no longer overwrite each
+  other (Issue #210).
+- **A bridged heat pump is no longer identified as a chlorinator** (#216, @vicsol00-collab): on one
+  Fluidra account carrying both an AstralPool Elite Connect LS chlorinator and a Zodiac PX50 heat
+  pump, only the chlorinator produced entities — the PX50 had no climate entity at all. Both devices
+  are bridged and share the `nn` protocol marker in their cloud ids (`*.nn_*`), and the chlorinator
+  catch-all profile listed that marker among its identifier patterns, scoring enough points on the
+  heat pump to outrank every heat-pump profile. That marker says how a device reaches the cloud, not
+  what it is, so no profile claims it any more; model-specific profiles no longer lean on a family
+  match they never needed either. The PX50 now resolves to the generic heat-pump behaviour with a
+  working climate entity, and since its exact register map is still unverified, the existing
+  unverified-profile repair issue asks its owner for a diagnostics dump. The Elite Connect LS keeps
+  resolving exactly as before.
+
 ## [2.84.0] - 2026-08-23
 
 ### Added
