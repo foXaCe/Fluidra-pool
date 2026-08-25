@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.85.1] - 2026-08-25
+
+### Fixed
+
+- **Pump and chlorinator schedule times now release their edited value.** On the pump/chlorinator
+  `time` entities, `native_value` returned the optimistic value directly and never reached
+  `_optimistic_or`, so neither release condition (device echo, hold expiry) ever ran: an edit that
+  failed or was refused kept masking the value shown by the Fluidra app until a restart (#219).
+- **A refused schedule write no longer destroys the composition base of the next one.** A rejected
+  PUT (HTTP != 200) or a transport failure discarded the register's pending-write base along with
+  the verifier entry; since a refused write changes nothing on the device, that base is still the
+  right one to compose on — dropping it sent the next edit back to the poll cache, which inside the
+  confirmation window still reports the pre-write list, reopening the stale-field overwrite fixed in
+  #218 on real hardware.
+
 ## [2.85.0] - 2026-08-25
 
 ### Added
