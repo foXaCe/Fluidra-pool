@@ -106,6 +106,7 @@ def test_declared_families_are_the_measured_ones() -> None:
         "ns25_exo_chlorinator": ["exr"],
         "z550iq_heat_pump": ["zs500"],
         "command_connect_cabinet": ["SRC"],
+        "blue_connect_silver": ["BC3"],
     }
 
 
@@ -148,3 +149,48 @@ def test_unmapped_register_log_says_unknown_when_absent(caplog: Any) -> None:
         coordinator._log_unmapped_components("DEV-1", {99: {"reportedValue": 7}}, set(), "")
 
     assert "thing_type=unknown" in caplog.text
+
+
+# --- Blue Connect (Issue #186) -----------------------------------------------
+
+
+def test_blue_connect_recognised_without_serial_or_name() -> None:
+    """A Blue Connect that matches neither WA* nor "gold" still reads correctly.
+
+    Before this, such a unit fell to the chlorinator catch-all, which reads
+    c12/c13/c14 as something other than temperature/pH/ORP.
+    """
+    device = _device(thing_type="BC3", type="chlorinator", family="Data collectors")
+    assert DeviceIdentifier.identify_device(device) is DEVICE_CONFIGS["blue_connect_silver"]
+
+
+def test_blue_connect_family_read_from_component_7() -> None:
+    """The line publishes its family id on c7, not only on the device entry."""
+    device = _device(
+        type="chlorinator",
+        family="Data collectors",
+        components={"7": {"reportedValue": "BC3"}},
+    )
+    assert DeviceIdentifier.identify_device(device) is DEVICE_CONFIGS["blue_connect_silver"]
+
+
+def test_named_gold_still_wins_over_the_shared_family() -> None:
+    """ "BC3" covers Silver and Gold alike, so the richer profile must keep priority."""
+    device = _device(
+        name="Blue Connect Gold",
+        thing_type="BC3",
+        type="chlorinator",
+        family="Data collectors",
+    )
+    assert DeviceIdentifier.identify_device(device) is DEVICE_CONFIGS["blue_connect_gold"]
+
+
+def test_component_7_product_codes_do_not_mislabel_heat_pumps() -> None:
+    """Heat pumps put a product code on c7; it must match no family pattern."""
+    device = _device(
+        device_id="LF12345",
+        type="heat_pump",
+        components={"7": {"reportedValue": "BXWAD"}},
+    )
+    config = DeviceIdentifier.identify_device(device)
+    assert config is DEVICE_CONFIGS["z260iq_heat_pump"]

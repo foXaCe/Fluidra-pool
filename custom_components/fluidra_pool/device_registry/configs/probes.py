@@ -21,6 +21,17 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
         #  - comp 14 = ORP (mV, direct, e.g. 764)
         identifier_patterns=["WA*"],
         family_patterns=["data collectors"],
+        # Fluidra's own family id for the whole Blue Connect line, so a unit whose
+        # serial is not WA* and whose name does not say "gold" lands on this
+        # mapping — right readings on temperature/pH/ORP — instead of the
+        # chlorinator catch-all, which reads those registers as something else
+        # entirely (Issue #186).
+        #
+        # It is declared here, on the minimal profile, and deliberately not on
+        # the Gold: "BC3" does not tell the two apart, so putting it on both
+        # would tie them on score and hand every unnamed unit to the richer
+        # profile. The Gold is reached by its own "QX…" serial or by its name.
+        thing_type_patterns=["BC3"],
         components_range=25,
         required_components=[0, 1, 2, 3],
         # Sensor-only: no switch (probe doesn't actuate), no select (no mode),
@@ -64,6 +75,13 @@ PROBE_CONFIGS: dict[str, DeviceConfig] = {
         # so the two are told apart by the product name, which is stable across
         # units (the Silver is "…Silver").
         name_patterns=["blue connect gold"],
+        # The Gold's own cloud serial. It carries no thing_type_patterns on
+        # purpose: "BC3" covers Silver and Gold alike, so declaring it here would
+        # tie the two on score and hand every unnamed Blue Connect to this richer
+        # profile — leaving a Silver with permanently unavailable conductivity,
+        # salinity and battery entities. The family id belongs on the minimal
+        # profile; this one is reached by its serial or its name (Issue #186).
+        identifier_patterns=["QX*"],
         family_patterns=["data collectors"],
         components_range=25,
         required_components=[0, 1, 2, 3],
