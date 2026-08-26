@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.86.0] - 2026-08-26
+
+### Added
+
+- **Realtime updates, opt-in** (#210): the Fluidra cloud can now push state changes as they
+  happen instead of being polled for them — a change reaches Home Assistant in about **2 seconds**
+  against a full poll interval before. Enable it under the integration's **Configure** button; it
+  is off by default, and polling keeps running underneath either way, so the channel only ever
+  shortens the wait. Every detail of its lifecycle comes from measuring the live channel: it
+  authenticates with the access token as a query parameter (an `Authorization` header is refused),
+  the token is checked only when the connection opens — so nothing reconnects when it is refreshed
+  — and a silent connection is dropped at exactly 600 s, hence the keepalive and the treatment of
+  an abrupt close as routine rather than an error. Pushed changes go through the very decoder the
+  poll uses, so there is no second path that could drift from it.
+- **UV lamp, boost countdown and filtration state on the tecnoLC2 line-up**: a UV lamp presence
+  binary sensor and its running-hours counter, the boost countdown rebuilt from the hours and
+  minutes registers the app itself joins, and the live state of the filtration block. Each stays
+  unavailable or unknown when its register never answers, rather than reporting a made-up zero.
+- **Three-speed pump select** for controllers that carry the speed on a single writable register.
+  Both the read and write tables live in the device profile, so a family numbering its speeds
+  differently is a profile edit rather than a code change. No profile declares it yet: the mapping
+  is still unconfirmed on hardware, and this one writes.
+- **Diagnostics now carry what the cloud itself declares** about each device's schedule register,
+  next to the register the profile resolved and a flag saying whether the two agree (#174). One
+  request when diagnostics are downloaded, never on the polling path.
+
+### Changed
+
+- **Devices are now recognised by Fluidra's own family identifier**, not only by their serial.
+  That label ships with every device and was previously used for a single special case; it now
+  scores between the product name and the generic strings the whole line-up shares, so a model
+  nobody has reported yet lands on the right register map instead of a fallback that misreads it.
+  Declared only where the cloud's own configuration files make the mapping unambiguous. Two
+  families are deliberately left out and pinned by tests: the Z250iQ/Z260iQ pair, which is
+  separated by a component signature, and the Z450/Z650iQ/Elyo family, too broad for one profile.
+- **Blue Connect recognition widened** (#186, @Kal42): the family id is read from component 7 when
+  the device entry does not carry it, so a unit whose serial matches neither known prefix and whose
+  name says nothing now lands on the Blue Connect mapping instead of the chlorinator fallback,
+  which reads its temperature, pH and ORP registers as something else. The Gold gains its own
+  `QX…` serial prefix, keeping it apart from the Silver without the two competing on the family
+  label they share.
+- **The unmapped-register debug line now names the device's family id**, which is what identifies
+  an unreported model. It is the line users paste into issues, and it previously gave register
+  numbers with nothing to attach them to.
+
 ## [2.85.1] - 2026-08-25
 
 ### Fixed
