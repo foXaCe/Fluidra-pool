@@ -65,6 +65,9 @@
       "chlorinator_producing": {
         "name": "A produzir"
       },
+      "filtration_state": {
+        "name": "Filtração em funcionamento"
+      },
       "no_flow_alarm": {
         "name": "Falha de ausência de caudal"
       },
@@ -76,6 +79,9 @@
       },
       "speed_input_medium": {
         "name": "Entrada velocidade média"
+      },
+      "uv_present": {
+        "name": "Lâmpada UV detetada"
       }
     },
     "button": {
@@ -173,6 +179,14 @@
           "static_color": "Cor Fixa"
         }
       },
+      "pump_3speed": {
+        "name": "Bomba de 3 velocidades",
+        "state": {
+          "high": "Velocidade alta",
+          "low": "Velocidade baixa",
+          "medium": "Velocidade média"
+        }
+      },
       "pump_speed": {
         "name": "Nível de Velocidade",
         "state": {
@@ -203,6 +217,9 @@
       },
       "boost_remaining": {
         "name": "Turbo restante"
+      },
+      "boost_remaining_hours": {
+        "name": "Tempo de boost restante"
       },
       "brightness": {
         "name": "Brilho"
@@ -321,6 +338,9 @@
       },
       "target_temperature": {
         "name": "Temperatura Alvo"
+      },
+      "uv_running_hours": {
+        "name": "Horas de funcionamento da lâmpada UV"
       },
       "water_quality": {
         "name": "Qualidade da Água",
@@ -544,9 +564,11 @@
     "step": {
       "init": {
         "data": {
+          "enable_realtime": "Atualizações em tempo real (experimental)",
           "scan_interval": "Intervalo de atualização (segundos)"
         },
         "data_description": {
+          "enable_realtime": "Permite que a nuvem da Fluidra envie as alterações assim que ocorrem, em vez de esperar pela sondagem seguinte — uma alteração de estado chega em cerca de 2 segundos. A sondagem continua a funcionar, pelo que desativar esta opção repõe o comportamento anterior.",
           "scan_interval": "Frequência com que o Home Assistant consulta a nuvem Fluidra. Um valor mais baixo fornece dados mais recentes mas gera mais pedidos."
         },
         "description": "Configurar opções avançadas",

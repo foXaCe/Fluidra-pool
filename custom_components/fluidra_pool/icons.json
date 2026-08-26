@@ -6,6 +6,18 @@
         "state": {
           "on": "mdi:flash"
         }
+      },
+      "filtration_state": {
+        "default": "mdi:pump-off",
+        "state": {
+          "on": "mdi:pump"
+        }
+      },
+      "uv_present": {
+        "default": "mdi:lightbulb-off-outline",
+        "state": {
+          "on": "mdi:lightbulb-on-outline"
+        }
       }
     },
     "climate": {

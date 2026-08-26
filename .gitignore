@@ -91,3 +91,13 @@ scan_*_components.py
 *_IMPROVEMENTS.md
 *_COMPLETE.md
 *_report.md
+
+# Local reverse-engineering artefacts: the vendor APK and its extracted strings
+# are third-party binaries, hundreds of MB, and have no place in the repo. The
+# findings drawn from them live in API-DISCOVERY.md.
+com.fluidra.iaqualinkplus_*.apks
+apk-analysis/
+
+# Local agent tooling scratch directories.
+.agent_context/
+.commandcode/

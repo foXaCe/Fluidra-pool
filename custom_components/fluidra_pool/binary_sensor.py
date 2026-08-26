@@ -334,6 +334,119 @@ class FluidraHeatPumpAlarmBinarySensor(FluidraPoolEntity, BinarySensorEntity):
         return bool(value) if value is not None else None
 
 
+class FluidraUvPresentBinarySensor(FluidraPoolEntity, BinarySensorEntity):
+    """Whether the chlorinator reports a UV lamp block at all.
+
+    The app uses this register as a display mask: 0 hides the whole UV block,
+    non-zero shows it. Exposed as a diagnostic sensor so a UV unit that stops
+    being reported (lamp module unplugged, firmware downgrade) is visible
+    rather than silently turning the hours counter unavailable.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.PRESENCE
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        component_id: int,
+    ) -> None:
+        """Initialize the UV presence binary sensor."""
+        super().__init__(coordinator, pool_id, device_id)
+        self._api = api
+        self._component_id = component_id
+        self._attr_unique_id = f"{DOMAIN}_{pool_id}_{device_id}_uv_present"
+        self._attr_translation_key = "uv_present"
+
+    @property
+    def available(self) -> bool:
+        """Return True once the device has reported component data."""
+        return self.coordinator.last_update_success and bool(self.device_data.get("components"))
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True when the UV block is reported present."""
+        components = self.device_data.get("components", {})
+        raw = components.get(str(self._component_id), {}).get("reportedValue")
+        if raw is None:
+            return None
+        try:
+            return float(raw) > 0
+        except (ValueError, TypeError):
+            return None
+
+
+class FluidraFiltrationStateBinarySensor(FluidraPoolEntity, BinarySensorEntity):
+    """Whether the filtration block driven by this controller is running.
+
+    Distinct from the pump's own on/off: on a schedule-driven installation the
+    controller reports the live state of the filtration block on its own
+    register, which is what an automation actually needs ("is water flowing"),
+    while the on/off switch only says whether the pump was commanded on.
+
+    The register id is profile-declared (``filtration_state``) with an optional
+    fallback, because the same numbers carry unrelated meanings on other
+    families — c135 is the active quick-function slot on a Victoria VS pump.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.RUNNING
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        component_id: int,
+        fallback_component_id: int | None = None,
+    ) -> None:
+        """Initialize the filtration state binary sensor."""
+        super().__init__(coordinator, pool_id, device_id)
+        self._api = api
+        self._component_id = component_id
+        self._fallback_component_id = fallback_component_id
+        self._attr_unique_id = f"{DOMAIN}_{pool_id}_{device_id}_filtration_state"
+        self._attr_translation_key = "filtration_state"
+
+    @property
+    def available(self) -> bool:
+        """Return True once the device has reported component data."""
+        return self.coordinator.last_update_success and bool(self.device_data.get("components"))
+
+    def _read(self, component_id: int | None) -> float | None:
+        """Return one register's value as a float, or None when unusable."""
+        if component_id is None:
+            return None
+        components = self.device_data.get("components", {})
+        raw = components.get(str(component_id), {}).get("reportedValue")
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except (ValueError, TypeError):
+            return None
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return True while the filtration block is running.
+
+        The primary register wins whenever it answers; the fallback covers the
+        firmware versions that only carry the second one. Both are 0 = stopped,
+        non-zero = running (the app treats 1 and 2 alike for the block state).
+        """
+        value = self._read(self._component_id)
+        if value is None:
+            value = self._read(self._fallback_component_id)
+        if value is None:
+            return None
+        return value > 0
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: FluidraPoolConfigEntry,
@@ -393,6 +506,36 @@ async def async_setup_entry(
                     alarm_key,
                 )
                 for alarm_key in alarm_keys
+            )
+
+        # UV lamp block, on the chlorinator families that carry one. Both
+        # registers are profile-declared: the presence flag is the app's own
+        # display mask, the counter is the lamp's running hours.
+        uv_lamp = DeviceIdentifier.get_feature(device, "uv_lamp")
+        if isinstance(uv_lamp, dict) and uv_lamp.get("present") is not None:
+            entities.append(
+                FluidraUvPresentBinarySensor(
+                    coordinator,
+                    coordinator.api,
+                    pool_id,
+                    device_id,
+                    uv_lamp["present"],
+                )
+            )
+
+        # Live state of the filtration block, where the controller reports it
+        # on its own register rather than through the pump's on/off.
+        filtration_state = DeviceIdentifier.get_feature(device, "filtration_state")
+        if isinstance(filtration_state, dict) and filtration_state.get("state") is not None:
+            entities.append(
+                FluidraFiltrationStateBinarySensor(
+                    coordinator,
+                    coordinator.api,
+                    pool_id,
+                    device_id,
+                    filtration_state["state"],
+                    filtration_state.get("fallback"),
+                )
             )
 
         # Victoria VS speed-preset dry-contact inputs (Issue #144).

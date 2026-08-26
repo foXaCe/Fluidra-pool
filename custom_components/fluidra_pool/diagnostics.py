@@ -9,7 +9,10 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
 
+from .api_resilience import FluidraAuthError
 from .const import FluidraPoolConfigEntry
+from .helpers import resolve_schedule_component
+from .utils import mask_device_id
 
 TO_REDACT = {
     CONF_EMAIL,
@@ -120,8 +123,55 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: Fluidra
         # ids are already masked by the verifier and the values are setpoints
         # and modes, so there is nothing identifying left to redact.
         "lost_writes": list(getattr(coordinator, "lost_writes", [])),
+        # What the cloud itself says about each device's schedule register,
+        # next to what the profile resolved. Fetched here and nowhere else:
+        # on the poll path it would cost one request per device and buy
+        # nothing, but in a bug report it settles "my schedule writes land on
+        # the wrong slot" outright (Issue #174).
+        "cloud_schedulers": await _collect_scheduler_capabilities(coordinator, coordinator_data),
         "pools": _redact_pools_data(coordinator_data),
     }
+
+
+async def _collect_scheduler_capabilities(coordinator: Any, pools_data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Compare the cloud-declared schedule register with the resolved one, per device.
+
+    Never fails the diagnostics download: an endpoint that refuses, an account
+    whose token expired mid-download, or a device the cloud says nothing about
+    all come back as an empty or partial list.
+    """
+    api = getattr(coordinator, "api", None)
+    if api is None or not hasattr(api, "get_device_capabilities"):
+        return []
+
+    collected: list[dict[str, Any]] = []
+    for pool in pools_data.values():
+        if not isinstance(pool, dict):
+            continue
+        for device in pool.get("devices", []):
+            device_id = device.get("device_id")
+            if not device_id:
+                continue
+            try:
+                capabilities = await api.get_device_capabilities(device_id)
+            except (FluidraAuthError, OSError, TimeoutError):
+                continue
+
+            resolved = resolve_schedule_component(device)
+            for capability in capabilities:
+                collected.append(
+                    {
+                        "device_id": mask_device_id(device_id),
+                        "scheduler_id": capability.scheduler_id,
+                        "type": capability.scheduler_type,
+                        "enabled": capability.enabled,
+                        "cloud_component_read": capability.component_read,
+                        "cloud_component_write": capability.component_write,
+                        "profile_resolved_component": resolved,
+                        "matches_profile": capability.component_write == resolved,
+                    }
+                )
+    return collected
 
 
 def _redact_pools_data(pools_data: dict[str, Any]) -> dict[str, Any]:

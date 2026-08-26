@@ -185,6 +185,101 @@ class FluidraPumpSpeedSelect(FluidraPoolControlEntity, SelectEntity):
         return attrs
 
 
+# Fallback mapping for the three-speed control register, used when a profile
+# declares the feature without spelling its own tables out. Both directions are
+# profile-overridable on purpose: the app's own UI config reads the state as
+# 0/1/2 and writes 1/2/3, but which physical speed each number stands for is the
+# one thing the APK dump does not settle (plan 013, Pass 2), so a family that
+# turns out to number them differently is a profile edit, not a code change.
+THREE_SPEED_DEFAULT_WRITE: dict[str, int] = {"low": 1, "medium": 2, "high": 3}
+THREE_SPEED_DEFAULT_READ: dict[int, str] = {0: "low", 1: "medium", 2: "high"}
+
+
+class FluidraThreeSpeedPumpSelect(FluidraPoolControlEntity, SelectEntity):
+    """Speed of a three-speed filtration pump driven by a controller register.
+
+    Distinct from :class:`FluidraPumpSpeedSelect`, which drives an E30iQ over
+    its own c9/c11 pair and derives its state from the coordinator's decoded
+    ``speed_level_reported``/``speed_percent``. Here the controller exposes a
+    single register carrying the speed as a small integer, and writing that
+    same register changes it — nothing else in the device data reflects it.
+
+    Both the read table and the write table come from the profile
+    (``pump_3speed``), so a family that numbers its speeds differently needs no
+    code change.
+    """
+
+    __slots__ = ("_component", "_optimistic_option", "_read_map", "_write_map")
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        component: int,
+        write_map: dict[str, int] | None = None,
+        read_map: dict[int, str] | None = None,
+    ) -> None:
+        """Initialize the three-speed select."""
+        super().__init__(coordinator, api, pool_id, device_id)
+        self._component = component
+        self._write_map = dict(write_map or THREE_SPEED_DEFAULT_WRITE)
+        self._read_map = dict(read_map or THREE_SPEED_DEFAULT_READ)
+        self._optimistic_option: str | None = None
+
+        self._attr_unique_id = f"{DOMAIN}_{pool_id}_{device_id}_pump_3speed"
+        self._attr_translation_key = "pump_3speed"
+        self._attr_options = list(self._write_map)
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the speed the controller reports, or None while it is unknown."""
+        if self._optimistic_option is not None:
+            return self._optimistic_option
+
+        components = self.device_data.get("components", {})
+        raw = components.get(str(self._component), {}).get("reportedValue")
+        if raw is None:
+            return None
+        try:
+            reported = int(float(raw))
+        except (ValueError, TypeError):
+            _LOGGER.debug("Unparsable three-speed value %s on component %s", raw, self._component)
+            return None
+
+        option = self._read_map.get(reported)
+        if option is None:
+            # A value outside the declared table means the profile's mapping is
+            # wrong for this unit — say nothing rather than name a wrong speed.
+            _LOGGER.debug("Three-speed register %s reports unmapped value %s", self._component, reported)
+        return option
+
+    async def async_select_option(self, option: str) -> None:
+        """Write the requested speed to the controller's register."""
+        self._ensure_pool_writable()
+        value = self._write_map.get(option)
+        if value is None:
+            return
+
+        try:
+            self._optimistic_option = option
+            self.async_write_ha_state()
+
+            success = await self._api.control_device_component(self._device_id, self._component, value)
+            if success:
+                await asyncio.sleep(COMMAND_CONFIRMATION_DELAY)
+                await self.coordinator.async_request_refresh()
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="pump_speed_set_failed") from err
+        finally:
+            self._optimistic_option = None
+            self.async_write_ha_state()
+
+        if not success:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="pump_speed_set_failed")
+
+
 class FluidraVictoriaQuickFunctionSelect(FluidraPoolControlEntity, SelectEntity):
     """Run one of the Victoria's configured quick functions (Issue #144).
 

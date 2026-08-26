@@ -97,6 +97,162 @@ class FluidraBoostRemainingSensor(FluidraPoolEntity, SensorEntity):
             return None
 
 
+class FluidraBoostRemainingHoursSensor(FluidraPoolEntity, SensorEntity):
+    """Time left on a running boost cycle, on the families that split it in two.
+
+    The tecnoLC2/CC chlorinators do not carry the eXO's single-register minute
+    countdown (c51): the app builds its "Will set prod to max for 24h" label
+    from a pair of registers, hours and minutes, declared by the profile as the
+    ``boost_remaining_hours`` feature. Both are combined into one value in
+    hours, so a dashboard gets a single number instead of two halves.
+
+    0 is a real reading (boost off), not a missing one, and is reported as-is.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "boost_remaining_hours"
+    _attr_icon = "mdi:timer-sand"
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the split boost countdown sensor."""
+        super().__init__(coordinator, pool_id, device_id)
+        self._api = api
+        self._attr_unique_id = f"fluidra_{device_id}_boost_remaining_hours"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        firmware = self.device_data.get("firmware_version_component")
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device_name,
+            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+            model="Chlorinator",
+            sw_version=str(firmware) if firmware is not None else None,
+            via_device=(DOMAIN, self._pool_id),
+        )
+
+    @property
+    def available(self) -> bool:
+        """Return True once the device has reported component data."""
+        return self.coordinator.last_update_success and bool(self.device_data.get("components"))
+
+    def _read_part(self, component: Any) -> float | None:
+        """Return one half of the countdown, or None when it is missing."""
+        if component is None:
+            return None
+        components = self.device_data.get("components", {})
+        raw = components.get(str(component), {}).get("reportedValue")
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except (ValueError, TypeError):
+            _LOGGER.debug("Unparsable boost countdown value %s on component %s", raw, component)
+            return None
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the remaining boost time in hours.
+
+        Either half may be absent (a firmware that reports only whole hours, or
+        only the minutes of the last hour), so the value is whatever is
+        actually reported — None only when neither register answers.
+        """
+        feature = DeviceIdentifier.get_feature(self.device_data, "boost_remaining_hours", None)
+        if not isinstance(feature, dict):
+            return None
+
+        hours = self._read_part(feature.get("hours"))
+        minutes = self._read_part(feature.get("minutes"))
+        if hours is None and minutes is None:
+            return None
+
+        total = (hours or 0.0) + (minutes or 0.0) / 60
+        return round(total, 2)
+
+
+class FluidraUvRunningHoursSensor(FluidraPoolEntity, SensorEntity):
+    """Running hours of the UV lamp of a chlorinator that has one.
+
+    The register is a plain integer hour counter (factor 1, no decimals in the
+    app's own UI block), so it is exposed as a TOTAL_INCREASING duration — the
+    lamp-replacement interval is a running-hours threshold.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "uv_running_hours"
+    _attr_icon = "mdi:clock-outline"
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.HOURS
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        component_id: int,
+    ) -> None:
+        """Initialize the UV running-hours sensor."""
+        super().__init__(coordinator, pool_id, device_id)
+        self._api = api
+        self._component_id = component_id
+        self._attr_unique_id = f"fluidra_{device_id}_uv_running_hours"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device information."""
+        device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
+        firmware = self.device_data.get("firmware_version_component")
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device_id)},
+            name=device_name,
+            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+            model="Chlorinator",
+            sw_version=str(firmware) if firmware is not None else None,
+            via_device=(DOMAIN, self._pool_id),
+        )
+
+    @property
+    def available(self) -> bool:
+        """Return True once the device has reported this register.
+
+        Unlike the measurement sensors, availability is tied to the register
+        itself: a unit whose UV block is absent must not show a permanently
+        zero counter.
+        """
+        if not (self.coordinator.last_update_success and self.device_data.get("components")):
+            return False
+        components = self.device_data.get("components", {})
+        return components.get(str(self._component_id), {}).get("reportedValue") is not None
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the UV lamp running hours."""
+        components = self.device_data.get("components", {})
+        raw = components.get(str(self._component_id), {}).get("reportedValue")
+        if raw is None:
+            return None
+        try:
+            return int(float(raw))
+        except (ValueError, TypeError):
+            _LOGGER.debug("Unparsable UV running hours %s on component %s", raw, self._component_id)
+            return None
+
+
 class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
     """Sensor for chlorinator measurements (pH, ORP, chlorine, temperature, salinity)."""
 

@@ -15,7 +15,12 @@ from ..const import (
 from ..device_registry import DeviceIdentifier
 from ..platform_setup import async_setup_dynamic_platform
 from .base import FluidraPoolSensorBase, FluidraPoolSensorEntity
-from .chlorinator import FluidraBoostRemainingSensor, FluidraChlorinatorSensor
+from .chlorinator import (
+    FluidraBoostRemainingHoursSensor,
+    FluidraBoostRemainingSensor,
+    FluidraChlorinatorSensor,
+    FluidraUvRunningHoursSensor,
+)
 from .device import (
     FluidraCabinetPackedConfigSensor,
     FluidraCompressorHoursSensor,
@@ -47,6 +52,7 @@ if TYPE_CHECKING:
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 __all__ = [
+    "FluidraBoostRemainingHoursSensor",
     "FluidraBoostRemainingSensor",
     "FluidraCabinetPackedConfigSensor",
     "FluidraChlorinatorSensor",
@@ -71,6 +77,7 @@ __all__ = [
     "FluidraRunningHoursSensor",
     "FluidraScheduleDaysSensor",
     "FluidraTemperatureSensor",
+    "FluidraUvRunningHoursSensor",
     "FluidraWifiSignalSensor",
     "async_setup_entry",
 ]
@@ -169,6 +176,23 @@ async def async_setup_entry(
         if device_type == DEVICE_TYPE_CHLORINATOR:
             if DeviceIdentifier.has_feature(device, "boost_remaining"):
                 entities.append(FluidraBoostRemainingSensor(coordinator, coordinator.api, pool_id, device_id))
+
+            # Families that split the countdown over an hours + minutes pair
+            # instead of the eXO's single minute register.
+            if isinstance(DeviceIdentifier.get_feature(device, "boost_remaining_hours"), dict):
+                entities.append(FluidraBoostRemainingHoursSensor(coordinator, coordinator.api, pool_id, device_id))
+
+            uv_lamp = DeviceIdentifier.get_feature(device, "uv_lamp")
+            if isinstance(uv_lamp, dict) and uv_lamp.get("running_hours") is not None:
+                entities.append(
+                    FluidraUvRunningHoursSensor(
+                        coordinator,
+                        coordinator.api,
+                        pool_id,
+                        device_id,
+                        uv_lamp["running_hours"],
+                    )
+                )
 
             sensors_config = DeviceIdentifier.get_feature(device, "sensors", {})
 

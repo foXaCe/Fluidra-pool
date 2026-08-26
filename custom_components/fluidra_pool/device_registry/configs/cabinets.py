@@ -22,6 +22,8 @@ CABINET_CONFIGS: dict[str, DeviceConfig] = {
         # Times are local wall-clock despite the bridge reporting GMT0.
         family_patterns=["Cabinets"],
         model_patterns=["Command Connect"],
+        # Cloud family id, until now recognised by its model string alone.
+        thing_type_patterns=["SRC"],
         components_range=40,
         required_components=[13, 24],
         entities=["switch"],

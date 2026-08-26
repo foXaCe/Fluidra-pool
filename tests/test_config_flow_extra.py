@@ -22,6 +22,7 @@ from custom_components.fluidra_pool.api_resilience import (
     FluidraMFARequired,
 )
 from custom_components.fluidra_pool.const import (
+    CONF_ENABLE_REALTIME,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -70,7 +71,9 @@ async def test_options_flow_create_entry(hass: HomeAssistant) -> None:
     )
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"] == {CONF_SCAN_INTERVAL: 120}
+    # The realtime toggle rides along with its default: the form always submits
+    # every option it shows, and off is what a user who never touched it gets.
+    assert result["data"] == {CONF_SCAN_INTERVAL: 120, CONF_ENABLE_REALTIME: False}
     assert entry.options[CONF_SCAN_INTERVAL] == 120
 
 

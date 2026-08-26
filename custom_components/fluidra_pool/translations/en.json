@@ -65,6 +65,9 @@
       "chlorinator_producing": {
         "name": "Producing"
       },
+      "filtration_state": {
+        "name": "Filtration running"
+      },
       "no_flow_alarm": {
         "name": "No flow fault"
       },
@@ -76,6 +79,9 @@
       },
       "speed_input_medium": {
         "name": "Medium speed input"
+      },
+      "uv_present": {
+        "name": "UV lamp detected"
       }
     },
     "button": {
@@ -173,6 +179,14 @@
           "static_color": "Static Color"
         }
       },
+      "pump_3speed": {
+        "name": "Three-speed pump",
+        "state": {
+          "high": "High",
+          "low": "Low",
+          "medium": "Medium"
+        }
+      },
       "pump_speed": {
         "name": "Speed Level",
         "state": {
@@ -202,6 +216,9 @@
         "name": "Battery"
       },
       "boost_remaining": {
+        "name": "Boost Remaining"
+      },
+      "boost_remaining_hours": {
         "name": "Boost Remaining"
       },
       "brightness": {
@@ -321,6 +338,9 @@
       },
       "target_temperature": {
         "name": "Target Temperature"
+      },
+      "uv_running_hours": {
+        "name": "UV Lamp Running Hours"
       },
       "water_quality": {
         "name": "Water Quality",
@@ -544,9 +564,11 @@
     "step": {
       "init": {
         "data": {
+          "enable_realtime": "Realtime updates (experimental)",
           "scan_interval": "Update interval (seconds)"
         },
         "data_description": {
+          "enable_realtime": "Lets the Fluidra cloud push changes as they happen, instead of waiting for the next poll — a state change lands in about 2 seconds. Polling keeps running either way, so turning this off simply returns to the previous behaviour.",
           "scan_interval": "How often Home Assistant polls the Fluidra cloud. Lower values give fresher data but more requests."
         },
         "description": "Configure advanced options",

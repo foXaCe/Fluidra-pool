@@ -8,6 +8,10 @@ PUMP_CONFIGS: dict[str, DeviceConfig] = {
     "e30iq_pump": DeviceConfig(
         device_type="pump",
         identifier_patterns=["E30*", "LE*", "PUMP*"],
+        # Fluidra's own family id for this pump line, measured on hardware
+        # (thingType "eppvs", model E30iQ). The cloud lists Inari VS and
+        # Verdon VS under it too, and their serials need not start with E30/LE.
+        thing_type_patterns=["eppvs"],
         components_range=5,
         required_components=[0, 1, 2, 3],
         entities=[
@@ -47,6 +51,8 @@ PUMP_CONFIGS: dict[str, DeviceConfig] = {
         # remaining work — direct speed via /schedulers, activity/telemetry polish —
         # is additive, not a correctness gap).
         model_patterns=["Victoria Smart Connect"],
+        # Until now this family was recognised by its model string alone.
+        thing_type_patterns=["mppvs"],
         components_range=25,
         required_components=[0, 1, 2, 3],
         # No plain on/off "switch": the Victoria is schedule-driven, so control is

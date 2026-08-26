@@ -69,6 +69,7 @@ def _identify_device_uncached(
     model: str,
     device_type_hint: str,
     comp7_value: str,
+    thing_type: str = "",
 ) -> DeviceConfig | None:
     """Resolve a :class:`DeviceConfig` from hashable primitives so lru_cache can memoise."""
     sorted_configs = sorted(DEVICE_CONFIGS.items(), key=lambda x: x[1].priority, reverse=True)
@@ -85,6 +86,14 @@ def _identify_device_uncached(
 
         if _match(device_id, tuple(config.identifier_patterns)):
             signal += 50
+        # Fluidra's own family identifier, slotted between the product name and
+        # the generic strings. It names a *family*, so it must lose to a serial
+        # (a profile written for one unit) and to an explicit product name
+        # ("Blue Connect Gold" is more specific than the "BC3" family both Blue
+        # Connect models report), while still beating "Chlorinator"/"Chlorinators"
+        # and other labels the whole line-up shares.
+        if _match(thing_type, tuple(config.thing_type_patterns)):
+            signal += 25
         if _match(device_name, tuple(config.name_patterns)):
             signal += 30
         if _match(family, tuple(config.family_patterns)):
@@ -216,6 +225,13 @@ class DeviceIdentifier:
         comp7_value = ""
         if "7" in components and isinstance(components["7"], dict):
             comp7_value = str(components["7"].get("reportedValue", ""))
+        if not thing_type:
+            # Some families publish the family id on component 7 instead of (or as
+            # well as) the device entry — a Blue Connect reports "BC3" there
+            # (Issue #186). Heat pumps put a product code there instead
+            # ("BXWAA"/"BXWAD"), which matches no declared family pattern, so
+            # reading it here cannot mislabel them.
+            thing_type = comp7_value
 
         cache_key = (
             device.get("device_id", ""),
@@ -237,6 +253,7 @@ class DeviceIdentifier:
             model=str(cache_key[2]),
             device_type_hint=str(cache_key[3]).lower(),
             comp7_value=comp7_value,
+            thing_type=thing_type,
         )
         device["_identify_cache"] = {"key": cache_key, "config": result}
         return _tecnolc2_signature_override(result, components, thing_type)

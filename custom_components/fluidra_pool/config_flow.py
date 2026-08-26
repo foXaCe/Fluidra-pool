@@ -16,6 +16,7 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD, CONF_SCAN_INTERVAL
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -31,7 +32,13 @@ from .api_resilience import (
     FluidraError,
     FluidraMFARequired,
 )
-from .const import CONF_REFRESH_TOKEN, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import (
+    CONF_ENABLE_REALTIME,
+    CONF_REFRESH_TOKEN,
+    DEFAULT_ENABLE_REALTIME,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+)
 from .fluidra_api import FluidraPoolAPI
 from .utils import mask_email
 
@@ -439,6 +446,7 @@ class FluidraPoolOptionsFlowHandler(OptionsFlow):
 
         # Get current values or defaults
         current_scan_interval = self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        current_realtime = self.config_entry.options.get(CONF_ENABLE_REALTIME, DEFAULT_ENABLE_REALTIME)
 
         return self.async_show_form(
             step_id="init",
@@ -459,6 +467,13 @@ class FluidraPoolOptionsFlowHandler(OptionsFlow):
                         ),
                         vol.Coerce(int),
                     ),
+                    # Realtime channel: the cloud pushes changes instead of
+                    # being polled for them. Off by default — the poll keeps
+                    # running either way, this only shortens the wait.
+                    vol.Optional(
+                        CONF_ENABLE_REALTIME,
+                        default=current_realtime,
+                    ): BooleanSelector(),
                 }
             ),
         )

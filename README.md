@@ -39,7 +39,15 @@ Your contributions help me keep improving this project and adding new equipment.
   a circuit breaker for sustained outages, and a rate limiter.
 - **Localized UI** — English, French, Spanish and Portuguese translations; failed commands
   surface a clear, translated error instead of silently doing nothing.
-- **Diagnostics** — downloadable diagnostics (with credentials redacted) for bug reports.
+- **Realtime updates (opt-in)** — the Fluidra cloud can push changes as they happen
+  instead of being polled for them: a state change reaches Home Assistant in about
+  2 seconds. Polling keeps running underneath, so the channel only ever shortens the
+  wait. Off by default; enable it under **Configure**.
+- **Family-aware recognition** — devices are matched on Fluidra's own family identifier
+  as well as on their serial, so a model nobody has reported yet still lands on the right
+  register map instead of a generic fallback.
+- **Diagnostics** — downloadable diagnostics (with credentials redacted) for bug reports,
+  including what the cloud itself declares about each device's schedule register.
 
 ### 🧩 Entity platforms
 
@@ -52,7 +60,8 @@ Your contributions help me keep improving this project and adding new equipment.
 | `light`  | LumiPlus Connect RGBW (on/off, brightness, colour) |
 | `time`   | Schedule start/end time editing |
 | `button` | Victoria VS pump Stop (halt without disarming the schedule) |
-| `sensor` | pH, ORP, free chlorine, salinity, temperatures, pump speed/mode, power & head & flow (VS pumps), firmware, signal, status |
+| `sensor` | pH, ORP, free chlorine, salinity, temperatures, pump speed/mode, power & head & flow (VS pumps), UV lamp hours, boost countdown, firmware, signal, status |
+| `binary_sensor` | Cell production, alarms, speed-preset inputs, UV lamp presence, filtration running |
 
 ---
 
@@ -138,7 +147,9 @@ Your equipment isn't listed or is only partially recognised? Help us add it:
    ```
 2. **Open an [issue](https://github.com/foXaCe/Fluidra-pool/issues)** with:
    - Your equipment model and serial prefix
-   - The device-discovery debug logs
+   - The device-discovery debug logs — these now include the device's `thing_type`
+     (Fluidra's own family id, e.g. `eppvs`, `tecnoLC2`) and every register no profile
+     maps yet, which is usually enough to identify what is missing
    - The features/values shown in the official Fluidra Pool app
 3. **Test and share** your results — most new models are added this way.
 
@@ -188,6 +199,10 @@ The integration is configured entirely from the UI (config flow):
 ### Options
 - **Update interval** — polling interval in seconds, configurable from **30 to 1800**
   (default **30 s**). Change it via the integration's **Configure** button.
+- **Realtime updates (experimental)** — subscribe to the Fluidra cloud's push channel so
+  state changes arrive in about 2 seconds instead of waiting for the next poll. Off by
+  default. Polling continues either way, so turning it off simply restores the previous
+  behaviour.
 
 ---
 

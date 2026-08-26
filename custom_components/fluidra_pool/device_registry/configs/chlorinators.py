@@ -1013,6 +1013,9 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "ns25_exo_chlorinator": DeviceConfig(
         device_type="chlorinator",
         identifier_patterns=["NS*"],
+        # Cloud family id for the eXO line — it also covers GenSalt OT iQ and
+        # Hydroxinator, whose serials do not start with NS.
+        thing_type_patterns=["exr"],
         # No family_patterns — see the module note (Issue #216).
         components_range=25,
         required_components=[0, 1, 2, 3],
@@ -1143,3 +1146,58 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
 # Signature-only profile: strip every pattern so it can never win pattern/priority
 # scoring; identifier.py hands it out solely via the tecnoLC2 component signature.
 CHLORINATOR_CONFIGS["tecnolc2_signature"].family_patterns = []
+
+
+# --- Registers read from the app's own UI config (plan 013, Pass 1) -----------
+#
+# The Fluidra app builds its tecnoLC2 screens from a `configFile` JSON that
+# declares more registers than the integration ever scanned. Three blocks of it
+# are read-only and decodable, so they are declared here for the whole lineup:
+#
+#   c252/c253 — UV lamp: c252 is the app's own display mask for the UV block
+#               (0 hides it), c253 the lamp's running hours (factor 1).
+#   c111/c118 — the two halves of the boost countdown the app joins into its
+#               "Will set prod to max for 24h" label (minutes and hours).
+#   c135/c244 — live state of the filtration block, 0 = stopped. The app hides
+#               the block when c135 reads 0 and falls back to c244.
+#
+# None of them is verified on hardware yet: the operator's own pool carries no
+# chlorinator (only an E30iQ pump), and the registers are absent from every
+# diagnostics dump collected so far. Declaring them costs nothing on the wire —
+# the bulk component fetch returns the whole register set anyway and only the
+# scan list decides what is kept — and the entities are built to stay quiet when
+# the register never answers: the UV counter reports unavailable, the UV mask and
+# the filtration state report unknown rather than a made-up zero.
+#
+# The lineup is identified by its water-temperature register: c172 is the
+# tecnoLC2 signature (the catch-all, the DM units and the eXO all read the
+# temperature elsewhere), the same signal identifier.py uses to rescue an
+# unknown-serial unit.
+UV_LAMP_REGISTERS: dict[str, int] = {"present": 252, "running_hours": 253}
+BOOST_COUNTDOWN_REGISTERS: dict[str, int] = {"hours": 118, "minutes": 111}
+FILTRATION_STATE_REGISTERS: dict[str, int] = {"state": 135, "fallback": 244}
+
+
+def _declare_tecnolc2_ui_registers() -> None:
+    """Add the UI-config registers above to every tecnoLC2 chlorinator profile."""
+    for config in CHLORINATOR_CONFIGS.values():
+        features = config.features
+        if features.get("sensors", {}).get("temperature") != 172:
+            continue
+
+        features["uv_lamp"] = dict(UV_LAMP_REGISTERS)
+        features["filtration_state"] = dict(FILTRATION_STATE_REGISTERS)
+        scan_ids = [*UV_LAMP_REGISTERS.values(), *FILTRATION_STATE_REGISTERS.values()]
+
+        # The countdown only means something on a unit that has a boost at all.
+        if features.get("boost_mode") is not None:
+            features["boost_remaining_hours"] = dict(BOOST_COUNTDOWN_REGISTERS)
+            scan_ids += list(BOOST_COUNTDOWN_REGISTERS.values())
+
+        # specific_components is the exhaustive scan set: a register missing from
+        # it is never read, whatever the entity asks for.
+        specific = features.setdefault("specific_components", [])
+        specific.extend(component for component in scan_ids if component not in specific)
+
+
+_declare_tecnolc2_ui_registers()
