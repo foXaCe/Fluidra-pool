@@ -96,6 +96,12 @@ ATTR_BRIGHTNESS: Final = "brightness"
 
 # Default values
 DEFAULT_SCAN_INTERVAL: Final = 30  # seconds
+
+# Realtime channel (plan 013, Pass 5). Opt-in: the REST poll stays the source of
+# truth and keeps running either way, so this only ever shortens the wait for a
+# value the next poll would have brought anyway.
+CONF_ENABLE_REALTIME: Final = "enable_realtime"
+DEFAULT_ENABLE_REALTIME: Final = False
 DEFAULT_TIMEOUT: Final = 30  # seconds — aligned with HTTP request timeout
 
 # Timing constants for optimistic state management

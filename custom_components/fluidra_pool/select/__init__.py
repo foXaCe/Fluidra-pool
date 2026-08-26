@@ -17,7 +17,11 @@ from ..platform_setup import async_setup_dynamic_platform
 from .aux import FluidraAuxOutputSelect
 from .chlorinator import FluidraChlorinatorModeSelect
 from .light import FluidraLightEffectSelect
-from .pump import FluidraPumpSpeedSelect, FluidraVictoriaQuickFunctionSelect
+from .pump import (
+    FluidraPumpSpeedSelect,
+    FluidraThreeSpeedPumpSelect,
+    FluidraVictoriaQuickFunctionSelect,
+)
 from .schedule import FluidraChlorinatorScheduleSpeedSelect, FluidraScheduleModeSelect
 
 if TYPE_CHECKING:
@@ -31,6 +35,7 @@ __all__ = [
     "FluidraLightEffectSelect",
     "FluidraPumpSpeedSelect",
     "FluidraScheduleModeSelect",
+    "FluidraThreeSpeedPumpSelect",
     "FluidraVictoriaQuickFunctionSelect",
     "async_setup_entry",
 ]
@@ -71,10 +76,28 @@ async def async_setup_entry(
         if DeviceIdentifier.has_feature(device, "skip_schedules"):
             return entities
 
+        # Three-speed filtration pump driven through a controller register, as
+        # opposed to the E30iQ's own c9/c11 pair below. The two are mutually
+        # exclusive: a profile declaring pump_3speed drives the pump only here.
+        three_speed = DeviceIdentifier.get_feature(device, "pump_3speed")
+        if isinstance(three_speed, dict) and three_speed.get("component") is not None:
+            entities.append(
+                FluidraThreeSpeedPumpSelect(
+                    coordinator,
+                    coordinator.api,
+                    pool_id,
+                    device_id,
+                    three_speed["component"],
+                    three_speed.get("write_map"),
+                    three_speed.get("read_map"),
+                )
+            )
+
         if (
             device_type == DEVICE_TYPE_PUMP
             and DeviceIdentifier.should_create_entity(device, "select")
             and device.get("variable_speed")
+            and not isinstance(three_speed, dict)
         ):
             entities.append(FluidraPumpSpeedSelect(coordinator, coordinator.api, pool_id, device_id))
 

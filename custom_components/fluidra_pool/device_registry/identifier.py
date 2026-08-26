@@ -69,6 +69,7 @@ def _identify_device_uncached(
     model: str,
     device_type_hint: str,
     comp7_value: str,
+    thing_type: str = "",
 ) -> DeviceConfig | None:
     """Resolve a :class:`DeviceConfig` from hashable primitives so lru_cache can memoise."""
     sorted_configs = sorted(DEVICE_CONFIGS.items(), key=lambda x: x[1].priority, reverse=True)
@@ -85,6 +86,12 @@ def _identify_device_uncached(
 
         if _match(device_id, tuple(config.identifier_patterns)):
             signal += 50
+        # Fluidra's own family identifier. Deliberately worth less than a serial
+        # match (a profile written for one unit stays more specific) and more
+        # than name/family/model, which are generic strings shared across the
+        # whole line-up ("Chlorinator", "Chlorinators").
+        if _match(thing_type, tuple(config.thing_type_patterns)):
+            signal += 40
         if _match(device_name, tuple(config.name_patterns)):
             signal += 30
         if _match(family, tuple(config.family_patterns)):
@@ -237,6 +244,7 @@ class DeviceIdentifier:
             model=str(cache_key[2]),
             device_type_hint=str(cache_key[3]).lower(),
             comp7_value=comp7_value,
+            thing_type=thing_type,
         )
         device["_identify_cache"] = {"key": cache_key, "config": result}
         return _tecnolc2_signature_override(result, components, thing_type)

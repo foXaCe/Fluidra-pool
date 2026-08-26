@@ -21,7 +21,9 @@ from ..api_resilience import FluidraConnectionError, FluidraError
 from ..const import (
     BULK_FETCH_FAILURE_LIMIT,
     COMPONENT_HEAT_PUMP_SETPOINT,
+    CONF_ENABLE_REALTIME,
     CONNECTION_ISSUE_THRESHOLD,
+    DEFAULT_ENABLE_REALTIME,
     DEFAULT_SCAN_INTERVAL,
     DEVICE_TYPE_CHLORINATOR,
     DEVICE_TYPE_HEAT_PUMP,
@@ -84,6 +86,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Devices whose unmapped registers have already been dumped at DEBUG — see
         # _log_unmapped_components; log once per session, not on every poll.
         self._unmapped_logged: set[str] = set()
+
+        # Realtime channel (opt-in, plan 013 Pass 5). None until started; the
+        # poll runs identically whether it is up or not.
+        self._realtime: Any = None
+        self.realtime_changes = 0
 
         # Honour the user-configured polling interval.
         scan_interval = DEFAULT_SCAN_INTERVAL
@@ -196,7 +203,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Calculate current speed based on active schedules in auto mode."""
         return calculate_auto_speed_from_schedules(device)
 
-    async def _fetch_components(self, device_id: str, components_to_scan: list[int]) -> dict[int, dict[str, Any]]:
+    async def _fetch_components(
+        self, device_id: str, components_to_scan: list[int], thing_type: str = ""
+    ) -> dict[int, dict[str, Any]]:
         """Fetch the requested components, preferring the single bulk request.
 
         The bulk endpoint returns every component in one call (Issue #144), which
@@ -222,7 +231,7 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # carries every register, and processing unrequested ones would feed
                 # the per-family decoders components they don't expect.
                 wanted = set(components_to_scan)
-                self._log_unmapped_components(device_id, bulk, wanted)
+                self._log_unmapped_components(device_id, bulk, wanted, thing_type)
                 return {cid: state for cid, state in bulk.items() if cid in wanted}
 
             failures = self._bulk_fetch_failures.get(device_id, 0) + 1
@@ -237,7 +246,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         return await self._fetch_components_parallel(device_id, components_to_scan)
 
-    def _log_unmapped_components(self, device_id: str, bulk: dict[int, dict[str, Any]], wanted: set[int]) -> None:
+    def _log_unmapped_components(
+        self, device_id: str, bulk: dict[int, dict[str, Any]], wanted: set[int], thing_type: str = ""
+    ) -> None:
         """Log, once per device, the registers the bulk response carries but no profile maps.
 
         Adding support for a missing feature (a boost mode, an aux output, a
@@ -248,6 +259,10 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for repeated diagnostics exports that only ever contain the registers we
         already know about (Issues #174/#175, where every requested register was
         unrelated to the missing boost/aux/schedule features).
+
+        The device's ``thingType`` goes in the same line: it is Fluidra's own
+        family identifier, and it is what tells a maintainer which register map
+        an unreported model should be reading (README "Adding New Equipment").
         """
         if not _LOGGER.isEnabledFor(logging.DEBUG) or device_id in self._unmapped_logged:
             return
@@ -255,9 +270,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         unmapped = {cid: bulk[cid].get("reportedValue") for cid in sorted(bulk) if cid not in wanted}
         if unmapped:
             _LOGGER.debug(
-                "Device %s reports %d component(s) no profile maps — toggle a missing "
-                "feature in the Fluidra app and compare to find its register: %s",
+                "Device %s (thing_type=%s) reports %d component(s) no profile maps — "
+                "toggle a missing feature in the Fluidra app and compare to find its "
+                "register: %s",
                 device_id,
+                thing_type or "unknown",
                 len(unmapped),
                 unmapped,
             )
@@ -290,6 +307,88 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if state and isinstance(state, dict):
                 component_states[cid] = state
         return component_states
+
+    @property
+    def realtime_enabled(self) -> bool:
+        """Return True when the user opted into the realtime channel."""
+        entry = self.config_entry
+        if entry is None or not entry.options:
+            return DEFAULT_ENABLE_REALTIME
+        return bool(entry.options.get(CONF_ENABLE_REALTIME, DEFAULT_ENABLE_REALTIME))
+
+    @property
+    def realtime_connected(self) -> bool:
+        """Return True while the realtime channel is actually connected."""
+        return bool(getattr(self._realtime, "connected", False))
+
+    def _known_device_ids(self) -> list[str]:
+        """Return every device id currently in the coordinator's data."""
+        device_ids: list[str] = []
+        for pool in (self.data or {}).values():
+            if not isinstance(pool, dict):
+                continue
+            for device in pool.get("devices", []):
+                device_id = device.get("device_id")
+                if device_id and str(device_id) not in device_ids:
+                    device_ids.append(str(device_id))
+        return device_ids
+
+    async def async_start_realtime(self) -> None:
+        """Open the realtime channel, if the user asked for it.
+
+        Failure here is never fatal: the integration polls exactly as before,
+        and the channel retries on its own.
+        """
+        if not self.realtime_enabled or self._realtime is not None:
+            return
+
+        from ..fluidra_api._websocket import FluidraWebsocketClient
+
+        session = await self.api._get_session()
+        device_ids = self._known_device_ids()
+        self._realtime = FluidraWebsocketClient(
+            session,
+            lambda: self.api.access_token,
+            self._handle_realtime_change,
+        )
+        await self._realtime.start(device_ids)
+        _LOGGER.debug("Realtime channel requested for %d device(s)", len(device_ids))
+
+    async def async_stop_realtime(self) -> None:
+        """Close the realtime channel, if one is running."""
+        if self._realtime is None:
+            return
+        await self._realtime.stop()
+        self._realtime = None
+
+    async def _handle_realtime_change(self, change: Any) -> None:
+        """Apply one pushed component change and tell the entities right away.
+
+        The push carries the same triplet a poll would have read, so it goes
+        through the very same decoder — no second code path that could drift
+        from the polled one. A change for a device we do not know is ignored:
+        discovery stays the poll's job.
+        """
+        data = self.data
+        if not data:
+            return
+
+        for pool_id, pool in data.items():
+            if not isinstance(pool, dict):
+                continue
+            for device in pool.get("devices", []):
+                if str(device.get("device_id")) != change.device_id:
+                    continue
+                device.setdefault("components", {})
+                state: dict[str, Any] = {"reportedValue": change.reported_value}
+                if change.timestamp is not None:
+                    state["ts"] = change.timestamp
+                self._process_component_state(device, str(pool_id), change.component_id, state)
+                self.realtime_changes += 1
+                # Push to the entities without a network round-trip: this is
+                # the whole point of the channel (Issue #210).
+                self.async_set_updated_data(data)
+                return
 
     def _process_component_state(
         self, device: dict[str, Any], pool_id: str, component_id: int, component_state: dict[str, Any]
@@ -1176,7 +1275,9 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 component_range = DeviceIdentifier.get_components_range(device)
                 components_to_scan = list(range(component_range))
-            component_states = await self._fetch_components(device_id, components_to_scan)
+            component_states = await self._fetch_components(
+                device_id, components_to_scan, str(device.get("thing_type", ""))
+            )
 
             if components_to_scan and not component_states:
                 strikes = self._empty_component_fetch_counts.get(device_id, 0) + 1

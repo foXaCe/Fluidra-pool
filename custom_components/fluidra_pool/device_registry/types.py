@@ -15,6 +15,12 @@ class DeviceConfig:
     name_patterns: list[str] = field(default_factory=list)  # Substrings matched against the device name.
     family_patterns: list[str] = field(default_factory=list)  # Substrings matched against the family field.
     model_patterns: list[str] = field(default_factory=list)  # Substrings matched against the model field.
+    # Fluidra's own family identifier, served on every device of the account from
+    # the very first fetch (``thingType``: "eppvs", "tecnoLC2", "domS2", ...). It
+    # names the *family*, not the unit, so it scores below a serial match but well
+    # above the catch-alls: a model nobody has reported yet still lands on the
+    # right family instead of on a profile that misreads its registers.
+    thing_type_patterns: list[str] = field(default_factory=list)
 
     # Polling scope.
     components_range: int = 25  # Number of components to scan.

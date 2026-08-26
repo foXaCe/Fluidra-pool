@@ -65,6 +65,9 @@
       "chlorinator_producing": {
         "name": "Produciendo"
       },
+      "filtration_state": {
+        "name": "Filtración en marcha"
+      },
       "no_flow_alarm": {
         "name": "Fallo de falta de caudal"
       },
@@ -76,6 +79,9 @@
       },
       "speed_input_medium": {
         "name": "Entrada velocidad media"
+      },
+      "uv_present": {
+        "name": "Lámpara UV detectada"
       }
     },
     "button": {
@@ -173,6 +179,14 @@
           "static_color": "Color Fijo"
         }
       },
+      "pump_3speed": {
+        "name": "Bomba de 3 velocidades",
+        "state": {
+          "high": "Velocidad alta",
+          "low": "Velocidad baja",
+          "medium": "Velocidad media"
+        }
+      },
       "pump_speed": {
         "name": "Nivel de Velocidad",
         "state": {
@@ -203,6 +217,9 @@
       },
       "boost_remaining": {
         "name": "Turbo restante"
+      },
+      "boost_remaining_hours": {
+        "name": "Tiempo de boost restante"
       },
       "brightness": {
         "name": "Brillo"
@@ -321,6 +338,9 @@
       },
       "target_temperature": {
         "name": "Temperatura Objetivo"
+      },
+      "uv_running_hours": {
+        "name": "Horas de funcionamiento de la lámpara UV"
       },
       "water_quality": {
         "name": "Calidad del Agua",
@@ -544,9 +564,11 @@
     "step": {
       "init": {
         "data": {
+          "enable_realtime": "Actualizaciones en tiempo real (experimental)",
           "scan_interval": "Intervalo de actualización (segundos)"
         },
         "data_description": {
+          "enable_realtime": "Permite que la nube de Fluidra envíe los cambios en cuanto se producen, en lugar de esperar al siguiente sondeo: un cambio de estado llega en unos 2 segundos. El sondeo sigue funcionando igualmente, así que desactivar esta opción vuelve al comportamiento anterior.",
           "scan_interval": "Frecuencia con la que Home Assistant consulta la nube de Fluidra. Un valor más bajo ofrece datos más recientes pero genera más solicitudes."
         },
         "description": "Configurar opciones avanzadas",

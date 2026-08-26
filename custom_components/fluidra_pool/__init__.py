@@ -204,6 +204,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
     # Set up platforms after coordinator has data
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Realtime channel, when the user opted in (plan 013, Pass 5). Started after
+    # the platforms so a change pushed within the first seconds lands on
+    # entities that exist. It never gates setup: the poll is the source of
+    # truth and runs the same whether the channel comes up or not.
+    # Closing it is async and belongs to async_unload_entry, which can await it
+    # — an async_on_unload callback would have to spawn a task and leave it
+    # lingering past teardown.
+    await coordinator.async_start_realtime()
+
     # 🥇 Gold: Recharger l'intégration quand les options changent
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
@@ -238,6 +247,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry)
         runtime = getattr(entry, "runtime_data", None)
         coordinator = getattr(runtime, "coordinator", None)
         if coordinator is not None:
+            await coordinator.async_stop_realtime()
             await coordinator.api.close()
     return unload_ok
 

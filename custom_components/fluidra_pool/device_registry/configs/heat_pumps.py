@@ -136,6 +136,9 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
     "z550iq_heat_pump": DeviceConfig(
         device_type="heat_pump",
         identifier_patterns=["LD*"],
+        # Cloud family id covering Z550iQ and Z550iQ+ (Z550iQR32), which this
+        # profile already handles together.
+        thing_type_patterns=["zs500"],
         name_patterns=["z550", "z55"],
         # No family_patterns — see the module note (Issue #216).
         components_range=5,

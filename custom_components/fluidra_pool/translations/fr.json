@@ -65,6 +65,9 @@
       "chlorinator_producing": {
         "name": "En production"
       },
+      "filtration_state": {
+        "name": "Filtration en marche"
+      },
       "no_flow_alarm": {
         "name": "Défaut absence de débit"
       },
@@ -76,6 +79,9 @@
       },
       "speed_input_medium": {
         "name": "Entrée vitesse moyenne"
+      },
+      "uv_present": {
+        "name": "Lampe UV détectée"
       }
     },
     "button": {
@@ -173,6 +179,14 @@
           "static_color": "Couleur fixe"
         }
       },
+      "pump_3speed": {
+        "name": "Pompe 3 vitesses",
+        "state": {
+          "high": "Grande vitesse",
+          "low": "Petite vitesse",
+          "medium": "Vitesse moyenne"
+        }
+      },
       "pump_speed": {
         "name": "Niveau de Vitesse",
         "state": {
@@ -203,6 +217,9 @@
       },
       "boost_remaining": {
         "name": "Boost restant"
+      },
+      "boost_remaining_hours": {
+        "name": "Temps de boost restant"
       },
       "brightness": {
         "name": "Luminosité"
@@ -321,6 +338,9 @@
       },
       "target_temperature": {
         "name": "Température Cible"
+      },
+      "uv_running_hours": {
+        "name": "Heures de fonctionnement de la lampe UV"
       },
       "water_quality": {
         "name": "Qualité de l'Eau",
@@ -544,9 +564,11 @@
     "step": {
       "init": {
         "data": {
+          "enable_realtime": "Mises à jour en temps réel (expérimental)",
           "scan_interval": "Intervalle de mise à jour (secondes)"
         },
         "data_description": {
+          "enable_realtime": "Laisse le cloud Fluidra pousser les changements au moment où ils surviennent, au lieu d'attendre l'interrogation suivante — un changement d'état arrive en 2 secondes environ. L'interrogation continue dans tous les cas : désactiver cette option revient simplement au comportement précédent.",
           "scan_interval": "Fréquence d'interrogation du cloud Fluidra par Home Assistant. Une valeur plus basse donne des données plus fraîches mais génère davantage de requêtes."
         },
         "description": "Configurer les options avancées",

@@ -54,4 +54,4 @@ skips = ["B101", "B105", "B110"]  # B101: assert, B105: hardcoded password (fals
 
 [tool.codespell]
 skip = "*.json,*.yaml,*.yml,.git"
-ignore-words-list = "hass,informations,authentification,formater,potentiel,complet,valide,conflit,conflits,groupe,correspondant,mis"
+ignore-words-list = "hass,informations,authentification,formater,potentiel,complet,valide,conflit,conflits,groupe,correspondant,mis,ot"

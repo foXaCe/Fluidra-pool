@@ -15,6 +15,7 @@ from ._components import ComponentsMixin
 from ._devices import DevicesMixin
 from ._schedules import PendingScheduleWrite, SchedulesMixin
 from ._session import SessionMixin
+from ._uiconfig import UiConfigMixin
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -22,7 +23,15 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 
-class FluidraPoolAPI(SessionMixin, AuthMixin, DevicesMixin, ComponentsMixin, CommandsMixin, SchedulesMixin):
+class FluidraPoolAPI(
+    SessionMixin,
+    AuthMixin,
+    DevicesMixin,
+    ComponentsMixin,
+    CommandsMixin,
+    SchedulesMixin,
+    UiConfigMixin,
+):
     """Wrapper for Fluidra Pool API for Home Assistant.
 
     Deliberately not slotted: there is a single instance per config entry (no
