@@ -53,5 +53,7 @@ exclude_dirs = ["tests", ".venv"]
 skips = ["B101", "B105", "B110"]  # B101: assert, B105: hardcoded password (false positive on const names), B110: try/except/pass (common in HA)
 
 [tool.codespell]
-skip = "*.json,*.yaml,*.yml,.git"
+# API-DISCOVERY.md and the plans are written in French: codespell reads them
+# as misspelt English and flags dozens of ordinary French words.
+skip = "*.json,*.yaml,*.yml,.git,API-DISCOVERY.md,plans/*,./plans/*"
 ignore-words-list = "hass,informations,authentification,formater,potentiel,complet,valide,conflit,conflits,groupe,correspondant,mis,ot"
