@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.86.2] - 2026-08-31
+
+### Fixed
+
+- **No more `via_device` deprecation warnings on Home Assistant 2026.9.** Every start logged two
+  of them, one for the pool's child devices and one for each entity's `device_info`. HA 2026.9
+  replaced `via_device` — the parent's identifiers — with `via_device_id`, its registry id. The two
+  keys are mutually exclusive across the versions this integration supports (the declared floor,
+  2025.4.0, knows only the first; 2026.9 declares only the second, and passing both raises), so the
+  key is now chosen from what the running core actually declares. Writing the id needs the pool
+  device's registry id, which is kept when those devices are created and published on the
+  coordinator for the entities to use. Devices stay attached to their pool either way — the older
+  key remains the fallback, since a deprecation warning is a better outcome than an orphaned
+  device. Verified on a live 2026.9 install and by an import sweep against the declared floor.
+
 ## [2.86.1] - 2026-08-31
 
 ### Fixed
