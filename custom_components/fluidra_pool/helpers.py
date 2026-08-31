@@ -9,11 +9,33 @@ from __future__ import annotations
 
 from datetime import time
 import logging
-from typing import Any
+from typing import Any, cast
 
-from .const import EXO_LED_COLOURS_LUMIPLUS, EXO_LED_COLOURS_ZODIAC_NL
+from homeassistant.helpers.device_registry import DeviceInfo
+
+from .const import DOMAIN, EXO_LED_COLOURS_LUMIPLUS, EXO_LED_COLOURS_ZODIAC_NL
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def link_to_pool(info: DeviceInfo, pool_id: str) -> DeviceInfo:
+    """Attach ``info`` to its parent pool device and return it.
+
+    HA 2026.9 dropped ``via_device`` from the ``DeviceInfo`` TypedDict in favour
+    of ``via_device_id``, which carries the *registry id* of the parent instead
+    of its identifiers. Two reasons keep us on the old key for now:
+
+    - ``via_device_id`` needs a lookup (``async_get_device_id_by_identifier``)
+      that does not exist at the HA floor declared in ``hacs.json``, and that
+      raises when the pool device is not registered yet — which is exactly the
+      state ``device_info`` is evaluated in for the first platform set up.
+    - ``via_device`` stays accepted by the registry until HA 2027.8.
+
+    So the key is written here, outside the TypedDict literal that no longer
+    types it, and this is the single place to migrate once the floor allows it.
+    """
+    cast(dict[str, Any], info)["via_device"] = (DOMAIN, pool_id)
+    return info
 
 
 def resolve_schedule_component(device_data: dict[str, Any], default: int = 20) -> int:

@@ -19,6 +19,7 @@ from ..entity import FluidraPoolControlEntity
 from ..helpers import (
     get_aux_schedule_data,
     get_schedule_data,
+    link_to_pool,
     resolve_aux_schedule_component,
     resolve_schedule_component,
 )
@@ -240,13 +241,15 @@ class FluidraScheduleTimeEntity(_FluidraTimeEntityBase):
 
         device_name = self.device_data.get("name") or f"Device {self._device_id}"
         firmware = self.device_data.get("firmware_version_component")
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=device_name,
-            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
-            model=default_model,
-            sw_version=str(firmware) if firmware is not None else None,
-            via_device=(DOMAIN, self._pool_id),
+        return link_to_pool(
+            DeviceInfo(
+                identifiers={(DOMAIN, self._device_id)},
+                name=device_name,
+                manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+                model=default_model,
+                sw_version=str(firmware) if firmware is not None else None,
+            ),
+            self._pool_id,
         )
 
     def _get_schedule_days(self, schedule: dict[str, Any] | None) -> set[int]:
@@ -340,11 +343,13 @@ class FluidraLightScheduleTimeEntity(_FluidraTimeEntityBase):
         """Return device info."""
         device_name = self.device_data.get("name") or f"Pool Light {self._device_id}"
         firmware = self.device_data.get("firmware_version_component")
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=device_name,
-            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
-            model=self.device_data.get("model", "LumiPlus Connect"),
-            sw_version=str(firmware) if firmware is not None else None,
-            via_device=(DOMAIN, self._pool_id),
+        return link_to_pool(
+            DeviceInfo(
+                identifiers={(DOMAIN, self._device_id)},
+                name=device_name,
+                manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+                model=self.device_data.get("model", "LumiPlus Connect"),
+                sw_version=str(firmware) if firmware is not None else None,
+            ),
+            self._pool_id,
         )

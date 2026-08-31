@@ -110,11 +110,11 @@ async def test_setup_entry_loaded(hass: HomeAssistant, mock_api: AsyncMock) -> N
 async def test_setup_entry_registers_devices(hass: HomeAssistant, mock_api: AsyncMock) -> None:
     """The pool device and the pump device are written to the device registry."""
     _prepare_api(mock_api)
-    await _setup(hass, mock_api)
+    entry = await _setup(hass, mock_api)
 
     registry = dr.async_get(hass)
-    pool_device = registry.async_get_device(identifiers={(DOMAIN, POOL_ID)})
-    pump_device = registry.async_get_device(identifiers={(DOMAIN, DEVICE_ID)})
+    pool_device = registry.async_get_device_by_identifier((DOMAIN, POOL_ID), entry.entry_id)
+    pump_device = registry.async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
 
     assert pool_device is not None
     assert pool_device.manufacturer == "Fluidra"
@@ -154,7 +154,30 @@ async def test_setup_entry_device_without_id_skipped(hass: HomeAssistant, mock_a
     assert entry.state is ConfigEntryState.LOADED
     registry = dr.async_get(hass)
     # The named pump is registered, the anonymous one is not.
-    assert registry.async_get_device(identifiers={(DOMAIN, DEVICE_ID)}) is not None
+    assert registry.async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id) is not None
+
+
+async def test_firmware_sync_writes_to_the_real_registry(hass: HomeAssistant, mock_api: AsyncMock) -> None:
+    """The coordinator's firmware sync reaches a real device registry, no deprecation on the way.
+
+    The unit tests for _sync_device_firmware mock the registry, so they cannot
+    catch a signature drift in the scoped lookup the coordinator now uses. This
+    one drives the actual registry the installed HA ships.
+    """
+    _prepare_api(mock_api)
+    entry = await _setup(hass, mock_api)
+    coordinator = entry.runtime_data.coordinator
+    # Production wires the entry through the current-entry ContextVar.
+    assert coordinator.config_entry is entry
+
+    registry = dr.async_get(hass)
+    assert registry.async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id).sw_version is None
+
+    pools = [{"id": POOL_ID, "devices": [{"device_id": DEVICE_ID, "firmware_version_component": "9.9.9"}]}]
+    coordinator._sync_device_firmware(pools)
+
+    device = registry.async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
+    assert device.sw_version == "9.9.9"
 
 
 # --------------------------------------------------------------------------- #

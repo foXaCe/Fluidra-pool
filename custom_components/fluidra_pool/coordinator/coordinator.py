@@ -6,7 +6,7 @@ import asyncio
 import copy
 from datetime import timedelta
 import logging
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -50,6 +50,24 @@ from ..write_verification import WriteVerifier
 from ._parsers import calculate_auto_speed_from_schedules, parse_dm24049704_schedule_format
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _async_get_device(
+    registry: dr.DeviceRegistry, identifier: tuple[str, str], config_entry_id: str | None
+) -> dr.DeviceEntry | None:
+    """Return the device carrying ``identifier``, or None.
+
+    HA 2026.9 deprecated ``async_get_device`` — identifiers are no longer unique
+    across config entries — in favour of ``async_get_device_by_identifier``,
+    which scopes the lookup to one entry. That method does not exist at the HA
+    floor declared in ``hacs.json``, so the old call stays as the fallback; it
+    keeps working until HA 2027.8, by which time the floor will have moved and
+    this whole function can go.
+    """
+    lookup = getattr(registry, "async_get_device_by_identifier", None)
+    if lookup is None or config_entry_id is None:
+        return registry.async_get_device(identifiers={identifier})
+    return cast("dr.DeviceEntry | None", lookup(identifier, config_entry_id))
 
 
 class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -1042,13 +1060,14 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _sync_device_firmware(self, pools: list[dict[str, Any]]) -> None:
         """Mirror reported firmware versions into the HA device registry (no-op if unchanged)."""
         registry = dr.async_get(self.hass)
+        config_entry_id = self.config_entry.entry_id if self.config_entry else None
         for pool in pools:
             for device in pool.get("devices", []):
                 device_id = device.get("device_id")
                 firmware = device.get("firmware_version_component")
                 if not device_id or firmware is None:
                     continue
-                entry = registry.async_get_device(identifiers={(DOMAIN, str(device_id))})
+                entry = _async_get_device(registry, (DOMAIN, str(device_id)), config_entry_id)
                 if entry is not None and entry.sw_version != str(firmware):
                     registry.async_update_device(entry.id, sw_version=str(firmware))
 
