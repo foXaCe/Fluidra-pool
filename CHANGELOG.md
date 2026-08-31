@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.86.1] - 2026-08-31
+
+### Fixed
+
+- **A device on an unverified profile can now be diagnosed.** A device that lands on a catch-all
+  profile is the one whose register map nobody knows yet, and it was the one the integration could
+  say the least about: `generic_heat_pump` polls only components 0-3 and 13/14/15, so a diagnostics
+  download could never carry anything else. Diagnostics now include an `unverified_devices` section
+  listing, for each device resolved on a `verified=False` profile, every register the bulk endpoint
+  returns, next to the profile name, the cloud's `thingType` and the registers the profile actually
+  scans. The unmapped-register debug dump also follows the device now — the full dump still goes out
+  once, then each register whose value moved is logged on its own line, so "toggle the feature in
+  the app and compare" no longer needs a Home Assistant restart between every step. Both changes are
+  read-only and neither guesses a mapping; the poll path is untouched (#221).
+- **A realtime push no longer wipes the polled setpoint.** `_handle_realtime_change` rebuilt the
+  component entry from scratch and the state was assigned wholesale, so a push on c9/c10/c11
+  discarded the polled `desiredValue`: `pump_desired`, `auto_desired` and `speed_level_desired` read
+  as unknown until the next poll restored them. The pushed state is now seeded from the stored
+  component.
+- **Device identification no longer serves a stale generic profile for a whole poll.** The
+  identification cache key does not hold the family id, and that id can arrive after a first
+  identification — the device tree may omit it while the status tree, attached later in the same
+  poll, carries it. It is now checked alongside the cache key.
+- **A non-finite register value degrades to unknown instead of raising.** `int(float("inf"))` raises
+  `OverflowError`, which two parsers did not catch, so a cloud value of `inf` propagated out of a
+  property.
+- **Unanswered WebSocket PING frames.** The realtime read loop skips every non-text frame, so a PING
+  from the gateway was received and dropped. `autoping` is enabled; the custom keepalive is
+  unchanged.
+- **Home Assistant 2026.9 compatibility.** The core device registry reworked its API: `DeviceInfo`
+  no longer declares `via_device`, and `async_get_device` is deprecated because identifiers are no
+  longer unique across config entries. The firmware sync moves to `async_get_device_by_identifier`,
+  scoped to the integration's own config entry, behind a shim that falls back on cores predating it.
+  The parent-pool link keeps writing `via_device` — accepted by the registry until HA 2027.8 — but
+  from a single `link_to_pool()` helper, the one place to migrate once the declared HA floor allows
+  `via_device_id`.
+
 ## [2.86.0] - 2026-08-26
 
 ### Added
