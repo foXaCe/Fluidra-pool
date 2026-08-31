@@ -205,8 +205,11 @@ class FluidraWebsocketClient:
             raise RuntimeError("no access token available")
 
         headers = {"User-Agent": FLUIDRA_USER_AGENT}
+        # autoping=True so aiohttp answers the gateway's own PING frames: the
+        # read loop drops every non-text frame, so an unanswered PING would let
+        # the gateway drop us. heartbeat stays None — the keepalive below is ours.
         async with self._session.ws_connect(
-            f"{self._url}?token={token}", headers=headers, autoping=False, heartbeat=None
+            f"{self._url}?token={token}", headers=headers, autoping=True, heartbeat=None
         ) as ws:
             self._ws = ws
             self.connected = True

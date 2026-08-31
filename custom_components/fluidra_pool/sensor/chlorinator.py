@@ -248,7 +248,8 @@ class FluidraUvRunningHoursSensor(FluidraPoolEntity, SensorEntity):
             return None
         try:
             return int(float(raw))
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
+            # OverflowError included: float("inf") parses, int() of it does not.
             _LOGGER.debug("Unparsable UV running hours %s on component %s", raw, self._component_id)
             return None
 

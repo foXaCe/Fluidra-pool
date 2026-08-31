@@ -174,6 +174,17 @@ async def test_subscribes_to_every_device_on_connect() -> None:
     ]
 
 
+async def test_server_pings_are_answered_automatically() -> None:
+    """The read loop drops non-text frames, so aiohttp must answer PINGs itself."""
+    client, _ = _client([], lambda change: None)
+
+    await client._connect_once()
+
+    kwargs = client._session.ws_connect.call_args.kwargs
+    assert kwargs["autoping"] is True
+    assert kwargs["heartbeat"] is None
+
+
 async def test_changes_reach_the_callback() -> None:
     """The measured frame ends up as a ComponentChange on the callback."""
     seen: list[ComponentChange] = []
@@ -316,6 +327,26 @@ async def test_pushed_change_updates_the_component_and_notifies() -> None:
     assert device["components"]["11"]["ts"] == 1787767038
     assert coordinator.realtime_changes == 1
     coordinator.async_set_updated_data.assert_called_once_with(coordinator.data)
+
+
+async def test_pushed_change_keeps_the_polled_desired_value() -> None:
+    """The push only carries the reported value -- the rest of the component stays.
+
+    ``_process_component_state`` replaces the whole component entry, so a push
+    built from scratch would drop the polled ``desiredValue`` and blank out
+    pump_desired / auto_desired / speed_level_desired until the next poll.
+    """
+    coordinator = _coordinator()
+    device = coordinator.data["pool-1"]["devices"][0]
+    device["components"]["11"] = {"reportedValue": 0, "desiredValue": 3, "extra": "kept"}
+
+    await coordinator._handle_realtime_change(ComponentChange(device_id=DEVICE_ID, component_id=11, reported_value=2))
+
+    component = device["components"]["11"]
+    assert component["reportedValue"] == 2
+    assert component["desiredValue"] == 3
+    assert component["extra"] == "kept"
+    assert device["speed_level_desired"] == 3
 
 
 async def test_change_for_an_unknown_device_is_ignored() -> None:
