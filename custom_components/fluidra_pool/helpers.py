@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import time
 import logging
-from typing import Any, cast
+from typing import Any, Final, cast
 
 from homeassistant.helpers.device_registry import DeviceInfo
 
@@ -18,23 +18,47 @@ from .const import DOMAIN, EXO_LED_COLOURS_LUMIPLUS, EXO_LED_COLOURS_ZODIAC_NL
 _LOGGER = logging.getLogger(__name__)
 
 
-def link_to_pool(info: DeviceInfo, pool_id: str) -> DeviceInfo:
+# HA 2026.9 replaced ``via_device`` — the parent's *identifiers* — with
+# ``via_device_id``, which carries the parent's *registry id*. The two are
+# mutually exclusive across the range this integration supports, so neither can
+# be written unconditionally:
+#
+#   * at the floor declared in ``hacs.json`` (2025.4.0) only ``via_device``
+#     exists, on both ``DeviceInfo`` and ``async_get_or_create``;
+#   * from 2026.9 ``DeviceInfo`` declares only ``via_device_id``, and passing
+#     ``via_device`` logs a deprecation warning on every device it links.
+#
+# Passing both raises, so the key is chosen from what the running core actually
+# declares. Reading it off ``DeviceInfo`` keeps this a pure data check — no
+# version parsing, no registry access — and it is evaluated once at import.
+_VIA_DEVICE_ID_SUPPORTED: Final = "via_device_id" in DeviceInfo.__annotations__
+
+
+def pool_link_kwargs(pool_id: str, pool_device_id: str | None) -> dict[str, Any]:
+    """Return the parent-pool link as keyword arguments for the device registry.
+
+    ``pool_device_id`` is the pool's registry id, which only the code that
+    created the pool device can know. When the caller cannot produce one, the
+    deprecated key is written instead: it still links the device, and a
+    deprecation warning is a far better outcome than a broken parent link. The
+    id is type-checked rather than merely tested against ``None`` because the
+    registry *raises* on a via_device_id it cannot resolve, which would abort
+    the device creation outright.
+    """
+    if _VIA_DEVICE_ID_SUPPORTED and isinstance(pool_device_id, str):
+        return {"via_device_id": pool_device_id}
+    return {"via_device": (DOMAIN, pool_id)}
+
+
+def link_to_pool(info: DeviceInfo, pool_id: str, pool_device_id: str | None = None) -> DeviceInfo:
     """Attach ``info`` to its parent pool device and return it.
 
-    HA 2026.9 dropped ``via_device`` from the ``DeviceInfo`` TypedDict in favour
-    of ``via_device_id``, which carries the *registry id* of the parent instead
-    of its identifiers. Two reasons keep us on the old key for now:
-
-    - ``via_device_id`` needs a lookup (``async_get_device_id_by_identifier``)
-      that does not exist at the HA floor declared in ``hacs.json``, and that
-      raises when the pool device is not registered yet — which is exactly the
-      state ``device_info`` is evaluated in for the first platform set up.
-    - ``via_device`` stays accepted by the registry until HA 2027.8.
-
-    So the key is written here, outside the TypedDict literal that no longer
-    types it, and this is the single place to migrate once the floor allows it.
+    The link is written here rather than in the ``DeviceInfo`` literal because
+    neither key is typed across the whole supported range — see
+    ``_VIA_DEVICE_ID_SUPPORTED`` for which one is picked and why. This is the
+    single place entities express the parent link.
     """
-    cast(dict[str, Any], info)["via_device"] = (DOMAIN, pool_id)
+    cast(dict[str, Any], info).update(pool_link_kwargs(pool_id, pool_device_id))
     return info
 
 

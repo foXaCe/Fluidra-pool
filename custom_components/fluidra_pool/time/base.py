@@ -250,6 +250,7 @@ class FluidraScheduleTimeEntity(_FluidraTimeEntityBase):
                 sw_version=str(firmware) if firmware is not None else None,
             ),
             self._pool_id,
+            self.coordinator.pool_device_ids.get(self._pool_id),
         )
 
     def _get_schedule_days(self, schedule: dict[str, Any] | None) -> set[int]:
@@ -352,4 +353,5 @@ class FluidraLightScheduleTimeEntity(_FluidraTimeEntityBase):
                 sw_version=str(firmware) if firmware is not None else None,
             ),
             self._pool_id,
+            self.coordinator.pool_device_ids.get(self._pool_id),
         )

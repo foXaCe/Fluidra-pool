@@ -15,6 +15,8 @@ from custom_components.fluidra_pool.binary_sensor import (
 from custom_components.fluidra_pool.const import DOMAIN
 from custom_components.fluidra_pool.device_registry import DEVICE_CONFIGS, DeviceIdentifier
 
+from .pool_link_asserts import POOL_DEVICE_ID, assert_linked_to_pool
+
 POOL_ID = "pool-1"
 DEVICE_ID = "TEST-DEV-001"
 PRODUCTION_COMPONENT = 154
@@ -24,6 +26,7 @@ def _coord(devices: list[dict]) -> Any:
     coordinator = MagicMock()
     coordinator.data = {POOL_ID: {"id": POOL_ID, "name": "Pool", "devices": devices}}
     coordinator.last_update_success = True
+    coordinator.pool_device_ids = {POOL_ID: POOL_DEVICE_ID}
     return coordinator
 
 
@@ -108,7 +111,7 @@ def test_device_info_uses_device_name_and_links_pool() -> None:
     info = _sensor(device).device_info
     assert info["name"] == "Chlorinator"
     assert (DOMAIN, DEVICE_ID) in info["identifiers"]
-    assert info["via_device"] == (DOMAIN, POOL_ID)
+    assert_linked_to_pool(info, POOL_ID, POOL_DEVICE_ID)
 
 
 async def test_setup_ignores_non_chlorinator_devices() -> None:

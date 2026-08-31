@@ -32,7 +32,7 @@ from .const import (
     FluidraPoolConfigEntry,
     FluidraPoolRuntimeData,
 )
-from .helpers import resolve_schedule_component
+from .helpers import pool_link_kwargs, resolve_schedule_component
 from .utils import mask_email
 
 if TYPE_CHECKING:
@@ -149,26 +149,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
         _LOGGER.debug("No pools returned yet (cloud not ready after restart); retrying setup")
         raise ConfigEntryNotReady("Fluidra returned no pools yet; Home Assistant will retry")
 
-    # Create devices for each pool
+    # Create devices for each pool. Their registry ids are kept: from HA 2026.9
+    # a child device links to its parent by id, not by identifiers, and this is
+    # the only point where those ids are known first-hand.
     device_registry = dr.async_get(hass)
+    pool_device_ids: dict[str, str] = {}
     for pool in pools:
         raw_pool_id = pool.get("id")
         if raw_pool_id is None:
             continue
         pool_id = str(raw_pool_id)
         pool_name = pool.get("name", f"Pool {pool_id}")
-        device_registry.async_get_or_create(
+        pool_device = device_registry.async_get_or_create(
             config_entry_id=entry.entry_id,
             identifiers={(DOMAIN, pool_id)},
             name=pool_name,
             manufacturer="Fluidra",
             model="Pool",
         )
+        pool_device_ids[pool_id] = pool_device.id
 
     # Create data update coordinator
     from .coordinator import FluidraDataUpdateCoordinator
 
     coordinator = FluidraDataUpdateCoordinator(hass, api, entry)
+    coordinator.pool_device_ids = pool_device_ids
 
     # 🏆 Utiliser runtime_data au lieu de hass.data (2024+)
     entry.runtime_data = FluidraPoolRuntimeData(
@@ -198,7 +203,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FluidraPoolConfigEntry) 
                         name=device_name,
                         manufacturer="Fluidra",
                         model=model,
-                        via_device=(DOMAIN, pool_id),
+                        **pool_link_kwargs(pool_id, pool_device_ids.get(pool_id)),
                     )
 
     # Set up platforms after coordinator has data

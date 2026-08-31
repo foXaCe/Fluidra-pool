@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from datetime import time
 
+from homeassistant.helpers.device_registry import DeviceInfo
 import pytest
 
+from custom_components.fluidra_pool import helpers
+from custom_components.fluidra_pool.const import DOMAIN
 from custom_components.fluidra_pool.helpers import (
     get_schedule_data,
     parse_cron_time,
@@ -128,3 +131,40 @@ def test_pool_access_unknown_without_contracts() -> None:
 
     assert determine_pool_access({"owner": "x"}, None) == "unknown"
     assert determine_pool_access({}, "user-1") == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# pool_link_kwargs — which key expresses the parent-pool link
+# ---------------------------------------------------------------------------
+
+
+def test_pool_link_kwargs_uses_the_registry_id_on_a_modern_core(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With via_device_id available and an id to hand, the id is what is written."""
+    monkeypatch.setattr(helpers, "_VIA_DEVICE_ID_SUPPORTED", True)
+    assert helpers.pool_link_kwargs("pool-1", "reg-42") == {"via_device_id": "reg-42"}
+
+
+def test_pool_link_kwargs_falls_back_to_identifiers_without_an_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No registry id means the link can only be expressed by identifiers."""
+    monkeypatch.setattr(helpers, "_VIA_DEVICE_ID_SUPPORTED", True)
+    assert helpers.pool_link_kwargs("pool-1", None) == {"via_device": (DOMAIN, "pool-1")}
+
+
+def test_pool_link_kwargs_rejects_a_non_string_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A non-string id would make the registry raise; the deprecated key still links."""
+    monkeypatch.setattr(helpers, "_VIA_DEVICE_ID_SUPPORTED", True)
+    assert helpers.pool_link_kwargs("pool-1", object()) == {"via_device": (DOMAIN, "pool-1")}
+
+
+def test_pool_link_kwargs_uses_identifiers_at_the_ha_floor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """At the declared HA floor via_device_id does not exist, id or no id."""
+    monkeypatch.setattr(helpers, "_VIA_DEVICE_ID_SUPPORTED", False)
+    assert helpers.pool_link_kwargs("pool-1", "reg-42") == {"via_device": (DOMAIN, "pool-1")}
+
+
+def test_link_to_pool_writes_the_link_onto_the_device_info(monkeypatch: pytest.MonkeyPatch) -> None:
+    """link_to_pool returns the same mapping, with the link added."""
+    monkeypatch.setattr(helpers, "_VIA_DEVICE_ID_SUPPORTED", True)
+    info = DeviceInfo(identifiers={(DOMAIN, "dev-1")})
+    assert helpers.link_to_pool(info, "pool-1", "reg-42") is info
+    assert info["via_device_id"] == "reg-42"

@@ -76,6 +76,7 @@ class FluidraBoostRemainingSensor(FluidraPoolEntity, SensorEntity):
                 sw_version=str(firmware) if firmware is not None else None,
             ),
             self._pool_id,
+            self.coordinator.pool_device_ids.get(self._pool_id),
         )
 
     @property
@@ -146,6 +147,7 @@ class FluidraBoostRemainingHoursSensor(FluidraPoolEntity, SensorEntity):
                 sw_version=str(firmware) if firmware is not None else None,
             ),
             self._pool_id,
+            self.coordinator.pool_device_ids.get(self._pool_id),
         )
 
     @property
@@ -231,6 +233,7 @@ class FluidraUvRunningHoursSensor(FluidraPoolEntity, SensorEntity):
                 sw_version=str(firmware) if firmware is not None else None,
             ),
             self._pool_id,
+            self.coordinator.pool_device_ids.get(self._pool_id),
         )
 
     @property
@@ -430,6 +433,7 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
                 sw_version=str(firmware) if firmware is not None else None,
             ),
             self._pool_id,
+            self.coordinator.pool_device_ids.get(self._pool_id),
         )
 
     @property

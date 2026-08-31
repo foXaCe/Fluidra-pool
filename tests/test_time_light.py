@@ -21,6 +21,8 @@ from custom_components.fluidra_pool.time.light import (
     FluidraLightScheduleStartTimeEntity,
 )
 
+from .pool_link_asserts import POOL_DEVICE_ID, assert_linked_to_pool
+
 POOL_ID = "pool-1"
 LIGHT_ID = "LE24500883"
 
@@ -50,6 +52,7 @@ def _coord(device: dict) -> Any:
     coordinator.data = {POOL_ID: {"id": POOL_ID, "name": "Pool", "devices": [device]}}
     coordinator.async_request_refresh = AsyncMock()
     coordinator.last_update_success = True
+    coordinator.pool_device_ids = {POOL_ID: POOL_DEVICE_ID}
     return coordinator
 
 
@@ -262,7 +265,7 @@ def test_device_info_uses_device_name_and_model() -> None:
     assert info["name"] == "Pool Light"
     assert info["manufacturer"] == "Fluidra"
     assert info["model"] == "LumiPlus Connect"
-    assert info["via_device"] == ("fluidra_pool", POOL_ID)
+    assert_linked_to_pool(info, POOL_ID, POOL_DEVICE_ID)
 
 
 def test_device_info_falls_back_to_default_name_and_model() -> None:

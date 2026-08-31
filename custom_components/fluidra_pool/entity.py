@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from .fluidra_api import FluidraPoolAPI
 
 
-class FluidraPoolEntity(CoordinatorEntity):
+class FluidraPoolEntity(CoordinatorEntity["FluidraDataUpdateCoordinator"]):
     """Base class for all Fluidra Pool entities (read-only)."""
 
     _attr_has_entity_name = True
@@ -80,6 +80,7 @@ class FluidraPoolEntity(CoordinatorEntity):
                 sw_version=str(firmware) if firmware is not None else None,
             ),
             self._pool_id,
+            self.coordinator.pool_device_ids.get(self._pool_id),
         )
 
     @property
