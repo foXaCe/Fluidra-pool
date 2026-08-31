@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.fluidra_pool.diagnostics import (
     REDACTED,
@@ -326,3 +326,126 @@ async def test_diagnostics_report_no_lost_writes_when_none_were_seen() -> None:
     diagnostics = await async_get_config_entry_diagnostics(None, entry)
 
     assert diagnostics["lost_writes"] == []
+
+
+async def test_diagnostics_dump_every_register_of_an_unverified_device() -> None:
+    """A guessed profile must ship its whole register set, not just what it reads.
+
+    The generic heat-pump profile polls components 0-3 plus 13/14/15, so the
+    pools block can only ever contain those. That is exactly the device for which
+    nobody knows the map yet: Issue #221's Z350iQ reads OFF because component 13
+    is not its ON/OFF flag, and no export could show which register is.
+    """
+    device = {
+        "device_id": "FE25000001",
+        "name": "Z350iQ",
+        "family": "Heat Pumps",
+        "type": "heat_pump",
+        "thing_type": "hpc",
+        "components": {"13": {"reportedValue": 0}, "15": {"reportedValue": 280}},
+    }
+    api = SimpleNamespace(
+        get_all_components=AsyncMock(
+            return_value={
+                1: {"reportedValue": "FE25000001"},
+                13: {"reportedValue": 0},
+                21: {"reportedValue": 1},
+                37: {"reportedValue": 274},
+            }
+        )
+    )
+    coordinator = SimpleNamespace(
+        data={"pool-abc": {"id": "pool-abc", "devices": [device]}},
+        last_update_success=True,
+        update_interval=timedelta(seconds=30),
+        api=api,
+    )
+
+    entry = MagicMock()
+    entry.entry_id = "entry-1"
+    entry.version = 1
+    entry.domain = "fluidra_pool"
+    entry.title = "Fluidra Pool"
+    entry.data = {}
+    entry.options = {}
+    entry.runtime_data = SimpleNamespace(coordinator=coordinator)
+
+    diagnostics = await async_get_config_entry_diagnostics(None, entry)
+
+    dumped = diagnostics["unverified_devices"]
+    assert len(dumped) == 1
+    assert dumped[0]["profile"] == "generic_heat_pump"
+    # The family id is what places an unreported model on a register map.
+    assert dumped[0]["thing_type"] == "hpc"
+    assert dumped[0]["scanned_components"] == [13, 15]
+    # Registers the profile never polls — the whole point of the block.
+    assert dumped[0]["all_registers"]["21"]["reportedValue"] == 1
+    assert dumped[0]["all_registers"]["37"]["reportedValue"] == 274
+    # Redaction still applies: component 1 carries the serial.
+    assert dumped[0]["all_registers"]["1"]["reportedValue"] == REDACTED
+    assert dumped[0]["device_id"] != "FE25000001"
+
+
+async def test_diagnostics_skip_the_register_dump_for_verified_devices() -> None:
+    """A verified profile already documents its map — no extra cloud request."""
+    device = {
+        "device_id": "ZB25000001",
+        "name": "Z650iQ",
+        "family": "Heat Pumps",
+        "type": "heat_pump",
+        "components": {"10": {"reportedValue": 1}},
+    }
+    api = SimpleNamespace(get_all_components=AsyncMock(return_value={10: {"reportedValue": 1}}))
+    coordinator = SimpleNamespace(
+        data={"pool-abc": {"id": "pool-abc", "devices": [device]}},
+        last_update_success=True,
+        update_interval=timedelta(seconds=30),
+        api=api,
+    )
+
+    entry = MagicMock()
+    entry.entry_id = "entry-1"
+    entry.version = 1
+    entry.domain = "fluidra_pool"
+    entry.title = "Fluidra Pool"
+    entry.data = {}
+    entry.options = {}
+    entry.runtime_data = SimpleNamespace(coordinator=coordinator)
+
+    diagnostics = await async_get_config_entry_diagnostics(None, entry)
+
+    assert diagnostics["unverified_devices"] == []
+    api.get_all_components.assert_not_awaited()
+
+
+async def test_diagnostics_survive_a_refused_register_dump() -> None:
+    """A cloud that refuses the bulk endpoint must not fail the whole download."""
+    device = {
+        "device_id": "FE25000001",
+        "name": "Z350iQ",
+        "family": "Heat Pumps",
+        "type": "heat_pump",
+        "thing_type": "hpc",
+        "components": {},
+    }
+    api = SimpleNamespace(get_all_components=AsyncMock(side_effect=TimeoutError))
+    coordinator = SimpleNamespace(
+        data={"pool-abc": {"id": "pool-abc", "devices": [device]}},
+        last_update_success=True,
+        update_interval=timedelta(seconds=30),
+        api=api,
+    )
+
+    entry = MagicMock()
+    entry.entry_id = "entry-1"
+    entry.version = 1
+    entry.domain = "fluidra_pool"
+    entry.title = "Fluidra Pool"
+    entry.data = {}
+    entry.options = {}
+    entry.runtime_data = SimpleNamespace(coordinator=coordinator)
+
+    diagnostics = await async_get_config_entry_diagnostics(None, entry)
+
+    assert diagnostics["unverified_devices"] == []
+    assert diagnostics["coordinator"]["last_update_success"] is True
