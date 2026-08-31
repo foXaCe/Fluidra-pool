@@ -26,6 +26,7 @@ from homeassistant.util import dt as dt_util
 from ..const import DOMAIN
 from ..device_registry import DeviceIdentifier
 from ..entity import FluidraPoolEntity
+from ..helpers import link_to_pool
 
 if TYPE_CHECKING:
     from ..coordinator import FluidraDataUpdateCoordinator
@@ -66,13 +67,15 @@ class FluidraBoostRemainingSensor(FluidraPoolEntity, SensorEntity):
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
         firmware = self.device_data.get("firmware_version_component")
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=device_name,
-            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
-            model="Chlorinator",
-            sw_version=str(firmware) if firmware is not None else None,
-            via_device=(DOMAIN, self._pool_id),
+        return link_to_pool(
+            DeviceInfo(
+                identifiers={(DOMAIN, self._device_id)},
+                name=device_name,
+                manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+                model="Chlorinator",
+                sw_version=str(firmware) if firmware is not None else None,
+            ),
+            self._pool_id,
         )
 
     @property
@@ -134,13 +137,15 @@ class FluidraBoostRemainingHoursSensor(FluidraPoolEntity, SensorEntity):
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
         firmware = self.device_data.get("firmware_version_component")
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=device_name,
-            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
-            model="Chlorinator",
-            sw_version=str(firmware) if firmware is not None else None,
-            via_device=(DOMAIN, self._pool_id),
+        return link_to_pool(
+            DeviceInfo(
+                identifiers={(DOMAIN, self._device_id)},
+                name=device_name,
+                manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+                model="Chlorinator",
+                sw_version=str(firmware) if firmware is not None else None,
+            ),
+            self._pool_id,
         )
 
     @property
@@ -217,13 +222,15 @@ class FluidraUvRunningHoursSensor(FluidraPoolEntity, SensorEntity):
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
         firmware = self.device_data.get("firmware_version_component")
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=device_name,
-            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
-            model="Chlorinator",
-            sw_version=str(firmware) if firmware is not None else None,
-            via_device=(DOMAIN, self._pool_id),
+        return link_to_pool(
+            DeviceInfo(
+                identifiers={(DOMAIN, self._device_id)},
+                name=device_name,
+                manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+                model="Chlorinator",
+                sw_version=str(firmware) if firmware is not None else None,
+            ),
+            self._pool_id,
         )
 
     @property
@@ -414,13 +421,15 @@ class FluidraChlorinatorSensor(FluidraPoolEntity, SensorEntity):
         """Return device information."""
         device_name = self.device_data.get("name") or f"Chlorinator {self._device_id}"
         firmware = self.device_data.get("firmware_version_component")
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=device_name,
-            manufacturer=self.device_data.get("manufacturer", "Fluidra"),
-            model="Chlorinator",
-            sw_version=str(firmware) if firmware is not None else None,
-            via_device=(DOMAIN, self._pool_id),
+        return link_to_pool(
+            DeviceInfo(
+                identifiers={(DOMAIN, self._device_id)},
+                name=device_name,
+                manufacturer=self.device_data.get("manufacturer", "Fluidra"),
+                model="Chlorinator",
+                sw_version=str(firmware) if firmware is not None else None,
+            ),
+            self._pool_id,
         )
 
     @property

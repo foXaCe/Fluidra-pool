@@ -9,6 +9,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DEVICE_MODEL_FALLBACK, DEVICE_MODEL_MAP, DOMAIN
+from .helpers import link_to_pool
 
 if TYPE_CHECKING:
     from .coordinator import FluidraDataUpdateCoordinator
@@ -70,13 +71,15 @@ class FluidraPoolEntity(CoordinatorEntity):
 
         device_name = device_data.get("name", f"Device {self._device_id}")
         firmware = device_data.get("firmware_version_component")
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=device_name,
-            manufacturer=device_data.get("manufacturer", "Fluidra"),
-            model=default_model,
-            sw_version=str(firmware) if firmware is not None else None,
-            via_device=(DOMAIN, self._pool_id),
+        return link_to_pool(
+            DeviceInfo(
+                identifiers={(DOMAIN, self._device_id)},
+                name=device_name,
+                manufacturer=device_data.get("manufacturer", "Fluidra"),
+                model=default_model,
+                sw_version=str(firmware) if firmware is not None else None,
+            ),
+            self._pool_id,
         )
 
     @property

@@ -11,6 +11,7 @@ import pytest
 
 from custom_components.fluidra_pool.api_resilience import FluidraConnectionError
 from custom_components.fluidra_pool.const import (
+    DOMAIN,
     EMPTY_COMPONENT_FETCH_THRESHOLD,
     OFFLINE_GRACE_POLLS,
     STALE_DEVICE_THRESHOLD,
@@ -379,10 +380,27 @@ class TestSyncDeviceFirmware:
 
     _POOLS = [{"id": "p1", "devices": [{"device_id": "D1", "firmware_version_component": "2.0"}]}]
 
+    @staticmethod
+    def _coordinator(hass: HomeAssistant, mock_api: AsyncMock) -> FluidraDataUpdateCoordinator:
+        """A coordinator that knows its config entry, as it does once set up.
+
+        DataUpdateCoordinator.__init__ overwrites self.config_entry from the
+        current-entry ContextVar, which is only set inside async_setup_entry, so
+        constructing one here leaves it None. Assign it back to get the shape
+        production actually runs with.
+        """
+        config_entry = MagicMock()
+        config_entry.entry_id = "entry_1"
+        config_entry.options = {}
+        coord = FluidraDataUpdateCoordinator(hass, mock_api, config_entry)
+        coord.config_entry = config_entry
+        return coord
+
     def _sync(self, hass: HomeAssistant, mock_api: AsyncMock, pools, registry_entry):
-        coord = FluidraDataUpdateCoordinator(hass, mock_api)
+        """Run the sync as production does: with a config entry, on a modern registry."""
+        coord = self._coordinator(hass, mock_api)
         dev_reg = MagicMock()
-        dev_reg.async_get_device.return_value = registry_entry
+        dev_reg.async_get_device_by_identifier.return_value = registry_entry
         with patch(
             "custom_components.fluidra_pool.coordinator.coordinator.dr.async_get",
             return_value=dev_reg,
@@ -395,6 +413,7 @@ class TestSyncDeviceFirmware:
         entry.id = "reg_1"
         entry.sw_version = "1.0"
         dev_reg = self._sync(hass, mock_api, self._POOLS, entry)
+        dev_reg.async_get_device_by_identifier.assert_called_once_with((DOMAIN, "D1"), "entry_1")
         dev_reg.async_update_device.assert_called_once_with("reg_1", sw_version="2.0")
 
     def test_noop_when_firmware_unchanged(self, hass: HomeAssistant, mock_api: AsyncMock):
@@ -410,7 +429,41 @@ class TestSyncDeviceFirmware:
     def test_skips_devices_without_firmware_or_id(self, hass: HomeAssistant, mock_api: AsyncMock):
         pools = [{"id": "p1", "devices": [{"device_id": "D1"}, {"firmware_version_component": "9"}]}]
         dev_reg = self._sync(hass, mock_api, pools, MagicMock())
-        dev_reg.async_get_device.assert_not_called()
+        dev_reg.async_get_device_by_identifier.assert_not_called()
+
+    def test_falls_back_when_registry_predates_the_scoped_lookup(self, hass: HomeAssistant, mock_api: AsyncMock):
+        """At the HA floor there is no async_get_device_by_identifier — use the old call."""
+        coord = self._coordinator(hass, mock_api)
+        entry = MagicMock()
+        entry.id = "reg_1"
+        entry.sw_version = "1.0"
+        # spec= gives a registry that only exposes the two methods the floor has.
+        dev_reg = MagicMock(spec=["async_get_device", "async_update_device"])
+        dev_reg.async_get_device.return_value = entry
+        with patch(
+            "custom_components.fluidra_pool.coordinator.coordinator.dr.async_get",
+            return_value=dev_reg,
+        ):
+            coord._sync_device_firmware(self._POOLS)
+        dev_reg.async_get_device.assert_called_once_with(identifiers={(DOMAIN, "D1")})
+        dev_reg.async_update_device.assert_called_once_with("reg_1", sw_version="2.0")
+
+    def test_falls_back_without_a_config_entry(self, hass: HomeAssistant, mock_api: AsyncMock):
+        """The scoped lookup needs an entry id; without one, the unscoped call still works."""
+        coord = FluidraDataUpdateCoordinator(hass, mock_api)
+        entry = MagicMock()
+        entry.id = "reg_1"
+        entry.sw_version = "1.0"
+        dev_reg = MagicMock()
+        dev_reg.async_get_device.return_value = entry
+        with patch(
+            "custom_components.fluidra_pool.coordinator.coordinator.dr.async_get",
+            return_value=dev_reg,
+        ):
+            coord._sync_device_firmware(self._POOLS)
+        dev_reg.async_get_device.assert_called_once_with(identifiers={(DOMAIN, "D1")})
+        dev_reg.async_get_device_by_identifier.assert_not_called()
+        dev_reg.async_update_device.assert_called_once_with("reg_1", sw_version="2.0")
 
 
 class TestUpdateDataOutagePath:
