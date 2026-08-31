@@ -42,6 +42,8 @@ from custom_components.fluidra_pool.sensor import (
     async_setup_entry,
 )
 
+from .pool_link_asserts import POOL_DEVICE_ID, assert_linked_to_pool
+
 POOL_ID = "pool-1"
 DEVICE_ID = "TEST-DEV-001"
 
@@ -58,6 +60,7 @@ def _coord(devices: list[dict], pool_extra: dict | None = None) -> Any:
     pool.update(pool_extra or {})
     coordinator.data = {POOL_ID: pool}
     coordinator.last_update_success = True
+    coordinator.pool_device_ids = {POOL_ID: POOL_DEVICE_ID}
     return coordinator
 
 
@@ -1312,7 +1315,7 @@ def test_chlorinator_device_info_uses_device_name_and_manufacturer() -> None:
     assert info["manufacturer"] == "Hayward"
     assert info["model"] == "Chlorinator"
     assert (DOMAIN, DEVICE_ID) in info["identifiers"]
-    assert info["via_device"] == (DOMAIN, POOL_ID)
+    assert_linked_to_pool(info, POOL_ID, POOL_DEVICE_ID)
 
 
 def test_chlorinator_device_info_falls_back_to_generated_name() -> None:

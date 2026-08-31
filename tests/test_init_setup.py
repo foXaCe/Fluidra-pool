@@ -8,6 +8,7 @@ the options-update reload listener, and the pure time/schedule helpers.
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import ConfigEntryState
@@ -120,6 +121,47 @@ async def test_setup_entry_registers_devices(hass: HomeAssistant, mock_api: Asyn
     assert pool_device.manufacturer == "Fluidra"
     assert pump_device is not None
     assert pump_device.model == "Pump"
+
+
+async def test_setup_entry_links_devices_to_their_pool(hass: HomeAssistant, mock_api: AsyncMock) -> None:
+    """The pump hangs off the pool device, and the coordinator keeps the pool's id.
+
+    Driven against a real device registry rather than a mock: the two keys that
+    can express this link (`via_device`, `via_device_id`) are resolved by the
+    registry itself, so only a real one proves the child actually ended up
+    attached rather than silently unlinked.
+    """
+    _prepare_api(mock_api)
+    entry = await _setup(hass, mock_api)
+
+    registry = dr.async_get(hass)
+    pool_device = registry.async_get_device_by_identifier((DOMAIN, POOL_ID), entry.entry_id)
+    pump_device = registry.async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
+
+    assert pool_device is not None
+    assert pump_device is not None
+    assert pump_device.via_device_id == pool_device.id
+    # The id the entities need to express the same link is published on the
+    # coordinator; without it every device_info would fall back to the
+    # deprecated key.
+    assert entry.runtime_data.coordinator.pool_device_ids == {POOL_ID: pool_device.id}
+
+
+async def test_setup_entry_links_without_the_deprecated_parameter(
+    hass: HomeAssistant, mock_api: AsyncMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Setting up emits no `via_device` deprecation warning on a core that dropped it.
+
+    HA only logs — rather than raises — for a custom integration, so nothing but
+    reading the log catches this: the whole setup, pool devices, child devices
+    and every entity's device_info, must go through without one.
+    """
+    _prepare_api(mock_api)
+    with caplog.at_level(logging.WARNING):
+        await _setup(hass, mock_api)
+
+    deprecations = [r.getMessage() for r in caplog.records if "deprecated `via_device`" in r.getMessage()]
+    assert deprecations == []
 
 
 async def test_setup_entry_no_pools_retries(hass: HomeAssistant, mock_api: AsyncMock) -> None:

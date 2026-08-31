@@ -41,7 +41,7 @@ class FluidraPoolSensorEntity(FluidraPoolEntity, SensorEntity):
         return f"{DOMAIN}_{self._pool_id}_{self._device_id}_sensor{suffix}"
 
 
-class FluidraPoolSensorBase(CoordinatorEntity, SensorEntity):
+class FluidraPoolSensorBase(CoordinatorEntity["FluidraDataUpdateCoordinator"], SensorEntity):
     """Base class for pool-level sensor entities (not bound to a single device)."""
 
     _attr_has_entity_name = True

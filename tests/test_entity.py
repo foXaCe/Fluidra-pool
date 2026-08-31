@@ -9,6 +9,8 @@ import pytest
 from custom_components.fluidra_pool.const import DOMAIN
 from custom_components.fluidra_pool.entity import FluidraPoolControlEntity, FluidraPoolEntity
 
+from .pool_link_asserts import POOL_DEVICE_ID, assert_linked_to_pool
+
 
 @pytest.fixture
 def mock_coordinator(mock_pool_data: dict) -> MagicMock:
@@ -16,6 +18,7 @@ def mock_coordinator(mock_pool_data: dict) -> MagicMock:
     coordinator = MagicMock()
     coordinator.data = mock_pool_data
     coordinator.last_update_success = True
+    coordinator.pool_device_ids = {"pool_001": POOL_DEVICE_ID}
     return coordinator
 
 
@@ -69,7 +72,7 @@ class TestFluidraPoolEntity:
         assert (DOMAIN, "E30-001") in info["identifiers"]
         assert info["name"] == "Pool Pump"
         assert info["manufacturer"] == "Fluidra"
-        assert info["via_device"] == (DOMAIN, "pool_001")
+        assert_linked_to_pool(info, "pool_001", POOL_DEVICE_ID)
 
     def test_device_info_unknown_device(self, mock_coordinator: MagicMock):
         entity = FluidraPoolEntity(mock_coordinator, "pool_001", "UNKNOWN")

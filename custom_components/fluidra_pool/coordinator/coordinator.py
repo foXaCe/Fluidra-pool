@@ -96,6 +96,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._read_only_pools_warned: set[str] = set()
         # Devices already flagged for an unverified profile — raise once, not every poll.
         self._unverified_profile_flagged: set[str] = set()
+        # Registry id of each pool device, keyed by cloud pool id. Filled by
+        # async_setup_entry right after it creates those devices, because that
+        # is the only place the ids are known: entities need them to express
+        # their parent link as via_device_id (see helpers.pool_link_kwargs).
+        self.pool_device_ids: dict[str, str] = {}
         # Consecutive bulk-fetch failures per device (Issue #144). Tracked per
         # device, not globally: some devices 404 the bulk endpoint while others on
         # the same account answer it fine (Issue #175), and a shared counter was
