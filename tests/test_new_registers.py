@@ -11,6 +11,8 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from custom_components.fluidra_pool.binary_sensor import (
     FluidraFiltrationStateBinarySensor,
     FluidraUvPresentBinarySensor,
@@ -119,6 +121,12 @@ def test_uv_running_hours_accepts_float_reading() -> None:
 def test_uv_running_hours_none_on_unparsable_value() -> None:
     """Unparsable readings degrade to None."""
     assert _uv_hours(_device({"253": {"reportedValue": "n/a"}})).native_value is None
+
+
+@pytest.mark.parametrize("raw", ["inf", "-inf", "nan", float("inf")])
+def test_uv_running_hours_none_on_non_finite_value(raw: Any) -> None:
+    """A non-finite reading parses as a float but not as an int -- report nothing."""
+    assert _uv_hours(_device({"253": {"reportedValue": raw}})).native_value is None
 
 
 def test_uv_running_hours_unavailable_when_register_missing() -> None:

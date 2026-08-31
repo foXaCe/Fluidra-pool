@@ -438,7 +438,13 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if str(device.get("device_id")) != change.device_id:
                     continue
                 device.setdefault("components", {})
-                state: dict[str, Any] = {"reportedValue": change.reported_value}
+                # The push only carries the reported value: seed from what the
+                # poll stored so the rest of the component — `desiredValue`
+                # above all, which feeds pump_desired/auto_desired — survives.
+                # _process_component_state replaces the whole component entry.
+                previous = device["components"].get(str(change.component_id))
+                state: dict[str, Any] = dict(previous) if isinstance(previous, dict) else {}
+                state["reportedValue"] = change.reported_value
                 if change.timestamp is not None:
                     state["ts"] = change.timestamp
                 self._process_component_state(device, str(pool_id), change.component_id, state)

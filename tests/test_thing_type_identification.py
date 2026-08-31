@@ -57,6 +57,20 @@ def test_family_id_read_from_the_status_tree_too() -> None:
 # --- What it must not do -----------------------------------------------------
 
 
+def test_family_id_arriving_late_invalidates_the_cache() -> None:
+    """The label can land after a first identification — the cache must not hide it.
+
+    The device tree may omit ``thingType`` while the status tree, attached later
+    in the same poll, carries it. The result is cached on the device dict, so the
+    family id has to be part of the cache key or the generic answer sticks.
+    """
+    device = _device(type="pump")
+    assert DeviceIdentifier.identify_device(device) is not DEVICE_CONFIGS["e30iq_pump"]
+
+    device["status"] = {"thingType": "eppvs"}
+    assert DeviceIdentifier.identify_device(device) is DEVICE_CONFIGS["e30iq_pump"]
+
+
 def test_serial_match_still_wins_over_the_family_id() -> None:
     """A profile written for one unit stays more specific than its family.
 

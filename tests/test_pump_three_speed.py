@@ -116,6 +116,12 @@ def test_current_option_none_on_unparsable_value() -> None:
     assert _select({"137": {"reportedValue": "n/a"}}).current_option is None
 
 
+@pytest.mark.parametrize("raw", ["inf", "-inf", "nan", float("inf")])
+def test_current_option_none_on_non_finite_value(raw: Any) -> None:
+    """A non-finite reading parses as a float but not as an int -- stay unknown."""
+    assert _select({"137": {"reportedValue": raw}}).current_option is None
+
+
 def test_read_and_write_tables_are_profile_overridable() -> None:
     """A family numbering its speeds differently is a profile edit, not a code change."""
     entity = _select(

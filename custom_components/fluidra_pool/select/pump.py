@@ -244,7 +244,8 @@ class FluidraThreeSpeedPumpSelect(FluidraPoolControlEntity, SelectEntity):
             return None
         try:
             reported = int(float(raw))
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
+            # OverflowError included: float("inf") parses, int() of it does not.
             _LOGGER.debug("Unparsable three-speed value %s on component %s", raw, self._component)
             return None
 

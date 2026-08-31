@@ -241,7 +241,14 @@ class DeviceIdentifier:
             comp7_value,
         )
         cache = device.get("_identify_cache")
-        if isinstance(cache, dict) and cache.get("key") == cache_key:
+        # The family id is checked alongside the key, not inside it: it can arrive
+        # after a first identification (the device tree may omit ``thingType``
+        # while the status tree, attached later in the same poll, carries it) and
+        # none of the key's fields move with it, so the stale generic result would
+        # be served for the rest of the poll. An entry that records no family id
+        # states nothing about it and is left valid.
+        cached_thing_type = cache.get("thing_type", thing_type) if isinstance(cache, dict) else thing_type
+        if isinstance(cache, dict) and cache.get("key") == cache_key and cached_thing_type == thing_type:
             # The tecnoLC2 signature is re-evaluated here (not baked into the cache) so
             # it activates as soon as c8/c172 are scanned, without a key change.
             return _tecnolc2_signature_override(cache.get("config"), components, thing_type)
@@ -255,7 +262,7 @@ class DeviceIdentifier:
             comp7_value=comp7_value,
             thing_type=thing_type,
         )
-        device["_identify_cache"] = {"key": cache_key, "config": result}
+        device["_identify_cache"] = {"key": cache_key, "thing_type": thing_type, "config": result}
         return _tecnolc2_signature_override(result, components, thing_type)
 
     @staticmethod
