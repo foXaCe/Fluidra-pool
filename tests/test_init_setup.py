@@ -110,11 +110,11 @@ async def test_setup_entry_loaded(hass: HomeAssistant, mock_api: AsyncMock) -> N
 async def test_setup_entry_registers_devices(hass: HomeAssistant, mock_api: AsyncMock) -> None:
     """The pool device and the pump device are written to the device registry."""
     _prepare_api(mock_api)
-    await _setup(hass, mock_api)
+    entry = await _setup(hass, mock_api)
 
     registry = dr.async_get(hass)
-    pool_device = registry.async_get_device(identifiers={(DOMAIN, POOL_ID)})
-    pump_device = registry.async_get_device(identifiers={(DOMAIN, DEVICE_ID)})
+    pool_device = registry.async_get_device_by_identifier((DOMAIN, POOL_ID), entry.entry_id)
+    pump_device = registry.async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id)
 
     assert pool_device is not None
     assert pool_device.manufacturer == "Fluidra"
@@ -154,7 +154,7 @@ async def test_setup_entry_device_without_id_skipped(hass: HomeAssistant, mock_a
     assert entry.state is ConfigEntryState.LOADED
     registry = dr.async_get(hass)
     # The named pump is registered, the anonymous one is not.
-    assert registry.async_get_device(identifiers={(DOMAIN, DEVICE_ID)}) is not None
+    assert registry.async_get_device_by_identifier((DOMAIN, DEVICE_ID), entry.entry_id) is not None
 
 
 # --------------------------------------------------------------------------- #
