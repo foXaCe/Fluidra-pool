@@ -273,16 +273,19 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         the user had to restart Home Assistant between every step (Issue #221, a
         Z350iQ whose real ON/OFF register is still unknown). A poll that changed
         nothing is still silent, so an idle device does not fill the log.
+
+        Removals count as changes too: a register that vanishes from the bulk
+        response must clear the snapshot, otherwise a later reappearance with
+        the same value stays silent.
         """
         if not _LOGGER.isEnabledFor(logging.DEBUG):
             return
         unmapped = {cid: bulk[cid].get("reportedValue") for cid in sorted(bulk) if cid not in wanted}
-        if not unmapped:
-            return
-
         previous = self._unmapped_snapshots.get(device_id)
-        self._unmapped_snapshots[device_id] = unmapped
         if previous is None:
+            if not unmapped:
+                return
+            self._unmapped_snapshots[device_id] = unmapped
             _LOGGER.debug(
                 "Device %s (thing_type=%s) reports %d component(s) no profile maps — "
                 "toggle a missing feature in the Fluidra app and compare to find its "
@@ -294,11 +297,18 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             return
 
-        changes = {
-            cid: f"{previous.get(cid)} -> {value}"
-            for cid, value in unmapped.items()
-            if cid not in previous or previous[cid] != value
-        }
+        # Always refresh the snapshot once tracking has started, including the
+        # empty case — otherwise a removed register sticks and a same-value
+        # reappearance is never logged.
+        self._unmapped_snapshots[device_id] = unmapped
+        changes: dict[int, str] = {}
+        for cid in previous.keys() | unmapped.keys():
+            was_present = cid in previous
+            is_present = cid in unmapped
+            old = previous[cid] if was_present else None
+            new: Any = unmapped[cid] if is_present else "<absent>"
+            if not was_present or not is_present or old != new:
+                changes[cid] = f"{old} -> {new}"
         if changes:
             _LOGGER.debug(
                 "Device %s (thing_type=%s): %d unmapped component(s) changed — whatever "

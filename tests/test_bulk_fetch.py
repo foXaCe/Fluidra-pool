@@ -360,3 +360,29 @@ async def test_unchanged_unmapped_registers_never_log_again(
 
     assert len([r for r in caplog.records if "no profile maps" in r.getMessage()]) == 1
     assert not [r for r in caplog.records if "changed" in r.getMessage()]
+
+
+async def test_unmapped_register_removal_then_reappearance_is_logged(
+    coordinator: FluidraDataUpdateCoordinator, mock_api: AsyncMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    """present → absent → present must log both transitions.
+
+    Returning early when the current poll has no unmapped registers left the
+    previous snapshot untouched. A register that vanished, then came back with
+    the same value, stayed silent — the whole point of the comparison log
+    (CodeRabbit on PR #224).
+    """
+    mock_api.get_all_components = AsyncMock(return_value={9: {"reportedValue": 1}, 77: {"reportedValue": 0}})
+    with caplog.at_level(logging.DEBUG, logger="custom_components.fluidra_pool.coordinator.coordinator"):
+        await coordinator._fetch_components("DEV-1", [9])
+        mock_api.get_all_components = AsyncMock(return_value={9: {"reportedValue": 1}})
+        await coordinator._fetch_components("DEV-1", [9])
+        mock_api.get_all_components = AsyncMock(return_value={9: {"reportedValue": 1}, 77: {"reportedValue": 0}})
+        await coordinator._fetch_components("DEV-1", [9])
+
+    changes = [r.getMessage() for r in caplog.records if "changed" in r.getMessage()]
+    assert len(changes) == 2
+    assert "77" in changes[0]
+    assert "0 -> <absent>" in changes[0]
+    assert "77" in changes[1]
+    assert "None -> 0" in changes[1]
