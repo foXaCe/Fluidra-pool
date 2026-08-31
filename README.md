@@ -145,13 +145,20 @@ Your equipment isn't listed or is only partially recognised? Help us add it:
      logs:
        custom_components.fluidra_pool: debug
    ```
-2. **Open an [issue](https://github.com/foXaCe/Fluidra-pool/issues)** with:
+2. **Switch the missing feature on and off in the official app** while the logs run. The
+   first debug dump lists every register no profile maps; each following change is logged
+   on its own line, so the register that moved with the feature is the one to report.
+3. **Download diagnostics** from the integration's device page (credentials are redacted).
+   When a device sits on a guessed profile — the one that raises the *unverified profile*
+   repair warning — the dump carries an `unverified_devices` block with **all** of its
+   registers, not only the handful that profile reads.
+4. **Open an [issue](https://github.com/foXaCe/Fluidra-pool/issues)** with:
    - Your equipment model and serial prefix
-   - The device-discovery debug logs — these now include the device's `thing_type`
-     (Fluidra's own family id, e.g. `eppvs`, `tecnoLC2`) and every register no profile
-     maps yet, which is usually enough to identify what is missing
+   - The diagnostics file and the debug logs — both carry the device's `thing_type`
+     (Fluidra's own family id, e.g. `eppvs`, `tecnoLC2`), which is what places an
+     unreported model on the right register map
    - The features/values shown in the official Fluidra Pool app
-3. **Test and share** your results — most new models are added this way.
+5. **Test and share** your results — most new models are added this way.
 
 ---
 

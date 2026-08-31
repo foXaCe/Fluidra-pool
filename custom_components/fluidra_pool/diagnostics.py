@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 
 from .api_resilience import FluidraAuthError
 from .const import FluidraPoolConfigEntry
+from .device_registry import DEVICE_CONFIGS, DeviceIdentifier
 from .helpers import resolve_schedule_component
 from .utils import mask_device_id
 
@@ -129,8 +130,95 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: Fluidra
         # nothing, but in a bug report it settles "my schedule writes land on
         # the wrong slot" outright (Issue #174).
         "cloud_schedulers": await _collect_scheduler_capabilities(coordinator, coordinator_data),
+        # Every register of the devices whose profile is a guess. Without this
+        # block a report about an unreported model can only ever contain the
+        # registers the guess already reads (Issue #221).
+        "unverified_devices": await _collect_unverified_device_registers(coordinator, coordinator_data),
         "pools": _redact_pools_data(coordinator_data),
     }
+
+
+def _profile_name(config: Any) -> str:
+    """Return the registry key of a resolved profile (for a bug report to quote)."""
+    for name, candidate in DEVICE_CONFIGS.items():
+        if candidate is config:
+            return name
+    return "unknown"
+
+
+def _register_sort_key(item: tuple[Any, Any]) -> tuple[int, int, str]:
+    """Sort registers numerically, tolerating a payload that keyed them as strings."""
+    key = item[0]
+    text = str(key)
+    return (0, int(text), "") if text.lstrip("-").isdigit() else (1, 0, text)
+
+
+def _device_thing_type(device: dict[str, Any]) -> str:
+    """Read Fluidra's own family id the way the identifier does."""
+    thing_type = str(device.get("thing_type", ""))
+    if thing_type:
+        return thing_type
+    status = device.get("status")
+    return str(status.get("thingType", "")) if isinstance(status, dict) else ""
+
+
+async def _collect_unverified_device_registers(coordinator: Any, pools_data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Dump every register of the devices resolved on an unverified profile.
+
+    A catch-all profile scans only the handful of registers it guesses at, so
+    ``device["components"]`` — and therefore the rest of this download — can
+    never contain the register that actually carries the state. Issue #221 is
+    the case in point: a Z350iQ reads OFF in Home Assistant because component 13
+    is not its ON/OFF flag, and no diagnostics export could show which register
+    is, because that register was never polled. The bulk endpoint returns all of
+    them, so ask for it here — once per download, and only for the devices whose
+    mapping is a guess. On the poll path it would cost a request per device per
+    cycle and buy nothing (same reasoning as ``cloud_schedulers``).
+
+    Never fails the diagnostics download: an endpoint that refuses, a device the
+    cloud says nothing about, or an expired token all come back as a shorter list.
+    """
+    api = getattr(coordinator, "api", None)
+    if api is None or not hasattr(api, "get_all_components"):
+        return []
+
+    collected: list[dict[str, Any]] = []
+    for pool in pools_data.values():
+        if not isinstance(pool, dict):
+            continue
+        for device in pool.get("devices", []):
+            if not isinstance(device, dict):
+                continue
+            device_id = device.get("device_id")
+            if not device_id:
+                continue
+            config = DeviceIdentifier.identify_device(device)
+            if config is None or config.verified:
+                continue
+            try:
+                bulk = await api.get_all_components(device_id)
+            except (FluidraAuthError, OSError, TimeoutError):
+                continue
+            if not isinstance(bulk, dict):
+                continue
+            scanned = sorted(int(cid) for cid in device.get("components", {}) if str(cid).isdigit())
+            collected.append(
+                {
+                    "device_id": mask_device_id(device_id),
+                    # What the cloud calls this family — the single field that
+                    # tells a maintainer which register map the unit should read.
+                    "thing_type": _device_thing_type(device) or "unknown",
+                    "profile": _profile_name(config),
+                    "profile_verified": False,
+                    # The gap between the two lists is the point of this block.
+                    "scanned_components": scanned,
+                    "all_registers": {
+                        str(cid): _redact_component_data(cid, state)
+                        for cid, state in sorted(bulk.items(), key=_register_sort_key)
+                    },
+                }
+            )
+    return collected
 
 
 async def _collect_scheduler_capabilities(coordinator: Any, pools_data: dict[str, Any]) -> list[dict[str, Any]]:

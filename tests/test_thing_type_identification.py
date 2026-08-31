@@ -125,7 +125,7 @@ def test_unmapped_register_log_names_the_family(caplog: Any) -> None:
     from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordinator
 
     coordinator = FluidraDataUpdateCoordinator.__new__(FluidraDataUpdateCoordinator)
-    coordinator._unmapped_logged = set()
+    coordinator._unmapped_snapshots = {}
 
     with caplog.at_level(logging.DEBUG, logger="custom_components.fluidra_pool.coordinator.coordinator"):
         coordinator._log_unmapped_components(
@@ -143,7 +143,7 @@ def test_unmapped_register_log_says_unknown_when_absent(caplog: Any) -> None:
     from custom_components.fluidra_pool.coordinator import FluidraDataUpdateCoordinator
 
     coordinator = FluidraDataUpdateCoordinator.__new__(FluidraDataUpdateCoordinator)
-    coordinator._unmapped_logged = set()
+    coordinator._unmapped_snapshots = {}
 
     with caplog.at_level(logging.DEBUG, logger="custom_components.fluidra_pool.coordinator.coordinator"):
         coordinator._log_unmapped_components("DEV-1", {99: {"reportedValue": 7}}, set(), "")

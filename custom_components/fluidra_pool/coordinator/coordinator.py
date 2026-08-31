@@ -83,9 +83,11 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # the same account answer it fine (Issue #175), and a shared counter was
         # reset by their successes so the unsupported one was retried every poll.
         self._bulk_fetch_failures: dict[str, int] = {}
-        # Devices whose unmapped registers have already been dumped at DEBUG — see
-        # _log_unmapped_components; log once per session, not on every poll.
-        self._unmapped_logged: set[str] = set()
+        # Last unmapped-register values seen per device — see
+        # _log_unmapped_components. The full dump goes out once per device, then
+        # only the registers whose value moved, so a poll that changed nothing
+        # stays quiet.
+        self._unmapped_snapshots: dict[str, dict[int, Any]] = {}
 
         # Realtime channel (opt-in, plan 013 Pass 5). None until started; the
         # poll runs identically whether it is up or not.
@@ -263,12 +265,24 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         The device's ``thingType`` goes in the same line: it is Fluidra's own
         family identifier, and it is what tells a maintainer which register map
         an unreported model should be reading (README "Adding New Equipment").
+
+        "Compare" needs more than one reading, so after the first full dump the
+        registers whose value moved are logged again, on their own. A single
+        dump per session made the instruction impossible to follow: switching
+        the device on in the app produced no second line to compare against, and
+        the user had to restart Home Assistant between every step (Issue #221, a
+        Z350iQ whose real ON/OFF register is still unknown). A poll that changed
+        nothing is still silent, so an idle device does not fill the log.
         """
-        if not _LOGGER.isEnabledFor(logging.DEBUG) or device_id in self._unmapped_logged:
+        if not _LOGGER.isEnabledFor(logging.DEBUG):
             return
-        self._unmapped_logged.add(device_id)
         unmapped = {cid: bulk[cid].get("reportedValue") for cid in sorted(bulk) if cid not in wanted}
-        if unmapped:
+        if not unmapped:
+            return
+
+        previous = self._unmapped_snapshots.get(device_id)
+        self._unmapped_snapshots[device_id] = unmapped
+        if previous is None:
             _LOGGER.debug(
                 "Device %s (thing_type=%s) reports %d component(s) no profile maps — "
                 "toggle a missing feature in the Fluidra app and compare to find its "
@@ -277,6 +291,22 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 thing_type or "unknown",
                 len(unmapped),
                 unmapped,
+            )
+            return
+
+        changes = {
+            cid: f"{previous.get(cid)} -> {value}"
+            for cid, value in unmapped.items()
+            if cid not in previous or previous[cid] != value
+        }
+        if changes:
+            _LOGGER.debug(
+                "Device %s (thing_type=%s): %d unmapped component(s) changed — whatever "
+                "just happened on the device is carried by one of these registers: %s",
+                device_id,
+                thing_type or "unknown",
+                len(changes),
+                changes,
             )
 
     async def _fetch_components_parallel(
