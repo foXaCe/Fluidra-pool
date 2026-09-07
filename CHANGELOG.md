@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.86.3] - 2026-09-07
+
+### Fixed
+
+- **Zodiac Z350iQ: the heat pump no longer reads permanently OFF** (#221). This model reports the
+  cloud family `hpc`, which no profile claimed, so it fell through to the generic heat-pump
+  fallback — and that fallback assumes component 13 carries the ON/OFF flag. On a Z350iQ c13 stays
+  at 0 while the unit runs, so Home Assistant showed it off whatever the equipment was doing, its
+  switch did nothing, and automations built on it stopped working. The reporter's measurements,
+  taken across two separate captures on live hardware, land on the register map already shipped for
+  the Z550iQ: c21 follows the ON/OFF state in both directions, and c61 returned two distinct values
+  of that map's state table (11 no-flow, then 2 heating). The Z350iQ now uses that map, which also
+  stops c13 being read as an on/off flag at all — the actual repair. The setpoint, already working
+  because the generic profile happens to scan c15, is unchanged. Mode, water temperature, air
+  temperature and running hours come from the shared map and are not yet confirmed on this model;
+  each is range-checked before display, so a register that means something else here is dropped
+  rather than shown as a wrong reading.
+
 ## [2.86.2] - 2026-08-31
 
 ### Fixed
