@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.86.4] - 2026-09-07
+
+### Fixed
+
+- **Zodiac Z350iQ: the operating mode is no longer read as a Z550iQ HVAC mode** (#221). The profile
+  added in 2.86.3 borrows the Z550iQ register map, which is right for the power register, the
+  running state and the temperatures — but not for component 16. On a Z550iQ that register selects
+  heating, cooling or auto; on a Z350iQ, whose line has no cooling at all, it selects Boost, Silence
+  or Smart. So a unit running in Silence reported itself as cooling and one in Smart as heat/cool,
+  and the climate entity offered cooling modes that, if picked, would have written that register and
+  changed how hard the unit runs. The mode now comes from the power register alone, only off and
+  heat are offered, and the Boost/Silence/Smart setting is reported as an attribute instead. It is
+  deliberately not writable: its three values were established by reading them, and nothing shows
+  the register accepts a write.
+- **Z350iQ: every register is now confirmed on hardware** rather than inherited from the Z550iQ
+  map — setpoint, water and air temperatures, running hours and the running-state values were all
+  read back against the Fluidra app by the reporter. Only the temperature bounds remain inherited.
+
 ## [2.86.3] - 2026-09-07
 
 ### Fixed
