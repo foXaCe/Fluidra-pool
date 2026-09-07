@@ -548,7 +548,7 @@ correspondant.
 | `domoticS2` / `dm2` | Chlorinators / Bridges | Elite Connect, Control Connect, Neolysis | catch-all `chlorinator` |
 | `amt` | Heat Pumps | Z250iQ, Z260iQ, PX25, PX26, Eco Elyo | **non déclaré** — zone gelée, ces profils se départagent au composant 7 |
 | `nhpp` | Heat Pumps | Z450, Z650iQ, Verti/Silent/Eco Elyo R290 | **non déclaré** — famille trop large pour un seul profil |
-| `hpc` | Heat Pumps | Z350iQ | aucun profil |
+| `hpc` | Heat Pumps | Z350iQ | ✅ `z350iq_heat_pump` |
 | `proelyo` | Heat Pumps | PX50, HPO, Pro Elyo Touch | aucun profil |
 | `evoline` | Heat Pumps | PM40, Evoline | aucun profil |
 | `z950iq` | Heat Pumps | z950iQ Powerforce Inverter | aucun profil |
