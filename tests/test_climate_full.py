@@ -1138,3 +1138,72 @@ async def test_setup_adds_new_device_dynamically() -> None:
     new_uids = {e.unique_id for e in added} - uids_after_setup
     assert new_uids, "new device entities should be added without a reload"
     assert all("HP-DYN-2" in u for u in new_uids), "only the newly-added device's entities are created"
+
+
+# --- Z350iQ: the Z550iQ registers, minus its c16 meaning (Issue #221) --------
+
+
+@pytest.mark.parametrize(
+    ("mode", "label"),
+    [(0, "boost"), (1, "silence"), (2, "smart")],
+)
+def test_hvac_mode_z350_is_heat_whatever_c16_says(mode, label) -> None:
+    """c16 selects Boost/Silence/Smart on this line, not heating/cooling/auto.
+
+    Decoded as a Z550iQ, a unit in Silence reads back as COOL and one in Smart
+    as HEAT_COOL — neither of which a heat-only Z350iQ can do.
+    """
+    device = _pin(features={"z550_mode": True, "z350_mode": True}, heat_pump_reported=1, z550_mode_reported=mode)
+    climate = _make(device)
+    assert climate.hvac_mode == HVACMode.HEAT
+    assert climate.extra_state_attributes["z350_mode"] == label
+    assert climate.extra_state_attributes["z350_mode_raw"] == mode
+    # The Z550iQ naming must not leak onto this model.
+    assert "z550_mode" not in climate.extra_state_attributes
+
+
+def test_hvac_mode_z350_off_follows_the_power_register() -> None:
+    """c21 alone decides on/off — the whole point of the profile."""
+    climate = _make(_pin(features={"z550_mode": True, "z350_mode": True}, heat_pump_reported=0, z550_mode_reported=2))
+    assert climate.hvac_mode == HVACMode.OFF
+
+
+def test_hvac_modes_z350_offers_no_cooling() -> None:
+    """A heat-only unit must not advertise cool or heat_cool."""
+    climate = _make(_pin(features={"z550_mode": True, "z350_mode": True}))
+    assert climate.hvac_modes == [HVACMode.OFF, HVACMode.HEAT]
+
+
+def test_hvac_action_z350_still_reads_c61() -> None:
+    """The running state is genuinely shared with the Z550iQ."""
+    device = _pin(features={"z550_mode": True, "z350_mode": True}, heat_pump_reported=1, z550_state_reported=2)
+    assert _make(device).hvac_action == HVACAction.HEATING
+
+
+async def test_set_hvac_mode_z350_writes_only_the_power_register() -> None:
+    """Turning it on must not also write c16 and change how hard it runs."""
+    api = _api()
+    api.control_device_component = AsyncMock(return_value=True)
+    climate = _make(_pin(features={"z550_mode": True, "z350_mode": True}), api=api)
+
+    await climate.async_set_hvac_mode(HVACMode.HEAT)
+
+    written = [call.args[1] for call in api.control_device_component.await_args_list]
+    assert written == [21]
+
+
+async def test_set_hvac_mode_z350_off_writes_the_power_register() -> None:
+    api = _api()
+    api.control_device_component = AsyncMock(return_value=True)
+    climate = _make(_pin(features={"z550_mode": True, "z350_mode": True}), api=api)
+
+    await climate.async_set_hvac_mode(HVACMode.OFF)
+
+    assert api.control_device_component.await_args.args[1:] == (21, 0)
+
+
+def test_z550_mode_semantics_are_untouched() -> None:
+    """Without z350_mode, c16 keeps meaning heating/cooling/auto."""
+    climate = _make(_pin(features={"z550_mode": True}, heat_pump_reported=1, z550_mode_reported=1))
+    assert climate.hvac_mode == HVACMode.COOL
+    assert climate.extra_state_attributes["z550_mode"] == "cooling"

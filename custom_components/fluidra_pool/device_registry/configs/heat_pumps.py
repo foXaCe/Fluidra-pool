@@ -181,21 +181,23 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         # while the heat pump runs, so Home Assistant reported it permanently
         # OFF and its switch did nothing.
         #
-        # The register map is the Z550iQ one, which is where the reporter's
-        # measurements landed. Confirmed on their hardware, across two separate
-        # captures:
-        #   - c21 ON/OFF   — 1 with the unit running, 0 after switching it off
-        #                    from the Fluidra app; c13 stayed 0 throughout.
-        #   - c61 state    — 11 (no flow) on the first capture, 2 (heating) on
-        #                    the second, both matching the Z550iQ table.
-        #   - c15 setpoint — already read correctly through the generic profile,
-        #                    which happens to scan it; the reporter confirms the
-        #                    target temperature reads and writes.
-        # Inherited from the Z550iQ map but NOT yet confirmed on a Z350iQ:
-        # c16 (mode), c37 (water), c40 (air), c60 (running hours). Each is
-        # range-validated by the decoder, so a register that means something
-        # else on this model is dropped rather than shown — and the full
-        # register dump is still being collected to settle them.
+        # The register map is the Z550iQ one. Every entry below was then read
+        # back on the reporter's own unit, against the Fluidra app:
+        #   - c21 ON/OFF     — 1 running, 0 off; c13 stayed 0 throughout, and a
+        #                      write to c13 from Home Assistant was recorded as a
+        #                      lost write while the unit kept running.
+        #   - c15 setpoint   — 280 = 28.0 degC
+        #   - c37 water      — 251 = 25.1 degC
+        #   - c40 air        — 194 = 19.4 degC
+        #   - c60 hours      — 1151 h
+        #   - c61 state      — 0 off, 2 heating, 11 no flow
+        #   - c16 mode       — 0 Boost, 1 Silence, 2 Smart. NOT the Z550iQ
+        #                      meaning (heating/cooling/auto): this line is
+        #                      heat-only and c16 sets how hard it works. Hence
+        #                      z350_mode below, which keeps the shared decoding
+        #                      but takes the HVAC mode from c21 alone — see
+        #                      Z350Behavior in climate_behaviors.py.
+        # Only the temperature bounds are still inherited rather than measured.
         device_type="heat_pump",
         thing_type_patterns=["hpc"],
         name_patterns=["z350", "z35"],
@@ -206,13 +208,17 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         entities=["climate", "switch", "sensor_info", "sensor_temperature", "sensor_running_hours", "sensor_activity"],
         features={
             "temperature_control": True,
-            "hvac_modes": ["off", "heat", "cool", "auto"],
+            "hvac_modes": ["off", "heat"],
             "skip_auto_mode": True,
             "skip_schedules": True,
             # Drives the shared Z550iQ decoding: c21 as the on/off state, c61 as
-            # the running action, c16/c37/c40 as mode, water and air. It also
-            # stops c13 being read as an on/off flag, which is the actual bug.
+            # the running action, c37/c40 as water and air. It also stops c13
+            # being read as an on/off flag, which is the bug this profile fixes.
             "z550_mode": True,
+            # Overrides the part of that family which does not carry over: c16
+            # is Boost/Silence/Smart here, not heating/cooling/auto, so it is
+            # reported as an attribute and never written as an HVAC mode.
+            "z350_mode": True,
             "on_off_component": 21,
             "setpoint_component": 15,
             "mode_component": 16,

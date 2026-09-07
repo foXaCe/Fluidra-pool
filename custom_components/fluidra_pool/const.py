@@ -234,6 +234,19 @@ Z550_STATE_HEATING: Final = 2
 Z550_STATE_COOLING: Final = 3
 Z550_STATE_NO_FLOW: Final = 11
 
+# Z350iQ component 16. The register sits where the Z550iQ keeps its HVAC mode,
+# but it does NOT mean the same thing: this line has no cooling, and the three
+# values select how hard the unit works, not what it does. Measured on a live
+# unit by the reporter of Issue #221, against the Fluidra app.
+Z350_MODE_BOOST: Final = 0
+Z350_MODE_SILENCE: Final = 1
+Z350_MODE_SMART: Final = 2
+Z350_MODE_NAMES: Final = {
+    Z350_MODE_BOOST: "boost",
+    Z350_MODE_SILENCE: "silence",
+    Z350_MODE_SMART: "smart",
+}
+
 # LG Heat Pump constants (component 14 values)
 LG_PRESET_SMART_HEATING: Final = "smart_heating"
 LG_PRESET_SMART_COOLING: Final = "smart_cooling"
