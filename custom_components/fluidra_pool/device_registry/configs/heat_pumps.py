@@ -174,6 +174,55 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=96,  # Higher than z250iq.
     ),
+    "z350iq_heat_pump": DeviceConfig(
+        # Zodiac Z350iQ — Issue #221 (@HHjung1981). Cloud family id "hpc",
+        # which no profile claimed, so it fell through to generic_heat_pump.
+        # That fallback assumes c13 carries ON/OFF; on this unit c13 stays 0
+        # while the heat pump runs, so Home Assistant reported it permanently
+        # OFF and its switch did nothing.
+        #
+        # The register map is the Z550iQ one, which is where the reporter's
+        # measurements landed. Confirmed on their hardware, across two separate
+        # captures:
+        #   - c21 ON/OFF   — 1 with the unit running, 0 after switching it off
+        #                    from the Fluidra app; c13 stayed 0 throughout.
+        #   - c61 state    — 11 (no flow) on the first capture, 2 (heating) on
+        #                    the second, both matching the Z550iQ table.
+        #   - c15 setpoint — already read correctly through the generic profile,
+        #                    which happens to scan it; the reporter confirms the
+        #                    target temperature reads and writes.
+        # Inherited from the Z550iQ map but NOT yet confirmed on a Z350iQ:
+        # c16 (mode), c37 (water), c40 (air), c60 (running hours). Each is
+        # range-validated by the decoder, so a register that means something
+        # else on this model is dropped rather than shown — and the full
+        # register dump is still being collected to settle them.
+        device_type="heat_pump",
+        thing_type_patterns=["hpc"],
+        name_patterns=["z350", "z35"],
+        model_patterns=["z350", "z35"],
+        # No family_patterns — see the module note (Issue #216).
+        components_range=5,
+        required_components=[0, 1, 2, 3],
+        entities=["climate", "switch", "sensor_info", "sensor_temperature", "sensor_running_hours", "sensor_activity"],
+        features={
+            "temperature_control": True,
+            "hvac_modes": ["off", "heat", "cool", "auto"],
+            "skip_auto_mode": True,
+            "skip_schedules": True,
+            # Drives the shared Z550iQ decoding: c21 as the on/off state, c61 as
+            # the running action, c16/c37/c40 as mode, water and air. It also
+            # stops c13 being read as an on/off flag, which is the actual bug.
+            "z550_mode": True,
+            "on_off_component": 21,
+            "setpoint_component": 15,
+            "mode_component": 16,
+            "water_temp_component": 37,
+            "air_temp_component": 40,
+            "state_component": 61,
+            "specific_components": [15, 16, 17, 18, 21, 37, 40, 60, 61],
+        },
+        priority=98,  # Above z550iq (96) — "hpc" is this model alone.
+    ),
     "hpgic_gre_heat_pump": DeviceConfig(
         device_type="heat_pump",
         # Gre HPGIC full-inverter heat pump — Issue #92 (@sterubbg). Its cloud

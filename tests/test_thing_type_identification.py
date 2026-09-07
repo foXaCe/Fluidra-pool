@@ -119,6 +119,7 @@ def test_declared_families_are_the_measured_ones() -> None:
         "victoria_smart_connect_pump": ["mppvs"],
         "ns25_exo_chlorinator": ["exr"],
         "z550iq_heat_pump": ["zs500"],
+        "z350iq_heat_pump": ["hpc"],
         "command_connect_cabinet": ["SRC"],
         "blue_connect_silver": ["BC3"],
     }
@@ -208,3 +209,41 @@ def test_component_7_product_codes_do_not_mislabel_heat_pumps() -> None:
     )
     config = DeviceIdentifier.identify_device(device)
     assert config is DEVICE_CONFIGS["z260iq_heat_pump"]
+
+
+# --- Z350iQ (Issue #221) ------------------------------------------------------
+
+
+def test_z350iq_routed_by_its_family_id() -> None:
+    """The Z350iQ reports family "hpc" and nothing else identifying.
+
+    Its serial carries no recognised prefix and the cloud name is not guaranteed,
+    so the family id is the only reliable signal — which is why it fell through
+    to generic_heat_pump before this profile existed.
+    """
+    device = {
+        "device_id": "FE25000001",
+        "name": "Heat Pump",
+        "type": "heat_pump",
+        "thing_type": "hpc",
+        "family": "Heat Pumps",
+    }
+    config = DeviceIdentifier.identify_device(device)
+    assert config is DEVICE_CONFIGS["z350iq_heat_pump"]
+    assert config.verified is True
+
+
+def test_z350iq_reads_its_on_off_flag_off_component_21() -> None:
+    """c21 is the ON/OFF register, not c13 — the whole of Issue #221.
+
+    The reporter measured c13 stuck at 0 while the unit ran, and c21 tracking
+    the state exactly. The generic profile's guess (c13) is what made Home
+    Assistant report the heat pump permanently OFF.
+    """
+    config = DEVICE_CONFIGS["z350iq_heat_pump"]
+    assert config.features["on_off_component"] == 21
+    assert config.features["setpoint_component"] == 15
+    # z550_mode is what routes c21/c61 through the decoder and, just as
+    # importantly, stops c13 being read as an on/off flag.
+    assert config.features["z550_mode"] is True
+    assert 13 not in config.features["specific_components"]

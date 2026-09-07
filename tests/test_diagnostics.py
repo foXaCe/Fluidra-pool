@@ -333,15 +333,16 @@ async def test_diagnostics_dump_every_register_of_an_unverified_device() -> None
 
     The generic heat-pump profile polls components 0-3 plus 13/14/15, so the
     pools block can only ever contain those. That is exactly the device for which
-    nobody knows the map yet: Issue #221's Z350iQ reads OFF because component 13
-    is not its ON/OFF flag, and no export could show which register is.
+    nobody knows the map yet — the case Issue #221 made, on a Z350iQ whose c13 was
+    not the ON/OFF flag. That model now has a profile; "evoline" (PM40) stands in
+    as a family that still has none.
     """
     device = {
         "device_id": "FE25000001",
-        "name": "Z350iQ",
+        "name": "PM40",
         "family": "Heat Pumps",
         "type": "heat_pump",
-        "thing_type": "hpc",
+        "thing_type": "evoline",
         "components": {"13": {"reportedValue": 0}, "15": {"reportedValue": 280}},
     }
     api = SimpleNamespace(
@@ -376,7 +377,7 @@ async def test_diagnostics_dump_every_register_of_an_unverified_device() -> None
     assert len(dumped) == 1
     assert dumped[0]["profile"] == "generic_heat_pump"
     # The family id is what places an unreported model on a register map.
-    assert dumped[0]["thing_type"] == "hpc"
+    assert dumped[0]["thing_type"] == "evoline"
     assert dumped[0]["scanned_components"] == [13, 15]
     # Registers the profile never polls — the whole point of the block.
     assert dumped[0]["all_registers"]["21"]["reportedValue"] == 1
