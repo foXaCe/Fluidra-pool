@@ -28,6 +28,7 @@ from .const import (
     LG_PRESET_MODES,
     LG_PRESET_SMART_HEATING,
     LG_VALUE_TO_MODE,
+    Z350_MODE_NAMES,
     Z550_STATE_NO_FLOW,
     Z650_MODE_TO_VALUE,
     Z650_PRESET_MODES,
@@ -521,12 +522,18 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             if air_temp is not None:
                 attrs["air_temperature"] = air_temp
 
-            # Mode (0=heating, 1=cooling, 2=auto)
+            # Mode, read off c16. Same register on the Z550iQ and the Z350iQ,
+            # different meanings: heating/cooling/auto there, Boost/Silence/Smart
+            # here — the Z350iQ is heat-only and c16 sets how hard it works.
             z550_mode = device_data.get("z550_mode_reported")
             if z550_mode is not None:
-                mode_names = {0: "heating", 1: "cooling", 2: "auto"}
-                attrs["z550_mode"] = mode_names.get(z550_mode, f"unknown ({z550_mode})")
-                attrs["z550_mode_raw"] = z550_mode
+                if DeviceIdentifier.has_feature(device_data, "z350_mode"):
+                    attrs["z350_mode"] = Z350_MODE_NAMES.get(z550_mode, f"unknown ({z550_mode})")
+                    attrs["z350_mode_raw"] = z550_mode
+                else:
+                    mode_names = {0: "heating", 1: "cooling", 2: "auto"}
+                    attrs["z550_mode"] = mode_names.get(z550_mode, f"unknown ({z550_mode})")
+                    attrs["z550_mode_raw"] = z550_mode
 
             # State (0=idle, 2=heating, 3=cooling, 11=no flow)
             z550_state = device_data.get("z550_state_reported")

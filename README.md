@@ -94,10 +94,11 @@ profile, so unknown equipment is usually still usable.
   running hours, WiFi signal
 - **Z260iQ** — HVAC modes (heat / cool / heat-cool), presets, no-flow alarm, water/air temperatures
 - **Z550iQ+** — HVAC modes (heat / cool / auto), presets, HVAC action (heating/cooling/idle/no-flow), water/air temperatures
-- **Z350iQ** — shares the Z550iQ register map: on/off switch, target temperature, HVAC action
-  (heating/cooling/idle/no-flow). Its on/off flag, running state and setpoint were confirmed on a
-  live unit; water and air temperatures come from the shared map and are still being confirmed
-  on this model.
+- **Z350iQ** — heat-only unit sharing the Z550iQ registers: on/off switch, target temperature,
+  water and air temperatures, running hours, and HVAC action (heating/idle/no-flow). Its operating
+  mode (Boost / Silence / Smart) is reported as an attribute rather than an HVAC mode — the register
+  that carries it holds heating/cooling/auto on the Z550iQ, but this line does not cool. Every
+  register was read back on a live unit.
 - **Z650iQ** — HVAC modes (heat / cool / heat-cool), Smart+/Smart/Ecosilence/Boost presets,
   on/off switch, water/air temperatures, running hours, compressor running hours, WiFi
   signal, instantaneous power (Watts) and compressor modulation (percent). Reverse-

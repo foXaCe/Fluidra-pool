@@ -198,6 +198,47 @@ class Z550Behavior(HeatPumpBehavior):
         return success
 
 
+class Z350Behavior(Z550Behavior):
+    """Z350iQ: the Z550iQ registers, but a heat-only unit.
+
+    It shares c21 (on/off), c37/c40 (water/air) and c61 (running state) with the
+    Z550iQ, so everything else is inherited. What it does NOT share is the
+    meaning of c16: on the Z550iQ that register selects heating/cooling/auto,
+    while on the Z350iQ it selects Boost/Silence/Smart — how hard the unit
+    works, not what it does. This line has no cooling at all.
+
+    Reading c16 as an HVAC mode would therefore report a Z350iQ running in
+    Silence as "cool" and one in Smart as "heat_cool". So the mode is taken from
+    the power register alone, and c16 is surfaced as a plain attribute instead
+    (see climate.py). It is not written either: the reporter confirmed the three
+    values by reading them, and nothing establishes that the register accepts a
+    write — the Z550iQ's own c17 answers 403 (Issues #56, #88).
+
+    Measured on a live unit for Issue #221.
+    """
+
+    hvac_modes: list[HVACMode] = [HVACMode.OFF, HVACMode.HEAT]
+
+    def hvac_mode(self, device_data: dict[str, Any]) -> HVACMode:
+        """ON/OFF only — c21 is the whole story on a heat-only unit."""
+        return HVACMode.HEAT if device_data.get("heat_pump_reported") else HVACMode.OFF
+
+    async def async_set_hvac_mode(
+        self,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        hvac_mode: HVACMode,
+        current_preset: str | None,
+    ) -> bool | None:
+        """Write the power register and nothing else.
+
+        The Z550iQ path would follow up with a mode write on c16, which here
+        would change how hard the unit runs as a side effect of turning it on.
+        """
+        return await api.control_device_component(device_id, 21, 0 if hvac_mode == HVACMode.OFF else 1)
+
+
 # Live compressor state on c75, confirmed on a Z250iQ across Boost/Silent and
 # Heating/Cooling (Issue #139, @Kal42). Only these three values are mapped: a
 # transient 8 was observed right after a mode change and never explained, so
@@ -434,6 +475,7 @@ class Z650iqBehavior(HeatPumpBehavior):
 
 # Behaviors are stateless: one singleton per family is enough.
 Z550_BEHAVIOR = Z550Behavior()
+Z350_BEHAVIOR = Z350Behavior()
 Z260IQ_BEHAVIOR = Z260iqBehavior()
 Z650IQ_BEHAVIOR = Z650iqBehavior()
 LG_BEHAVIOR = LgBehavior()
@@ -447,10 +489,15 @@ def resolve_behavior(device_data: dict[str, Any]) -> HeatPumpBehavior:
     comp-7 signature yet) and later ones; DeviceIdentifier.identify_device is
     cached, so re-resolving on every property/action access is cheap and
     mirrors the pre-refactor per-property has_feature() checks. Precedence
-    order matches the original dispatch: z550_mode, then z650iq_mode (before
+    order matches the original dispatch: z350_mode, then z550_mode, then
+    z650iq_mode (before
     z260iq_mode since it also sets z260iq_mode=True), then z260iq_mode, then
     preset_modes, else standard.
     """
+    # z350_mode before z550_mode: a Z350iQ sets both (it borrows the Z550iQ
+    # register decoding) but must not inherit its c16 mode semantics.
+    if DeviceIdentifier.has_feature(device_data, "z350_mode"):
+        return Z350_BEHAVIOR
     if DeviceIdentifier.has_feature(device_data, "z550_mode"):
         return Z550_BEHAVIOR
     if DeviceIdentifier.has_feature(device_data, "z650iq_mode"):
