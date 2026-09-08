@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.87.0] - 2026-09-08
+
+### Added
+
+- **Zodiac Z350iQ: the operating mode is now an entity** (#221). Boost, Silence and Smart shipped in
+  2.86.4 as an attribute on the climate entity, where it was effectively invisible: attributes do not
+  appear in the device view and need a template to be used in an automation. The mode now has its own
+  sensor, next to the activity sensor that follows the same pattern. It stays read-only, because
+  nothing establishes that the register accepts a write — its three values were confirmed by reading
+  them, and the equivalent register on the Z550iQ refuses writes. A value outside those three, or a
+  register that has not answered yet, reports nothing rather than inventing a mode. Available in all
+  four supported languages.
+
 ## [2.86.4] - 2026-09-07
 
 ### Fixed
