@@ -17,6 +17,7 @@ from custom_components.fluidra_pool.sensor import (
     FluidraDeviceBatterySensor,
     FluidraHeatPumpActivitySensor,
     FluidraScheduleDaysSensor,
+    FluidraZ350ModeSensor,
 )
 from custom_components.fluidra_pool.switch import FluidraChlorinatorToggleSwitch
 from tests.test_sensor_full import _run_setup  # noqa: F401  (reused setup helper)
@@ -391,3 +392,45 @@ async def test_heat_pump_setup_creates_activity_sensor() -> None:
     activities = [e for e in entities if isinstance(e, FluidraHeatPumpActivitySensor)]
     assert len(activities) == 1
     assert activities[0].native_value == "off"
+
+
+class TestZ350ModeSensor:
+    """The Z350iQ operating mode as its own entity (Issue #221).
+
+    It lived only as a climate attribute at first, where the reporter could not
+    find it: attributes do not show in the device view.
+    """
+
+    def _device(self, **extra: Any) -> dict[str, Any]:
+        device = {
+            "device_id": "FE25000001",
+            "name": "Z350iQ",
+            "type": "heat_pump",
+            "thing_type": "hpc",
+            "components": {},
+        }
+        device.update(extra)
+        return device
+
+    def _sensor(self, device: dict[str, Any]) -> FluidraZ350ModeSensor:
+        return FluidraZ350ModeSensor(_coordinator(device), None, POOL_ID, device["device_id"])
+
+    def test_options_are_the_three_measured_modes(self) -> None:
+        sensor = self._sensor(self._device())
+        assert sensor._attr_options == ["boost", "silence", "smart"]
+
+    @pytest.mark.parametrize(("raw", "expected"), [(0, "boost"), (1, "silence"), (2, "smart")])
+    def test_decodes_component_16(self, raw, expected) -> None:
+        assert self._sensor(self._device(z550_mode_reported=raw)).native_value == expected
+
+    def test_unknown_while_the_register_is_silent(self) -> None:
+        """No reading is not a mode — better unknown than a made-up Boost."""
+        assert self._sensor(self._device()).native_value is None
+
+    def test_unmapped_value_reports_nothing(self) -> None:
+        """A fourth value would be outside what was measured on hardware."""
+        assert self._sensor(self._device(z550_mode_reported=7)).native_value is None
+
+    def test_the_profile_declares_the_entity(self) -> None:
+        """Without this the sensor is written but never created."""
+        assert "sensor_mode" in DEVICE_CONFIGS["z350iq_heat_pump"].entities

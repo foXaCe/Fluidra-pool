@@ -22,7 +22,7 @@ from homeassistant.util import dt as dt_util
 
 from ..api_resilience import FluidraError
 from ..climate_behaviors import resolve_behavior
-from ..const import HEAT_COOL_ACTION_DEADBAND, LUMIPLUS_COMPONENT_BRIGHTNESS
+from ..const import HEAT_COOL_ACTION_DEADBAND, LUMIPLUS_COMPONENT_BRIGHTNESS, Z350_MODE_NAMES
 from ..device_registry import DeviceIdentifier
 from ..helpers import parse_cron_time
 from .base import FluidraPoolSensorEntity
@@ -950,6 +950,45 @@ class FluidraCabinetPackedConfigSensor(FluidraPoolSensorEntity):
         if reported is None:
             return None
         return str(reported)
+
+
+class FluidraZ350ModeSensor(FluidraPoolSensorEntity):
+    """The Z350iQ operating mode: Boost, Silence or Smart (Issue #221).
+
+    Read off component 16. That register holds the HVAC mode on a Z550iQ, but
+    this line is heat-only and uses it to select how hard the unit works, so it
+    cannot be surfaced through the climate entity's hvac_mode. Its three values
+    were confirmed by reading them against the Fluidra app; nothing shows the
+    register accepts a write, so this stays a sensor rather than a preset.
+
+    The climate entity also carries the value as a z350_mode attribute, which is
+    where it lived first — an attribute is invisible in the device view and
+    awkward in automations, hence this entity.
+    """
+
+    _attr_translation_key = "z350_mode"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(Z350_MODE_NAMES.values())
+    _attr_icon = "mdi:heat-pump-outline"
+
+    def __init__(
+        self,
+        coordinator: FluidraDataUpdateCoordinator,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+    ) -> None:
+        """Initialize the Z350iQ mode sensor."""
+        super().__init__(coordinator, api, pool_id, device_id, "z350_mode")
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the mode name, or None while the register has not answered."""
+        # Shares the Z550iQ decoding, hence the z550_mode_reported key.
+        raw = self.device_data.get("z550_mode_reported")
+        if raw is None:
+            return None
+        return Z350_MODE_NAMES.get(raw)
 
 
 class FluidraHeatPumpActivitySensor(FluidraPoolSensorEntity):

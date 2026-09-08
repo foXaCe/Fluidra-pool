@@ -39,6 +39,7 @@ from .device import (
     FluidraScheduleDaysSensor,
     FluidraTemperatureSensor,
     FluidraWifiSignalSensor,
+    FluidraZ350ModeSensor,
 )
 from .pool import (
     FluidraPoolLocationSensor,
@@ -130,6 +131,9 @@ async def async_setup_entry(
                 entities.append(FluidraHeatPumpActivitySensor(coordinator, coordinator.api, pool_id, device_id))
             elif device_type == DEVICE_TYPE_PUMP:
                 entities.append(FluidraPumpActivitySensor(coordinator, coordinator.api, pool_id, device_id))
+
+        if DeviceIdentifier.should_create_entity(device, "sensor_mode"):
+            entities.append(FluidraZ350ModeSensor(coordinator, coordinator.api, pool_id, device_id))
 
         if DeviceIdentifier.should_create_entity(device, "sensor_temperature"):
             # Temperature sensors for heaters / heat pumps.

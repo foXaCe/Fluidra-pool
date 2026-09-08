@@ -205,7 +205,17 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         # No family_patterns — see the module note (Issue #216).
         components_range=5,
         required_components=[0, 1, 2, 3],
-        entities=["climate", "switch", "sensor_info", "sensor_temperature", "sensor_running_hours", "sensor_activity"],
+        entities=[
+            "climate",
+            "switch",
+            "sensor_info",
+            "sensor_temperature",
+            "sensor_running_hours",
+            "sensor_activity",
+            # c16 cannot be an HVAC mode here and is not writable, so the
+            # Boost/Silence/Smart setting gets its own read-only sensor.
+            "sensor_mode",
+        ],
         features={
             "temperature_control": True,
             "hvac_modes": ["off", "heat"],
