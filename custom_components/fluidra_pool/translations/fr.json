@@ -358,6 +358,14 @@
       },
       "wifi_signal": {
         "name": "Signal Wi-Fi"
+      },
+      "z350_mode": {
+        "name": "Mode de fonctionnement",
+        "state": {
+          "boost": "Boost",
+          "silence": "Silence",
+          "smart": "Smart"
+        }
       }
     },
     "switch": {
