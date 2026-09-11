@@ -298,7 +298,9 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
             "z650iq_mode": True,
             "preset_modes": True,
             "temperature_control": True,
-            "hvac_modes": ["off", "heat", "cool", "heat_cool"],
+            # Heat-only unit: c14 selects a heating strategy (Boost/Smart/
+            # Smart+/Ecosilence), not a heat/cool direction (Issue #233).
+            "hvac_modes": ["off", "heat"],
             "skip_auto_mode": True,
             "skip_schedules": True,
             "min_temp": 15.0,
