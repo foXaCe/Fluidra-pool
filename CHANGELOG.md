@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.87.1] - 2026-09-11
+
+### Fixed
+
+- **Zodiac Z650iQ: no longer reported as cooling while it heats** (#233). The component-14 register
+  was being read as a heat/cool direction — `1` (Boost) was mapped to COOL — but the Z650iQ is a
+  heat-only unit: its four presets (Boost, Smart, Smart+, Eco-silence) are heating strategies, Boost
+  being maximum heating power. The climate entity now takes its mode from the power register alone,
+  reports `heating` whenever the unit runs (`idle` if flow is blocked) and no longer offers or writes
+  the cooling modes.
+
+### Changed
+
+- **README: the supported backend is named correctly** (#201). The integration speaks to Fluidra Pool
+  / iAquaLink+ / myFluidra (EMEA), not the Fluidra Connect Box — a separate platform with its own
+  accounts and OAuth login. The Connect Box rejection is now called out in the troubleshooting table.
+
+### Build
+
+- pre-commit: `ruff-pre-commit` bumped to v0.16.6 (#230).
+
 ## [2.87.0] - 2026-09-08
 
 ### Added
