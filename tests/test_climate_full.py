@@ -903,6 +903,50 @@ def test_z650iq_preset_mode_unknown_raw_falls_back() -> None:
     assert climate.preset_mode == Z650_PRESET_SMART_PLUS
 
 
+def test_hvac_modes_z650iq_heat_only() -> None:
+    """Z650iQ is a heating pump — no COOL/HEAT_COOL (Issue #233)."""
+    assert _make(_pin(features=_Z650)).hvac_modes == [HVACMode.OFF, HVACMode.HEAT]
+
+
+def test_hvac_mode_z650iq_from_power_only() -> None:
+    assert _make(_pin(features=_Z650, heat_pump_reported=1)).hvac_mode == HVACMode.HEAT
+    assert _make(_pin(features=_Z650, heat_pump_reported=0)).hvac_mode == HVACMode.OFF
+
+
+@pytest.mark.parametrize("mode_value", [0, 1, 2, 3])
+def test_hvac_mode_z650iq_preset_is_not_a_direction(mode_value: int) -> None:
+    """Every c14 preset is a heating strategy — never reported as COOL (Issue #233)."""
+    climate = _make(_pin(features=_Z650, heat_pump_reported=1, z260iq_mode_value=mode_value))
+    assert climate.hvac_mode == HVACMode.HEAT
+
+
+@pytest.mark.parametrize("mode_value", [0, 1, 2, 3])
+def test_hvac_action_z650iq_heating_for_every_preset(mode_value: int) -> None:
+    """Boost (c14=1) must report HEATING, not COOLING (Issue #233)."""
+    climate = _make(_pin(features=_Z650, heat_pump_reported=1, z260iq_mode_value=mode_value))
+    assert climate.hvac_action == HVACAction.HEATING
+
+
+def test_hvac_action_z650iq_off() -> None:
+    climate = _make(_pin(features=_Z650, heat_pump_reported=0))
+    assert climate.hvac_action == HVACAction.OFF
+
+
+def test_hvac_action_z650iq_no_flow_idle() -> None:
+    climate = _make(_pin(features=_Z650, heat_pump_reported=1, no_flow_alarm=True))
+    assert climate.hvac_action == HVACAction.IDLE
+
+
+async def test_z650iq_set_hvac_mode_cool_is_unsupported() -> None:
+    """No cooling on this unit — COOL is rejected without touching the device."""
+    api = _api()
+    climate = _make(_pin(features=_Z650), api)
+    await climate.async_set_hvac_mode(HVACMode.COOL)
+    api.control_device_component.assert_not_awaited()
+    api.start_pump.assert_not_awaited()
+    assert climate._pending_hvac_mode is None
+
+
 async def test_z650iq_set_preset_mode_writes_component_14() -> None:
     api = _api()
     climate = _make(_pin(features=_Z650), api)
