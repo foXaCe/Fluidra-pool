@@ -6,14 +6,18 @@
 
 # Fluidra Pool Integration for Home Assistant 🏊‍♂️
 
-A Home Assistant integration for **Fluidra Connect** pool equipment — variable-speed pumps,
-heat pumps, salt chlorinators / electrolysers, water analysers and connected lighting.
-It talks to the Fluidra cloud (AWS Cognito auth) and exposes each device as native
-Home Assistant entities.
+A Home Assistant integration for **Fluidra Pool / iAquaLink+ / myFluidra** pool equipment
+(EMEA) — variable-speed pumps, heat pumps, salt chlorinators / electrolysers, water
+analysers and connected lighting. It talks to the Fluidra cloud (AWS Cognito auth) and
+exposes each device as native Home Assistant entities.
 
-> The integration was built by reverse-engineering the Fluidra Connect API. Most device
+> The integration was built by reverse-engineering the Fluidra Pool EMEA API. Most device
 > mappings were confirmed by the community against the official Fluidra Pool app — if your
 > model isn't recognised yet, [open an issue](#-adding-new-equipment) and help us add it.
+>
+> Not to be confused with **Fluidra Connect** (the installer platform behind the *Fluidra
+> Connect Box*, `portal.fluidraconnect.com`). That is a **separate cloud with separate
+> accounts** and is **not supported** — see [Troubleshooting](#-troubleshooting).
 
 ---
 
@@ -193,20 +197,27 @@ Then restart Home Assistant and add the integration from the UI.
 
 The integration is configured entirely from the UI (config flow):
 
-- **Email** — your Fluidra Connect account email
-- **Password** — your Fluidra Connect password
+- **Email** — your Fluidra Pool / myFluidra account email (not a Fluidra Connect account)
+- **Password** — your Fluidra Pool / myFluidra password
 - **MFA** — if your account uses multi-factor authentication, you'll be prompted for the code
 - **Re-auth / Reconfigure** — Home Assistant prompts you to re-authenticate if the token is
   rejected; you can also reconfigure (e.g. change the account email) from the integration menu
 
 > [!IMPORTANT]
 > **Region — EMEA (Europe) only.** This integration talks to Fluidra's **EMEA** backend
-> (`api.fluidra-emea.com`). Only myFluidra / Fluidra Connect accounts registered in the
-> EMEA region can log in. Accounts created in other regions — e.g. **North America**
+> (`api.fluidra-emea.com`). Only Fluidra Pool / myFluidra / iAquaLink+ accounts registered in
+> the EMEA region can log in. Accounts created in other regions — e.g. **North America**
 > (iAquaLink US) or **Australia / APAC** — live on a different Fluidra backend and will be
 > rejected with an "invalid credentials" error even though the same credentials work in the
 > official app. Multi-region support isn't available yet (it needs the regional endpoints and
 > a test account to implement safely).
+>
+> **Product — Fluidra Pool only, not Fluidra Connect.** The **FluidraConnect** app
+> (publisher *FLUIDRA S.A.*) and the *Fluidra Connect Box* are a different product line with
+> their own login (`portal.fluidraconnect.com`, OAuth) and their own accounts. This
+> integration cannot log those in — Cognito answers `NotAuthorizedException` because the
+> account does not exist in its user pool. Use the **Fluidra Pool** app (publisher *Zodiac
+> Pool Systems*) if your equipment is supported here.
 
 ### Options
 - **Update interval** — polling interval in seconds, configurable from **30 to 1800**
@@ -371,6 +382,7 @@ entities:
 | Symptom | Likely cause / fix |
 |---------|--------------------|
 | `Invalid credentials` but the app works | Account registered **outside EMEA** (North America, Australia, …) — not supported (see [Configuration](#-configuration)) |
+| `Authentication failed` / `Incorrect username or password` (Cognito `NotAuthorizedException`), account works in **FluidraConnect** | Different product line — **Fluidra Connect Box** accounts live on `portal.fluidraconnect.com`, not this integration's cloud. Not supported (see [Configuration](#-configuration)) |
 | `Authentication failed` | Wrong credentials or expired token → re-authenticate |
 | `No pools found` | Account has no equipment, or it's offline in the Fluidra app |
 | Wrong readings after a HACS update (e.g. a chlorinator's pH shows a temperature) | A custom integration's code only reloads on a **full Home Assistant restart** (Settings → System → Restart) — a "Reload" is not enough. Restart, then re-check |
