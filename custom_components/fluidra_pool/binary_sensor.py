@@ -345,6 +345,12 @@ class FluidraUvPresentBinarySensor(FluidraPoolEntity, BinarySensorEntity):
     non-zero shows it. Exposed as a diagnostic sensor so a UV unit that stops
     being reported (lamp module unplugged, firmware downgrade) is visible
     rather than silently turning the hours counter unavailable.
+
+    A unit with no UV lamp fitted never reports the register at all — the
+    profile polls it, the device just does not answer. That is the same "no UV
+    block" state the zero mask encodes, so it reports ``off`` (False) rather
+    than unknown: otherwise a lamp-less chlorinator shows a permanently
+    unknown diagnostic with nothing to act on (Issue #237).
     """
 
     _attr_has_entity_name = True
@@ -373,11 +379,16 @@ class FluidraUvPresentBinarySensor(FluidraPoolEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
-        """Return True when the UV block is reported present."""
+        """Return True when the UV block is reported present.
+
+        An absent register means the unit has no UV block (Issue #237) — the
+        mask the app would read is simply not there — so it is reported as
+        off, not unknown. An unparsable value still degrades to unknown.
+        """
         components = self.device_data.get("components", {})
         raw = components.get(str(self._component_id), {}).get("reportedValue")
         if raw is None:
-            return None
+            return False
         try:
             return float(raw) > 0
         except (ValueError, TypeError):

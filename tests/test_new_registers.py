@@ -33,6 +33,7 @@ DEVICE_ID = "TEST-DEV-001"
 
 UV_PRESENT = 252
 UV_HOURS = 253
+BOOST_MODE = 103
 BOOST_HOURS = 118
 BOOST_MINUTES = 111
 FILTRATION_STATE = 135
@@ -86,9 +87,9 @@ def test_uv_present_false_when_masked() -> None:
     assert _uv_present(_device({"252": {"reportedValue": 0}})).is_on is False
 
 
-def test_uv_present_none_when_register_absent() -> None:
-    """A firmware that never reports the register stays unknown, not off."""
-    assert _uv_present(_device({})).is_on is None
+def test_uv_present_false_when_register_absent() -> None:
+    """A unit with no UV lamp never reports the register — that is "no UV block", not unknown (Issue #237)."""
+    assert _uv_present(_device({})).is_on is False
 
 
 def test_uv_present_none_on_unparsable_value() -> None:
@@ -144,10 +145,14 @@ def test_uv_running_hours_available_when_register_reported() -> None:
 # --- Boost countdown split over hours + minutes (c118 / c111) ----------------
 
 
-def _boost(components: dict, feature: dict | None = None) -> FluidraBoostRemainingHoursSensor:
+def _boost(
+    components: dict, feature: dict | None = None, boost_mode: int | None = None
+) -> FluidraBoostRemainingHoursSensor:
     features = {
         "boost_remaining_hours": feature if feature is not None else {"hours": BOOST_HOURS, "minutes": BOOST_MINUTES}
     }
+    if boost_mode is not None:
+        features["boost_mode"] = boost_mode
     return FluidraBoostRemainingHoursSensor(
         _coord([_device(components, features)]), SimpleNamespace(), POOL_ID, DEVICE_ID
     )
@@ -189,6 +194,34 @@ def test_boost_remaining_none_without_feature_mapping() -> None:
 def test_boost_remaining_ignores_unparsable_half() -> None:
     """One bad half does not sink the other."""
     assert _boost({"118": {"reportedValue": 3}, "111": {"reportedValue": "n/a"}}).native_value == 3.0
+
+
+def test_boost_remaining_zero_when_boost_mode_off() -> None:
+    """Boost off ignores the stale hours register and reports 0 (Issue #238)."""
+    sensor = _boost(
+        {"118": {"reportedValue": 1}, "111": {"reportedValue": 0}, "103": {"reportedValue": False}},
+        boost_mode=BOOST_MODE,
+    )
+    assert sensor.native_value == 0.0
+
+
+def test_boost_remaining_counts_when_boost_mode_on() -> None:
+    """With boost running, the pair is read normally."""
+    sensor = _boost(
+        {"118": {"reportedValue": 23}, "111": {"reportedValue": 30}, "103": {"reportedValue": True}},
+        boost_mode=BOOST_MODE,
+    )
+    assert sensor.native_value == 23.5
+
+
+def test_boost_remaining_keeps_pair_when_boost_mode_register_silent() -> None:
+    """A declared boost_mode register that has not answered must not zero the countdown."""
+    assert _boost({"118": {"reportedValue": 5}, "103": {}}, boost_mode=BOOST_MODE).native_value == 5.0
+
+
+def test_boost_remaining_without_boost_mode_feature_reads_pair() -> None:
+    """A profile that declares no boost_mode register keeps the previous behaviour."""
+    assert _boost({"118": {"reportedValue": 4}, "111": {"reportedValue": 15}}).native_value == 4.25
 
 
 # --- Filtration state (c135, c244 fallback) ---------------------------------

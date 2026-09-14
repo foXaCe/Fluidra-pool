@@ -110,6 +110,10 @@ class FluidraBoostRemainingHoursSensor(FluidraPoolEntity, SensorEntity):
     ``boost_remaining_hours`` feature. Both are combined into one value in
     hours, so a dashboard gets a single number instead of two halves.
 
+    When the profile also declares a ``boost_mode`` register, it gates the
+    reading: the hours half is not reset when a cycle ends, so a unit with
+    boost off would otherwise show a stale hour (Issue #238).
+
     0 is a real reading (boost off), not a missing one, and is reported as-is.
     """
 
@@ -169,17 +173,41 @@ class FluidraBoostRemainingHoursSensor(FluidraPoolEntity, SensorEntity):
             _LOGGER.debug("Unparsable boost countdown value %s on component %s", raw, component)
             return None
 
+    def _boost_is_off(self) -> bool:
+        """Return True when the profile's boost-mode register says boost is off.
+
+        The hours register on these units is not reset when a cycle ends — it
+        keeps its last value — so it reads "1" with boost disabled and the
+        countdown would show a permanent 1 h (Issue #238). The boost-mode
+        register is what actually says whether a cycle is running. Only
+        consulted when the profile declares one: a profile without it keeps
+        reading the pair as before.
+        """
+        component = DeviceIdentifier.get_feature(self.device_data, "boost_mode", None)
+        if component is None:
+            return False
+        components = self.device_data.get("components", {})
+        raw = components.get(str(component), {}).get("reportedValue")
+        if raw is None:
+            return False
+        return not bool(raw)
+
     @property
     def native_value(self) -> float | None:
         """Return the remaining boost time in hours.
 
         Either half may be absent (a firmware that reports only whole hours, or
         only the minutes of the last hour), so the value is whatever is
-        actually reported — None only when neither register answers.
+        actually reported — None only when neither register answers. With boost
+        off the stale hours register is ignored and the value is 0 (Issue
+        #238).
         """
         feature = DeviceIdentifier.get_feature(self.device_data, "boost_remaining_hours", None)
         if not isinstance(feature, dict):
             return None
+
+        if self._boost_is_off():
+            return 0.0
 
         hours = self._read_part(feature.get("hours"))
         minutes = self._read_part(feature.get("minutes"))
