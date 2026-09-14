@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.87.2] - 2026-09-14
+
+### Fixed
+
+- **Chlorinator: "UV lamp detected" no longer stays unknown on a unit without a lamp** (#237). The
+  presence register is never reported on a lamp-less unit; an absent register is the same "no UV
+  block" state as a zero mask, so the diagnostic now reports off.
+- **Chlorinator: remaining boost time no longer stuck at 1 h with boost disabled** (#238). The hour
+  register is not reset when a cycle ends; the countdown is now gated on the boost-mode register and
+  reports 0 with boost off.
+
+### Build
+
+- Dependencies: `pytest-homeassistant-custom-component` bumped to 0.13.365 and the
+  `home-assistant/actions` digest updated (#235, #236).
+
 ## [2.87.1] - 2026-09-11
 
 ### Fixed
