@@ -103,12 +103,18 @@ profile, so unknown equipment is usually still usable.
   mode (Boost / Silence / Smart) is reported as an attribute rather than an HVAC mode — the register
   that carries it holds heating/cooling/auto on the Z550iQ, but this line does not cool. Every
   register was read back on a live unit.
-- **Z650iQ** — HVAC modes (heat / cool / heat-cool), Smart+/Smart/Ecosilence/Boost presets,
+- **Z650iQ** — HVAC modes (off / heat / heat-cool), Smart+/Smart/Ecosilence/Boost presets,
   on/off switch, water/air temperatures, running hours, compressor running hours, WiFi
   signal, instantaneous power (Watts) and compressor modulation (percent). Reverse-
   engineered from live captures; some registers remain undecoded and show up in
   the unmapped-register
-  debug log.
+  debug log. Smart+ automatically heats or cools; Smart, Ecosilence and Boost only heat
+  ([official manual, section 2.4.4, English page 17](https://dam.fluidra.com/asset/b6ef2e6a-9911-4abb-a2bb-a1af36fd41c6/usermanual_z650iq_ALL_2024_12.pdf)).
+  Zero compressor modulation reports idle even while enabled. With an active compressor
+  in Smart+, the thermal direction is unknown: the integration does not infer it from
+  the setpoint or report an unverified heating/cooling action. The modulation sensor and
+  `compressor_running` climate attribute still expose compressor activity. Selecting
+  `heat` leaves Smart+ for Smart; simply turning on preserves the existing preset.
 - **Gre HPGIC** — on/off, target temperature, water temperature
 - Generic heat-pump fallback
 
