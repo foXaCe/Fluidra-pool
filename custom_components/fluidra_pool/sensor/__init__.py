@@ -47,6 +47,7 @@ from .pool import (
     FluidraPoolWaterQualitySensor,
     FluidraPoolWeatherSensor,
 )
+from .salinity import FluidraCellGuardSalinitySensor, FluidraSalinityStatusSensor
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -211,6 +212,12 @@ async def async_setup_entry(
                 "battery_voltage",
             ):
                 if sensor_type in sensors_config:
+                    if sensor_type == "salinity" and DeviceIdentifier.has_feature(device, "salinity_min_production"):
+                        salinity = FluidraCellGuardSalinitySensor(
+                            coordinator, coordinator.api, pool_id, device_id, sensors_config[sensor_type]
+                        )
+                        entities.extend((salinity, FluidraSalinityStatusSensor(salinity)))
+                        continue
                     entities.append(
                         FluidraChlorinatorSensor(
                             coordinator,
