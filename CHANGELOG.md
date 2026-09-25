@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.87.3] - 2026-09-25
+
+### Fixed
+
+- **Elite Connect Cell Guard: the pH and ORP targets no longer show the measured values** (#242,
+  #243, contributed by @jalochi). These Domotic S2 chlorinators fell back to the generic chlorinator
+  profile, which reads the pH setpoint back from the register that holds the measured pH. So the
+  editable "pH setpoint" showed the live measurement — 9.24 where the app's target was 7.30 on one
+  unit — and a change appeared to bounce back to the reading. Three Cell Guard serial prefixes
+  (`DM24086706`, `DM24086206`, `DM25008408`) now have their own profiles, which keep the targets
+  (pH c8, ORP c11, chlorination read on c263 and written to c4) separate from the measurements (pH
+  c172, ORP c177, actual production c164). The mapping was confirmed on three units against the
+  official app, including writes of the pH target and the chlorination level from Home Assistant.
+  The profiles stay marked unverified until the remaining controls have been exercised.
+- **Chlorinators: the `current_ph_reading` and `current_orp_reading` attributes show the
+  measurement.** On the pH and ORP setpoint entities they read the target register and presented
+  it as the current reading on any profile that keeps the two apart. They now read the measurement
+  register, with the same scale as the pH sensor entity.
+
 ## [2.87.2] - 2026-09-14
 
 ### Fixed
