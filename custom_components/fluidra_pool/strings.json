@@ -246,7 +246,48 @@
         "name": "pH"
       },
       "chlorinator_salinity": {
-        "name": "Salinity"
+        "name": "Salinity",
+        "state_attributes": {
+          "actual_production": {
+            "name": "Actual chlorine production"
+          },
+          "is_current_reading": {
+            "name": "Current measurement"
+          },
+          "last_known_at": {
+            "name": "Last valid reading time"
+          },
+          "last_known_value": {
+            "name": "Last valid salinity"
+          },
+          "measurement_status": {
+            "name": "Measurement status",
+            "state": {
+              "awaiting_reading": "Waiting for a valid reading",
+              "low_production": "Production below 30%",
+              "no_flow": "No water flow",
+              "not_producing": "No production for measurement",
+              "offline": "Device offline",
+              "production_unknown": "Production unknown",
+              "valid": "Current reading"
+            }
+          },
+          "minimum_production": {
+            "name": "Minimum production for measurement"
+          }
+        }
+      },
+      "chlorinator_salinity_status": {
+        "name": "Salinity measurement",
+        "state": {
+          "awaiting_reading": "Waiting for a valid reading",
+          "low_production": "Production below 30%",
+          "no_flow": "No water flow",
+          "not_producing": "No production for measurement",
+          "offline": "Device offline",
+          "production_unknown": "Production unknown",
+          "valid": "Current reading"
+        }
       },
       "chlorinator_water_temperature": {
         "name": "Water Temperature"
