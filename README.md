@@ -123,9 +123,28 @@ profile, so unknown equipment is usually still usable.
   their serial to be added by hand
 - **Zodiac EXO iQ** (e.g. iQ35 / NS25) — 0–100% chlorination in 5% steps, output schedules, Boost (with remaining-time countdown), Low and freeze protection, Aux 1 / Aux 2 outputs (Off/On/Auto), heating setpoint
 - **DM24049704** (Domotic S2) — program/slot schedule format
+- **Elite Connect CellGuard** (`DM24086706`, `DM24086206`, `DM25008408`) — separate
+  chlorination/pH/ORP targets and measurements; provisional profiles (see #242).
 - Typical capabilities (model-dependent): chlorination level (0–100%), **pH setpoint**,
   **ORP/Redox setpoint**, boost mode, schedules, and sensors (pH, ORP, free chlorine,
   salinity, water temperature)
+
+**CellGuard salinity:** the supported profiles retain the last valid salinity and
+its source timestamp across HA restarts. The separate **Salinity measurement**
+sensor explains whether the reading is current, production is stopped/below 30%,
+or the integration is waiting for usable data. A zero while not measuring does
+not replace the last valid reading. With no saved reading, salinity is unknown.
+While receiving trustworthy data, an active no-flow alarm also makes the numeric
+reading unknown and preserves its history in the attributes. Offline data is
+marked historical rather than trusting a cached alarm. Keep the numeric salinity
+entity enabled to use its companion measurement-status sensor.
+
+The [CellGuard manual (page 12)](https://dam.fluidra.com/m/6c13c5e22976047f/original/Manual_Cellguard__ES_2025_10-pdf.pdfManual_Cellguard__ES_2025_10.pdf#page=12)
+requires at least 30% **actual cell production** for the salinity test. A unit
+being on or having a 90% target does not meet that condition by itself: internal
+ORP control can stop electrolysis. `is_current_reading`, `measurement_status`,
+`last_known_value` and `last_known_at` distinguish a current reading from a held
+one; repeated cloud timestamps never advance the last valid reading time.
 
 > **tecnoLC2: there is no free-chlorine probe.** These units expose 11 components and carry exactly
 > **two** probes — pH and ORP/Redox. The *Free Chlorine* sensor stays `unavailable` for their whole
