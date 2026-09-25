@@ -157,6 +157,90 @@ class TestDeviceConfigRegistry:
         assert config.features["orp_setpoint"] == 11
         assert config.features["chlorination_level"] == {"write": 4, "read": 164}
 
+    def test_dm24086706_cell_guard_separates_targets_from_measurements(self):
+        """The tested LS12 prefix gets target registers and a separate production sensor."""
+        device = {
+            "device_id": "DM24086706-test-fixture",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "thing_type": "domoticS2",
+            "components": {"8": {"reportedValue": 730}, "172": {"reportedValue": 700}},
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is DEVICE_CONFIGS["dm24086706_chlorinator"]
+        assert config.features["chlorination_level"] == {"write": 4, "read": 263}
+        assert config.features["ph_setpoint"] == 8
+        assert config.features["orp_setpoint"] == 11
+        assert config.features["sensors"]["chlorination_actual"] == 164
+        assert 263 in config.features["specific_components"]
+        assert config.verified is False  # Retain full diagnostics for untested controls.
+
+    def test_dm24086206_cell_guard_matches_only_its_provisional_profile(self):
+        """The second known prefix receives the provisional target/measurement map."""
+        device = {
+            "device_id": "DM24086206-test-fixture",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "thing_type": "domoticS2",
+            "components": {"8": {"reportedValue": 730}, "172": {"reportedValue": 710}},
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is DEVICE_CONFIGS["dm24086206_chlorinator"]
+        assert config is not DEVICE_CONFIGS["dm24086706_chlorinator"]
+        assert config.features["chlorination_level"] == {"write": 4, "read": 263}
+        assert config.features["ph_setpoint"] == 8
+        assert config.features["orp_setpoint"] == 11
+        assert config.features["sensors"]["chlorination_actual"] == 164
+        assert 263 in config.features["specific_components"]
+        assert config.verified is False
+        assert "schedules" not in config.features
+        assert "speed_control" not in config.features
+
+    def test_dm25008408_cell_guard_uses_the_shared_family_map_provisionally(self):
+        """The additional Cell Guard uses the shared map without claiming full verification."""
+        device = {
+            "device_id": "DM25008408-test-fixture",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "thing_type": "domoticS2",
+            "components": {
+                "4": {"reportedValue": 100},
+                "263": {"reportedValue": 100},
+                "164": {"reportedValue": 82},
+                "8": {"reportedValue": 750},
+                "172": {"reportedValue": 736},
+                "11": {"reportedValue": None},
+                "177": {"reportedValue": None},
+            },
+        }
+        config = DeviceIdentifier.identify_device(device)
+        assert config is DEVICE_CONFIGS["dm25008408_chlorinator"]
+        assert config.features == DEVICE_CONFIGS["dm24086706_chlorinator"].features
+        assert config.features == DEVICE_CONFIGS["dm24086206_chlorinator"].features
+        assert config.features["chlorination_level"] == {"write": 4, "read": 263}
+        assert config.features["ph_setpoint"] == 8
+        assert config.features["orp_setpoint"] == 11
+        assert config.features["sensors"]["ph"] == 172
+        assert config.features.get("ph_setpoint_divisor", 100) == 100
+        assert config.features.get("sensor_divisors", {}).get("ph", 100) == 100
+        assert config.entities == DEVICE_CONFIGS["chlorinator"].entities
+        assert config.family_patterns == []
+        assert config.thing_type_patterns == []
+        assert config.verified is False
+        assert 263 in config.features["specific_components"]
+        assert config.features["sensors"]["chlorination_actual"] == 164
+
+    def test_cell_guard_profile_does_not_claim_other_domotics2_units(self):
+        """Known serial-specific evidence must not change unrelated domoticS2 units."""
+        device = {
+            "device_id": "DM99000000-test-fixture",
+            "family": "Chlorinators",
+            "type": "chlorinator",
+            "thing_type": "domoticS2",
+            "components": {"8": {"reportedValue": 730}, "172": {"reportedValue": 924}},
+        }
+        assert DeviceIdentifier.identify_device(device) is DEVICE_CONFIGS["chlorinator"]
+
     def test_cc25021136_zodiac_ei2_iq_evo_uses_teclc2_layout(self):
         """Zodiac Ei2 iQ Evo (CC25021136) maps to the tecnoLC2 Evo profile, not the generic one (Issue #104)."""
         config = DEVICE_CONFIGS["cc25102423_chlorinator"]

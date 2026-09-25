@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from custom_components.fluidra_pool.device_registry import DEVICE_CONFIGS
 from custom_components.fluidra_pool.number import (
     FluidraChlorinatorLevelNumber,
     FluidraChlorinatorOrpSetpoint,
@@ -449,6 +450,131 @@ def test_orp_setpoint_extra_state_attributes_simple_int() -> None:
     assert attrs["read_component"] == 11
     assert attrs["write_component"] == 11
     assert attrs["current_orp_reading"] == 700
+
+
+def test_cell_guard_targets_remain_distinct_from_measurements() -> None:
+    """Idle production and drifting probes must not overwrite the configured targets."""
+    device = _chlorinator_device(
+        components={
+            "4": {"reportedValue": 80},
+            "263": {"reportedValue": 90},
+            "164": {"reportedValue": 0},
+            "8": {"reportedValue": 730},
+            "172": {"reportedValue": 700, "desiredValue": 799},
+            "11": {"reportedValue": 740},
+            "177": {"reportedValue": 753, "desiredValue": 800},
+        },
+        features=DEVICE_CONFIGS["dm24086706_chlorinator"].features,
+    )
+    coordinator = _coord_with(device)
+    level = FluidraChlorinatorLevelNumber(coordinator, _api(), POOL_ID, DEVICE_ID)
+    ph = FluidraChlorinatorPhSetpoint(coordinator, _api(), POOL_ID, DEVICE_ID)
+    orp = FluidraChlorinatorOrpSetpoint(coordinator, _api(), POOL_ID, DEVICE_ID)
+
+    assert level.native_value == 90  # c263, neither write echo c4 nor actual c164.
+    assert ph.native_value == 7.3
+    assert ph.extra_state_attributes["current_ph_reading"] == 7.0
+    assert orp.native_value == 740
+    assert orp.extra_state_attributes["current_orp_reading"] == 753
+
+
+def test_second_cell_guard_targets_remain_distinct_from_measurements() -> None:
+    """The provisional unit also reads its targets independently of active production."""
+    device = _chlorinator_device(
+        components={
+            "4": {"reportedValue": 80},
+            "263": {"reportedValue": 90},
+            "164": {"reportedValue": 89},
+            "8": {"reportedValue": 730},
+            "172": {"reportedValue": 710, "desiredValue": 799},
+            "11": {"reportedValue": 740},
+            "177": {"reportedValue": 732, "desiredValue": 800},
+        },
+        features=DEVICE_CONFIGS["dm24086206_chlorinator"].features,
+    )
+    coordinator = _coord_with(device)
+    level = FluidraChlorinatorLevelNumber(coordinator, _api(), POOL_ID, DEVICE_ID)
+    ph = FluidraChlorinatorPhSetpoint(coordinator, _api(), POOL_ID, DEVICE_ID)
+    orp = FluidraChlorinatorOrpSetpoint(coordinator, _api(), POOL_ID, DEVICE_ID)
+
+    assert level.native_value == 90
+    assert ph.native_value == 7.3
+    assert ph.extra_state_attributes["current_ph_reading"] == 7.1
+    assert orp.native_value == 740
+    assert orp.extra_state_attributes["current_orp_reading"] == 732
+
+
+def test_third_cell_guard_targets_remain_distinct_from_measurements() -> None:
+    """Apply the shared CellGuard map to the additional reporter's diagnostic values."""
+    device = _chlorinator_device(
+        components={
+            "4": {"reportedValue": 100},
+            "263": {"reportedValue": 100},
+            "164": {"reportedValue": 82},
+            "8": {"reportedValue": 750},
+            "172": {"reportedValue": 736},
+            "11": {"reportedValue": None},
+            "177": {"reportedValue": None},
+        },
+        features=DEVICE_CONFIGS["dm25008408_chlorinator"].features,
+    )
+    coordinator = _coord_with(device)
+    level = FluidraChlorinatorLevelNumber(coordinator, _api(), POOL_ID, DEVICE_ID)
+    ph = FluidraChlorinatorPhSetpoint(coordinator, _api(), POOL_ID, DEVICE_ID)
+    orp = FluidraChlorinatorOrpSetpoint(coordinator, _api(), POOL_ID, DEVICE_ID)
+
+    assert level.native_value == 100  # Target, not actual production c164=82.
+    assert ph.native_value == 7.5
+    attrs = ph.extra_state_attributes
+    assert attrs["read_component"] == 8
+    assert attrs["write_component"] == 8
+    assert attrs["current_ph_reading"] == 7.36
+    assert orp.native_value is None  # No ORP reading in the supplied diagnostic.
+    assert orp.extra_state_attributes["current_orp_reading"] is None
+
+    # Simulated later readings must not replace configured targets.
+    device["components"]["4"]["reportedValue"] = 90
+    device["components"]["164"]["reportedValue"] = 0
+    device["components"]["172"]["reportedValue"] = 737
+    assert level.native_value == 100
+    assert ph.native_value == 7.5
+    assert ph.extra_state_attributes["current_ph_reading"] == 7.37
+
+    # A missing measurement must not be replaced by the valid target.
+    device["components"]["172"]["reportedValue"] = None
+    assert ph.native_value == 7.5
+    assert ph.extra_state_attributes["current_ph_reading"] is None
+
+
+def test_ph_measurement_attribute_uses_sensor_scale_not_target_scale() -> None:
+    """A profile can give the probe a different scale from its target register."""
+    device = _chlorinator_device(
+        components={"8": {"reportedValue": 73}, "172": {"reportedValue": 7100}},
+        features={
+            "ph_setpoint": 8,
+            "ph_setpoint_divisor": 10,
+            "sensors": {"ph": 172},
+            "sensor_divisors": {"ph": 1000},
+        },
+    )
+    ph = FluidraChlorinatorPhSetpoint(_coord_with(device), _api(), POOL_ID, DEVICE_ID)
+
+    assert ph.native_value == 7.3
+    assert ph.extra_state_attributes["current_ph_reading"] == 7.1
+
+
+def test_missing_mapped_measurements_do_not_fall_back_to_targets() -> None:
+    """An absent probe reading remains unknown even when the target is available."""
+    device = _chlorinator_device(
+        components={"8": {"reportedValue": 730}, "11": {"reportedValue": 740}},
+        features=DEVICE_CONFIGS["dm24086706_chlorinator"].features,
+    )
+    coordinator = _coord_with(device)
+    ph = FluidraChlorinatorPhSetpoint(coordinator, _api(), POOL_ID, DEVICE_ID)
+    orp = FluidraChlorinatorOrpSetpoint(coordinator, _api(), POOL_ID, DEVICE_ID)
+
+    assert ph.extra_state_attributes["current_ph_reading"] is None
+    assert orp.extra_state_attributes["current_orp_reading"] is None
 
 
 # --- FluidraLightEffectSpeed ---------------------------------------------
