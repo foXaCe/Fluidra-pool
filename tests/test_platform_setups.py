@@ -37,6 +37,12 @@ from custom_components.fluidra_pool.select import (
 from custom_components.fluidra_pool.select import (
     async_setup_entry as select_setup,
 )
+from custom_components.fluidra_pool.sensor import async_setup_entry as sensor_setup
+from custom_components.fluidra_pool.sensor.chlorinator import FluidraChlorinatorSensor
+from custom_components.fluidra_pool.sensor.salinity import (
+    FluidraCellGuardSalinitySensor,
+    FluidraSalinityStatusSensor,
+)
 from custom_components.fluidra_pool.switch import (
     FluidraAutoModeSwitch,
     FluidraChlorinatorBoostSwitch,
@@ -562,3 +568,29 @@ async def test_light_setup_light_without_device_id_skipped():
     coordinator = _coordinator([light], data=data)
     added, _ = await _run(light_setup, coordinator)
     assert _count(added, FluidraLight) == 0
+
+
+async def test_cellguard_salinity_setup_preserves_ids_and_leaves_other_models_unchanged():
+    """Only the three opt-in profiles get restored salinity and its status entity."""
+    cellguards = [f"{prefix}.nn_1" for prefix in ("DM24086706", "DM24086206", "DM25008408")]
+    other = "DM24008702.nn_1"
+    devices = [_device(device_id) for device_id in [*cellguards, other]]
+    added, _ = await _run(sensor_setup, _coordinator(devices))
+    by_id = {entity.unique_id: entity for entity in added}
+
+    assert _count(added, FluidraCellGuardSalinitySensor) == 3
+    assert _count(added, FluidraSalinityStatusSensor) == 3
+    for device_id in cellguards:
+        assert isinstance(by_id[f"fluidra_{device_id}_salinity"], FluidraCellGuardSalinitySensor)
+    assert type(by_id[f"fluidra_{other}_salinity"]) is FluidraChlorinatorSensor
+
+
+async def test_cellguard_salinity_setup_does_not_duplicate_entities_on_refresh():
+    """A coordinator refresh must not create another status or measurement entity."""
+    device = _device("DM24086706.nn_1")
+    coordinator = _coordinator([device])
+    coordinator.get_pools_from_data.return_value = coordinator.api.cached_pools
+    added, async_add = await _run(sensor_setup, coordinator)
+    coordinator.async_add_listener.call_args.args[0]()
+    async_add.assert_called_once()
+    assert _count(added, FluidraSalinityStatusSensor) == 1
