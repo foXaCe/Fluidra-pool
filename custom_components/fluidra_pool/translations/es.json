@@ -246,7 +246,48 @@
         "name": "pH"
       },
       "chlorinator_salinity": {
-        "name": "Salinidad"
+        "name": "Salinidad",
+        "state_attributes": {
+          "actual_production": {
+            "name": "Producción real de cloro"
+          },
+          "is_current_reading": {
+            "name": "Medición actual"
+          },
+          "last_known_at": {
+            "name": "Fecha de la última lectura válida"
+          },
+          "last_known_value": {
+            "name": "Última salinidad válida"
+          },
+          "measurement_status": {
+            "name": "Estado de la medición",
+            "state": {
+              "awaiting_reading": "Esperando una lectura válida",
+              "low_production": "Producción inferior al 30 %",
+              "no_flow": "Sin caudal de agua",
+              "not_producing": "Sin producción para medir",
+              "offline": "Dispositivo desconectado",
+              "production_unknown": "Producción desconocida",
+              "valid": "Lectura actual"
+            }
+          },
+          "minimum_production": {
+            "name": "Producción mínima para medir"
+          }
+        }
+      },
+      "chlorinator_salinity_status": {
+        "name": "Medición de salinidad",
+        "state": {
+          "awaiting_reading": "Esperando una lectura válida",
+          "low_production": "Producción inferior al 30 %",
+          "no_flow": "Sin caudal de agua",
+          "not_producing": "Sin producción para medir",
+          "offline": "Dispositivo desconectado",
+          "production_unknown": "Producción desconocida",
+          "valid": "Lectura actual"
+        }
       },
       "chlorinator_water_temperature": {
         "name": "Temperatura del Agua"
