@@ -933,6 +933,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         required_components=[0, 1, 2, 3],
         entities=["switch", "select", "number", "sensor_info"],
         features={
+            "salinity_min_production": 30,  # CellGuard manual, section 4: actual production, not target.
             "chlorination_level": {"write": 4, "read": 263},
             "ph_setpoint": 8,
             "orp_setpoint": 11,
@@ -962,6 +963,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         required_components=[0, 1, 2, 3],
         entities=["switch", "select", "number", "sensor_info"],
         features={
+            "salinity_min_production": 30,  # CellGuard manual, section 4: actual production, not target.
             "chlorination_level": {"write": 4, "read": 263},
             "ph_setpoint": 8,
             "orp_setpoint": 11,
@@ -993,6 +995,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         required_components=[0, 1, 2, 3],
         entities=["switch", "select", "number", "sensor_info"],
         features={
+            "salinity_min_production": 30,  # CellGuard manual, section 4: actual production, not target.
             "chlorination_level": {"write": 4, "read": 263},
             "ph_setpoint": 8,  # Target and measured pH both use the default divisor 100.
             "orp_setpoint": 11,
