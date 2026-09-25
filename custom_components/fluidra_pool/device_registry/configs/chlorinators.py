@@ -920,6 +920,96 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=90,
     ),
+    "dm24086706_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Elite Connect Cell Guard LS12 (domoticS2) — Issue #242.
+        # Controlled app tests: pH target c8 = 730 -> 740 -> 730; chlorination
+        # target c4/c263 = 90 -> 80 -> 90 while actual production c164 stayed 0.
+        # The app's embedded D2R UI also reads the chlorination target on c263
+        # and writes c4. Keep targets separate from measured pH/ORP/production.
+        # Only this serial prefix was exercised; do not match the whole family.
+        identifier_patterns=["DM24086706*"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "select", "number", "sensor_info"],
+        features={
+            "chlorination_level": {"write": 4, "read": 263},
+            "ph_setpoint": 8,
+            "orp_setpoint": 11,
+            "boost_mode": 245,
+            "sensors": {
+                "ph": 172,
+                "orp": 177,
+                "free_chlorine": 178,  # Retain the existing entity; no usable reading observed.
+                "temperature": 183,
+                "salinity": 185,
+                "chlorination_actual": 164,
+            },
+            "specific_components": [4, 8, 11, 20, 164, 172, 177, 178, 183, 185, 245, 263],
+        },
+        priority=90,
+        # Keep full diagnostic downloads while the remaining controls are untested.
+        verified=False,
+    ),
+    "dm24086206_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Provisional local profile for a second Elite Connect Cell Guard LS12.
+        # App/read-only diagnostics agree on the target/measurement split used
+        # above. This unit has not undergone the controlled write/restore tests.
+        # Retain the existing controls; do not infer VSP or schedule support.
+        identifier_patterns=["DM24086206*"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "select", "number", "sensor_info"],
+        features={
+            "chlorination_level": {"write": 4, "read": 263},
+            "ph_setpoint": 8,
+            "orp_setpoint": 11,
+            "boost_mode": 245,
+            "sensors": {
+                "ph": 172,
+                "orp": 177,
+                "free_chlorine": 178,
+                "temperature": 183,
+                "salinity": 185,
+                "chlorination_actual": 164,
+            },
+            "specific_components": [4, 8, 11, 20, 164, 172, 177, 178, 183, 185, 245, 263],
+        },
+        priority=90,
+        verified=False,
+    ),
+    "dm25008408_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Elite Connect Cell Guard (domoticS2) — Issue #242; capacity unconfirmed.
+        # Changing only the app pH target 7.30 -> 7.50 yielded c8=750 with
+        # measured pH on c172=736 (7.36). The same diagnostic has c4=c263=100
+        # while actual production c164=82, supporting the target/output split.
+        # Use the shared Cell Guard map provisionally. Only the pH change was
+        # controlled on this unit; the remaining controls are extrapolated from
+        # the same product family (ORP registers are null in its captures).
+        identifier_patterns=["DM25008408*"],
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["switch", "select", "number", "sensor_info"],
+        features={
+            "chlorination_level": {"write": 4, "read": 263},
+            "ph_setpoint": 8,  # Target and measured pH both use the default divisor 100.
+            "orp_setpoint": 11,
+            "boost_mode": 245,
+            "sensors": {
+                "ph": 172,
+                "orp": 177,
+                "free_chlorine": 178,
+                "temperature": 183,
+                "salinity": 185,
+                "chlorination_actual": 164,
+            },
+            "specific_components": [4, 8, 11, 20, 164, 172, 177, 178, 183, 185, 245, 263],
+        },
+        priority=90,
+        verified=False,
+    ),
     "dm25028908_chlorinator": DeviceConfig(
         device_type="chlorinator",
         # pH-only domoticS2 chlorinator (thing type domoticS2, bridged) — Issue #144
