@@ -32,7 +32,6 @@ from .const import (
     Z550_STATE_NO_FLOW,
     Z650_MODE_TO_VALUE,
     Z650_PRESET_MODES,
-    Z650_PRESET_SMART_PLUS,
     Z650_VALUE_TO_MODE,
     FluidraPoolConfigEntry,
 )
@@ -214,16 +213,18 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             reported_value = components["14"].get("reportedValue")
             if reported_value is not None:
                 if DeviceIdentifier.has_feature(device_data, "z650iq_mode"):
-                    return Z650_VALUE_TO_MODE.get(reported_value, Z650_PRESET_SMART_PLUS)
+                    if isinstance(reported_value, bool) or not isinstance(reported_value, int):
+                        return None
+                    return Z650_VALUE_TO_MODE.get(reported_value)
                 return LG_VALUE_TO_MODE.get(reported_value, LG_PRESET_SMART_HEATING)
 
         # Fallback to family default
         if DeviceIdentifier.has_feature(device_data, "z650iq_mode"):
-            return Z650_PRESET_SMART_PLUS
+            return None
         return LG_PRESET_SMART_HEATING
 
     @property
-    def hvac_mode(self) -> HVACMode:
+    def hvac_mode(self) -> HVACMode | None:
         """Return current hvac operation mode."""
 
         # Check for pending optimistic HVAC mode first
@@ -234,12 +235,21 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             else:
                 return self._pending_hvac_mode
 
-        # If we have a pending preset mode, the heat pump should stay HEAT
+        device_data = self.device_data
+        behavior = resolve_behavior(device_data)
+        if isinstance(behavior, Z650iqBehavior):
+            # Reading preset_mode also expires a pending preset. A c14-only
+            # edit must not turn an OFF unit on, or show Smart+ as HEAT.
+            preset = self.preset_mode
+            if self._pending_preset_mode is not None:
+                return behavior.hvac_mode({**device_data, "z260iq_mode_value": Z650_MODE_TO_VALUE.get(preset or "")})
+            return behavior.hvac_mode(device_data)
+
+        # Preserve the existing optimistic behavior of the other families.
         if self._pending_preset_mode is not None:
             return HVACMode.HEAT
 
-        device_data = self.device_data
-        return resolve_behavior(device_data).hvac_mode(device_data)
+        return behavior.hvac_mode(device_data)
 
     def _infer_heat_cool_action(self) -> HVACAction:
         """Infer the running direction in Smart Heat+Cool (component 14 = 2).
@@ -270,9 +280,35 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
     @property
     def icon(self) -> str:
         """Return the icon of the climate entity."""
-        if self.hvac_mode == HVACMode.HEAT:
+        if self.hvac_mode in (HVACMode.HEAT, HVACMode.HEAT_COOL):
             return "mdi:heat-pump"
         return "mdi:heat-pump-outline"
+
+    async def async_turn_on(self) -> None:
+        """Enable Z650iQ without HA's default turn-on selecting Smart+."""
+        if not isinstance(resolve_behavior(self.device_data), Z650iqBehavior):
+            await super().async_turn_on()
+            return
+        self._ensure_pool_writable()
+        try:
+            success = await self._api.start_pump(self._device_id)
+            if success:
+                # An earlier optimistic OFF must not hide the refreshed ON.
+                self._pending_hvac_mode = None
+                self._last_hvac_action_time = None
+            await self.coordinator.async_request_refresh()
+            if not success:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="hvac_mode_set_failed",
+                    translation_placeholders={"hvac_mode": "on"},
+                )
+        except (aiohttp.ClientError, TimeoutError, FluidraError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="heat_pump_control_failed",
+                translation_placeholders={"error_type": type(err).__name__},
+            ) from err
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target hvac mode."""
@@ -567,7 +603,17 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             def _raw(comp_id: int) -> object:
                 return components.get(str(comp_id), {}).get("reportedValue") if isinstance(components, dict) else None
 
-            attrs["heat_pump_on"] = bool(device_data.get("heat_pump_reported"))
+            enabled = device_data.get("heat_pump_reported")
+            attrs["heat_pump_on"] = bool(enabled) if enabled in (0, 1) else None
+            if isinstance(behavior, Z650iqBehavior):
+                running = behavior.compressor_running(device_data)
+                action = behavior.hvac_action(device_data, self._infer_heat_cool_action)
+                attrs["compressor_running"] = running
+                attrs["compressor_modulation"] = device_data.get("compressor_modulation")
+                # Override generic c9/c10 aliases which do not establish
+                # compressor activity or thermal direction for this family.
+                attrs["is_running"] = running
+                attrs["is_heating"] = None if action is None else action == HVACAction.HEATING
             attrs["preset_mode_raw"] = _raw(14)
             attrs["water_temperature"] = device_data.get("water_temperature")
             attrs["air_temperature"] = device_data.get("air_temperature")
