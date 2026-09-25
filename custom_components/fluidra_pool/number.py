@@ -236,14 +236,22 @@ class FluidraChlorinatorPhSetpoint(FluidraPoolControlEntity, NumberEntity):
         ph_config = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint", {"write": 8, "read": 172})
         read_component, write_component = resolve_component_rw(ph_config)
 
-        # Get current pH reading
+        # The current measurement can live on a different register and scale
+        # from the target. Preserve the legacy fallback for profiles without a
+        # measurement mapping.
+        sensors = DeviceIdentifier.get_feature(self.device_data, "sensors", {})
+        measurement_component = sensors.get("ph", read_component)
         components = self.device_data.get("components", {})
-        component_data = components.get(str(read_component), {})
+        component_data = components.get(str(measurement_component), {})
         raw_reading = component_data.get("reportedValue")
 
         current_ph = None
         if raw_reading is not None:
-            divisor = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint_divisor", 100)
+            if "ph" in sensors:
+                divisors = DeviceIdentifier.get_feature(self.device_data, "sensor_divisors", {})
+                divisor = divisors.get("ph", 100)
+            else:
+                divisor = DeviceIdentifier.get_feature(self.device_data, "ph_setpoint_divisor", 100)
             try:
                 current_ph = float(raw_reading) / divisor
             except (ValueError, TypeError):
@@ -423,9 +431,12 @@ class FluidraChlorinatorOrpSetpoint(FluidraPoolControlEntity, NumberEntity):
         orp_config = DeviceIdentifier.get_feature(self.device_data, "orp_setpoint", {"write": 11, "read": 177})
         read_component, write_component = resolve_component_rw(orp_config)
 
-        # Get current ORP reading
+        # Read the measurement register, not the target register, when the
+        # profile declares separate components.
+        sensors = DeviceIdentifier.get_feature(self.device_data, "sensors", {})
+        measurement_component = sensors.get("orp", read_component)
         components = self.device_data.get("components", {})
-        component_data = components.get(str(read_component), {})
+        component_data = components.get(str(measurement_component), {})
         current_orp = component_data.get("reportedValue")
 
         return {
