@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.88.0] - 2026-09-26
+
+### Added
+
+- **Elite Connect Cell Guard: a salinity measurement status** (#242, #244, contributed by @jalochi).
+  The Cell Guard only measures salinity while the cell is producing — its manual requires at least
+  30 % production — and reports 0 when it cannot measure, which the Fluidra app then displays as
+  0.0 g/L. A new status sensor says whether the salinity shown is a current reading or the last
+  valid one, and why: production stopped, below the 30 % minimum, no flow, offline, or waiting for a
+  new reading.
+
+### Fixed
+
+- **Cell Guard: the last valid salinity survives a restart.** The integration already ignored a
+  zero and kept the last real salinity, but only in memory, so a Home Assistant restart while the
+  cell was stopped left the sensor unknown. The last qualified reading is now kept across restarts,
+  with the date of the report it came from, and only a newer report taken during production can
+  replace it. With a flow alarm the value shows as unknown and the last reading stays in the
+  attributes. Tested on a Cell Guard LS12 through a stop and resume of production and through a
+  real loss of flow. The existing salinity entity keeps its ID, and no other model changes.
+
 ## [2.87.3] - 2026-09-25
 
 ### Fixed
