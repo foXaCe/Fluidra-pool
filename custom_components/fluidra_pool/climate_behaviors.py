@@ -12,6 +12,7 @@ the first poll.
 from __future__ import annotations
 
 from collections.abc import Callable
+from math import isfinite
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.climate.const import HVACAction, HVACMode
@@ -35,6 +36,7 @@ from .const import (
     Z550_STATE_NO_FLOW,
     Z550_TEMP_STEP,
     Z650_MODE_TO_VALUE,
+    Z650_PRESET_SMART,
     Z650_PRESET_SMART_PLUS,
 )
 from .device_registry import DeviceIdentifier
@@ -63,7 +65,7 @@ class HeatPumpBehavior:
     max_temp: float = 40.0
     temp_step: float = 1.0
 
-    def hvac_mode(self, device_data: dict[str, Any]) -> HVACMode:
+    def hvac_mode(self, device_data: dict[str, Any]) -> HVACMode | None:
         """Return current hvac operation mode (standard heat pump logic).
 
         1. Priority: heat_pump_reported (specific heat pump state)
@@ -84,7 +86,7 @@ class HeatPumpBehavior:
 
         return HVACMode.OFF
 
-    def hvac_action(self, device_data: dict[str, Any], infer_heat_cool: InferHeatCoolAction) -> HVACAction:
+    def hvac_action(self, device_data: dict[str, Any], infer_heat_cool: InferHeatCoolAction) -> HVACAction | None:
         """Return the current hvac action (standard heat pump logic)."""
         if device_data.get("is_heating", False):
             return HVACAction.HEATING
@@ -390,36 +392,70 @@ class LgBehavior(HeatPumpBehavior):
 class Z650iqBehavior(HeatPumpBehavior):
     """Z650iQ command set: component 10 (on/off), 14 (mode/preset).
 
-    Heat-only. The Z650iQ is a heating pump — the manufacturer's own
-    documentation describes all four c14 presets as heating strategies
-    (Boost = maximum heating power, Smart+, Smart, Eco-silence), never a
-    heat/cool direction. The reversible model is the Z250iQ/Z260iQ, whose
-    page says heat *and* cool; this one says "designed to heat the pool"
-    (Issue #233). So the register selects how hard the unit heats, exactly
-    like the Z350iQ's c16, and the HVAC mode comes from the power register
-    alone.
-
-    The register is nonetheless shared with the Z260iQ, with different
-    values (here 0 = Smart+, 1 = Boost, 2 = Smart, 3 = Ecosilence), so a
-    shared behavior would misread this unit.
+    The manual (H0872300, section 2.4.4) and app distinguish automatic
+    heating/cooling in Smart+ from the three heating-only presets. c14 is
+    still a preset, not the current thermal direction: in particular,
+    Boost must never be interpreted as cooling (Issue #233).
+    c32 reports compressor modulation; c10 alone only means enabled.
     """
 
-    hvac_modes: list[HVACMode] = [HVACMode.OFF, HVACMode.HEAT]
+    hvac_modes: list[HVACMode] = [HVACMode.OFF, HVACMode.HEAT, HVACMode.HEAT_COOL]
     min_temp: float = 15.0
     max_temp: float = 35.0
     temp_step: float = 0.5
 
-    def hvac_mode(self, device_data: dict[str, Any]) -> HVACMode:
-        """ON/OFF only — c14 is a heating strategy here, not a direction."""
-        return HVACMode.HEAT if device_data.get("heat_pump_reported") else HVACMode.OFF
+    def hvac_mode(self, device_data: dict[str, Any]) -> HVACMode | None:
+        """Report the selected operating mode, without inventing missing data."""
+        enabled = device_data.get("heat_pump_reported")
+        if enabled == 0:
+            return HVACMode.OFF
+        if enabled != 1:
+            return None
+        preset = device_data.get("z260iq_mode_value")
+        if isinstance(preset, bool) or not isinstance(preset, int):
+            return None
+        if preset == 0:
+            return HVACMode.HEAT_COOL
+        if preset in (1, 2, 3):
+            return HVACMode.HEAT
+        return None
 
-    def hvac_action(self, device_data: dict[str, Any], infer_heat_cool: InferHeatCoolAction) -> HVACAction:
-        """A heat-only unit is HEATING whenever it runs; IDLE if flow is blocked."""
-        if not device_data.get("heat_pump_reported"):
-            return HVACAction.OFF
+    def compressor_running(self, device_data: dict[str, Any]) -> bool | None:
+        """Use valid modulation to distinguish an enabled unit from activity."""
+        enabled = device_data.get("heat_pump_reported")
+        if enabled == 0:
+            return False
+        if enabled != 1:
+            return None
         if device_data.get("no_flow_alarm"):
+            return False
+        # Prefer the raw register when present: a null/invalid update must
+        # not fall back to a previous decoded value retained by the coordinator.
+        component = device_data.get("components", {}).get("32")
+        modulation = (
+            component.get("reportedValue") if isinstance(component, dict) else device_data.get("compressor_modulation")
+        )
+        if (
+            isinstance(modulation, bool)
+            or not isinstance(modulation, (int, float))
+            or not isfinite(modulation)
+            or not 0 <= modulation <= 100
+        ):
+            return None
+        return modulation > 0
+
+    def hvac_action(self, device_data: dict[str, Any], infer_heat_cool: InferHeatCoolAction) -> HVACAction | None:
+        """Report idle/activity; Smart+ direction needs a confirmed register."""
+        if device_data.get("heat_pump_reported") == 0:
+            return HVACAction.OFF
+        running = self.compressor_running(device_data)
+        if running is False:
             return HVACAction.IDLE
-        return HVACAction.HEATING
+        if running and self.hvac_mode(device_data) == HVACMode.HEAT:
+            return HVACAction.HEATING
+        # A temperature delta describes demand, not actual thermal direction.
+        # Do not infer cooling (or heating) in Smart+, even with an active compressor.
+        return None
 
     async def async_set_hvac_mode(
         self,
@@ -429,22 +465,24 @@ class Z650iqBehavior(HeatPumpBehavior):
         hvac_mode: HVACMode,
         current_preset: str | None,
     ) -> bool | None:
-        """Z650iQ: ON/OFF via start/stop_pump, heating strategy via component 14.
+        """Select heating or automatic heating/cooling, then enable the unit.
 
         start_pump/stop_pump resolve the on/off register from the profile's
         "on_off_component" (c10 here), so this stays family-agnostic.
         """
         if hvac_mode == HVACMode.OFF:
             return await api.stop_pump(device_id)
-        if hvac_mode != HVACMode.HEAT:
-            # No cooling on this unit (Issue #233).
+        if hvac_mode == HVACMode.HEAT_COOL:
+            mode_value = Z650_MODE_TO_VALUE[Z650_PRESET_SMART_PLUS]
+        elif hvac_mode == HVACMode.HEAT:
+            # Preserve a heating-only preset, but leave Smart+ when HEAT is
+            # explicitly requested. A simple turn_on does not change presets.
+            mode_value = Z650_MODE_TO_VALUE.get(current_preset or "", Z650_MODE_TO_VALUE[Z650_PRESET_SMART])
+            if mode_value == Z650_MODE_TO_VALUE[Z650_PRESET_SMART_PLUS]:
+                mode_value = Z650_MODE_TO_VALUE[Z650_PRESET_SMART]
+        else:
+            # No independent cooling-only command has been established.
             return None
-
-        # Keep the current heating preset (Boost/Smart/Smart+/Ecosilence),
-        # defaulting to Smart+ when none is known.
-        mode_value = Z650_MODE_TO_VALUE.get(
-            current_preset or Z650_PRESET_SMART_PLUS, Z650_MODE_TO_VALUE[Z650_PRESET_SMART_PLUS]
-        )
 
         success = await api.control_device_component(device_id, 14, mode_value)
         if success:

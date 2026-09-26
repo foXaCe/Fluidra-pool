@@ -280,10 +280,10 @@ LG_VALUE_TO_MODE: Final = {v: k for k, v in LG_MODE_TO_VALUE.items()}
 
 # Z650iQ Heat Pump constants — the Fluidra App uses different names for the
 # same component-14 register values. Only 4 of the 7 LG presets are available.
-# Heat-only unit (Issue #233): all four are heating strategies, not a
-# heat/cool direction — Boost delivers maximum heating power.
+# Smart+ automatically heats/cools; the other three presets only heat.
+# None of these values reports the current thermal direction (Issue #233).
 # Mapping: App "Smart+" -> c14=0, "Boost" -> c14=1, "Smart" -> c14=2, "Ecosilence" -> c14=3
-Z650_PRESET_SMART_PLUS: Final = "smart_plus"  # Fluidra App: "Smart+" (heat, auto Boost/Eco-silence)
+Z650_PRESET_SMART_PLUS: Final = "smart_plus"  # Fluidra App: "Smart+" (automatic heating/cooling)
 Z650_PRESET_SMART: Final = "smart"  # Fluidra App: "Smart" (heat)
 Z650_PRESET_ECOSILENCE: Final = "ecosilence"  # Fluidra App: "Ecosilence" (heat)
 Z650_PRESET_BOOST: Final = "boost"  # Fluidra App: "Boost" (heat, max power)

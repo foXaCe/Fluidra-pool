@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from homeassistant.components.climate import (
     ATTR_TEMPERATURE,
@@ -892,92 +892,284 @@ def test_z650iq_preset_mode_from_component_14(raw: int, expected: str) -> None:
     assert climate.preset_mode == expected
 
 
-def test_z650iq_preset_mode_defaults_without_component_14() -> None:
-    """No c14 reading yet -> fall back to the family default, not the LG one."""
-    assert _make(_pin(features=_Z650)).preset_mode == Z650_PRESET_SMART_PLUS
+def _z650_device(raw: Any = 2, **extra: Any) -> dict:
+    """A coherent Z650 snapshot, with the real c10/c14/c32 sources."""
+    values = {
+        "heat_pump_reported": 1,
+        "z260iq_mode_value": raw,
+        "compressor_modulation": 50,
+        "components": {"14": {"reportedValue": raw}},
+    }
+    values.update(extra)
+    return _pin(features=_Z650, **values)
 
 
-def test_z650iq_preset_mode_unknown_raw_falls_back() -> None:
-    """An unmapped c14 value must not raise."""
-    climate = _make(_pin(features=_Z650, components={"14": {"reportedValue": 99}}))
-    assert climate.preset_mode == Z650_PRESET_SMART_PLUS
+def test_z650iq_preset_mode_unknown_without_component_14() -> None:
+    """A missing preset cannot claim Smart+ was selected."""
+    assert _make(_pin(features=_Z650)).preset_mode is None
 
 
-def test_hvac_modes_z650iq_heat_only() -> None:
-    """Z650iQ is a heating pump — no COOL/HEAT_COOL (Issue #233)."""
-    assert _make(_pin(features=_Z650)).hvac_modes == [HVACMode.OFF, HVACMode.HEAT]
+@pytest.mark.parametrize("raw", [None, 99, -1, "invalid", "0", True, False, 1.5, float("nan"), float("inf")])
+def test_z650iq_preset_mode_unknown_raw_remains_unknown(raw: Any) -> None:
+    assert _make(_z650_device(raw)).preset_mode is None
 
 
-def test_hvac_mode_z650iq_from_power_only() -> None:
-    assert _make(_pin(features=_Z650, heat_pump_reported=1)).hvac_mode == HVACMode.HEAT
-    assert _make(_pin(features=_Z650, heat_pump_reported=0)).hvac_mode == HVACMode.OFF
+def test_hvac_modes_z650iq_include_automatic_direction_not_cool_only() -> None:
+    assert _make(_pin(features=_Z650)).hvac_modes == [HVACMode.OFF, HVACMode.HEAT, HVACMode.HEAT_COOL]
 
 
-@pytest.mark.parametrize("mode_value", [0, 1, 2, 3])
-def test_hvac_mode_z650iq_preset_is_not_a_direction(mode_value: int) -> None:
-    """Every c14 preset is a heating strategy — never reported as COOL (Issue #233)."""
-    climate = _make(_pin(features=_Z650, heat_pump_reported=1, z260iq_mode_value=mode_value))
-    assert climate.hvac_mode == HVACMode.HEAT
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [(0, HVACMode.HEAT_COOL), (1, HVACMode.HEAT), (2, HVACMode.HEAT), (3, HVACMode.HEAT), (99, None)],
+)
+def test_hvac_mode_z650iq_respects_selected_preset(raw: int, expected: HVACMode | None) -> None:
+    assert _make(_z650_device(raw)).hvac_mode == expected
 
 
-@pytest.mark.parametrize("mode_value", [0, 1, 2, 3])
-def test_hvac_action_z650iq_heating_for_every_preset(mode_value: int) -> None:
-    """Boost (c14=1) must report HEATING, not COOLING (Issue #233)."""
-    climate = _make(_pin(features=_Z650, heat_pump_reported=1, z260iq_mode_value=mode_value))
-    assert climate.hvac_action == HVACAction.HEATING
+@pytest.mark.parametrize("raw", [0, 1, 2, 3, 99])
+def test_hvac_mode_z650iq_explicit_power_off_wins(raw: int) -> None:
+    assert _make(_z650_device(raw, heat_pump_reported=0)).hvac_mode == HVACMode.OFF
 
 
-def test_hvac_action_z650iq_off() -> None:
-    climate = _make(_pin(features=_Z650, heat_pump_reported=0))
+@pytest.mark.parametrize("power", [None, 2, "invalid"])
+def test_hvac_mode_z650iq_unknown_power_is_not_off(power: Any) -> None:
+    climate = _make(_z650_device(heat_pump_reported=power))
+    assert climate.hvac_mode is None
+    assert climate.hvac_action is None
+
+
+@pytest.mark.parametrize("raw", [0, 1, 2, 3])
+def test_hvac_action_z650iq_idle_with_zero_modulation(raw: int) -> None:
+    """The 7 W standby snapshot must not be presented as active heating."""
+    climate = _make(_z650_device(raw, compressor_modulation=0, pump_power=7))
+    assert climate.hvac_action == HVACAction.IDLE
+
+
+@pytest.mark.parametrize("raw", [1, 2, 3])
+@pytest.mark.parametrize("modulation", [0.5, 35, 100])
+def test_hvac_action_z650iq_heating_requires_running_compressor(raw: int, modulation: float) -> None:
+    assert _make(_z650_device(raw, compressor_modulation=modulation)).hvac_action == HVACAction.HEATING
+
+
+@pytest.mark.parametrize(("water", "target"), [(20.0, 32.0), (35.0, 25.0), (30.0, 30.0)])
+def test_hvac_action_z650iq_smart_plus_never_infers_direction(water: float, target: float) -> None:
+    climate = _make(_z650_device(0, water_temperature=water, target_temperature=target))
+    climate._infer_heat_cool_action = MagicMock(side_effect=AssertionError("Do not infer Z650 direction"))
+    assert climate.hvac_mode == HVACMode.HEAT_COOL
+    assert climate.hvac_action is None
+    climate._infer_heat_cool_action.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "modulation", [None, True, False, "50", "invalid", -1, 101, float("nan"), float("inf"), float("-inf")]
+)
+def test_hvac_action_z650iq_invalid_modulation_is_unknown(modulation: Any) -> None:
+    assert _make(_z650_device(compressor_modulation=modulation)).hvac_action is None
+
+
+def test_hvac_action_z650iq_missing_modulation_is_unknown() -> None:
+    device = _z650_device()
+    device.pop("compressor_modulation")
+    assert _make(device).hvac_action is None
+
+
+def test_hvac_action_z650iq_raw_missing_modulation_overrides_old_decoded_value() -> None:
+    """A fresh unusable c32 must not reuse a previous positive modulation."""
+    device = _z650_device(compressor_modulation=50)
+    device["components"]["32"] = {"reportedValue": None}
+    assert _make(device).hvac_action is None
+
+
+@pytest.mark.parametrize("raw", [True, False])
+def test_z650iq_boolean_preset_never_becomes_a_known_operating_mode(raw: bool) -> None:
+    climate = _make(_z650_device(raw))
+    assert climate.hvac_mode is None
+    assert climate.hvac_action is None
+
+
+def test_hvac_action_z650iq_unknown_preset_is_unknown_with_running_compressor() -> None:
+    assert _make(_z650_device(99)).hvac_action is None
+
+
+def test_hvac_action_z650iq_off_wins_over_stale_modulation_and_flow_fault() -> None:
+    climate = _make(_z650_device(heat_pump_reported=0, compressor_modulation=80, no_flow_alarm=True))
     assert climate.hvac_action == HVACAction.OFF
 
 
-def test_hvac_action_z650iq_no_flow_idle() -> None:
-    climate = _make(_pin(features=_Z650, heat_pump_reported=1, no_flow_alarm=True))
+def test_hvac_action_z650iq_no_flow_idle_even_without_modulation() -> None:
+    climate = _make(_z650_device(0, no_flow_alarm=True, compressor_modulation=None))
     assert climate.hvac_action == HVACAction.IDLE
 
 
 async def test_z650iq_set_hvac_mode_cool_is_unsupported() -> None:
-    """No cooling on this unit — COOL is rejected without touching the device."""
+    """The supported automatic mode must not invent a COOL-only command."""
     api = _api()
-    climate = _make(_pin(features=_Z650), api)
+    climate = _make(_z650_device(), api)
     await climate.async_set_hvac_mode(HVACMode.COOL)
     api.control_device_component.assert_not_awaited()
+    api.start_pump.assert_not_awaited()
+    api.stop_pump.assert_not_awaited()
+    assert climate._pending_hvac_mode is None
+
+
+@pytest.mark.parametrize("raw", [0, 1, 2, 3])
+async def test_z650iq_heat_cool_writes_smart_plus_before_start(raw: int) -> None:
+    api = _api()
+    calls = MagicMock()
+    calls.attach_mock(api.control_device_component, "set_component")
+    calls.attach_mock(api.start_pump, "start")
+    climate = _make(_z650_device(raw, heat_pump_reported=0), api)
+    await climate.async_set_hvac_mode(HVACMode.HEAT_COOL)
+    assert calls.mock_calls == [call.set_component(DEVICE_ID, 14, 0), call.start(DEVICE_ID)]
+    climate.coordinator.async_request_refresh.assert_awaited_once()
+
+
+@pytest.mark.parametrize(("raw", "expected"), [(0, 2), (1, 1), (2, 2), (3, 3), (99, 2), (None, 2)])
+async def test_z650iq_heat_preserves_heat_presets_and_replaces_smart_plus(raw: Any, expected: int) -> None:
+    api = _api()
+    calls = MagicMock()
+    calls.attach_mock(api.control_device_component, "set_component")
+    calls.attach_mock(api.start_pump, "start")
+    climate = _make(_z650_device(raw), api)
+    await climate.async_set_hvac_mode(HVACMode.HEAT)
+    assert calls.mock_calls == [call.set_component(DEVICE_ID, 14, expected), call.start(DEVICE_ID)]
+
+
+@pytest.mark.parametrize("mode", [HVACMode.HEAT, HVACMode.HEAT_COOL])
+@pytest.mark.parametrize("failure", [False, FluidraConnectionError("network failure")])
+async def test_z650iq_failed_preset_command_never_starts(mode: HVACMode, failure: Any) -> None:
+    api = _api()
+    if isinstance(failure, Exception):
+        api.control_device_component.side_effect = failure
+    else:
+        api.control_device_component.return_value = failure
+    climate = _make(_z650_device(), api)
+    with pytest.raises(HomeAssistantError):
+        await climate.async_set_hvac_mode(mode)
     api.start_pump.assert_not_awaited()
     assert climate._pending_hvac_mode is None
 
 
-async def test_z650iq_set_preset_mode_writes_component_14() -> None:
+async def test_z650iq_start_failure_after_preset_is_not_reported_as_success() -> None:
     api = _api()
-    climate = _make(_pin(features=_Z650), api)
-    await climate.async_set_preset_mode(Z650_PRESET_BOOST)
-    api.control_device_component.assert_awaited_once_with(DEVICE_ID, 14, 1)
+    api.start_pump.return_value = False
+    climate = _make(_z650_device(heat_pump_reported=0), api)
+    with pytest.raises(HomeAssistantError):
+        await climate.async_set_hvac_mode(HVACMode.HEAT_COOL)
+    api.control_device_component.assert_awaited_once_with(DEVICE_ID, 14, 0)
+    api.start_pump.assert_awaited_once_with(DEVICE_ID)
+    assert climate._pending_hvac_mode is None
+    assert climate.hvac_mode == HVACMode.OFF
+
+
+async def test_z650iq_set_hvac_off_only_stops() -> None:
+    api = _api()
+    climate = _make(_z650_device(0), api)
+    await climate.async_set_hvac_mode(HVACMode.OFF)
+    api.stop_pump.assert_awaited_once_with(DEVICE_ID)
+    api.control_device_component.assert_not_awaited()
+    api.start_pump.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("preset", "raw"),
+    [(Z650_PRESET_SMART_PLUS, 0), (Z650_PRESET_BOOST, 1), (Z650_PRESET_SMART, 2), (Z650_PRESET_ECOSILENCE, 3)],
+)
+async def test_z650iq_set_preset_mode_writes_component_14_without_starting(preset: str, raw: int) -> None:
+    api = _api()
+    climate = _make(_z650_device(heat_pump_reported=0), api)
+    await climate.async_set_preset_mode(preset)
+    api.control_device_component.assert_awaited_once_with(DEVICE_ID, 14, raw)
+    api.start_pump.assert_not_awaited()
 
 
 async def test_z650iq_set_preset_mode_ignores_unknown_preset() -> None:
-    """An LG-only preset name is not writable on this family."""
     api = _api()
-    climate = _make(_pin(features=_Z650), api)
+    climate = _make(_z650_device(), api)
     await climate.async_set_preset_mode(LG_PRESET_SMART_HEATING)
     api.control_device_component.assert_not_awaited()
     assert climate._pending_preset_mode is None
 
 
-async def test_z650iq_set_hvac_mode_heat_preserves_ecosilence_preset() -> None:
-    """Re-selecting HEAT while already on Ecosilence must not reset to Smart+.
+async def test_z650iq_pending_smart_plus_mode_expires_without_reading_preset_first() -> None:
+    climate = _make(_z650_device(2))
+    with patch(TIME_MOD) as mock_time:
+        mock_time.time.return_value = 1000.0
+        await climate.async_set_preset_mode(Z650_PRESET_SMART_PLUS)
+        assert climate.hvac_mode == HVACMode.HEAT_COOL
+        mock_time.time.return_value = 1006.0
+        # The device still reports Smart: hvac_mode must itself expire optimism.
+        assert climate.hvac_mode == HVACMode.HEAT
+        assert climate.preset_mode == Z650_PRESET_SMART
+        assert climate._pending_preset_mode is None
 
-    async_set_hvac_mode passes the climate entity's *current* preset into the
-    behavior so it can keep it; the caller has to recognize Z650iqBehavior for
-    that plumbing to actually reach it (CodeRabbit finding).
-    """
+
+async def test_z650iq_pending_preset_does_not_turn_an_off_unit_on() -> None:
+    climate = _make(_z650_device(2, heat_pump_reported=0))
+    with patch(TIME_MOD) as mock_time:
+        mock_time.time.return_value = 1000.0
+        await climate.async_set_preset_mode(Z650_PRESET_SMART_PLUS)
+        assert climate.preset_mode == Z650_PRESET_SMART_PLUS
+        assert climate.hvac_mode == HVACMode.OFF
+        assert climate.hvac_action == HVACAction.OFF
+
+
+@pytest.mark.parametrize("raw", [0, 1, 2, 3, None])
+async def test_z650iq_turn_on_preserves_preset_and_waits_for_reported_power(raw: Any) -> None:
     api = _api()
-    climate = _make(_pin(features=_Z650, components={"14": {"reportedValue": 3}}), api)
-    assert climate.preset_mode == Z650_PRESET_ECOSILENCE  # sanity: currently on Ecosilence
-
-    await climate.async_set_hvac_mode(HVACMode.HEAT)
-
-    api.control_device_component.assert_awaited_once_with(DEVICE_ID, 14, 3)  # Ecosilence, not Smart+
+    climate = _make(_z650_device(raw, heat_pump_reported=0), api)
+    await climate.async_turn_on()
     api.start_pump.assert_awaited_once_with(DEVICE_ID)
+    api.control_device_component.assert_not_awaited()
+    api.stop_pump.assert_not_awaited()
+    climate.coordinator.async_request_refresh.assert_awaited_once()
+    assert climate.hvac_mode == HVACMode.OFF
+    assert climate._pending_hvac_mode is None
+
+
+@pytest.mark.parametrize("failure", [False, FluidraConnectionError("network failure")])
+async def test_z650iq_turn_on_failure_keeps_off(failure: Any) -> None:
+    api = _api()
+    if isinstance(failure, Exception):
+        api.start_pump.side_effect = failure
+    else:
+        api.start_pump.return_value = failure
+    climate = _make(_z650_device(0, heat_pump_reported=0), api)
+    with pytest.raises(HomeAssistantError):
+        await climate.async_turn_on()
+    api.control_device_component.assert_not_awaited()
+    assert climate.hvac_mode == HVACMode.OFF
+
+
+async def test_z650iq_turn_on_replaces_previous_optimistic_off() -> None:
+    """A quick off/on cycle follows the new report instead of old optimism."""
+    api = _api()
+    device = _z650_device(0)
+    climate = _make(device, api)
+    await climate.async_set_hvac_mode(HVACMode.OFF)
+    assert climate.hvac_mode == HVACMode.OFF
+    await climate.async_turn_on()
+    assert climate._pending_hvac_mode is None
+    assert climate.hvac_mode == HVACMode.HEAT_COOL
+    api.control_device_component.assert_not_awaited()
+
+
+async def test_z650iq_turn_on_read_only_pool_sends_no_commands() -> None:
+    api = _api()
+    climate = _make(_z650_device(0, heat_pump_reported=0), api)
+    climate.coordinator.data[POOL_ID]["access_level"] = "viewer"
+    with pytest.raises(ServiceValidationError):
+        await climate.async_turn_on()
+    api.start_pump.assert_not_awaited()
+    api.control_device_component.assert_not_awaited()
+
+
+async def test_z260iq_turn_on_keeps_home_assistant_default_mode_selection() -> None:
+    """The Z650 power-only override must not change another family's turn-on."""
+    climate = _make(_pin(features={"z260iq_mode": True, "preset_modes": True}))
+    with patch.object(climate, "async_set_hvac_mode", new_callable=AsyncMock) as set_mode:
+        await climate.async_turn_on()
+    set_mode.assert_awaited_once_with(HVACMode.HEAT_COOL)
 
 
 def test_extra_state_attributes_z650iq_branch() -> None:

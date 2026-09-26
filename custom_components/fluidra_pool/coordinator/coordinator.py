@@ -569,7 +569,8 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 and device.get("type", "").lower() == DEVICE_TYPE_HEAT_PUMP
             ):
                 device["heat_pump_reported"] = reported_value
-                device["is_heating"] = bool(reported_value)
+                # Enabled is not evidence of compressor activity or direction.
+                device.pop("is_heating", None)
         elif component_id == 11:
             device["speed_level_reported"] = reported_value
             device["speed_level_desired"] = component_state.get("desiredValue")
@@ -627,7 +628,12 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                             pass
         elif component_id == 14:
             device["component_14_data"] = component_state
-            if DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
+            if DeviceIdentifier.has_feature(device, "z650iq_mode"):
+                if isinstance(reported_value, int) and not isinstance(reported_value, bool):
+                    device["z260iq_mode_value"] = reported_value
+                else:
+                    device.pop("z260iq_mode_value", None)
+            elif DeviceIdentifier.has_feature(device, "z260iq_mode") and reported_value is not None:
                 try:
                     device["z260iq_mode_value"] = int(reported_value)
                 except (ValueError, TypeError):
@@ -725,8 +731,14 @@ class FluidraDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             device["component_32_data"] = component_state
             # Compressor modulation level in percent — see the profile's
             # register map for the confidence note.
-            if isinstance(reported_value, (int, float)) and not isinstance(reported_value, bool):
+            if (
+                isinstance(reported_value, (int, float))
+                and not isinstance(reported_value, bool)
+                and 0 <= reported_value <= 100
+            ):
                 device["compressor_modulation"] = int(reported_value)
+            else:
+                device.pop("compressor_modulation", None)
         elif component_id == 44 and DeviceIdentifier.has_feature(device, "z650iq_mode"):
             device["component_44_data"] = component_state
             # Outdoor air on the Z650iQ — c40 is the evaporator temperature there.

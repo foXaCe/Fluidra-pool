@@ -302,11 +302,35 @@ async def test_component_10_heat_pump_on_off_for_z650iq(coordinator: FluidraData
     device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True, "z260iq_mode": True})
     coordinator._process_component_state(device, "pool_001", 10, {"reportedValue": 1})
     assert device["heat_pump_reported"] == 1
-    assert device["is_heating"] is True
+    assert "is_heating" not in device
 
     coordinator._process_component_state(device, "pool_001", 10, {"reportedValue": 0})
     assert device["heat_pump_reported"] == 0
-    assert device["is_heating"] is False
+    assert "is_heating" not in device
+
+
+@pytest.mark.parametrize("invalid", [None, True, False, "0", "bad", 1.5, float("inf"), float("nan")])
+async def test_z650iq_invalid_preset_clears_previous_mode(
+    coordinator: FluidraDataUpdateCoordinator, invalid: object
+) -> None:
+    """A failed/new c14 reading cannot keep an old heating direction alive."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True, "z260iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 14, {"reportedValue": 2})
+    assert device["z260iq_mode_value"] == 2
+    coordinator._process_component_state(device, "pool_001", 14, {"reportedValue": invalid})
+    assert "z260iq_mode_value" not in device
+
+
+@pytest.mark.parametrize("invalid", [None, True, "50", "bad", -1, 101, float("inf"), float("nan")])
+async def test_z650iq_invalid_modulation_clears_previous_activity(
+    coordinator: FluidraDataUpdateCoordinator, invalid: object
+) -> None:
+    """Missing/invalid c32 is unknown, not a retained active compressor."""
+    device = _pinned_device(device_type="heat_pump", features={"z650iq_mode": True})
+    coordinator._process_component_state(device, "pool_001", 32, {"reportedValue": 50})
+    assert device["compressor_modulation"] == 50
+    coordinator._process_component_state(device, "pool_001", 32, {"reportedValue": invalid})
+    assert "compressor_modulation" not in device
 
 
 async def test_component_10_auto_mode_unaffected_for_non_z650iq_devices(
