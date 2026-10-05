@@ -14,8 +14,6 @@
     "custom_components.fluidra_pool"
   ],
   "quality_scale": "platinum",
-  "requirements": [
-    "aiohttp>=3.11.0"
-  ],
+  "requirements": [],
   "version": "2.88.0"
 }
