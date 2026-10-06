@@ -196,8 +196,8 @@ class TestDeviceConfigRegistry:
         assert "schedules" not in config.features
         assert "speed_control" not in config.features
 
-    def test_dm25008408_cell_guard_uses_the_shared_family_map_provisionally(self):
-        """The additional Cell Guard uses the shared map without claiming full verification."""
+    def test_dm25008408_cell_guard_uses_the_shared_family_map_and_is_verified(self):
+        """The standard Cell Guard uses the shared map and is hardware-verified."""
         device = {
             "device_id": "DM25008408-test-fixture",
             "family": "Chlorinators",
@@ -226,7 +226,7 @@ class TestDeviceConfigRegistry:
         assert config.entities == DEVICE_CONFIGS["chlorinator"].entities
         assert config.family_patterns == []
         assert config.thing_type_patterns == []
-        assert config.verified is False
+        assert config.verified is True
         assert 263 in config.features["specific_components"]
         assert config.features["sensors"]["chlorination_actual"] == 164
 
