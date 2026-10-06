@@ -987,9 +987,9 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         # Changing only the app pH target 7.30 -> 7.50 yielded c8=750 with
         # measured pH on c172=736 (7.36). The same diagnostic has c4=c263=100
         # while actual production c164=82, supporting the target/output split.
-        # Use the shared Cell Guard map provisionally. Only the pH change was
-        # controlled on this unit; the remaining controls are extrapolated from
-        # the same product family (ORP registers are null in its captures).
+        # Validated on hardware by the reporter (standard model, pH + salinity, no ORP):
+        # pH target/measurement, chlorination write/readback/production and salinity
+        # (valid only while the cell produces >= 30%). Boost/mode/auxiliaries untested.
         identifier_patterns=["DM25008408*"],
         components_range=25,
         required_components=[0, 1, 2, 3],
@@ -1011,7 +1011,7 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
             "specific_components": [4, 8, 11, 20, 164, 172, 177, 178, 183, 185, 245, 263],
         },
         priority=90,
-        verified=False,
+        verified=True,
     ),
     "dm25028908_chlorinator": DeviceConfig(
         device_type="chlorinator",
