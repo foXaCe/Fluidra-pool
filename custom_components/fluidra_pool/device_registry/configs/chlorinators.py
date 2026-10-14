@@ -1226,6 +1226,69 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
         },
         priority=85,
     ),
+    "tecno2_expert_chlorinator": DeviceConfig(
+        device_type="chlorinator",
+        # Fluidra eXPERT + pH + ORP — Issue #253, @jlkalagan. The cloud labels this
+        # family ``thingType: "tecno2"``, and it is a layout of its own: the unit's
+        # registers stop at c127, so the catch-all ``chlorinator`` profile read
+        # c164-c185, which do not exist here, and every probe stayed "Unknown".
+        #
+        # Identification is the family id alone: the reporter's diagnostics mask the
+        # serial (``QS2***n_1``), and a ``QS2*`` prefix would claim any other unit of
+        # that serial batch. "tecno2" is not a substring of "tecnoLC2", so the LC2
+        # family keeps its own route (see the non-regression test).
+        #
+        # Every register below was pinned against the official app on a pair of
+        # captures of the same unit — pump stopped with a No Flow alarm, then running.
+        # The register values are (diag1 / diag2), with the app values in brackets:
+        #   c2   chlorination setpoint (0-100%)       80 / 80     [80%]
+        #   c54  actual production, 0 when stopped     0 / 80     [80%]
+        #   c69  water temperature (°C × 10)         252 / 214   [21.4 °C]
+        #   c78  salinity (g/L × 100)                0 / 416    [4.2 g/L]
+        #   c96  pH setpoint (÷100)                  720 / 720   [7.20]
+        #   c99  pH measured (÷100)                  321 / 698   [7.0]
+        #   c110 ORP measured (mV)                   762 / 642   [642 mV]
+        #   c111 ORP setpoint (mV)                   718 / 718   [718 mV]
+        # c54 (actual production) is what drives the ``chlorinator_producing`` sensor.
+        # The defaults of ``sensor/chlorinator.py`` already fit this family (pH ÷100,
+        # ORP ÷1, temperature ÷10, salinity ÷100), so no ``sensor_divisors`` is needed.
+        #
+        # Deliberately NOT mapped — the captures do not isolate them:
+        #   c108/c109 (600/855) and c53 (30) look like thresholds, c52 (80) is a
+        #   second candidate for the chlorination setpoint, and the
+        #   c45-c50/c75/c102/c103/c116 flags only ever tracked the No Flow alarm.
+        #   Neither the OFF/ON/AUTO mode register nor a boost register is identified:
+        #   writing a guess on a mode register silently overwrites the setpoints
+        #   (Issue #195). Hence no ``switch``, no ``select`` and no ``boost_mode``,
+        #   and ``entities`` carries only the controls that are mapped.
+        #
+        # ``verified`` stays False until the writes and those registers are confirmed
+        # on hardware. To be confirmed too: the family also covers the Smart Next
+        # (± pH/Rx); the mapping above was measured on an eXPERT + pH + ORP, and a
+        # capture from a Smart Next would say whether it is shared. Keeping the
+        # profile unverified also keeps this unit's full register dump in the
+        # diagnostics, which is how the mapping was found in the first place.
+        thing_type_patterns=["tecno2"],
+        # No family_patterns — see the module note (Issue #216).
+        components_range=25,
+        required_components=[0, 1, 2, 3],
+        entities=["number", "sensor_info"],
+        features={
+            "chlorination_level": 2,  # c2, read and written (the app's 80%).
+            "cell_production_state": 54,  # Real production → `chlorinator_producing`.
+            "ph_setpoint": 96,  # ÷100 — target, distinct from the c99 measurement.
+            "orp_setpoint": 111,  # mV — target, distinct from the c110 measurement.
+            "sensors": {
+                "ph": 99,
+                "orp": 110,
+                "temperature": 69,
+                "salinity": 78,
+            },
+            "specific_components": [2, 54, 69, 78, 96, 99, 110, 111],
+        },
+        priority=90,
+        verified=False,
+    ),
     # Standard tecnoLC2 layout applied by the component-signature fallback in
     # identifier.py: an unknown-serial chlorinator whose c8 (the domoticS2 pH setpoint)
     # is blank and whose c172 sits in the water-temperature band is really a tecnoLC2

@@ -552,7 +552,7 @@ correspondant.
 | `proelyo` | Heat Pumps | PX50, HPO, Pro Elyo Touch | aucun profil |
 | `evoline` | Heat Pumps | PM40, Evoline | aucun profil |
 | `z950iq` | Heat Pumps | z950iQ Powerforce Inverter | aucun profil |
-| `tecno2` | Chlorinators | eXPERT, Smart Next (± pH/Rx) | aucun profil |
+| `tecno2` | Chlorinators | eXPERT, Smart Next (± pH/Rx) | ✅ `tecno2_expert_chlorinator` (eXPERT + pH + ORP mesuré, Smart Next à confirmer) |
 | `tecnoS3` / `ts3` | Chlorinators | Smart Connect LS, eXPERT iQ LS | aucun profil |
 | `dosingpump` | Chlorinators | DoseNext Pro, eDose Pro iQ, Smart Dosing | aucun profil |
 | `LWM` | Light Controllers | Lumiplus Connect | `generic_light` |
