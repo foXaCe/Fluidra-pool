@@ -24,7 +24,7 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
-import voluptuous as vol
+import probatio as vol
 
 from .api_resilience import (
     FluidraAuthError,
