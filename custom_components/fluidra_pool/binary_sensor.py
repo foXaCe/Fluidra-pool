@@ -5,8 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
-from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity,
+)
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo

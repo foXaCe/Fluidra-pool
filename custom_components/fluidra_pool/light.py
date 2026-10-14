@@ -6,12 +6,12 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
-from homeassistant.components.light import LightEntity
-from homeassistant.components.light.const import (
+from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_RGBW_COLOR,
-    ColorMode,
+    LightEntity,
 )
+from homeassistant.components.light.const import ColorMode
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
