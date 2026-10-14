@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
+
 try:
     from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
 except ImportError:
