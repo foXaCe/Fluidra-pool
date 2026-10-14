@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from custom_components.fluidra_pool.device_registry import DEVICE_CONFIGS, DeviceIdentifier
 from custom_components.fluidra_pool.sensor import (
     FluidraChlorinatorSensor,
     FluidraLightBrightnessSensor,
@@ -237,6 +238,58 @@ def test_chlorinator_sensor_applies_per_type_divisor(
     device = _pinned_device(DEVICE_ID, components={str(component_id): {"reportedValue": raw_value}})
     sensor = FluidraChlorinatorSensor(
         _coord([device]), SimpleNamespace(), POOL_ID, DEVICE_ID, sensor_type, component_id
+    )
+    assert sensor.native_value == pytest.approx(expected)
+
+
+def _expert_tecno2_device() -> dict:
+    """eXPERT + pH + ORP as the reporter's diagnostics report it (Issue #253).
+
+    Deliberately not cache-pinned: the unit has to identify through the real
+    registry, on its ``thingType`` alone.
+    """
+    return {
+        "device_id": "QS2***n_1",
+        "name": "eXPERT + pH + ORP",
+        "family": "Chlorinators",
+        "model": "eXPERT + pH + ORP",
+        "type": "chlorinator",
+        "thing_type": "tecno2",
+        "online": True,
+        # Second capture (pump running); the app values are in the comments.
+        "components": {
+            "69": {"reportedValue": 214},  # 21.4 °C
+            "78": {"reportedValue": 416},  # 4.16 g/L (app 4.2)
+            "96": {"reportedValue": 720},  # pH target 7.20
+            "99": {"reportedValue": 698},  # 6.98 pH (app 7.0)
+            "110": {"reportedValue": 642},  # 642 mV
+            "111": {"reportedValue": 718},  # ORP target 718 mV
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("sensor_type", "expected"),
+    [
+        ("temperature", 21.4),
+        ("ph", 6.98),
+        ("orp", 642.0),
+        ("salinity", 4.16),
+    ],
+)
+def test_expert_tecno2_probes_read_their_own_registers(sensor_type: str, expected: float) -> None:
+    """The four probes land on the registers the app reads, not on c164-c185.
+
+    Every one of them stayed "Unknown" while the unit ran on the generic chlorinator
+    profile, whose registers stop being meaningful on a unit whose own set ends at
+    c127 — the mapping here is the one measured against the app (Issue #253).
+    """
+    device = _expert_tecno2_device()
+    config = DeviceIdentifier.identify_device(device)
+    assert config is DEVICE_CONFIGS["tecno2_expert_chlorinator"]
+    component = config.features["sensors"][sensor_type]
+    sensor = FluidraChlorinatorSensor(
+        _coord([device]), SimpleNamespace(), POOL_ID, device["device_id"], sensor_type, component
     )
     assert sensor.native_value == pytest.approx(expected)
 

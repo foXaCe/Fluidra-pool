@@ -110,7 +110,12 @@ def test_ambiguous_heat_pump_family_is_not_declared() -> None:
 
 
 def test_declared_families_are_the_measured_ones() -> None:
-    """Only labels confirmed against the cloud's own configFiles are declared."""
+    """Only labels confirmed against the cloud's own configFiles are declared.
+
+    The one addition measured elsewhere is ``tecno2``, read straight from a
+    reporter's diagnostics (Issue #253) — the cloud publishes it as a family of
+    its own in the thingTypes list all the same.
+    """
     declared = {
         name: config.thing_type_patterns for name, config in DEVICE_CONFIGS.items() if config.thing_type_patterns
     }
@@ -122,6 +127,7 @@ def test_declared_families_are_the_measured_ones() -> None:
         "z350iq_heat_pump": ["hpc"],
         "command_connect_cabinet": ["SRC"],
         "blue_connect_silver": ["BC3"],
+        "tecno2_expert_chlorinator": ["tecno2"],
     }
 
 
@@ -247,3 +253,76 @@ def test_z350iq_reads_its_on_off_flag_off_component_21() -> None:
     # importantly, stops c13 being read as an on/off flag.
     assert config.features["z550_mode"] is True
     assert 13 not in config.features["specific_components"]
+
+
+# --- eXPERT + pH + ORP (Issue #253) -------------------------------------------
+
+_EXPERT_DEVICE: dict[str, Any] = {
+    "device_id": "QS2***n_1",
+    "name": "eXPERT + pH + ORP",
+    "family": "Chlorinators",
+    "model": "eXPERT + pH + ORP",
+    "type": "chlorinator",
+    "thing_type": "tecno2",
+}
+
+
+def test_expert_tecno2_is_routed_by_its_family_id() -> None:
+    """The eXPERT + pH + ORP carries no usable serial, only its family id.
+
+    The reporter's diagnostics mask the serial (``QS2***n_1``) and the unit's
+    registers stop at c127, so the domoticS2 catch-all read c164-c185 — which do not
+    exist on it — and every probe stayed "Unknown" (Issue #253). The cloud family id
+    (``thingType: "tecno2"``) is what identifies the unit.
+    """
+    config = DeviceIdentifier.identify_device(dict(_EXPERT_DEVICE))
+    assert config is DEVICE_CONFIGS["tecno2_expert_chlorinator"]
+    # Writes are untested and the mode/boost registers are unidentified, so the
+    # profile stays unverified — which also keeps the unit's register dump in the
+    # diagnostics (that is how this mapping was found).
+    assert config.verified is False
+
+
+def test_tecno2_pattern_does_not_claim_the_tecnolc2_family() -> None:
+    """ "tecno2" is not a substring of "tecnoLC2": the LC2 lineup keeps its route.
+
+    Both ids start with "tecno", so a loose pattern would move a whole supported
+    lineup onto this new, unverified mapping.
+    """
+    device = _device(device_id="UNKNOWN-LC2-SERIAL", type="chlorinator", family="Chlorinators", thing_type="tecnoLC2")
+    assert DeviceIdentifier.identify_device(device) is DEVICE_CONFIGS["tecnolc2_signature"]
+    # ...and the new profile must not be reachable from the LC2 family id either.
+    assert DeviceIdentifier.identify_device(dict(_EXPERT_DEVICE)) is not DEVICE_CONFIGS["tecnolc2_signature"]
+
+
+def test_tecno2_mapping_is_the_one_measured_against_the_app() -> None:
+    """Pin the registers to the pair of captures and the app values behind them.
+
+    Second capture (pump running) against the official app at the same moment:
+    c69 214 → 21.4 °C, c99 698 → 6.98 pH (app 7.0), c110 642 = 642 mV, c78 416 →
+    4.16 g/L (app 4.2), c54 80 = 80 % production, c96 720 → 7.20 pH target,
+    c111 718 = 718 mV target, c2 80 = 80 % chlorination level.
+    """
+    config = DEVICE_CONFIGS["tecno2_expert_chlorinator"]
+    features = config.features
+    assert features["sensors"] == {"ph": 99, "orp": 110, "temperature": 69, "salinity": 78}
+    assert features["chlorination_level"] == 2
+    assert features["ph_setpoint"] == 96
+    assert features["orp_setpoint"] == 111
+    assert features["cell_production_state"] == 54
+    assert features["specific_components"] == [2, 54, 69, 78, 96, 99, 110, 111]
+    assert config.entities == ["number", "sensor_info"]
+    assert config.components_range == 25
+    assert config.required_components == [0, 1, 2, 3]
+    assert config.priority == 90
+    # The per-type defaults of sensor/chlorinator.py already decode these registers as
+    # the app does (pH ÷100, ORP ÷1, temperature ÷10, salinity ÷100).
+    assert "sensor_divisors" not in features
+    # No command entity: the mode and boost registers are unidentified, and a wrong
+    # mode register silently overwrites the setpoints (Issue #195).
+    assert "switch" not in config.entities
+    assert "select" not in config.entities
+    for unmapped in ("on_off_component", "boost_mode", "mode_component", "schedules"):
+        assert unmapped not in features
+    # None of the catch-all's registers (c164-c185) is scanned: they do not exist here.
+    assert [component for component in features["specific_components"] if component > 127] == []

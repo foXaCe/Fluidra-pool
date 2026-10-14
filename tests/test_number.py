@@ -452,6 +452,37 @@ def test_orp_setpoint_extra_state_attributes_simple_int() -> None:
     assert attrs["current_orp_reading"] == 700
 
 
+def test_expert_tecno2_targets_read_their_own_registers() -> None:
+    """80 % chlorination, pH target 7.2 and ORP target 718 mV, as the app shows.
+
+    On c2/c96/c111 — distinct from the c54/c99/c110 measurements, so an edit never
+    bounces back to the live reading (Issue #253).
+    """
+    device = _chlorinator_device(
+        components={
+            "2": {"reportedValue": 80},
+            "54": {"reportedValue": 80},
+            "96": {"reportedValue": 720},
+            "99": {"reportedValue": 698},
+            "111": {"reportedValue": 718},
+            "110": {"reportedValue": 642},
+        },
+        features=DEVICE_CONFIGS["tecno2_expert_chlorinator"].features,
+    )
+    coordinator = _coord_with(device)
+    level = FluidraChlorinatorLevelNumber(coordinator, _api(), POOL_ID, DEVICE_ID)
+    ph = FluidraChlorinatorPhSetpoint(coordinator, _api(), POOL_ID, DEVICE_ID)
+    orp = FluidraChlorinatorOrpSetpoint(coordinator, _api(), POOL_ID, DEVICE_ID)
+
+    assert level.native_value == 80
+    assert ph.native_value == pytest.approx(7.2)
+    assert ph.extra_state_attributes["read_component"] == 96
+    assert ph.extra_state_attributes["current_ph_reading"] == pytest.approx(6.98)
+    assert orp.native_value == 718
+    assert orp.extra_state_attributes["read_component"] == 111
+    assert orp.extra_state_attributes["current_orp_reading"] == 642
+
+
 def test_cell_guard_targets_remain_distinct_from_measurements() -> None:
     """Idle production and drifting probes must not overwrite the configured targets."""
     device = _chlorinator_device(
