@@ -20,7 +20,7 @@ from homeassistant.exceptions import (
 )
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
-import voluptuous as vol
+import probatio as vol
 
 from .api_resilience import FluidraError, FluidraMFARequired
 from .const import (
