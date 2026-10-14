@@ -8,19 +8,30 @@
     ":semanticCommits"
   ],
   "timezone": "Europe/Paris",
-  "schedule": ["before 6am on monday"],
-  "labels": ["dependencies"],
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "labels": [
+    "dependencies"
+  ],
   "prHourlyLimit": 4,
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
-    "labels": ["dependencies", "security"],
-    "schedule": ["at any time"]
+    "labels": [
+      "dependencies",
+      "security"
+    ],
+    "schedule": [
+      "at any time"
+    ]
   },
   "customManagers": [
     {
       "description": "Track the requirements pinned in the Home Assistant manifest (e.g. aiohttp)",
       "customType": "regex",
-      "managerFilePatterns": ["/^custom_components/fluidra_pool/manifest\\.json$/"],
+      "managerFilePatterns": [
+        "/^custom_components/fluidra_pool/manifest\\.json$/"
+      ],
       "matchStrings": [
         "\"(?<depName>[A-Za-z0-9._-]+)(?<currentValue>(?:>=|==|<=|~=|!=|>|<)[0-9][0-9A-Za-z.\\-]*)\""
       ],
@@ -31,44 +42,93 @@
   "packageRules": [
     {
       "description": "Group GitHub Actions and automerge them once CI is green",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "groupName": "github-actions",
-      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest",
+        "pin",
+        "pinDigest"
+      ],
       "automerge": true
     },
     {
       "description": "Group test/CI dependencies; automerge non-major bumps (CI is the guardrail)",
-      "matchManagers": ["pip_requirements"],
-      "matchFileNames": ["requirements_test.txt"],
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "matchFileNames": [
+        "requirements_test.txt"
+      ],
       "groupName": "test dependencies",
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true
     },
     {
       "description": "Bump the floor of HA manifest requirements; keep these as reviewed PRs (no automerge)",
-      "matchManagers": ["custom.regex"],
-      "matchFileNames": ["custom_components/fluidra_pool/manifest.json"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchFileNames": [
+        "custom_components/fluidra_pool/manifest.json"
+      ],
       "rangeStrategy": "bump",
       "automerge": false
     },
     {
-      "description": "Devcontainer image floats on :latest — only the pinned digest changes; automerge it",
-      "matchManagers": ["devcontainer", "docker-compose", "dockerfile"],
+      "description": "Devcontainer image floats on :latest \u2014 only the pinned digest changes; automerge it",
+      "matchManagers": [
+        "devcontainer",
+        "docker-compose",
+        "dockerfile"
+      ],
       "groupName": "devcontainer",
-      "matchUpdateTypes": ["digest", "pin", "pinDigest", "patch", "minor"],
+      "matchUpdateTypes": [
+        "digest",
+        "pin",
+        "pinDigest",
+        "patch",
+        "minor"
+      ],
       "automerge": true
     },
     {
       "description": "Python and Home Assistant floors are deliberate; never auto-raise them (manual, dashboard-only)",
-      "matchDepNames": ["python", "homeassistant", "ghcr.io/home-assistant/devcontainer"],
-      "matchUpdateTypes": ["major"],
+      "matchDepNames": [
+        "python",
+        "homeassistant",
+        "ghcr.io/home-assistant/devcontainer"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "dependencyDashboardApproval": true
     },
     {
-      "description": "Workflow python-version values are pinned by hand (Floor compat job pins the HA floor 3.13; the test/typing jobs pin 3.14). Renovate must not touch them at all — it opened a bad PR (#146) raising the floor job to 3.14, which breaks the floor-compat check.",
-      "matchManagers": ["github-actions"],
-      "matchDepNames": ["python"],
+      "description": "Workflow python-version values are pinned by hand (Floor compat job pins the HA floor 3.13; the test/typing jobs pin 3.14). Renovate must not touch them at all \u2014 it opened a bad PR (#146) raising the floor job to 3.14, which breaks the floor-compat check.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepNames": [
+        "python"
+      ],
       "enabled": false
+    },
+    {
+      "description": "Tout ce qui monte se fusionne seul quand la CI est verte (op\u00e9rateur, 2026-10-14)",
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
+      "automerge": true,
+      "platformAutomerge": true
     }
-  ]
+  ],
+  "rollbackPrs": false
 }
