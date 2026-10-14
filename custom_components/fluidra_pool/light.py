@@ -16,6 +16,8 @@ try:
 except ImportError:
     from homeassistant.components.light import (  # type: ignore[attr-defined]
         ATTR_BRIGHTNESS as ATTR_BRIGHTNESS,
+    )
+    from homeassistant.components.light import (
         ATTR_RGBW_COLOR as ATTR_RGBW_COLOR,
     )
 from homeassistant.components.light.const import ColorMode
