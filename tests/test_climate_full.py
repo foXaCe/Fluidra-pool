@@ -128,6 +128,17 @@ def test_unique_id_and_temperature_unit() -> None:
     assert climate.temperature_unit == "°C"
 
 
+def test_native_temperature_api() -> None:
+    """Native names carry the values; legacy names still resolve to them."""
+    climate = _make(_pin(water_temperature=26.0, target_temperature=28.0))
+    assert climate.native_temperature_unit == "°C"
+    assert climate.native_current_temperature == 26.0
+    assert climate.native_target_temperature == 28.0
+    assert climate.temperature_unit == "°C"
+    assert climate.current_temperature == 26.0
+    assert climate.target_temperature == 28.0
+
+
 # --- current / target temperature --------------------------------------
 
 

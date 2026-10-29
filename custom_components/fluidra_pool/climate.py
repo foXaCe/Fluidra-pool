@@ -46,6 +46,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# HA 2026.11 renamed the climate temperature API to native_*.
+_HAS_NATIVE = hasattr(ClimateEntity, "native_temperature_unit")
+
 PARALLEL_UPDATES = 0  # Coordinator handles all updates
 
 
@@ -109,18 +112,18 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         return f"{DOMAIN}_{self._pool_id}_{self._device_id}_climate"
 
     @property
-    def temperature_unit(self) -> str:
+    def native_temperature_unit(self) -> str:
         """Return the unit of measurement."""
         return UnitOfTemperature.CELSIUS
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Return the current temperature (pool water temperature)."""
         # Afficher la température de l'eau de la piscine comme température actuelle
         return self.device_data.get("water_temperature")
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Return the target temperature."""
         actual_temp = self.device_data.get("target_temperature")
 
@@ -141,6 +144,23 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
                 return self._pending_temperature
 
         return actual_temp
+
+    if not _HAS_NATIVE:
+        # HA < 2026.11: ClimateEntity only knows the legacy names.
+        @property
+        def temperature_unit(self) -> str:
+            """Return the unit of measurement (HA < 2026.11)."""
+            return self.native_temperature_unit
+
+        @property
+        def current_temperature(self) -> float | None:
+            """Return the current temperature (HA < 2026.11)."""
+            return self.native_current_temperature
+
+        @property
+        def target_temperature(self) -> float | None:
+            """Return the target temperature (HA < 2026.11)."""
+            return self.native_target_temperature
 
     @property
     def min_temp(self) -> float:
@@ -261,8 +281,8 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
         and the compressor rests — report IDLE. Stays a heuristic until a real
         state register is identified.
         """
-        current = self.current_temperature
-        target = self.target_temperature
+        current = self.native_current_temperature
+        target = self.native_target_temperature
         if current is None or target is None:
             return HVACAction.IDLE
         if target - current > HEAT_COOL_ACTION_DEADBAND:
