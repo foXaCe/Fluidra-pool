@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.88.2] - 2026-11-09
+
+### Fixed
+
+- Bridged tecnoLC2 chlorinators (such as an Energy Connect published as `CC24018113.nn_1`) are now matched to the standard tecnoLC2 profile directly from their cloud thingType, instead of being reported as the generic chlorinator profile in diagnostics (#272).
+- Diagnostics now state, for every device, the profile actually in use and whether it is verified.
+
+### Changed
+
+- Dependencies updated.
+
 ## [2.88.1] - 2026-10-29
 
 ### Fixed
