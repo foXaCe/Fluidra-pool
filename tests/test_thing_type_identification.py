@@ -114,7 +114,9 @@ def test_declared_families_are_the_measured_ones() -> None:
 
     The one addition measured elsewhere is ``tecno2``, read straight from a
     reporter's diagnostics (Issue #253) — the cloud publishes it as a family of
-    its own in the thingTypes list all the same.
+    its own in the thingTypes list all the same. ``tecnoLC2`` routes the
+    standard tecnoLC2 profile (Issue #272) — the label the identifier already
+    acted on through the signature override.
     """
     declared = {
         name: config.thing_type_patterns for name, config in DEVICE_CONFIGS.items() if config.thing_type_patterns
@@ -128,6 +130,7 @@ def test_declared_families_are_the_measured_ones() -> None:
         "command_connect_cabinet": ["SRC"],
         "blue_connect_silver": ["BC3"],
         "tecno2_expert_chlorinator": ["tecno2"],
+        "tecnolc2_signature": ["tecnoLC2"],
     }
 
 
