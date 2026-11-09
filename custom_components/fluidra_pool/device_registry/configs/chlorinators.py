@@ -1299,9 +1299,14 @@ CHLORINATOR_CONFIGS: dict[str, DeviceConfig] = {
     "tecnolc2_signature": _standard_tecnolc2([], priority=0, boost_mode=103),
 }
 
-# Signature-only profile: strip every pattern so it can never win pattern/priority
-# scoring; identifier.py hands it out solely via the tecnoLC2 component signature.
+# No family/serial pattern: identifier.py hands this profile out via the tecnoLC2
+# component signature. Fluidra's own family id is the one pattern it carries: a
+# unit the cloud labels thingType "tecnoLC2" scores it directly instead of the
+# catch-all, so every view of the identification — the cached match included,
+# which the diagnostics dump — names the profile actually applied (Issue #272).
+# Serial-specific profiles still win on their 50-point identifier signal.
 CHLORINATOR_CONFIGS["tecnolc2_signature"].family_patterns = []
+CHLORINATOR_CONFIGS["tecnolc2_signature"].thing_type_patterns = ["tecnoLC2"]
 
 
 # --- Registers read from the app's own UI config (plan 013, Pass 1) -----------

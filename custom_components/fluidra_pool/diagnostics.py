@@ -331,6 +331,13 @@ def _redact_devices_data(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     # Best-effort pattern-based redaction (IP/MAC/serial).
                     redacted_device[key] = _redact_if_identifier(value)
 
+            # The profile the entities actually read through. ``_identify_cache``
+            # holds the raw pattern match only — the tecnoLC2 component signature
+            # is applied on top of it — so it can name a different profile than
+            # the one in use (Issue #272).
+            config = DeviceIdentifier.identify_device(device)
+            redacted_device["resolved_profile"] = _profile_name(config) if config is not None else None
+            redacted_device["profile_verified"] = bool(config.verified) if config is not None else None
             redacted_device["_device_index"] = i
             redacted_devices.append(redacted_device)
         else:
