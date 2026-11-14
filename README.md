@@ -1,3 +1,4 @@
+[![Marketplace](https://img.shields.io/badge/Marketplace-Custom-41BDF5.svg)](https://www.home-assistant.io/integrations/marketplace/)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Quality Scale](https://img.shields.io/badge/Quality_Scale-Platinum-27ae60.svg)](https://developers.home-assistant.io/docs/core/integration-quality-scale/)
@@ -198,7 +199,19 @@ Your equipment isn't listed or is only partially recognised? Help us add it:
 
 ## 🚀 Installation
 
-### HACS (recommended)
+### Marketplace (Home Assistant 2026.11+, recommended)
+
+Home Assistant 2026.11 replaces HACS with the built-in
+[Marketplace](https://www.home-assistant.io/integrations/marketplace/). Existing HACS
+installs are migrated automatically on the first start after the update.
+
+1. Settings → **Marketplace** → **Add from link** → `foXaCe/Fluidra-pool`, type *Integration*
+   (the Marketplace may ask you to connect GitHub first)
+2. Install **Fluidra Pool**, then restart Home Assistant (a repair offers to do it)
+3. Finish the setup page that opens, or later: Settings → Devices & Services →
+   **Add Integration** → "Fluidra Pool"
+
+### HACS (Home Assistant before 2026.11)
 
 1. Add this repository as a custom repository (category *Integration*):
    ```
@@ -410,7 +423,7 @@ entities:
 | `Authentication failed` / `Incorrect username or password` (Cognito `NotAuthorizedException`), account works in **FluidraConnect** | Different product line — **Fluidra Connect Box** accounts live on `portal.fluidraconnect.com`, not this integration's cloud. Not supported (see [Configuration](#-configuration)) |
 | `Authentication failed` | Wrong credentials or expired token → re-authenticate |
 | `No pools found` | Account has no equipment, or it's offline in the Fluidra app |
-| Wrong readings after a HACS update (e.g. a chlorinator's pH shows a temperature) | A custom integration's code only reloads on a **full Home Assistant restart** (Settings → System → Restart) — a "Reload" is not enough. Restart, then re-check |
+| Wrong readings after an update from the Marketplace or HACS (e.g. a chlorinator's pH shows a temperature) | A custom integration's code only reloads on a **full Home Assistant restart** (Settings → System → Restart) — a "Reload" is not enough. Restart, then re-check |
 | Device shows *unavailable* | The device reports itself offline to the Fluidra cloud |
 | Commands seem ignored | Check debug logs; transient cloud rejections now surface as errors |
 | Setpoints/switches never change (no error) | Account has **viewer** (read-only) access to the pool — the cloud accepts writes but doesn't apply them. Check the `access_level` attribute on the pool status sensor; owner access is required to control equipment |
