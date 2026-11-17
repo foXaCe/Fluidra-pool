@@ -26,8 +26,11 @@ HEAT_PUMP_CONFIGS: dict[str, DeviceConfig] = {
         entities=["climate", "switch", "sensor_info", "sensor_activity"],
         features={
             "preset_modes": True,
+            # The c14 presets select heating, cooling or heat/cool, so the HVAC
+            # mode follows the preset (Issue #266).
+            "lg_cooling": True,
             "temperature_control": True,
-            "hvac_modes": ["off", "heat"],
+            "hvac_modes": ["off", "heat", "cool", "heat_cool"],
             "skip_auto_mode": True,
             "skip_schedules": True,
             # 7=signature (BXWAA), 13=ON/OFF, 14=preset, 15=target temp, 19=water temp.
