@@ -19,7 +19,14 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .api_resilience import FluidraError
-from .climate_behaviors import Z260iqBehavior, Z550Behavior, Z650iqBehavior, resolve_behavior
+from .climate_behaviors import (
+    LgCoolingBehavior,
+    Z260iqBehavior,
+    Z550Behavior,
+    Z650iqBehavior,
+    lg_preset_hvac_mode,
+    resolve_behavior,
+)
 from .const import (
     CLIMATE_OPTIMISTIC_TIMEOUT,
     DOMAIN,
@@ -267,6 +274,8 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
 
         # Preserve the existing optimistic behavior of the other families.
         if self._pending_preset_mode is not None:
+            if isinstance(behavior, LgCoolingBehavior):
+                return lg_preset_hvac_mode(LG_MODE_TO_VALUE.get(self._pending_preset_mode)) or HVACMode.HEAT
             return HVACMode.HEAT
 
         return behavior.hvac_mode(device_data)
@@ -341,8 +350,8 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             self.async_write_ha_state()
 
             behavior = resolve_behavior(self.device_data)
-            # Only the Z260iQ and Z650iQ families need the current preset (to
-            # keep the specific Smart/Boost/Silence/Ecosilence variant instead
+            # Only the Z260iQ, Z650iQ and LG cooling families need the current
+            # preset (to keep the specific Smart/Boost/Silence/Ecosilence variant instead
             # of resetting to their default on every mode write), and only on
             # a non-OFF write — their OFF branch ignores current_preset, and
             # the original never read self.preset_mode on OFF either. Reading
@@ -352,7 +361,8 @@ class FluidraHeatPumpClimate(FluidraPoolControlEntity, ClimateEntity):
             # untouched.
             current_preset = (
                 self.preset_mode
-                if isinstance(behavior, (Z260iqBehavior, Z650iqBehavior)) and hvac_mode != HVACMode.OFF
+                if isinstance(behavior, (Z260iqBehavior, Z650iqBehavior, LgCoolingBehavior))
+                and hvac_mode != HVACMode.OFF
                 else None
             )
             success = await behavior.async_set_hvac_mode(

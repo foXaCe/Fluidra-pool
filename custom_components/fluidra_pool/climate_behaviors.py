@@ -49,6 +49,45 @@ if TYPE_CHECKING:
 # entity — behaviors only get to call it.
 InferHeatCoolAction = Callable[[], HVACAction]
 
+# Component-14 preset values shared by LG Eco Elyo and Z260iQ, grouped by the
+# HVAC mode they belong to (see LG_MODE_TO_VALUE).
+LG_HEAT_VALUES = (0, 3, 4)  # Smart/Boost/Silence Heating
+LG_COOL_VALUES = (1, 5, 6)  # Smart/Boost/Silence Cooling
+LG_HEAT_COOL_VALUE = 2  # Smart Heat/Cool
+LG_DEFAULT_PRESET = {
+    HVACMode.HEAT: LG_PRESET_SMART_HEATING,
+    HVACMode.COOL: LG_PRESET_SMART_COOLING,
+    HVACMode.HEAT_COOL: LG_PRESET_SMART_HEAT_COOL,
+}
+
+
+def lg_preset_hvac_mode(value: object) -> HVACMode | None:
+    """Return the HVAC mode a component-14 preset value belongs to."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    if value in LG_HEAT_VALUES:
+        return HVACMode.HEAT
+    if value in LG_COOL_VALUES:
+        return HVACMode.COOL
+    if value == LG_HEAT_COOL_VALUE:
+        return HVACMode.HEAT_COOL
+    return None
+
+
+def lg_preset_value_for_hvac_mode(hvac_mode: HVACMode, current_preset: str | None) -> int | None:
+    """Return the component-14 value to write for an HVAC mode.
+
+    Keeps the current preset when it already belongs to that mode (a Boost or
+    Silence the user picked), else falls back to the Smart variant.
+    """
+    default = LG_DEFAULT_PRESET.get(hvac_mode)
+    if default is None:
+        return None
+    current = LG_MODE_TO_VALUE.get(current_preset or "")
+    if current is not None and lg_preset_hvac_mode(current) == hvac_mode:
+        return current
+    return LG_MODE_TO_VALUE[default]
+
 
 class HeatPumpBehavior:
     """Command set for one heat-pump family.
@@ -316,24 +355,8 @@ class Z260iqBehavior(HeatPumpBehavior):
         if hvac_mode == HVACMode.OFF:
             return await api.control_device_component(device_id, 13, 0)
 
-        # Determine component 14 value from target HVAC mode:
-        # Use the current preset to preserve the specific mode, or default to Smart variant
-        if hvac_mode == HVACMode.HEAT:
-            # Keep current preset if it's already a HEAT preset, else default to Smart Heat
-            mode_value = LG_MODE_TO_VALUE.get(
-                current_preset or LG_PRESET_SMART_HEATING, LG_MODE_TO_VALUE[LG_PRESET_SMART_HEATING]
-            )
-            if mode_value not in (0, 3, 4):
-                mode_value = LG_MODE_TO_VALUE[LG_PRESET_SMART_HEATING]
-        elif hvac_mode == HVACMode.COOL:
-            mode_value = LG_MODE_TO_VALUE.get(
-                current_preset or LG_PRESET_SMART_COOLING, LG_MODE_TO_VALUE[LG_PRESET_SMART_COOLING]
-            )
-            if mode_value not in (1, 5, 6):
-                mode_value = LG_MODE_TO_VALUE[LG_PRESET_SMART_COOLING]
-        elif hvac_mode == HVACMode.HEAT_COOL:
-            mode_value = LG_MODE_TO_VALUE[LG_PRESET_SMART_HEAT_COOL]
-        else:
+        mode_value = lg_preset_value_for_hvac_mode(hvac_mode, current_preset)
+        if mode_value is None:
             return None
 
         success = await api.control_device_component(device_id, 14, mode_value)
@@ -387,6 +410,45 @@ class LgBehavior(HeatPumpBehavior):
         if reported == 2:  # heat_cool: infer direction from temps
             return infer_heat_cool()
         return HVACAction.HEATING
+
+
+class LgCoolingBehavior(LgBehavior):
+    """LG Eco Elyo: the component-14 presets also select cooling.
+
+    The presets carry the direction (Smart/Boost/Silence Heating or Cooling,
+    Smart Heat/Cool), so the HVAC mode follows the preset and setting a mode
+    writes the matching preset before switching the unit on (Issue #266).
+    """
+
+    hvac_modes: list[HVACMode] = [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL]
+
+    def hvac_mode(self, device_data: dict[str, Any]) -> HVACMode:
+        """ON/OFF like other LG units, direction from the component-14 preset."""
+        mode = super().hvac_mode(device_data)
+        if mode == HVACMode.OFF:
+            return mode
+        components = device_data.get("components", {})
+        reported = components.get("14", {}).get("reportedValue") if isinstance(components, dict) else None
+        return lg_preset_hvac_mode(reported) or HVACMode.HEAT
+
+    async def async_set_hvac_mode(
+        self,
+        api: FluidraPoolAPI,
+        pool_id: str,
+        device_id: str,
+        hvac_mode: HVACMode,
+        current_preset: str | None,
+    ) -> bool | None:
+        """Write the preset for the mode on component 14, then switch the unit on."""
+        if hvac_mode == HVACMode.OFF:
+            return await api.stop_pump(device_id)
+        mode_value = lg_preset_value_for_hvac_mode(hvac_mode, current_preset)
+        if mode_value is None:
+            return None
+        success = await api.control_device_component(device_id, 14, mode_value)
+        if success:
+            success = await api.start_pump(device_id)
+        return success
 
 
 class Z650iqBehavior(HeatPumpBehavior):
@@ -496,6 +558,7 @@ Z350_BEHAVIOR = Z350Behavior()
 Z260IQ_BEHAVIOR = Z260iqBehavior()
 Z650IQ_BEHAVIOR = Z650iqBehavior()
 LG_BEHAVIOR = LgBehavior()
+LG_COOLING_BEHAVIOR = LgCoolingBehavior()
 STANDARD_BEHAVIOR = StandardBehavior()
 
 
@@ -509,7 +572,8 @@ def resolve_behavior(device_data: dict[str, Any]) -> HeatPumpBehavior:
     order matches the original dispatch: z350_mode, then z550_mode, then
     z650iq_mode (before
     z260iq_mode since it also sets z260iq_mode=True), then z260iq_mode, then
-    preset_modes, else standard.
+    lg_cooling (before preset_modes, which it also sets), then preset_modes,
+    else standard.
     """
     # z350_mode before z550_mode: a Z350iQ sets both (it borrows the Z550iQ
     # register decoding) but must not inherit its c16 mode semantics.
@@ -521,6 +585,8 @@ def resolve_behavior(device_data: dict[str, Any]) -> HeatPumpBehavior:
         return Z650IQ_BEHAVIOR
     if DeviceIdentifier.has_feature(device_data, "z260iq_mode"):
         return Z260IQ_BEHAVIOR
+    if DeviceIdentifier.has_feature(device_data, "lg_cooling"):
+        return LG_COOLING_BEHAVIOR
     if DeviceIdentifier.has_feature(device_data, "preset_modes"):
         return LG_BEHAVIOR
     return STANDARD_BEHAVIOR
